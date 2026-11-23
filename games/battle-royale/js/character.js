@@ -1,13 +1,40 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { WEAPONS, RARITIES } from './config.js?v=5';
-import { mergeParts } from './props.js?v=5';
+import { WEAPONS, RARITIES } from './config.js?v=6';
+import { mergeParts } from './props.js?v=6';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
   const key = color + JSON.stringify(opts);
   if (matCache.has(key)) return matCache.get(key);
   const m = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05, ...opts });
+  matCache.set(key, m);
+  return m;
+}
+// trama di tessuto condivisa (quasi bianca: moltiplica il colore della skin senza cambiarlo)
+let _fabric = null;
+function fabricTex() {
+  if (_fabric) return _fabric;
+  const S = 64, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d'), img = g.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const weave = ((x >> 1) + (y >> 1)) % 2 ? 1 : 0;          // intreccio diagonale
+    const v = 236 + weave * 12 + (Math.random() - 0.5) * 18 - ((y % 16 === 0) ? 22 : 0);   // + cuciture
+    const j = (y * S + x) * 4;
+    d[j] = d[j + 1] = d[j + 2] = Math.max(0, Math.min(255, v)); d[j + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  _fabric = new THREE.CanvasTexture(c);
+  _fabric.wrapS = _fabric.wrapT = THREE.RepeatWrapping;
+  _fabric.repeat.set(2, 2);
+  _fabric.colorSpace = THREE.SRGBColorSpace;
+  return _fabric;
+}
+function clothMat(color) {
+  const key = 'cloth' + color;
+  if (matCache.has(key)) return matCache.get(key);
+  const m = new THREE.MeshStandardMaterial({ color, map: fabricTex(), roughness: 0.85, metalness: 0.02 });
   matCache.set(key, m);
   return m;
 }
@@ -44,9 +71,9 @@ export function buildCharacter(skin) {
   root.add(body);
 
   const metal = skin.metal ? { metalness: 0.85, roughness: 0.28 } : {};
-  const shirtM = mat(skin.shirt, metal);
-  const pantsM = mat(skin.pants, metal);
-  const skinM = mat(skin.skin);
+  const shirtM = skin.metal ? mat(skin.shirt, metal) : clothMat(skin.shirt);
+  const pantsM = skin.metal ? mat(skin.pants, metal) : clothMat(skin.pants);
+  const skinM = mat(skin.skin, { roughness: 0.6 });
   const shoeM = mat(skin.shoes);
   const darkM = mat('#111111');
 

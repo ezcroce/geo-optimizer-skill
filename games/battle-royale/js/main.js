@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES,
-} from './config.js?v=5';
-import * as A from './audio.js?v=5';
+} from './config.js?v=6';
+import * as A from './audio.js?v=6';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE,
-} from './world.js?v=5';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=5';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=5';
+} from './world.js?v=6';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=6';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=6';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -58,12 +58,12 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog('#c4e0f6', 180, 700);
+scene.fog = new THREE.Fog('#c9e3f8', 190, 720);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2600);
 
-const hemi = new THREE.HemisphereLight('#dceeff', '#5a7040', 1.15);
+const hemi = new THREE.HemisphereLight('#d6ebff', '#5f6a3c', 1.1);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight('#fff1d6', 2.5);
+const sun = new THREE.DirectionalLight('#ffeccc', 2.65);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 400 });
@@ -77,16 +77,27 @@ scene.add(flashLight);
 function gradientMaterial(top, bottom) {
   return new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: new THREE.Color(top) }, bottom: { value: new THREE.Color(bottom) } },
+    uniforms: {
+      top: { value: new THREE.Color(top) }, bottom: { value: new THREE.Color(bottom) },
+      warm: { value: new THREE.Color('#ffe2b8') }, sunDir: { value: SUN_OFF.clone().normalize() },
+    },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform vec3 top; uniform vec3 bottom; varying vec3 vP;
-      void main(){ float h = clamp(vP.y * 1.3 + 0.12, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, h), 1.0);
+    fragmentShader: `uniform vec3 top; uniform vec3 bottom; uniform vec3 warm; uniform vec3 sunDir; varying vec3 vP;
+      void main(){
+        vec3 d = normalize(vP);
+        float h = clamp(d.y * 1.3 + 0.12, 0.0, 1.0);
+        vec3 col = mix(bottom, top, pow(h, 0.8));
+        float s = max(dot(d, sunDir), 0.0);
+        col = mix(col, warm, pow(s, 6.0) * 0.35 * (1.0 - h * 0.5));   // alone caldo intorno al sole
+        col += vec3(1.0, 0.92, 0.75) * (pow(s, 900.0) * 3.0 + pow(s, 60.0) * 0.25);   // disco del sole
+        col = mix(col, bottom * 1.02, smoothstep(0.08, -0.05, d.y));   // foschia all'orizzonte
+        gl_FragColor = vec4(col, 1.0);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
       }`,
   });
 }
-const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 24, 16), gradientMaterial('#3a7fd8', '#d4eaff'));
+const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 20), gradientMaterial('#2f72d2', '#cfe6fb'));
 sky.renderOrder = -1;
 scene.add(sky);
 
@@ -164,7 +175,7 @@ function updateParticles(dt) {
 const tracers = [];
 {
   const tg = new THREE.BoxGeometry(1, 1, 1);
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 120; i++) {
     const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: '#ffe9a0', transparent: true, opacity: 0, depthWrite: false }));
     m.visible = false; m.frustumCulled = false;
     scene.add(m);
@@ -172,7 +183,7 @@ const tracers = [];
   }
 }
 let tIdx = 0;
-function tracer(a, b, color = '#ffe9a0', width = 0.035) {
+function tracer(a, b, color = '#ffe9a0', width = 0.035, life = 0.07, opacity = 0.85) {
   const t = tracers[tIdx = (tIdx + 1) % tracers.length];
   const len = a.distanceTo(b);
   if (len < 0.5) return;
@@ -180,9 +191,9 @@ function tracer(a, b, color = '#ffe9a0', width = 0.035) {
   t.m.scale.set(width, width, len);
   t.m.lookAt(b);
   t.m.material.color.set(color);
-  t.m.material.opacity = 0.85;
+  t.m.material.opacity = opacity;
   t.m.visible = true;
-  t.life = 0.07;
+  t.life = t.max = life; t.op = opacity;
 }
 const flashes = [];
 {
@@ -212,7 +223,7 @@ const booms = [];
 }
 let bIdx = 0;
 function updateEffects(dt) {
-  for (const t of tracers) if (t.life > 0) { t.life -= dt; t.m.material.opacity = Math.max(0, t.life / 0.07) * 0.85; if (t.life <= 0) t.m.visible = false; }
+  for (const t of tracers) if (t.life > 0) { t.life -= dt; t.m.material.opacity = Math.max(0, t.life / t.max) * t.op; if (t.life <= 0) t.m.visible = false; }
   for (const f of flashes) if (f.life > 0) { f.life -= dt; if (f.life <= 0) f.m.visible = false; }
   for (const b of booms) if (b.life > 0) {
     b.life -= dt;
@@ -228,7 +239,7 @@ function updateEffects(dt) {
 // ─────────────── Stato di gioco ───────────────
 const G = {
   state: 'menu', paused: false, time: 0,
-  chars: [], player: null, loot: [], chests: [], projectiles: [], walls: [],
+  chars: [], player: null, loot: [], chests: [], projectiles: [], bullets: [], walls: [],
   storm: null, bus: null, diff: DIFFICULTY.normale,
   camYaw: 0, camPitch: 0, camDist: 4.2, fov: 70, shake: 0,
   ads: false, build: { on: false }, spectate: null, endShown: false,
@@ -883,22 +894,9 @@ function fireWeapon(ch, aimFn) {
   if (muzzle.distanceTo(camera.position) < 140) muzzleFlash(muzzle, def.pellets > 1 || def.projectile);
   if (ch.isPlayer) { flashLight.position.copy(muzzle); flashLight.intensity = 25; }
   for (let i = 0; i < def.pellets; i++) {
-    const { origin, dir, max } = aimFn(i);
+    const { origin, dir } = aimFn(i);
     if (def.projectile) { spawnRocket(ch, muzzle, dir, def.dmg * mult, def); continue; }
-    const hit = rayAll(origin, dir, max, ch);
-    const end = origin.clone().addScaledVector(dir, hit ? hit.t : max);
-    if (i < 4 && (ch.isPlayer || muzzle.distanceToSquared(camera.position) < 250 * 250)) tracer(muzzle, end, ch.isPlayer ? '#fff2b0' : '#ffd080');
-    if (hit) {
-      const fall = hit.t > def.range * 0.5 ? Math.max(0.5, 1 - (hit.t - def.range * 0.5) / def.range) : 1;
-      if (hit.char) {
-        damage(hit.char, def.dmg * mult * fall * (hit.head ? 2 : 1), ch, hit.head, def.name);
-        if (end.distanceTo(camera.position) < 120) emit(end, '#d02020', 5, 3, 0.4, 0.08);
-      } else {
-        if (end.distanceTo(camera.position) < 120) emit(end, hit.terrain ? '#7a6a4a' : '#d8d0c0', 4, 3, 0.35, 0.07);
-        if (hit.collider && hit.collider.hp) damageWall(hit.collider, def.dmg * mult * fall);
-        if (hit.collider && hit.collider.barrel) damageBarrel(hit.collider.barrel, def.dmg * mult * fall, ch);
-      }
-    }
+    spawnBullet(ch, origin, dir, def, def.dmg * mult);
   }
   if (s.mag === 0 && ch.ammo[def.ammo] > 0) setTimeout(() => { if (ch.alive && ch.weapon === s) startReload(ch); }, 250);
   return true;
@@ -1012,12 +1010,14 @@ function spawnRocket(owner, pos, dir, dmg, def) {
   const mesh = new THREE.Mesh(rocketGeo, rocketMat);
   mesh.position.copy(pos);
   scene.add(mesh);
-  G.projectiles.push({ owner, pos: pos.clone(), dir: dir.clone(), speed: 55, dmg, def, life: 6, mesh });
+  G.projectiles.push({ owner, pos: pos.clone(), dir: dir.clone(), vel: dir.clone().multiplyScalar(def.speed || 55), g: BULLET_G * (def.drop ?? 0), dmg, def, life: 6, mesh });
 }
 function updateProjectiles(dt) {
   for (let i = G.projectiles.length - 1; i >= 0; i--) {
     const pr = G.projectiles[i];
-    const step = pr.speed * dt;
+    pr.vel.y -= pr.g * dt;
+    const step = pr.vel.length() * dt;
+    pr.dir.copy(pr.vel).normalize();
     const hit = rayAll(pr.pos, pr.dir, step, pr.owner);
     pr.life -= dt;
     if (hit || pr.life <= 0) {
@@ -1033,6 +1033,104 @@ function updateProjectiles(dt) {
     emit(pr.pos, Math.random() < 0.5 ? '#ffb040' : '#888888', 1, 0.6, 0.5, 0.18, -0.05);
   }
 }
+// ─────────────── Proiettili balistici: velocità, gravità e tempo di volo ───────────────
+const BULLET_G = 9.8;
+const BMAX = 900;
+const bulletGeo = new THREE.BoxGeometry(1, 1, 1); bulletGeo.translate(0, 0, -0.5);   // la punta è nell'origine, la scia va indietro
+const bulletMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+const bulletMesh = new THREE.InstancedMesh(bulletGeo, bulletMat, BMAX);
+bulletMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+bulletMesh.frustumCulled = false;
+bulletMesh.count = 0;
+bulletMesh.setColorAt(0, new THREE.Color('#ffffff'));
+scene.add(bulletMesh);
+const _bdir = new THREE.Vector3(), _bz = new THREE.Vector3(0, 0, 1), _bq = new THREE.Quaternion(), _bs = new THREE.Vector3(), _bm = new THREE.Matrix4();
+const _bcolP = new THREE.Color('#fff0a8'), _bcolB = new THREE.Color('#ffae5a'), _bcolS = new THREE.Color('#bfe4ff');
+
+function spawnBullet(owner, origin, dir, def, dmg) {
+  if (G.bullets.length >= BMAX) G.bullets.shift();
+  G.bullets.push({
+    owner, def, dmg, pos: origin.clone(), prev: origin.clone(),
+    vel: dir.clone().multiplyScalar(def.speed || 300), g: BULLET_G * (def.drop ?? 1),
+    dist: 0, max: def.range * 1.35, whiz: false, player: owner.isPlayer,
+  });
+}
+
+function bulletImpact(b, hit, end, dist) {
+  const def = b.def;
+  const fall = dist > def.range * 0.5 ? Math.max(0.5, 1 - (dist - def.range * 0.5) / def.range) : 1;
+  const near = end.distanceToSquared(camera.position) < 120 * 120;
+  if (hit.char) {
+    damage(hit.char, b.dmg * fall * (hit.head ? 2 : 1), b.owner, hit.head, def.name);
+    if (near) emit(end, '#d02020', 5, 3, 0.4, 0.08);
+  } else {
+    if (near) {
+      emit(end, hit.terrain ? '#7a6a4a' : '#d8d0c0', 4, 3, 0.35, 0.07);
+      if (!hit.terrain) emit(end, '#ffd27a', 2, 5, 0.12, 0.04, 0.2);   // scintille
+    }
+    if (hit.collider && hit.collider.hp) damageWall(hit.collider, b.dmg * fall);
+    if (hit.collider && hit.collider.barrel) damageBarrel(hit.collider.barrel, b.dmg * fall, b.owner);
+  }
+}
+
+function updateBullets(dt) {
+  const P = G.player, cam = camera.position;
+  let n = 0;
+  for (let i = G.bullets.length - 1; i >= 0; i--) {
+    const b = G.bullets[i];
+    b.vel.y -= b.g * dt;                                  // gravità
+    const sx = b.vel.x * dt, sy = b.vel.y * dt, sz = b.vel.z * dt;
+    const len = Math.hypot(sx, sy, sz);
+    _bdir.set(sx / len, sy / len, sz / len);
+    const hit = rayAll(b.pos, _bdir, len, b.owner);
+    // sibilo quando un proiettile nemico ti passa vicino alla testa
+    if (!b.whiz && !b.player && P && P.alive) {
+      const hx = P.pos.x - b.pos.x, hy = P.pos.y + 1.6 - b.pos.y, hz = P.pos.z - b.pos.z;
+      const tp = clamp(hx * _bdir.x + hy * _bdir.y + hz * _bdir.z, 0, hit ? hit.t : len);
+      const cx = hx - _bdir.x * tp, cy = hy - _bdir.y * tp, cz = hz - _bdir.z * tp;
+      if (cx * cx + cy * cy + cz * cz < 2.4 * 2.4 && !(hit && hit.char === P)) { b.whiz = true; A.playWhiz(); }
+    }
+    b.prev.copy(b.pos);
+    if (hit) {
+      const end = b.pos.clone().addScaledVector(_bdir, hit.t);
+      bulletImpact(b, hit, end, b.dist + hit.t);
+      G.bullets.splice(i, 1);
+      continue;
+    }
+    b.pos.addScaledVector(_bdir, len);
+    b.dist += len;
+    // acqua: schizzo
+    if (b.prev.y > WATER_LEVEL && b.pos.y <= WATER_LEVEL) {
+      const k = (b.prev.y - WATER_LEVEL) / (b.prev.y - b.pos.y);
+      const at = _p.copy(b.prev).lerp(b.pos, k);
+      if (at.distanceToSquared(cam) < 120 * 120) emit(at, '#d8f0ff', 6, 3.5, 0.5, 0.09, 0.8);
+      G.bullets.splice(i, 1);
+      continue;
+    }
+    if (b.dist > b.max) { G.bullets.splice(i, 1); continue; }
+    // scia di fumo del cecchino
+    if (b.def.scope && b.pos.distanceToSquared(cam) < 260 * 260) tracer(b.prev, b.pos, '#e8f0ff', 0.03, 0.45, 0.35);
+  }
+  // disegno: una scia luminosa per proiettile (solo quelli abbastanza vicini)
+  for (const b of G.bullets) {
+    if (n >= BMAX) break;
+    const d2 = b.pos.distanceToSquared(cam);
+    if (d2 > 380 * 380) continue;
+    const sp = b.vel.length();
+    _bdir.copy(b.vel).divideScalar(sp);
+    const streak = Math.min(b.dist + 0.2, clamp(sp * 0.011, 1.6, 6));
+    const w = (b.player ? 0.05 : 0.04) * (1 + Math.sqrt(d2) / 120);   // da lontano un po' più spessa, per vederla
+    _bq.setFromUnitVectors(_bz, _bdir);
+    _bm.compose(b.pos, _bq, _bs.set(w, w, streak));
+    bulletMesh.setMatrixAt(n, _bm);
+    bulletMesh.setColorAt(n, b.def.scope ? _bcolS : b.player ? _bcolP : _bcolB);
+    n++;
+  }
+  bulletMesh.count = n;
+  bulletMesh.instanceMatrix.needsUpdate = true;
+  if (bulletMesh.instanceColor) bulletMesh.instanceColor.needsUpdate = true;
+}
+
 /** barile rosso: dopo un po' di colpi esplode (e può farne esplodere altri vicini) */
 function damageBarrel(pr, dmg, owner) {
   if (!pr.explosive || pr.dead) return;
@@ -1723,7 +1821,12 @@ function updateBot(b, dt) {
       else if (dist < def.range * 0.9 && G.time - ai.lastSeen < 0.6) {
         const origin = b.chest();
         const aimY = tgt.pos.y + (Math.random() < 0.15 ? 1.75 : 1.2);
-        const dir = new THREE.Vector3(tgt.pos.x, aimY, tgt.pos.z).sub(origin).normalize();
+        // il proiettile impiega tempo ad arrivare: il bot mira dove sarà il bersaglio e un po' più in alto
+        const d3 = Math.hypot(tgt.pos.x - origin.x, aimY - origin.y, tgt.pos.z - origin.z);
+        const tFly = d3 / (def.speed || 300);
+        const lead = G.diff.lead * rand(0.7, 1.15);
+        const comp = 0.5 * BULLET_G * (def.drop ?? 1) * tFly * tFly * G.diff.lead * rand(0.85, 1.1);
+        const dir = new THREE.Vector3(tgt.pos.x + tgt.vel.x * tFly * lead, aimY + tgt.vel.y * tFly * lead * 0.4 + comp, tgt.pos.z + tgt.vel.z * tFly * lead).sub(origin).normalize();
         const err = G.diff.aimError * (1 + tgt.moveAmt * 0.07) * (b.moveAmt > 1 ? 1.25 : 1) + def.spread * 0.6;
         if (fireWeapon(b, () => ({ origin, dir: spreadDir(dir, err), max: def.range }))) {
           if (!def.auto) ai.pauseT = rand(0.1, 0.5);
@@ -2241,6 +2344,26 @@ function updateHUD(dt) {
   hud.cross.style.setProperty('--s', Math.min(60, 3 + px) + 'px');
   const scopedNow = !$('#scope').classList.contains('hidden');
   hud.cross.style.display = (p.alive && p.mode === 'ground' && !G.build.on && !scopedNow) ? 'block' : 'none';
+  // telemetro: distanza, tempo di volo e caduta del proiettile mentre miri
+  {
+    const w = p.alive && p.mode === 'ground' && G.ads && p.weapon ? WEAPONS[p.weapon.id] : null;
+    const el = $('#rangeInfo');
+    if (w) {
+      G.rangeT = (G.rangeT || 0) - dt;
+      if (G.rangeT <= 0) {
+        G.rangeT = 0.1;
+        const cd = new THREE.Vector3(); camera.getWorldDirection(cd);
+        const h = rayAll(camera.position, cd, 700, p);
+        if (h) {
+          const d = Math.max(0, h.t - camera.position.distanceTo(p.chest()) * 0.5);
+          const tf = d / (w.speed || 300), drop = 0.5 * BULLET_G * (w.drop ?? 1) * tf * tf;
+          el.innerHTML = `<b>${Math.round(d)} m</b> · ${tf.toFixed(2).replace('.', ',')} s${drop >= 0.15 ? ` · <span>↓ ${drop.toFixed(1).replace('.', ',')} m</span>` : ''}`;
+        } else el.innerHTML = '<b>— m</b>';
+      }
+      el.style.display = 'block';
+      el.classList.toggle('scoped', !$('#scope').classList.contains('hidden'));
+    } else el.style.display = 'none';
+  }
   G.hitT -= dt;
   hud.hit.style.opacity = G.hitT > 0 ? 1 : 0;
   G.hurtT -= dt;
@@ -2356,6 +2479,7 @@ function clearMatch() {
   G.loot = [];
   for (const pr of G.projectiles) scene.remove(pr.mesh);
   G.projectiles = [];
+  G.bullets = []; bulletMesh.count = 0;
   for (const w of [...G.walls]) { removeCollider(w); scene.remove(w.mesh); }
   G.walls = [];
   for (const c of G.chests) { c.opened = false; if (c.lid) c.lid.rotation.x = 0; }
@@ -2594,6 +2718,7 @@ function update(dt) {
   updateLoot(dt);
   updateChests(dt);
   updateProjectiles(dt);
+  updateBullets(dt);
   updateStorm(dt);
   updateParticles(dt);
   updateEffects(dt);
@@ -2627,4 +2752,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

@@ -3,7 +3,7 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial } from './props.js?v=5';
+import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial } from './props.js?v=6';
 
 export const SCALE = 3;               // la mappa è 3 volte più grande della versione originale
 export const HALF = 200 * SCALE;      // la mappa va da -600 a +600
@@ -321,19 +321,36 @@ function makeWallTexture(base, line) {
   c.width = c.height = 128;
   const g = c.getContext('2d');
   g.fillStyle = base; g.fillRect(0, 0, 128, 128);
-  for (let i = 0; i < 400; i++) {
-    g.fillStyle = `rgba(0,0,0,${Math.random() * 0.06})`;
-    g.fillRect(Math.random() * 128, Math.random() * 128, 3, 3);
-  }
-  g.strokeStyle = line; g.lineWidth = 2;
+  // blocchi con leggere variazioni di tono
   for (let y = 0; y < 128; y += 16) {
-    g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke();
     const off = (y / 16) % 2 ? 16 : 0;
+    for (let x = off - 32; x < 128; x += 32) {
+      const k = Math.random();
+      g.fillStyle = k < 0.5 ? `rgba(0,0,0,${0.02 + k * 0.06})` : `rgba(255,255,255,${(k - 0.5) * 0.12})`;
+      g.fillRect(x, y, 32, 16);
+    }
+  }
+  // grana dell'intonaco
+  const img = g.getImageData(0, 0, 128, 128), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const v = (Math.random() - 0.5) * 14; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
+  g.putImageData(img, 0, 0);
+  for (let i = 0; i < 260; i++) {
+    g.fillStyle = `rgba(0,0,0,${Math.random() * 0.07})`;
+    g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+  // fughe con un filo di luce sotto (effetto rilievo)
+  g.lineWidth = 2;
+  for (let y = 0; y < 128; y += 16) {
+    g.strokeStyle = line; g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, y + 1.5); g.lineTo(128, y + 1.5); g.stroke(); g.lineWidth = 2;
+    const off = (y / 16) % 2 ? 16 : 0;
+    g.strokeStyle = line;
     for (let x = off; x < 128; x += 32) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 16); g.stroke(); }
   }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
   return t;
 }
 
@@ -351,8 +368,12 @@ function makeRoofTexture(base) {
       g.fillRect(x + 1, y + 1, 14, 13);
       g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(x, y + 13, 16, 3);
       g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x, y, 1.5, 14);
+      g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(x + 2, y + 2, 11, 2);
     }
   }
+  { const img = g.getImageData(0, 0, 128, 128), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const v = (Math.random() - 0.5) * 12; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
+    g.putImageData(img, 0, 0); }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
@@ -371,8 +392,13 @@ function makeBrickTexture(base = '#9a4a3a') {
       const cc = new THREE.Color(base).multiplyScalar(k);
       g.fillStyle = '#' + cc.getHexString();
       g.fillRect(x + 1, row * 8 + 1, 14, 6);
+      g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(x + 1, row * 8 + 1, 14, 1);
+      g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x + 1, row * 8 + 6, 14, 1);
     }
   }
+  { const img = g.getImageData(0, 0, 64, 64), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const v = (Math.random() - 0.5) * 16; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
+    g.putImageData(img, 0, 0); }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
@@ -424,17 +450,128 @@ function inTown(x, z, pad = 0) {
 }
 
 // colore del terreno in un punto (usato sia dai chunk dettagliati sia da quelli lontani)
-const _gc = { grass1: new THREE.Color('#5d9c3f'), grass2: new THREE.Color('#7cb84a'), sand: new THREE.Color('#d9c48a'), rock: new THREE.Color('#8a8578'), dirt: new THREE.Color('#a68a5a'), snow: new THREE.Color('#f2f2f2'), town: new THREE.Color('#9aa36b') };
-function groundColor(x, z, h, out) {
+const _gc = {
+  grass1: new THREE.Color('#4f9a3a'), grass2: new THREE.Color('#82c04e'), meadow: new THREE.Color('#3f8436'),
+  dry: new THREE.Color('#b5b65a'), flower: new THREE.Color('#9fc95a'), sand: new THREE.Color('#e3cf92'), wetSand: new THREE.Color('#a8956a'),
+  rock: new THREE.Color('#878274'), rockDark: new THREE.Color('#6a665c'), dirt: new THREE.Color('#a8865a'), dirtEdge: new THREE.Color('#7f8a48'),
+  snow: new THREE.Color('#f4f7fb'), town: new THREE.Color('#9aa36b'),
+};
+// rumore liscio economico (somma di seni sfasati, deterministico)
+function patch(x, z, f, o) {
+  return 0.5 + 0.25 * Math.sin(x * f + Math.sin(z * f * 0.7 + o) * 1.7) + 0.25 * Math.sin(z * f * 1.13 - Math.cos(x * f * 0.6 - o) * 1.9);
+}
+function groundColor(x, z, h, out, slope = null) {
+  // base: due verdi che si alternano + macchie di prato scuro, erba secca e fiorita
   const n = 0.5 + 0.5 * Math.sin(x * 0.21 + Math.cos(z * 0.17) * 2);
-  out.copy(_gc.grass1).lerp(_gc.grass2, n * 0.8);
+  out.copy(_gc.grass1).lerp(_gc.grass2, n * 0.7);
+  const big = patch(x, z, 0.011, 1.3), mid = patch(x, z, 0.043, 4.1);
+  out.lerp(_gc.meadow, smoothstep(0.55, 0.85, big) * 0.6);
+  out.lerp(_gc.dry, smoothstep(0.62, 0.9, mid) * smoothstep(0.35, 0.15, big) * 0.75);
+  out.lerp(_gc.flower, smoothstep(0.7, 0.95, patch(x, z, 0.09, 7.7)) * 0.35);
   if (inTown(x, z, 4)) out.lerp(_gc.town, 0.45);
+  // strade sterrate con bordo erboso più scuro
   const rd = roadDist(x, z);
+  if (rd < 5) out.lerp(_gc.dirtEdge, smoothstep(5, 3.5, rd) * 0.5);
   if (rd < 3.5) out.lerp(_gc.dirt, 1 - rd / 3.5);
-  if (h < WATER_LEVEL + 1.2) out.lerp(_gc.sand, Math.min(1, (WATER_LEVEL + 1.2 - h) / 1.2));
+  // spiagge, con sabbia bagnata vicino all'acqua
+  if (h < WATER_LEVEL + 1.4) out.lerp(_gc.sand, Math.min(1, (WATER_LEVEL + 1.4 - h) / 1.2));
+  if (h < WATER_LEVEL + 0.35) out.lerp(_gc.wetSand, Math.min(1, (WATER_LEVEL + 0.35 - h) / 0.6));
+  // pendii ripidi → roccia (pendenza stimata dalle differenze dell'altezza)
+  if (slope === null) {
+    const gx = terrainHeight(x + 1.5, z) - terrainHeight(x - 1.5, z), gz = terrainHeight(x, z + 1.5) - terrainHeight(x, z - 1.5);
+    slope = Math.hypot(gx, gz) / 3;
+  }
+  if (h > WATER_LEVEL + 0.5) out.lerp(_gc.rock, smoothstep(0.55, 1.0, slope) * 0.85);
   if (h > 14) out.lerp(_gc.rock, Math.min(1, (h - 14) / 6));
-  if (h > 28) out.lerp(_gc.snow, Math.min(1, (h - 28) / 8));
+  if (h > 16) out.lerp(_gc.rockDark, smoothstep(0.5, 0.8, mid) * 0.4);
+  if (h > 28) out.lerp(_gc.snow, Math.min(1, (h - 28) / 8) * (1 - smoothstep(0.7, 1.2, slope) * 0.6));
   return out;
+}
+
+// texture di dettaglio del terreno (dati lineari): R = filini d'erba fini, G = chiazze morbide
+function makeGroundDetail() {
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgb(150,150,0)'; g.fillRect(0, 0, S, S);
+  const wrap = (fn) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) fn(ox, oy); };
+  // canale G: chiazze morbide
+  g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = 10 + Math.random() * 38, v = Math.random() < 0.5 ? 90 : 215;
+    wrap((ox, oy) => {
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      gr.addColorStop(0, `rgba(0,${v},0,0.35)`); gr.addColorStop(1, `rgba(0,${v},0,0)`);
+      g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+    });
+  }
+  // canale R: filini d'erba e granelli (additivo/sottrattivo sul rosso)
+  const img = g.getImageData(0, 0, S, S), d = img.data;
+  for (let i = 0; i < d.length; i += 4) d[i] = 150 + (Math.random() - 0.5) * 50;
+  for (let k = 0; k < 2600; k++) {
+    let x = Math.random() * S, y = Math.random() * S;
+    const len = 2 + Math.random() * 5, dx = (Math.random() - 0.5) * 0.7, v = Math.random() < 0.55 ? 90 : 225;
+    for (let t = 0; t < len; t++) {
+      const ix = ((Math.round(x) % S) + S) % S, iy = ((Math.round(y) % S) + S) % S;
+      const j = (iy * S + ix) * 4;
+      d[j] = d[j] * 0.4 + v * 0.6;
+      x += dx; y -= 1;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.NoColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** aggiunge la texture di dettaglio (coordinate mondo, due scale) a un materiale del terreno.
+ *  Usa lo slot `map` integrato (binding affidabile) ma sostituisce il campionamento. */
+function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1) {
+  mat.map = tex;
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <map_fragment>', `
+        {
+          float dist = length(vWPos - cameraPosition);
+          float fine = texture2D(map, vWPos.xz * 0.17).r;
+          float fine2 = texture2D(map, vWPos.xz * 0.071 + vec2(0.31, 0.67)).r;
+          float blot = texture2D(map, vWPos.xz * 0.019).g;
+          float nearK = 1.0 - smoothstep(${near.toFixed(1)}, ${far.toFixed(1)}, dist);
+          float d = mix(1.0, 0.45 + 0.95 * fine, nearK * 0.9) * mix(1.0, 0.62 + 0.75 * fine2, 0.6);
+          d *= 0.72 + 0.5 * blot;
+          diffuseColor.rgb *= mix(1.0, d, ${amount.toFixed(2)});
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount;
+}
+
+/** normal map affiancabile per l'acqua (somma di onde con frequenze intere) */
+function makeWaterNormal() {
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d'), img = g.createImageData(S, S), d = img.data;
+  const waves = [];
+  for (let i = 0; i < 9; i++) waves.push({ kx: Math.round((Math.random() - 0.5) * 10), ky: Math.round((Math.random() - 0.5) * 10) || 1, a: 0.4 / (1 + i * 0.4), p: Math.random() * 6.283 });
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    let dx = 0, dy = 0;
+    for (const w of waves) {
+      const ph = (w.kx * x + w.ky * y) / S * 6.283 + w.p, cs = Math.cos(ph) * w.a;
+      dx += cs * w.kx * 0.08; dy += cs * w.ky * 0.08;
+    }
+    const nx = -dx, ny = -dy, nz = 1, l = Math.hypot(nx, ny, nz), j = (y * S + x) * 4;
+    d[j] = (nx / l * 0.5 + 0.5) * 255; d[j + 1] = (ny / l * 0.5 + 0.5) * 255; d[j + 2] = (nz / l * 0.5 + 0.5) * 255; d[j + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
 }
 
 // ═════════════════════════ COSTRUZIONE ═════════════════════════
@@ -471,8 +608,11 @@ export function buildWorld(scene) {
   const metalMat = m('metal', '#6a6f78', { metalness: 0.6, roughness: 0.4 });
   const contColors = ['#c0392b', '#2471a3', '#d68910', '#1e8449'];
   const containerMats = contColors.map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
+  const groundDetail = makeGroundDetail();
   const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  addGroundDetail(terrainMat, groundDetail, 70, 260, 1);
   const lodMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  addGroundDetail(lodMat, groundDetail, 0, 1, 0.7);
   const blockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
 
   /** Registra un box: il collisore subito, la mesh quando il chunk viene generato */
@@ -806,8 +946,11 @@ export function buildWorld(scene) {
   }
 
   // ── acqua (unica, enorme e leggera) ──
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000),
-    new THREE.MeshStandardMaterial({ color: '#2a7fc0', transparent: true, opacity: 0.75, roughness: 0.1, metalness: 0.3 }));
+  const waterNormal = makeWaterNormal();
+  waterNormal.repeat.set(6000 / 22, 6000 / 22);
+  const waterMat = new THREE.MeshStandardMaterial({ color: '#2384c4', transparent: true, opacity: 0.8, roughness: 0.16, metalness: 0.25,
+    normalMap: waterNormal, normalScale: new THREE.Vector2(0.45, 0.45) });
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.y = WATER_LEVEL;
   scene.add(water);
@@ -823,11 +966,17 @@ export function buildWorld(scene) {
     geo.translate(ch.x0 + CHUNK / 2, 0, ch.z0 + CHUNK / 2);
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
+    const n = seg + 1, hs = new Float32Array(pos.count), step = CHUNK / seg;
+    for (let i = 0; i < pos.count; i++) hs[i] = terrainHeight(pos.getX(i), pos.getZ(i));
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i);
-      const h = terrainHeight(x, z);
+      const x = pos.getX(i), z = pos.getZ(i), h = hs[i];
+      const r = (i / n) | 0, c = i % n;
+      // pendenza dalle altezze vicine della griglia (niente campionamenti extra)
+      const hl = hs[r * n + Math.max(0, c - 1)], hr = hs[r * n + Math.min(n - 1, c + 1)];
+      const hu = hs[Math.max(0, r - 1) * n + c], hd = hs[Math.min(n - 1, r + 1) * n + c];
+      const sx = (hr - hl) / (step * ((c > 0 && c < n - 1) ? 2 : 1)), sz = (hd - hu) / (step * ((r > 0 && r < n - 1) ? 2 : 1));
       pos.setY(i, h - skirt);
-      groundColor(x, z, h, col);
+      groundColor(x, z, h, col, Math.hypot(sx, sz));
       colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -1095,6 +1244,7 @@ export function buildWorld(scene) {
   const chunkList = [...chunks.values()];
 
   function update(camPos, budgetMs = 6) {
+    { const t = performance.now() * 0.001; waterNormal.offset.set(t * 0.012, t * 0.007); }
     const t0 = performance.now();
     const ccx = Math.floor(camPos.x / 25), ccz = Math.floor(camPos.z / 25);
     const key = ccx + ',' + ccz;

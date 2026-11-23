@@ -125,3 +125,26 @@ export function setStormSound(level) {
   }
   stormGain.gain.setTargetAtTime(level * 0.5, ctx.currentTime, 0.3);
 }
+
+/** sibilo di un proiettile che passa vicino (rumore filtrato con frequenza che scende) */
+let lastWhiz = 0;
+export function playWhiz() {
+  if (!ctx || ctx.currentTime - lastWhiz < 0.08) return;
+  lastWhiz = ctx.currentTime;
+  const t = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass'; f.Q.value = 6;
+  const f0 = 2600 + Math.random() * 1400;
+  f.frequency.setValueAtTime(f0, t);
+  f.frequency.exponentialRampToValueAtTime(f0 * 0.45, t + 0.16);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.001, t);
+  g.gain.exponentialRampToValueAtTime(0.35, t + 0.04);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; src.connect(f); f.connect(g); g.connect(pan); pan.connect(master); }
+  else { src.connect(f); f.connect(g); g.connect(master); }
+  src.start(t, Math.random() * 0.5, 0.25);
+}

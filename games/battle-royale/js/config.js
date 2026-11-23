@@ -78,10 +78,13 @@ export const CONSUMABLES = {
 
 export const SKINS = [
   { id: 'recluta', name: 'Recluta', rarity: 0, shirt: '#4f7f3d', pants: '#3a4628', skin: '#e2b58c', shoes: '#262626', acc: 'cap', accColor: '#2f5a26', hair: '#4a2e1a' },
+  { id: 'esploratrice', name: 'Esploratrice', rarity: 1, shirt: '#d0763a', pants: '#3a4a5a', skin: '#e8c0a0', shoes: '#5a3a22', acc: 'ponytail', accColor: '#2e8a7a', hair: '#6a3a1e', scarf: '#2e8a7a', backpack: '#7a5a2a', boots: true },
   { id: 'zombie', name: 'Zombie Errante', rarity: 1, shirt: '#5c6b7a', pants: '#3a3f4a', skin: '#86ab70', shoes: '#2b2b2b', acc: 'none', hair: '#2c3a22', torn: true },
   { id: 'agente', name: 'Agente Segreto', rarity: 1, shirt: '#1d1d22', pants: '#1d1d22', skin: '#d9a882', shoes: '#0d0d0d', acc: 'shades', tie: '#c41a1a', hair: '#1b1b1b' },
   { id: 'ninja', name: 'Ninja Ombra', rarity: 2, shirt: '#1b1b24', pants: '#15151b', skin: '#c99a74', shoes: '#101010', acc: 'ninja', accColor: '#d0242e' },
+  { id: 'tattico', name: 'Soldato Tattico', rarity: 2, shirt: '#5b6447', pants: '#4a4f3a', skin: '#c99872', shoes: '#2a2620', acc: 'helmet', accColor: '#4f573d', vest: '#3a3f2e', pouch: '#2e3324', kneepads: '#25281e', boots: true },
   { id: 'pirata', name: 'Capitan Pirata', rarity: 2, shirt: '#efe4cc', pants: '#5a3a20', skin: '#d8a47a', shoes: '#3a2210', acc: 'pirate', accColor: '#1e1e1e', belt: '#b8862b', hair: '#2a1a0e' },
+  { id: 'meccanico', name: 'Meccanico', rarity: 3, shirt: '#c94a3a', pants: '#2d5d9a', skin: '#b07a52', shoes: '#2a2a2a', acc: 'capback', accColor: '#e0a020', beard: '#3a2a1a', hair: '#3a2a1a', overalls: '#2d5d9a', toolbelt: true, boots: true },
   { id: 'cyber', name: 'Cyber Neon', rarity: 3, shirt: '#151530', pants: '#0d0d1f', skin: '#c8a080', shoes: '#0a0a14', acc: 'visor', accColor: '#ff2bd6', glow: '#00f0ff' },
   { id: 'astro', name: 'Astronauta', rarity: 3, shirt: '#e9e9f0', pants: '#cfd0d8', skin: '#f0c9a0', shoes: '#9a9aa4', acc: 'astro', accColor: '#ff7b00', backpack: '#c8c8d2' },
   { id: 'banana', name: 'Agente Banana', rarity: 3, shirt: '#ffe03a', pants: '#ffe03a', skin: '#ffe03a', shoes: '#6b4a12', acc: 'banana', accColor: '#6b4a12', banana: true },
@@ -97,9 +100,9 @@ export const GLIDERS = [
 ];
 
 export const DIFFICULTY = {
-  facile: { name: 'Facile', aimError: 0.11, reaction: 0.9, dmgMult: 0.6, bots: 19 },
-  normale: { name: 'Normale', aimError: 0.07, reaction: 0.55, dmgMult: 0.75, bots: 24 },
-  difficile: { name: 'Difficile', aimError: 0.035, reaction: 0.3, dmgMult: 1.0, bots: 29 },
+  facile: { name: 'Facile', aimError: 0.11, reaction: 0.9, dmgMult: 0.6 },
+  normale: { name: 'Normale', aimError: 0.07, reaction: 0.55, dmgMult: 0.75 },
+  difficile: { name: 'Difficile', aimError: 0.035, reaction: 0.3, dmgMult: 1.0 },
 };
 
 // Fasi della tempesta: attesa, durata restringimento, raggio finale, danno/sec

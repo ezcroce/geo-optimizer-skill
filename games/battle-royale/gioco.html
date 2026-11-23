@@ -4,9 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=4" />
+<link rel="stylesheet" href="style.css?v=5" />
 <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=4" } }
+  { "imports": { "three": "./vendor/three.module.js?v=5", "three/addons/": "./vendor/addons/" } }
 </script>
 </head>
 <body>
@@ -26,6 +26,12 @@
         <button data-d="facile">Facile</button>
         <button data-d="normale" class="on">Normale</button>
         <button data-d="difficile">Difficile</button>
+      </div>
+      <label class="lbl">Giocatori nella partita</label>
+      <div id="players" class="seg">
+        <button data-p="25">25</button>
+        <button data-p="50">50</button>
+        <button data-p="100" class="on">100</button>
       </div>
       <label class="lbl">Deltaplano</label>
       <div id="gliders" class="seg"></div>
@@ -118,7 +124,7 @@
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
 
-<script type="module" src="js/main.js?v=4"></script>
-<script src="js/transition.js?v=4"></script>
+<script type="module" src="js/main.js?v=5"></script>
+<script src="js/transition.js?v=5"></script>
 </body>
 </html>

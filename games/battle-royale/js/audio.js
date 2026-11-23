@@ -59,10 +59,16 @@ const GUN = {
 };
 
 // volume in base alla distanza dall'ascoltatore
+let gunWin = 0, gunCount = 0;
 export function playGun(kind, dist = 0) {
   if (!ctx) return;
   const att = Math.max(0, 1 - dist / 160);
   if (att <= 0.02) return;
+  // con 100 giocatori: al massimo 4 spari altrui ogni 60 ms (evita la saturazione)
+  if (dist > 0) {
+    if (ctx.currentTime - gunWin > 0.06) { gunWin = ctx.currentTime; gunCount = 0; }
+    if (++gunCount > 4) return;
+  }
   const saved = master.gain.value;
   const g = ctx.createGain();
   g.gain.value = att * att;

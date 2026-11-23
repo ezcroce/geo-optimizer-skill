@@ -5,13 +5,14 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES,
-} from './config.js?v=4';
-import * as A from './audio.js?v=4';
+} from './config.js?v=5';
+import * as A from './audio.js?v=5';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE,
-} from './world.js?v=4';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=4';
+} from './world.js?v=5';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=5';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=5';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -42,7 +43,7 @@ function rollRarity(weights) {
 }
 
 // ─────────────── Impostazioni salvate ───────────────
-const settings = Object.assign({ name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', sens: 1, vol: 0.5 },
+const settings = Object.assign({ name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', players: 100, sens: 1, vol: 0.5 },
   JSON.parse(localStorage.getItem('arenaRoyale') || '{}'));
 function saveSettings() { localStorage.setItem('arenaRoyale', JSON.stringify(settings)); }
 
@@ -111,6 +112,9 @@ const clouds = [];
 }
 
 // Mondo
+// se in models/ ci sono i file .glb originali vengono caricati prima di costruire il mondo
+const loadedModels = await loadModelOverrides('models/');
+if (loadedModels.length) console.info('Modelli GLB caricati:', loadedModels.join(', '));
 const world = buildWorld(scene);
 
 // ─────────────── Effetti: particelle, traccianti, flash ───────────────
@@ -563,6 +567,21 @@ function animateEmote(ch, m, dt) {
   if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.15 + Math.abs(Math.sin(b)) * 0.3, Math.min(1, dt * 6));
 }
 
+/** vicino: modello completo animato · lontano: modello semplificato · oltre la nebbia: nascosto */
+function updateCharVisual(c, dt) {
+  const m = c.m;
+  if (c.isPlayer || !c.alive) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
+  const d2 = c.pos.distanceToSquared(camera.position);
+  if (d2 < 85 * 85) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
+  m.body.visible = false;
+  m.root.position.copy(c.pos); m.root.rotation.set(0, c.yaw, 0);
+  if (d2 > 480 * 480) { m.lod.visible = false; return; }
+  m.lod.visible = true;
+  const falling = c.mode === 'fall';
+  m.lod.rotation.x = falling ? 1.15 : 0;
+  m.lod.position.y = falling ? 1 : 0;
+}
+
 function animateChar(ch, dt) {
   const m = ch.m;
   m.root.position.copy(ch.pos);
@@ -868,7 +887,7 @@ function fireWeapon(ch, aimFn) {
     if (def.projectile) { spawnRocket(ch, muzzle, dir, def.dmg * mult, def); continue; }
     const hit = rayAll(origin, dir, max, ch);
     const end = origin.clone().addScaledVector(dir, hit ? hit.t : max);
-    if (i < 4) tracer(muzzle, end, ch.isPlayer ? '#fff2b0' : '#ffd080');
+    if (i < 4 && (ch.isPlayer || muzzle.distanceToSquared(camera.position) < 250 * 250)) tracer(muzzle, end, ch.isPlayer ? '#fff2b0' : '#ffd080');
     if (hit) {
       const fall = hit.t > def.range * 0.5 ? Math.max(0.5, 1 - (hit.t - def.range * 0.5) / def.range) : 1;
       if (hit.char) {
@@ -877,6 +896,7 @@ function fireWeapon(ch, aimFn) {
       } else {
         if (end.distanceTo(camera.position) < 120) emit(end, hit.terrain ? '#7a6a4a' : '#d8d0c0', 4, 3, 0.35, 0.07);
         if (hit.collider && hit.collider.hp) damageWall(hit.collider, def.dmg * mult * fall);
+        if (hit.collider && hit.collider.barrel) damageBarrel(hit.collider.barrel, def.dmg * mult * fall, ch);
       }
     }
   }
@@ -898,19 +918,24 @@ function melee(ch) {
     if (hit.char) { damage(hit.char, 20, ch, false, 'Piccone'); emit(p, '#d02020', 6, 3, 0.4, 0.08); return; }
     if (hit.collider) {
       if (hit.collider.hp) damageWall(hit.collider, 50);
-      const gain = hit.collider.tree ? 12 : (hit.collider.type === 'cyl' ? 8 : 0);
+      if (hit.collider.barrel) damageBarrel(hit.collider.barrel, 20, ch);
+      const gain = hit.collider.harvest ?? (hit.collider.tree ? 12 : (hit.collider.type === 'cyl' ? 8 : 0));
       if (gain && ch.isPlayer) {
         ch.mats = Math.min(999, ch.mats + gain);
         dmgNumber(p, `+${gain} 🪵`, 'shield');
       }
-      emit(p, hit.collider.tree ? '#8a5a2a' : '#999999', 7, 3.5, 0.45, 0.1);
+      const pt = hit.collider.prop && hit.collider.prop.type;
+      emit(p, hit.collider.tree || pt === 'logs' || (hit.collider.barrel && !hit.collider.barrel.explosive) ? '#8a5a2a' : pt === 'bricks' ? '#b5533a' : '#999999', 7, 3.5, 0.45, 0.1);
       if (ch.isPlayer) A.playHit(false);
     }
   }, 160);
 }
 
+const BOT_VS_BOT = 0.2;
 function damage(t, amount, attacker, head = false, how = '', ignoreShield = false) {
   if (!t.alive || amount <= 0) return;
+  // con 100 giocatori i bot fra loro si fanno meno male: la partita dura di più e tu resti protagonista
+  if (attacker && !attacker.isPlayer && !t.isPlayer && attacker !== t) amount *= BOT_VS_BOT;
   amount = Math.max(1, Math.round(amount));
   let sh = 0;
   if (!ignoreShield) { sh = Math.min(t.shield, amount); t.shield -= sh; }
@@ -1008,7 +1033,17 @@ function updateProjectiles(dt) {
     emit(pr.pos, Math.random() < 0.5 ? '#ffb040' : '#888888', 1, 0.6, 0.5, 0.18, -0.05);
   }
 }
-function explode(at, owner, dmg, radius) {
+/** barile rosso: dopo un po' di colpi esplode (e può farne esplodere altri vicini) */
+function damageBarrel(pr, dmg, owner) {
+  if (!pr.explosive || pr.dead) return;
+  pr.hp -= dmg;
+  if (pr.hp > 0) return;
+  world.destroyBarrel(pr);
+  const at = new THREE.Vector3(pr.x, pr.y + 0.6, pr.z);
+  setTimeout(() => { if (G.state === 'play' || G.state === 'bus') explode(at, owner, 75, 6, 'Barile esplosivo'); }, 60 + Math.random() * 120);
+}
+
+function explode(at, owner, dmg, radius, how = 'Lanciarazzi') {
   const b = booms[bIdx = (bIdx + 1) % booms.length];
   b.m.position.copy(at); b.r = radius; b.life = 0.55; b.m.visible = true;
   emit(at, '#ff8a20', 26, 9, 0.8, 0.25, 0.6);
@@ -1020,7 +1055,11 @@ function explode(at, owner, dmg, radius) {
   for (const c of G.chars) {
     if (!c.alive || c.mode === 'bus') continue;
     const dist = c.chest().distanceTo(at);
-    if (dist < radius) damage(c, dmg * (1 - dist / radius * 0.7) * (c === owner ? 0.5 : 1), owner, false, 'Lanciarazzi');
+    if (dist < radius) damage(c, dmg * (1 - dist / radius * 0.7) * (c === owner ? 0.5 : 1), owner, false, how);
+  }
+  for (const b of world.barrels) {
+    if (!b.explosive || b.dead) continue;
+    if (Math.abs(b.x - at.x) < radius && Math.abs(b.z - at.z) < radius && Math.hypot(b.x - at.x, b.y + 0.6 - at.y, b.z - at.z) < radius) damageBarrel(b, 999, owner);
   }
   for (const w of [...G.walls]) {
     const cx = (w.minX + w.maxX) / 2, cz = (w.minZ + w.maxZ) / 2;
@@ -1466,7 +1505,7 @@ function botThink(b) {
     for (const c of G.chars) {
       if (c === b || !c.alive || c.mode === 'bus' || c.mode === 'fall') continue;
       const d = c.pos.distanceTo(b.pos);
-      if (d > range || d >= bd) continue;
+      if (d > (c.isPlayer ? range : range * 0.45) || d >= bd) continue;
       const ang = Math.abs(angDiff(b.yaw, Math.atan2(c.pos.x - b.pos.x, c.pos.z - b.pos.z)));
       if (ang > 1.9 && d > 12 && ai.alert <= 0) continue;
       if (!hasLOS(b, c)) continue;
@@ -2297,7 +2336,20 @@ function drawBigMap() {
 }
 
 // ─────────────── Partita ───────────────
+function makeBotNames(n) {
+  const out = [...BOT_NAMES].sort(() => Math.random() - 0.5);
+  const A1 = ['Lupo', 'Falco', 'Gatto', 'Drago', 'Squalo', 'Orso', 'Tigre', 'Volpe', 'Aquila', 'Cobra', 'Panda', 'Riccio', 'Polpo', 'Grifo', 'Bisonte', 'Gufo', 'Ghepardo', 'Scorpione', 'Cinghiale', 'Lince'];
+  const A2 = ['Rosso', 'Nero', 'Veloce', 'Matto', 'Furioso', 'Ninja', 'Turbo', 'Zen', 'Gentile', 'Pazzo', 'Felice', 'Elettrico', 'Dorato', 'Solitario', 'Selvaggio', 'Pigro', 'Veneto', 'Stellare'];
+  const used = new Set(out);
+  for (let k = 0; out.length < n && k < 5000; k++) {
+    const nm = pick(A1) + (Math.random() < 0.5 ? '_' : '') + pick(A2) + (Math.random() < 0.55 ? Math.floor(rand(1, 99)) : '');
+    if (!used.has(nm)) { used.add(nm); out.push(nm); }
+  }
+  return out.slice(0, n);
+}
+
 function clearMatch() {
+  world.resetProps();
   for (const c of G.chars) scene.remove(c.m.root);
   G.chars = [];
   for (const L of G.loot) if (L.mesh) scene.remove(L.mesh);
@@ -2341,14 +2393,14 @@ function startMatch() {
   const player = new Character(settings.name || 'Giocatore', skin, true);
   G.player = player;
   G.chars.push(player);
-  const names = [...BOT_NAMES].sort(() => Math.random() - 0.5);
-  const nb = G.diff.bots;
+  const nb = clamp((Number(settings.players) || 100) - 1, 1, 99);
+  const names = makeBotNames(nb);
   for (let i = 0; i < nb; i++) {
     const b = new Character(names[i % names.length], pick(SKINS));
     b.ai = makeAI();
     // punto di atterraggio: città o luogo casuale
     let tx, tz;
-    if (Math.random() < 0.75) { const t = pick(TOWNS); tx = t.x + rand(-t.r * 0.8, t.r * 0.8); tz = t.z + rand(-t.r * 0.8, t.r * 0.8); }
+    if (Math.random() < 0.55) { const t = pick(TOWNS); tx = t.x + rand(-t.r * 0.8, t.r * 0.8); tz = t.z + rand(-t.r * 0.8, t.r * 0.8); }
     else { tx = rand(-HALF + 25, HALF - 25); tz = rand(-HALF + 25, HALF - 25); }
     const hh = houseAt(tx, tz);
     if (hh && hh.doors.length) { const dd = pick(hh.doors); tx = dd.x + dd.nx * 3; tz = dd.z + dd.nz * 3; }
@@ -2495,6 +2547,10 @@ function buildMenu() {
     b.onclick = () => { settings.glider = g.id; saveSettings(); gl.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); A.initAudio(); A.playUI(); };
     gl.appendChild(b);
   }
+  document.querySelectorAll('#players button').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.p) === Number(settings.players));
+    b.onclick = () => { settings.players = Number(b.dataset.p); saveSettings(); document.querySelectorAll('#players button').forEach(x => x.classList.toggle('on', x === b)); A.initAudio(); A.playUI(); };
+  });
   document.querySelectorAll('#difficulty button').forEach(b => {
     b.classList.toggle('on', b.dataset.d === settings.difficulty);
     b.onclick = () => { settings.difficulty = b.dataset.d; saveSettings(); document.querySelectorAll('#difficulty button').forEach(x => x.classList.toggle('on', x === b)); A.initAudio(); A.playUI(); };
@@ -2532,7 +2588,7 @@ function update(dt) {
       }
       updateUse(c, dt);
     }
-    if (c.mode !== 'bus' && (c.isPlayer || c.pos.distanceToSquared(camera.position) < 180 * 180 || !c.alive)) animateChar(c, dt);
+    if (c.mode !== 'bus') updateCharVisual(c, dt);
     else if (c.mode !== 'bus') { c.m.root.position.copy(c.pos); c.m.root.rotation.y = c.yaw; }
   }
   updateLoot(dt);
@@ -2571,4 +2627,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

@@ -1,0 +1,416 @@
+// ─────────────────────────────────────────────────────────────
+//  Oggetti 3D low-poly semi-realistici (geometrie con colori per vertice)
+//  01 albero · 02 catasta di legna · 03 pila di mattoni · 05 casetta · 06 barile
+//  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
+// ─────────────────────────────────────────────────────────────
+import * as THREE from 'three';
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const _c = new THREE.Color(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
+
+/**
+ * Una parte di un modello: geometria + colore (+ trasformazione).
+ * opts.jit = variazione casuale di luminosità per faccia (look low-poly)
+ * opts.colorFn(nx, ny, nz, x, y, z) → colore personalizzato per faccia
+ */
+function part(geo, color, o = {}) {
+  return { geo, color, o };
+}
+
+/** Unisce più parti in un'unica geometria non indicizzata con colori per vertice */
+export function mergeParts(parts, seed = 1) {
+  const rnd = mulberry32(seed);
+  const pos = [], nor = [], col = [];
+  const n = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), cc = new THREE.Vector3();
+  for (const { geo, color, o } of parts) {
+    const g = geo.index ? geo.toNonIndexed() : geo.clone();
+    _e.set(o.rx || 0, o.ry || 0, o.rz || 0);
+    _q.setFromEuler(_e);
+    _s.set(o.sx ?? o.s ?? 1, o.sy ?? o.s ?? 1, o.sz ?? o.s ?? 1);
+    _p.set(o.x || 0, o.y || 0, o.z || 0);
+    _m.compose(_p, _q, _s);
+    g.applyMatrix4(_m);
+    if (o.post) g.applyMatrix4(o.post);
+    const P = g.attributes.position;
+    const base = new THREE.Color(color);
+    for (let i = 0; i < P.count; i += 3) {
+      a.fromBufferAttribute(P, i); b.fromBufferAttribute(P, i + 1); cc.fromBufferAttribute(P, i + 2);
+      n.subVectors(cc, b).cross(_p.subVectors(a, b)).normalize();
+      if (o.colorFn) _c.set(o.colorFn(n.x, n.y, n.z, (a.x + b.x + cc.x) / 3, (a.y + b.y + cc.y) / 3, (a.z + b.z + cc.z) / 3, rnd) || color);
+      else _c.copy(base);
+      const j = o.jit ?? 0.08;
+      const k = 1 + (rnd() * 2 - 1) * j;
+      // le facce rivolte verso l'alto sono un po' più chiare (luce dal cielo)
+      const sky = o.noSky ? 1 : 1 + Math.max(0, n.y) * 0.06;
+      const r = Math.min(1, _c.r * k * sky), gg = Math.min(1, _c.g * k * sky), bb = Math.min(1, _c.b * k * sky);
+      for (let v = 0; v < 3; v++) {
+        pos.push(P.getX(i + v), P.getY(i + v), P.getZ(i + v));
+        nor.push(n.x, n.y, n.z);
+        col.push(r, gg, bb);
+      }
+    }
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  out.computeBoundingSphere();
+  out.computeBoundingBox();
+  out.userData.shared = true;
+  return out;
+}
+
+/** sposta i vertici in modo casuale (forme più naturali) */
+function wobble(geo, amt, seed, keepBottom = false) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const rnd = mulberry32(seed);
+  const P = g.attributes.position;
+  const map = new Map();
+  for (let i = 0; i < P.count; i++) {
+    const key = `${P.getX(i).toFixed(3)}|${P.getY(i).toFixed(3)}|${P.getZ(i).toFixed(3)}`;
+    let d = map.get(key);
+    if (!d) { d = [(rnd() * 2 - 1) * amt, (rnd() * 2 - 1) * amt, (rnd() * 2 - 1) * amt]; map.set(key, d); }
+    if (keepBottom && P.getY(i) < -0.2) continue;
+    P.setXYZ(i, P.getX(i) + d[0], P.getY(i) + d[1], P.getZ(i) + d[2]);
+  }
+  return g;
+}
+
+// ═════════════ 01 · ALBERI ═════════════
+function trunkParts(h, r0, r1, color, lean = 0) {
+  return [part(new THREE.CylinderGeometry(r1, r0, h, 7, 2), color, { y: h / 2, rz: lean, jit: 0.12 })];
+}
+
+function makePine() {
+  const parts = trunkParts(3.2, 0.32, 0.18, '#5e3d22');
+  // radici
+  for (let i = 0; i < 4; i++) parts.push(part(new THREE.BoxGeometry(0.16, 0.2, 0.7), '#5a3a20', { y: 0.08, ry: i * Math.PI / 2 + 0.4, z: 0, x: 0, post: new THREE.Matrix4().makeTranslation(Math.sin(i * Math.PI / 2 + 0.4) * 0.3, 0, Math.cos(i * Math.PI / 2 + 0.4) * 0.3) }));
+  const tiers = [[2.4, 2.3, 2.1], [1.95, 2.1, 3.2], [1.5, 1.9, 4.25], [1.05, 1.7, 5.25], [0.6, 1.3, 6.15]];
+  const greens = ['#2a5d2f', '#2f6834', '#357238', '#3b7c3e', '#43884a'];
+  tiers.forEach(([r, h, y], i) => {
+    const cone = wobble(new THREE.ConeGeometry(r, h, 8, 1), 0.12, 11 + i);
+    parts.push(part(cone, greens[i], { y: y + h / 2 - 0.2, ry: i * 0.7, jit: 0.13, colorFn: (nx, ny, nz, x, yy, z, rnd) => ny < -0.3 ? '#1f4524' : null }));
+  });
+  return mergeParts(parts, 101);
+}
+
+function makeOak() {
+  const parts = trunkParts(3.4, 0.4, 0.24, '#6a4526');
+  // rami
+  parts.push(part(new THREE.CylinderGeometry(0.08, 0.13, 1.6, 6), '#6a4526', { x: 0.45, y: 3.2, rz: -0.8, jit: 0.1 }));
+  parts.push(part(new THREE.CylinderGeometry(0.07, 0.12, 1.4, 6), '#6a4526', { x: -0.4, y: 3.3, z: 0.2, rz: 0.75, ry: 0.4, jit: 0.1 }));
+  // chioma a grappoli
+  const blobs = [[0, 4.7, 0, 1.9], [1.2, 4.3, 0.3, 1.35], [-1.15, 4.4, -0.2, 1.4], [0.3, 4.4, 1.15, 1.3], [-0.2, 4.3, -1.15, 1.3], [0.2, 5.7, 0.1, 1.3]];
+  const greens = ['#4b9437', '#559f3d', '#438731', '#5aa842', '#4f9a3a', '#62b048'];
+  blobs.forEach(([x, y, z, r], i) => {
+    const g = wobble(new THREE.IcosahedronGeometry(r, 0), r * 0.12, 30 + i);
+    parts.push(part(g, greens[i], { x, y, z, jit: 0.14, colorFn: (nx, ny) => ny < -0.4 ? '#346b28' : null }));
+  });
+  return mergeParts(parts, 202);
+}
+
+function makeBirch() {
+  const parts = [];
+  // tronco bianco con segni scuri
+  parts.push(part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 7, 6), '#e6e2d6', {
+    y: 2.1, jit: 0.05,
+    colorFn: (nx, ny, nz, x, y, z, rnd) => (rnd() < 0.22 ? '#3a3a36' : '#e8e4d8'),
+  }));
+  const blobs = [[0, 4.4, 0, 1.25, 1.5], [0.15, 5.6, -0.1, 1.05, 1.4], [-0.1, 6.6, 0.1, 0.75, 1.3]];
+  const greens = ['#7ab546', '#86bf4e', '#93c957'];
+  blobs.forEach(([x, y, z, r, sy], i) => {
+    const g = wobble(new THREE.DodecahedronGeometry(r, 0), r * 0.1, 60 + i);
+    parts.push(part(g, greens[i], { x, y, z, sy, jit: 0.13 }));
+  });
+  return mergeParts(parts, 303);
+}
+
+// ═════════════ rocce ═════════════
+function makeRock(seed) {
+  const g = wobble(new THREE.DodecahedronGeometry(1, 1), 0.16, seed);
+  return mergeParts([part(g, '#8f8b82', {
+    jit: 0.1,
+    colorFn: (nx, ny, nz, x, y, z, rnd) => ny > 0.6 && rnd() < 0.6 ? '#6f8a4a' : (rnd() < 0.2 ? '#7d7970' : '#928e85'),
+  })], seed);
+}
+
+// ═════════════ 02 · CATASTA DI LEGNA ═════════════
+function makeLogs() {
+  const parts = [];
+  const rnd = mulberry32(77);
+  const r = 0.2, len = 2.2;
+  const rows = [4, 3, 2];
+  rows.forEach((n, row) => {
+    for (let i = 0; i < n; i++) {
+      const z = (i - (n - 1) / 2) * (r * 2.05);
+      const y = r + row * r * 1.75;
+      const dl = (rnd() - 0.5) * 0.25, rr = r * (0.9 + rnd() * 0.2);
+      const geo = new THREE.CylinderGeometry(rr, rr, len + dl, 8, 1);
+      parts.push(part(geo, '#6e4a2a', {
+        x: (rnd() - 0.5) * 0.15, y, z, rz: Math.PI / 2, rx: rnd() * 3, jit: 0.14,
+        // estremità del tronco più chiare (anelli del legno)
+        colorFn: (nx, ny, nz) => Math.abs(nx) > 0.9 ? (rnd() < 0.5 ? '#c99a5b' : '#d8ac6c') : (rnd() < 0.25 ? '#5a3a20' : '#6e4a2a'),
+      }));
+    }
+  });
+  // paletti di sostegno
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    parts.push(part(new THREE.BoxGeometry(0.1, 1.2, 0.1), '#4a3220', { x: sx * 0.85, y: 0.6, z: sz * 0.95, jit: 0.08 }));
+  }
+  return mergeParts(parts, 78);
+}
+
+// ═════════════ 03 · PILA DI MATTONI ═════════════
+function makeBricks() {
+  const parts = [];
+  const rnd = mulberry32(99);
+  // pallet
+  for (const z of [-0.42, 0, 0.42]) parts.push(part(new THREE.BoxGeometry(1.2, 0.1, 0.12), '#8a6a42', { y: 0.05, z, jit: 0.1 }));
+  for (let i = 0; i < 7; i++) parts.push(part(new THREE.BoxGeometry(0.15, 0.03, 1.0), '#a9814f', { x: -0.5 + i * 0.167, y: 0.115, jit: 0.12 }));
+  // mattoni in strati incrociati
+  const bw = 0.36, bh = 0.11, bd = 0.17;
+  const reds = ['#a8452f', '#b5533a', '#9a3d2a', '#c0603f', '#a34a35'];
+  for (let layer = 0; layer < 5; layer++) {
+    const y = 0.13 + bh / 2 + layer * (bh + 0.012);
+    const alongX = layer % 2 === 0;
+    for (let a = 0; a < 3; a++) for (let b = 0; b < 5; b++) {
+      if (layer === 4 && rnd() < 0.3) continue;     // qualche mattone già preso
+      const px = alongX ? (a - 1) * (bw + 0.01) : (b - 2) * (bd + 0.03);
+      const pz = alongX ? (b - 2) * (bd + 0.03) : (a - 1) * (bw + 0.01) * 0.85;
+      parts.push(part(new THREE.BoxGeometry(alongX ? bw : bd, bh, alongX ? bd : bw), reds[Math.floor(rnd() * reds.length)], { x: px, y, z: pz, ry: (rnd() - 0.5) * 0.06, jit: 0.1 }));
+    }
+  }
+  // due mattoni caduti a terra
+  parts.push(part(new THREE.BoxGeometry(bw, bh, bd), '#b5533a', { x: 0.85, y: bh / 2, z: 0.3, ry: 0.7 }));
+  parts.push(part(new THREE.BoxGeometry(bw, bh, bd), '#9a3d2a', { x: 0.75, y: bh / 2, z: -0.45, ry: -0.3 }));
+  return mergeParts(parts, 100);
+}
+
+// ═════════════ 06 · BARILI ═════════════
+function makeBarrel(kind) {
+  const parts = [];
+  const H = 1.15, R = 0.4;
+  if (kind === 'wood') {
+    // profilo bombato
+    const pts = [];
+    for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push(new THREE.Vector2(R * (0.86 + Math.sin(t * Math.PI) * 0.14), t * H)); }
+    const lathe = new THREE.LatheGeometry(pts, 12);
+    parts.push(part(lathe, '#8a5a30', { jit: 0.16, colorFn: (nx, ny, nz, x, y, z, rnd) => rnd() < 0.3 ? '#7a4c26' : '#8f5e33' }));
+    parts.push(part(new THREE.CircleGeometry(R * 0.86, 12), '#a57444', { y: H - 0.02, rx: -Math.PI / 2, jit: 0.1 }));
+    for (const y of [0.16, 0.42, 0.73, 0.99]) {
+      const rr = R * (0.86 + Math.sin((y / H) * Math.PI) * 0.14) + 0.012;
+      parts.push(part(new THREE.CylinderGeometry(rr, rr, 0.05, 12, 1, true), '#3a3a3e', { y, jit: 0.05 }));
+    }
+  } else {
+    const body = kind === 'red' ? '#c62e24' : '#2f5f9e';
+    parts.push(part(new THREE.CylinderGeometry(R, R, H, 14, 1), body, { y: H / 2, jit: 0.07, colorFn: (nx, ny) => ny > 0.9 ? (kind === 'red' ? '#9a241c' : '#264d80') : null }));
+    for (const y of [0.05, H / 3, (2 * H) / 3, H - 0.05]) parts.push(part(new THREE.CylinderGeometry(R + 0.018, R + 0.018, 0.045, 14, 1, true), kind === 'red' ? '#8a1e17' : '#1f4170', { y, jit: 0.04 }));
+    // tappo
+    parts.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 8), '#cfcfcf', { x: 0.2, y: H + 0.02, jit: 0.04 }));
+    if (kind === 'red') {
+      // fascia gialla di pericolo con triangolo
+      parts.push(part(new THREE.CylinderGeometry(R + 0.006, R + 0.006, 0.22, 14, 1, true), '#f2c230', { y: H / 2, jit: 0.05 }));
+      const tri = new THREE.CylinderGeometry(0.11, 0.11, 0.02, 3);
+      parts.push(part(tri, '#151515', { y: H / 2, z: R + 0.012, rx: Math.PI / 2, rz: Math.PI / 6, jit: 0 }));
+    }
+  }
+  return mergeParts(parts, kind.length * 13);
+}
+
+// ═════════════ 05 · CASETTA ═════════════
+function makeShed() {
+  const parts = [];
+  const W = 4.2, D = 3.6, WH = 2.5, RH = 1.35;  // larghezza, profondità, altezza muri, altezza tetto
+  const rnd = mulberry32(55);
+  // basamento in pietra
+  parts.push(part(new THREE.BoxGeometry(W + 0.2, 0.3, D + 0.2), '#8f8a80', { y: 0.15, jit: 0.1 }));
+  // pareti a tavole verticali
+  const plank = 0.35;
+  const woodC = ['#a8763f', '#9c6c38', '#b07f46', '#946535'];
+  for (const sz of [-1, 1]) for (let i = 0; i < Math.round(W / plank); i++) {
+    const x = -W / 2 + plank / 2 + i * plank;
+    parts.push(part(new THREE.BoxGeometry(plank - 0.02, WH, 0.1), woodC[Math.floor(rnd() * 4)], { x, y: 0.3 + WH / 2, z: sz * (D / 2 - 0.05), jit: 0.06 }));
+  }
+  for (const sx of [-1, 1]) for (let i = 0; i < Math.round(D / plank); i++) {
+    const z = -D / 2 + plank / 2 + i * plank;
+    parts.push(part(new THREE.BoxGeometry(0.1, WH, plank - 0.02), woodC[Math.floor(rnd() * 4)], { x: sx * (W / 2 - 0.05), y: 0.3 + WH / 2, z, jit: 0.06 }));
+  }
+  // timpani triangolari
+  for (const sz of [-1, 1]) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-W / 2, 0); shape.lineTo(W / 2, 0); shape.lineTo(0, RH); shape.lineTo(-W / 2, 0);
+    const g = new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
+    parts.push(part(g, '#9a6a36', { y: 0.3 + WH, z: sz * (D / 2) - (sz > 0 ? 0.1 : 0), jit: 0.06 }));
+  }
+  // travi angolari
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push(part(new THREE.BoxGeometry(0.16, WH, 0.16), '#5e3f22', { x: sx * (W / 2 - 0.04), y: 0.3 + WH / 2, z: sz * (D / 2 - 0.04), jit: 0.05 }));
+  // tetto a due falde (tegole a file)
+  const slope = Math.atan2(RH, W / 2 + 0.3), sl = Math.hypot(W / 2 + 0.3, RH) + 0.1;
+  const roofC = ['#8a3326', '#9a3a2b', '#7d2e22'];
+  for (const sx of [-1, 1]) {
+    for (let r = 0; r < 5; r++) {
+      const t = (r + 0.5) / 5;
+      const cx = sx * (W / 2 + 0.3) * (1 - t) + 0, cy = 0.3 + WH + RH * t - 0.12 + 0.08;
+      parts.push(part(new THREE.BoxGeometry(sl / 5 + 0.06, 0.09, D + 0.6), roofC[r % 3], { x: cx, y: cy, rz: -sx * slope, jit: 0.07 }));
+    }
+  }
+  parts.push(part(new THREE.BoxGeometry(0.2, 0.18, D + 0.7), '#5e2a20', { y: 0.3 + WH + RH + 0.02 }));
+  // porta, maniglia e finestra
+  parts.push(part(new THREE.BoxGeometry(1.0, 1.95, 0.06), '#5a3a20', { x: -0.7, y: 0.3 + 0.975, z: D / 2 + 0.03, jit: 0.05 }));
+  parts.push(part(new THREE.BoxGeometry(0.08, 0.08, 0.08), '#d8b040', { x: -0.32, y: 1.25, z: D / 2 + 0.08 }));
+  parts.push(part(new THREE.BoxGeometry(1.1, 0.9, 0.05), '#f0ece0', { x: 1.0, y: 1.75, z: D / 2 + 0.03 }));
+  parts.push(part(new THREE.BoxGeometry(0.9, 0.7, 0.06), '#7fb6d8', { x: 1.0, y: 1.75, z: D / 2 + 0.05, jit: 0.02 }));
+  parts.push(part(new THREE.BoxGeometry(0.06, 0.7, 0.07), '#f0ece0', { x: 1.0, y: 1.75, z: D / 2 + 0.06 }));
+  parts.push(part(new THREE.BoxGeometry(1.2, 0.08, 0.2), '#f0ece0', { x: 1.0, y: 1.28, z: D / 2 + 0.1 }));
+  // fioriera sotto la finestra
+  parts.push(part(new THREE.BoxGeometry(1.0, 0.22, 0.25), '#7a4a2a', { x: 1.0, y: 1.1, z: D / 2 + 0.17 }));
+  for (let i = 0; i < 4; i++) parts.push(part(new THREE.IcosahedronGeometry(0.11, 0), ['#e04a6a', '#f2c230', '#e86a3a', '#c04dff'][i], { x: 0.65 + i * 0.23, y: 1.27, z: D / 2 + 0.17, jit: 0.1 }));
+  // comignolo
+  parts.push(part(new THREE.BoxGeometry(0.5, 1.1, 0.5), '#9a4a3a', { x: 1.1, y: 0.3 + WH + RH * 0.55 + 0.4, z: -0.6, jit: 0.1 }));
+  parts.push(part(new THREE.BoxGeometry(0.62, 0.1, 0.62), '#5a5a5a', { x: 1.1, y: 0.3 + WH + RH * 0.55 + 0.98, z: -0.6 }));
+  // legna accatastata accanto
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3 - i; j++) {
+    parts.push(part(new THREE.CylinderGeometry(0.12, 0.12, 1.0, 7), '#6e4a2a', { x: -W / 2 - 0.25 - i * 0.0, y: 0.42 + i * 0.21, z: -0.6 + j * 0.25 + i * 0.12, rx: Math.PI / 2, jit: 0.12, colorFn: (nx, ny, nz) => Math.abs(nz) > 0.9 ? '#c99a5b' : null }));
+  }
+  const geo = mergeParts(parts, 56);
+  geo.userData.dims = { w: W + 0.6, d: D + 0.6, wallH: 0.3 + WH, h: 0.3 + WH + RH };
+  return geo;
+}
+
+// ═════════════ catalogo ═════════════
+export const PROPS = {
+  pine: makePine(), oak: makeOak(), birch: makeBirch(),
+  rocks: [makeRock(5), makeRock(17), makeRock(29)],
+  logs: makeLogs(), bricks: makeBricks(),
+  barrelWood: makeBarrel('wood'), barrelBlue: makeBarrel('blue'), barrelRed: makeBarrel('red'),
+  shed: makeShed(),
+};
+// dimensioni di riferimento (per i collisori)
+export const PROP_DIMS = {
+  logs: { w: 2.35, h: 1.2, d: 1.75 },
+  bricks: { w: 1.25, h: 0.75, d: 1.05 },
+  barrel: { r: 0.42, h: 1.15 },
+  shed: PROPS.shed.userData.dims,
+};
+export const propMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.02, flatShading: true });
+export const metalPropMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.35, flatShading: true });
+export const MODEL_SOURCE = { tree: 'procedurale', logs: 'procedurale', bricks: 'procedurale', shed: 'procedurale', barrel: 'procedurale' };
+
+// ═════════════ caricamento dei modelli GLB originali (facoltativo) ═════════════
+const GLB_FILES = {
+  tree: '01_albero.glb',
+  logs: '02_legna.glb',
+  bricks: '03_mattoni.glb',
+  shed: '05_casa.glb',
+  barrel: '06_barile.glb',
+};
+// misure finali desiderate: altezza (h) oppure lato più lungo (len)
+const GLB_TARGET = { tree: { h: 7.5 }, logs: { len: 2.3 }, bricks: { len: 1.25 }, shed: { h: 4.2 }, barrel: { h: 1.15 } };
+
+function averageTextureColor(tex) {
+  try {
+    const img = tex && tex.image;
+    if (!img || !img.width) return null;
+    const cv = document.createElement('canvas'); cv.width = cv.height = 4;
+    const g = cv.getContext('2d'); g.drawImage(img, 0, 0, 4, 4);
+    const d = g.getImageData(0, 0, 4, 4).data;
+    let r = 0, gg = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
+    const n = d.length / 4;
+    return new THREE.Color(r / n / 255, gg / n / 255, b / n / 255).convertSRGBToLinear();
+  } catch { return null; }
+}
+
+/** Converte la scena GLB in una sola geometria con colori per vertice, con i piedi a y=0 */
+function gltfToGeometry(root, key) {
+  root.updateMatrixWorld(true);
+  const pos = [], nor = [], col = [];
+  root.traverse(o => {
+    if (!o.isMesh || !o.geometry) return;
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    g.applyMatrix4(o.matrixWorld);
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const matColor = mats.map(m => {
+      const c = (m && m.color ? m.color.clone() : new THREE.Color(1, 1, 1));
+      if (m && m.map) { const avg = averageTextureColor(m.map); if (avg) c.multiply(avg); }
+      return c;
+    });
+    const groups = g.groups.length ? g.groups : [{ start: 0, count: g.attributes.position.count, materialIndex: 0 }];
+    const P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+    for (const gr of groups) {
+      const mc = matColor[gr.materialIndex || 0] || matColor[0];
+      for (let i = gr.start; i < gr.start + gr.count; i++) {
+        pos.push(P.getX(i), P.getY(i), P.getZ(i));
+        nor.push(N.getX(i), N.getY(i), N.getZ(i));
+        if (C) col.push(C.getX(i) * mc.r, C.getY(i) * mc.g, C.getZ(i) * mc.b);
+        else col.push(mc.r, mc.g, mc.b);
+      }
+    }
+    g.dispose();
+  });
+  if (!pos.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.computeBoundingBox();
+  // asse verticale: il file dice Z; se il modello è "sdraiato" lo raddrizziamo
+  let bb = geo.boundingBox, size = bb.getSize(new THREE.Vector3());
+  const zUp = Math.abs(bb.min.z) < Math.abs(bb.min.y) * 0.5 && bb.min.y < -0.2 * size.y;
+  if (zUp || (key === 'tree' && size.z > size.y * 1.2) || (key === 'barrel' && size.z > size.y * 1.2)) {
+    geo.rotateX(-Math.PI / 2);
+    geo.computeBoundingBox();
+    bb = geo.boundingBox; size = bb.getSize(new THREE.Vector3());
+  }
+  const t = GLB_TARGET[key];
+  const k = t.h ? t.h / Math.max(0.001, size.y) : t.len / Math.max(0.001, size.x, size.z);
+  const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+  geo.translate(-cx, -bb.min.y, -cz);
+  geo.scale(k, k, k);
+  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  geo.userData.shared = true;
+  return geo;
+}
+
+/**
+ * Prova a caricare i file .glb da models/. Se un file manca resta il modello procedurale.
+ * Va chiamato PRIMA di buildWorld (così i collisori usano le misure giuste).
+ */
+export async function loadModelOverrides(base = 'models/') {
+  const loaded = [];
+  let Loader = null;
+  await Promise.all(Object.entries(GLB_FILES).map(async ([key, file]) => {
+    try {
+      const res = await fetch(base + file, { cache: 'no-cache' });
+      if (!res.ok) return;
+      const type = res.headers.get('content-type') || '';
+      if (type.includes('text/html')) return;
+      const buf = await res.arrayBuffer();
+      if (buf.byteLength < 20) return;
+      if (!Loader) ({ GLTFLoader: Loader } = await import('three/addons/loaders/GLTFLoader.js'));
+      const gltf = await new Promise((ok, ko) => new Loader().parse(buf, base, ok, ko));
+      const geo = gltfToGeometry(gltf.scene, key);
+      if (!geo) return;
+      const s = geo.boundingBox.getSize(new THREE.Vector3());
+      if (key === 'tree') { PROPS.pine = PROPS.oak = PROPS.birch = geo; }
+      else if (key === 'barrel') { PROPS.barrelWood = PROPS.barrelBlue = PROPS.barrelRed = geo; PROP_DIMS.barrel = { r: Math.max(s.x, s.z) / 2 + 0.02, h: s.y }; }
+      else if (key === 'shed') { PROPS.shed = geo; PROP_DIMS.shed = { w: s.x, d: s.z, wallH: s.y * 0.6, h: s.y }; }
+      else { PROPS[key] = geo; PROP_DIMS[key] = { w: s.x, h: s.y, d: s.z }; }
+      MODEL_SOURCE[key] = file;
+      loaded.push(file);
+    } catch (err) {
+      console.warn('Modello non caricato:', file, err && err.message);
+    }
+  }));
+  return loaded;
+}

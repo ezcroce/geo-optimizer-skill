@@ -3,7 +3,7 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=7';
+import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=8';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -14,7 +14,7 @@ export const WATER_LEVEL = -2.6;
 export const CHUNK = 100;             // lato di un chunk (m)
 const EDGE = HALF + 60;               // il terreno continua un po' nel mare
 
-export const TOWNS = [
+const DEFAULT_TOWNS = [
   { name: 'Centro Caos', x: 15, z: 0, r: 52, houses: 12 },
   { name: 'Piazza Pulita', x: -315, z: -285, r: 34, houses: 7 },
   { name: 'Torri Tremanti', x: 300, z: -315, r: 32, houses: 4, towers: true },
@@ -34,6 +34,10 @@ export const TOWNS = [
   { name: 'Paese Pazzo', x: -10, z: 250, r: 32, houses: 6 },
   { name: 'Rocca Ribelle', x: -20, z: -290, r: 28, houses: 4 },
 ];
+/** città della mappa corrente (l'array resta lo stesso: viene riempito di nuovo a ogni mappa) */
+export const TOWNS = DEFAULT_TOWNS.map(t => ({ ...t }));
+/** mappa corrente: seme e tipo (classica o casuale) */
+export const MAP = { seed: 1337, random: false };
 
 // ── generatore pseudo-casuale con seme (mappa sempre uguale) ──
 function mulberry32(a) {
@@ -44,7 +48,7 @@ function mulberry32(a) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const srand = mulberry32(1337);
+let srand = mulberry32(1337);
 const sr = (a, b) => a + srand() * (b - a);
 
 function smoothstep(e0, e1, x) {
@@ -52,24 +56,28 @@ function smoothstep(e0, e1, x) {
   return t * t * (3 - 2 * t);
 }
 
-const MOUNTAINS = [
+const DEFAULT_MOUNTAINS = [
   { x: -290, z: -60, r: 120, h: 36 },
   { x: 340, z: 70, r: 105, h: 32 },
   { x: -90, z: 470, r: 85, h: 26 },
   { x: 150, z: -300, r: 70, h: 20 },
 ];
-const LAKES = [
+const DEFAULT_LAKES = [
   { x: -150, z: 110, r: 90, d: 10 },
   { x: 300, z: -60, r: 50, d: 9 },
   { x: -300, z: 420, r: 45, d: 9 },
 ];
+const MOUNTAINS = DEFAULT_MOUNTAINS.map(m => ({ ...m }));
+const LAKES = DEFAULT_LAKES.map(l => ({ ...l }));
+// sfasamenti delle colline (la mappa classica usa quelli originali)
+const TP = { a: 0.5, b: -0.3, c: 1.3, d: 0.7, e: 0, lift: 0 };
 
 function baseHeight(x, z) {
   const X = x / 1.8, Z = z / 1.8;   // colline più ampie
-  let h = 7 * Math.sin(X * 0.018 + 0.5) * Math.cos(Z * 0.015 - 0.3)
-    + 3.2 * Math.sin(X * 0.047 + 1.3) * Math.sin(Z * 0.041 + 0.7)
-    + 1.1 * Math.sin(x * 0.12) * Math.cos(z * 0.105)
-    + 0.4 * Math.sin(x * 0.31 + z * 0.27);
+  let h = 7 * Math.sin(X * 0.018 + TP.a) * Math.cos(Z * 0.015 + TP.b)
+    + 3.2 * Math.sin(X * 0.047 + TP.c) * Math.sin(Z * 0.041 + TP.d)
+    + 1.1 * Math.sin(x * 0.12 + TP.e) * Math.cos(z * 0.105)
+    + 0.4 * Math.sin(x * 0.31 + z * 0.27) + TP.lift;
   for (const m of MOUNTAINS) {
     const d = Math.hypot(x - m.x, z - m.z);
     if (d < m.r) { const k = 1 - d / m.r; h += m.h * k * k * (3 - 2 * k) * (0.85 + 0.15 * Math.sin(x * 0.07 + z * 0.05)); }
@@ -82,6 +90,78 @@ function baseHeight(x, z) {
 }
 
 for (const t of TOWNS) t.h = Math.max(1.2, baseHeight(t.x, t.z) + 0.5);
+
+// ─────────────── Mappa casuale ───────────────
+const P1 = ['Borgo', 'Villa', 'Porto', 'Monte', 'Valle', 'Bosco', 'Rocca', 'Lago', 'Piana', 'Forte', 'Colle', 'Riva', 'Torre', 'Campo', 'Baia', 'Poggio', 'Pieve', 'Cava'];
+const P2 = ['Pazzo', 'Perduto', 'Ruggente', 'Nebbioso', 'Dorato', 'Selvaggio', 'Tranquillo', 'Ventoso', 'Fiorito', 'Stregato', 'Felice', 'Lucente', 'Brontolone', 'Segreto', 'Gelato', 'Rovente', 'Spettrale', 'Sonnolento', 'Lampo', 'Bizzarro'];
+/** prepara le città, le montagne, i laghi e le colline per il seme indicato */
+function configureMap(seed, random) {
+  MAP.seed = seed; MAP.random = random;
+  srand = mulberry32(seed);
+  TOWNS.length = 0; MOUNTAINS.length = 0; LAKES.length = 0;
+  if (!random) {
+    Object.assign(TP, { a: 0.5, b: -0.3, c: 1.3, d: 0.7, e: 0, lift: 0 });
+    for (const t of DEFAULT_TOWNS) TOWNS.push({ ...t });
+    for (const m of DEFAULT_MOUNTAINS) MOUNTAINS.push({ ...m });
+    for (const l of DEFAULT_LAKES) LAKES.push({ ...l });
+  } else {
+    const r = mulberry32(seed ^ 0x9e3779b9), R = (a, b) => a + r() * (b - a);
+    Object.assign(TP, { a: R(0, 6.28), b: R(0, 6.28), c: R(0, 6.28), d: R(0, 6.28), e: R(0, 6.28), lift: 3.2 });
+    // città: una grande vicino al centro, le altre sparse con distanza minima
+    const n = 14 + Math.floor(r() * 5), used = new Set();
+    const name = () => { for (let k = 0; k < 50; k++) { const s = P1[Math.floor(r() * P1.length)] + ' ' + P2[Math.floor(r() * P2.length)]; if (!used.has(s)) { used.add(s); return s; } } return 'Paese ' + used.size; };
+    TOWNS.push({ name: name(), x: R(-120, 120), z: R(-120, 120), r: 50, houses: 12 });
+    for (let k = 0; TOWNS.length < n && k < 3000; k++) {
+      const x = R(-HALF + 90, HALF - 90), z = R(-HALF + 90, HALF - 90);
+      if (TOWNS.some(t => Math.hypot(t.x - x, t.z - z) < 150)) continue;
+      const tr = Math.round(R(24, 36)), kind = r();
+      TOWNS.push({ name: name(), x, z, r: tr, houses: Math.max(2, Math.round(tr / 5.5 + R(-1, 1.5))), towers: kind < 0.2, containers: kind > 0.78 });
+    }
+    // montagne e laghi lontani dalle città
+    for (let k = 0; MOUNTAINS.length < 3 + Math.floor(seed % 3) && k < 500; k++) {
+      const m = { x: R(-HALF + 100, HALF - 100), z: R(-HALF + 100, HALF - 100), r: R(70, 125), h: R(20, 38) };
+      if (TOWNS.some(t => Math.hypot(t.x - m.x, t.z - m.z) < m.r * 0.55 + t.r)) continue;
+      if (MOUNTAINS.some(o => Math.hypot(o.x - m.x, o.z - m.z) < o.r + m.r * 0.6)) continue;
+      MOUNTAINS.push(m);
+    }
+    for (let k = 0; LAKES.length < 2 + Math.floor((seed >> 3) % 3) && k < 500; k++) {
+      const l = { x: R(-HALF + 100, HALF - 100), z: R(-HALF + 100, HALF - 100), r: R(40, 85), d: R(8, 11) };
+      if (TOWNS.some(t => Math.hypot(t.x - l.x, t.z - l.z) < l.r + t.r + 25)) continue;
+      if (MOUNTAINS.some(o => Math.hypot(o.x - l.x, o.z - l.z) < o.r * 0.7 + l.r)) continue;
+      if (LAKES.some(o => Math.hypot(o.x - l.x, o.z - l.z) < o.r + l.r)) continue;
+      LAKES.push(l);
+    }
+  }
+  // le città stanno sopra il livello del mare
+  for (const t of TOWNS) t.h = Math.max(1.2, baseHeight(t.x, t.z) + 0.5);
+  colliders.length = 0; grid.clear(); roads.length = 0; stamp = 0;
+  TALL.length = 0; tallGrid.clear();
+}
+
+// ─────────────── Erba alta (ci si nasconde dentro) ───────────────
+const TALL = [];                 // macchie circolari { x, z, r }
+const tallGrid = new Map();      // celle da 40 m → macchie che le toccano
+const TCELL = 40;
+function addTallPatch(p) {
+  TALL.push(p);
+  for (let ix = Math.floor((p.x - p.r) / TCELL); ix <= Math.floor((p.x + p.r) / TCELL); ix++)
+    for (let iz = Math.floor((p.z - p.r) / TCELL); iz <= Math.floor((p.z + p.r) / TCELL); iz++) {
+      const k = ix * 1000 + iz;
+      if (!tallGrid.has(k)) tallGrid.set(k, []);
+      tallGrid.get(k).push(p);
+    }
+}
+/** true se il punto è dentro una macchia d'erba alta (bordo irregolare) */
+export function tallGrassAt(x, z) {
+  const arr = tallGrid.get(Math.floor(x / TCELL) * 1000 + Math.floor(z / TCELL));
+  if (!arr) return false;
+  for (const p of arr) {
+    const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
+    if (d < p.r * (0.82 + 0.18 * Math.sin(Math.atan2(dz, dx) * 3 + p.x))) return true;
+  }
+  return false;
+}
+export function tallGrassPatches() { return TALL; }
 
 export function terrainHeight(x, z) {
   let h = baseHeight(x, z);
@@ -578,7 +658,8 @@ function makeWaterNormal() {
 }
 
 // ═════════════════════════ COSTRUZIONE ═════════════════════════
-export function buildWorld(scene) {
+export function buildWorld(scene, opts = {}) {
+  configureMap(opts.seed ?? 1337, !!opts.random);
   buildRoads();
   const lootSpots = [];
   const chestSpots = [];
@@ -858,6 +939,23 @@ export function buildWorld(scene) {
     if (srand() < 0.15) lootSpots.push(new THREE.Vector3(x + r.s + 0.8, h, z));
   }
 
+  // ── erba alta: macchie nei prati dove ci si può nascondere (generatore a parte: il resto della mappa non cambia) ──
+  {
+    const tr = mulberry32(MAP.seed ^ 0x51ed27), R = (a, b) => a + tr() * (b - a);
+    const NTALL = 85;
+    for (let k = 0, n = 0; n < NTALL && k < 6000; k++) {
+      const x = R(-HALF + 25, HALF - 25), z = R(-HALF + 25, HALF - 25);
+      const h = terrainHeight(x, z);
+      if (h < WATER_LEVEL + 1.6 || h > 19) continue;
+      if (inTown(x, z, 9) || roadDist(x, z) < 7) continue;
+      if (Math.hypot(terrainHeight(x + 3, z) - h, terrainHeight(x, z + 3) - h) / 3 > 0.33) continue;
+      const r = R(5, 11.5);
+      if (TALL.some(p => Math.hypot(p.x - x, p.z - z) < p.r + r + 14)) continue;
+      addTallPatch({ x, z, r, seed: Math.floor(tr() * 1e9) });
+      n++;
+    }
+  }
+
   // ── oggetti di scena: catasta di legna, pile di mattoni, barili, casette ──
   const barrels = [];
   /** true se in (x,z) c'è spazio libero di raggio r (niente collisori né case) */
@@ -1107,16 +1205,16 @@ export function buildWorld(scene) {
 
   // geometrie condivise per alberi/rocce/erba
   // ── erba: ciuffi di fili sottili (colori per vertice: scuri alla base, chiari in punta) ──
-  function makeTuft(blades, seed) {
+  function makeTuft(blades, seed, h0 = 0.32, hr = 0.42, rad = 0.16, wMul = 1, dryK = 0.18) {
     const rnd = mulberry32(seed);
     const P = [], C = [], N = [];
     for (let b = 0; b < blades; b++) {
-      const a = rnd() * 6.283, r0 = rnd() * 0.16, h = 0.32 + rnd() * 0.42, w = 0.035 + rnd() * 0.025;
+      const a = rnd() * 6.283, r0 = rnd() * rad, h = h0 + rnd() * hr, w = (0.035 + rnd() * 0.025) * wMul;
       const lean = 0.08 + rnd() * 0.28, la = a + (rnd() - 0.5) * 0.8;
       const bx = Math.cos(a) * r0, bz = Math.sin(a) * r0;
       const px = -Math.sin(a) * w, pz = Math.cos(a) * w;          // larghezza perpendicolare
       const lx = Math.cos(la) * lean, lz = Math.sin(la) * lean;  // inclinazione
-      const tone = 0.92 + rnd() * 0.22, dry = rnd() < 0.18 ? 1 : 0;
+      const tone = 0.92 + rnd() * 0.22, dry = rnd() < dryK ? 1 : 0;
       const v = [
         [bx - px, 0, bz - pz, 0.42], [bx + px, 0, bz + pz, 0.42],
         [bx + lx * 0.35 + px * 0.6, h * 0.5, bz + lz * 0.35 + pz * 0.6, 0.78], [bx + lx * 0.35 - px * 0.6, h * 0.5, bz + lz * 0.35 - pz * 0.6, 0.78],
@@ -1157,9 +1255,10 @@ export function buildWorld(scene) {
     return g;
   }
   const tuftGeo = makeTuft(5, 9001);
+  const tallGeo = makeTuft(7, 4242, 0.85, 0.6, 0.3, 1.5, 0.3);   // erba alta: fili fino a 1,45 m
   const flowerGeo = makeFlower();
   /** materiale dell'erba: vento a raffiche, si piega attorno al giocatore e sfuma con la distanza */
-  function grassMaterial(fade0, fade1, key) {
+  function grassMaterial(fade0, fade1, key, sway = 0.55) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uWind = WIND;
@@ -1174,7 +1273,7 @@ export function buildWorld(scene) {
             float hg = max(transformed.y, 0.0);
             float gust = 0.55 + 0.45 * sin(uWind * 0.6 + ip.x * 0.018 + ip.z * 0.013);
             float ph = uWind * 2.2 + ip.x * 0.23 + ip.z * 0.19;
-            float sw = (sin(ph) * 0.6 + sin(ph * 2.7 + 1.3) * 0.25) * gust * hg * hg * 0.55;
+            float sw = (sin(ph) * 0.6 + sin(ph * 2.7 + 1.3) * 0.25) * gust * hg * hg * ${sway.toFixed(2)};
             transformed.x += sw; transformed.z += sw * 0.45;
             vec2 away = ip.xz - uPlayer.xz;
             float dp = length(away);
@@ -1194,6 +1293,7 @@ export function buildWorld(scene) {
   const grassNearMat = grassMaterial(42, 62, 'near');
   const grassFarMat = grassMaterial(140, 190, 'far');
   const flowerMat = grassMaterial(40, 60, 'flower');
+  const tallMat = grassMaterial(95, 135, 'tall', 0.16);
   /** dove può crescere l'erba (niente acqua, sabbia, rocce ripide, neve, strade e piazze) */
   function grassOK(x, z, h, slope = 0) {
     if (h < WATER_LEVEL + 1.2 || h > 24 || slope > 0.7) return false;
@@ -1302,7 +1402,7 @@ export function buildWorld(scene) {
     }
     stats.grass = grassCells.size;
   }
-  const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
+  const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), p2 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
   const boxGeoCache = new Map();
 
   function boxGeometry(b) {
@@ -1500,6 +1600,37 @@ export function buildWorld(scene) {
       gm.computeBoundingSphere();
       group.add(gm); ch.nearOnly.push(gm);
     }
+    // erba alta: le macchie che toccano questo chunk
+    {
+      const list = TALL.filter(p => p.x + p.r > ch.x0 && p.x - p.r < ch.x0 + CHUNK && p.z + p.r > ch.z0 && p.z - p.r < ch.z0 + CHUNK);
+      let total = 0;
+      for (const p of list) total += Math.round(Math.PI * p.r * p.r * 1.5);
+      if (total) {
+        const im = new THREE.InstancedMesh(tallGeo, tallMat, total);
+        let n = 0;
+        for (const p of list) {
+          const rnd = mulberry32(p.seed), N = Math.round(Math.PI * p.r * p.r * 1.5);
+          for (let i = 0; i < N; i++) {
+            const a = rnd() * 6.283, d = Math.sqrt(rnd()) * p.r * 1.05, r1 = rnd(), r2 = rnd();
+            const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+            if (x < ch.x0 || x >= ch.x0 + CHUNK || z < ch.z0 || z >= ch.z0 + CHUNK) continue;
+            if (!tallGrassAt(x, z) && r1 > 0.3) continue;           // bordo sfrangiato
+            const h = terrainHeight(x, z);
+            if (h < WATER_LEVEL + 0.8) continue;
+            const edge = tallGrassAt(x, z) ? 1 : 0.6;
+            q.setFromAxisAngle(up, r2 * 6.28); const sc0 = (0.8 + r1 * 0.45) * edge; sc.set(1, sc0, 1); p2.set(x, h - 0.05, z);
+            mat4.compose(p2, q, sc); im.setMatrixAt(n, mat4);
+            groundColor(x, z, h, col, 0.1);
+            im.setColorAt(n, col.lerp(_gc.dry, 0.18 + r2 * 0.2).multiplyScalar(1.0 + r1 * 0.15));
+            n++;
+          }
+        }
+        im.count = n; im.receiveShadow = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.computeBoundingSphere();
+        group.add(im); ch.nearOnly.push(im);
+      }
+    }
     // oggetti speciali
     for (const s of ch.specials) {
       if (s.type === 'fountain') {
@@ -1630,6 +1761,8 @@ export function buildWorld(scene) {
   for (const [a, b] of roads) { g.beginPath(); g.moveTo((a.x + HALF) * k, (a.z + HALF) * k); g.lineTo((b.x + HALF) * k, (b.z + HALF) * k); g.stroke(); }
   g.fillStyle = 'rgba(30,80,30,0.5)';
   for (const t of trees) g.fillRect((t.x + HALF) * k - 0.75, (t.z + HALF) * k - 0.75, 1.5, 1.5);
+  g.fillStyle = 'rgba(150,170,60,0.55)';
+  for (const p of TALL) { g.beginPath(); g.arc((p.x + HALF) * k, (p.z + HALF) * k, Math.max(1.5, p.r * k), 0, 7); g.fill(); }
   g.fillStyle = 'rgba(60,40,30,0.9)';
   for (const h of houses) g.fillRect((h.cx - h.w / 2 + HALF) * k, (h.cz - h.d / 2 + HALF) * k, Math.max(2, h.w * k), Math.max(2, h.d * k));
 
@@ -1638,5 +1771,16 @@ export function buildWorld(scene) {
     if (pr.type === 'shed') { g.fillStyle = 'rgba(120,70,40,0.95)'; g.fillRect((pr.x + HALF) * k - 1.5, (pr.z + HALF) * k - 1.5, 3, 3); }
   }
 
-  return { lootSpots, chestSpots, houses, barrels, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks, destroyBarrel, resetProps };
+  /** libera tutta la grafica di questa mappa (prima di generarne un'altra) */
+  function dispose() {
+    scene.remove(water); water.geometry.dispose(); waterMat.dispose(); depthTex.dispose();
+    for (const ch of chunkList) { if (ch.detail) unloadDetail(ch); if (ch.lod) { disposeGroup(ch.lod); ch.lod = null; } }
+    for (const c of grassCells.values()) disposeGrassCell(c);
+    grassCells.clear();
+    for (const m of [terrainMat, lodMat, blockMat, stoneMat, brickMat, crateMat, ...wallMats, ...roofMats]) { if (m.map) m.map.dispose(); m.dispose(); }
+    for (const g of boxGeoCache.values()) g.dispose();
+    boxGeoCache.clear();
+  }
+
+  return { lootSpots, chestSpots, houses, barrels, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks, destroyBarrel, resetProps, dispose, seed: MAP.seed, random: MAP.random };
 }

@@ -91,6 +91,48 @@ export const SKINS = [
   { id: 'banana', name: 'Agente Banana', rarity: 3, shirt: '#ffe03a', pants: '#ffe03a', skin: '#ffe03a', shoes: '#6b4a12', acc: 'banana', accColor: '#6b4a12', banana: true },
   { id: 'cavaliere', name: "Cavaliere d'Oro", rarity: 4, shirt: '#d8aa30', pants: '#8c6c1c', skin: '#e0b48a', shoes: '#6b5212', acc: 'knight', accColor: '#ffd24a', cape: '#a3122a', metal: true },
   { id: 'drago', name: 'Drago Rosso', rarity: 4, shirt: '#a3121a', pants: '#5e0a0f', skin: '#c2281f', shoes: '#2a0304', acc: 'horns', accColor: '#f2d28a', cape: '#2a0303', glow: '#ff6a00' },
+  // ── sbloccabili: pass battaglia e negozio ──
+  { id: 'cowboy', name: 'Cowboy Polveroso', rarity: 2, shirt: '#b0643a', pants: '#3b4a6b', skin: '#d9a478', shoes: '#4a2c14', acc: 'none', hair: '#5a3418', scarf: '#c0302a', belt: '#5a3a1a', boots: true, hat: 'cowboy', lock: 'pass' },
+  { id: 'scienziata', name: 'Scienziata Pazza', rarity: 2, shirt: '#f2f2f0', pants: '#3a3a5a', skin: '#f0c8a8', shoes: '#2a2a3a', acc: 'ponytail', accColor: '#7a4ad0', hair: '#c0602a', coat: true, lock: 'pass' },
+  { id: 'vichingo', name: 'Vichingo del Nord', rarity: 3, shirt: '#6b4a2a', pants: '#4a3a2a', skin: '#e8b890', shoes: '#3a2414', acc: 'none', hair: '#d08a3a', beard: '#d08a3a', fur: '#d8c8a8', belt: '#3a2a1a', boots: true, hat: 'viking', lock: 'pass' },
+  { id: 'samurai', name: 'Samurai Cremisi', rarity: 4, shirt: '#8a1a22', pants: '#1a1a22', skin: '#e0b088', shoes: '#141414', acc: 'ninja', accColor: '#f2c84a', vest: '#2a2a32', pouch: '#8a1a22', cape: '#5a0a12', lock: 'pass' },
+  { id: 'robot', name: 'Robot X-9', rarity: 3, shirt: '#8a96a8', pants: '#5a6474', skin: '#8a96a8', shoes: '#3a4250', acc: 'visor', accColor: '#3affd0', glow: '#3affd0', metal: true, lock: 'shop' },
+  { id: 'spettro', name: 'Spettro Gelido', rarity: 4, shirt: '#dce8f8', pants: '#b8c8e0', skin: '#c8d8f0', shoes: '#8aa0c0', acc: 'none', hair: '#f0f8ff', glow: '#7fd0ff', torn: true, cape: '#a8c0e8', lock: 'shop' },
+  { id: 'giardiniera', name: 'Giardiniera', rarity: 1, shirt: '#e8d06a', pants: '#5a8a3a', skin: '#c48a62', shoes: '#4a3a2a', acc: 'none', hair: '#2a1a12', overalls: '#5a8a3a', boots: true, hat: 'straw', lock: 'shop' },
+  { id: 'rapper', name: 'MC Rima', rarity: 2, shirt: '#2a2a2a', pants: '#3a5a9a', skin: '#8a5a3a', shoes: '#f2f2f2', acc: 'shades', hair: '#141414', chain: '#ffd24a', hat: 'beanie', lock: 'shop' },
+];
+
+/** Cappelli (si mettono su qualsiasi skin che non abbia già un casco) */
+export const HATS = [
+  { id: 'none', name: 'Nessuno', rarity: 0 },
+  { id: 'cap', name: 'Berretto sportivo', rarity: 0, color: '#2a5ad0' },
+  { id: 'beanie', name: 'Cuffia di lana', rarity: 1, color: '#d0402a', lock: 'pass' },
+  { id: 'cowboy', name: 'Cappello da cowboy', rarity: 2, color: '#7a4a24', lock: 'pass' },
+  { id: 'headphones', name: 'Cuffie da gamer', rarity: 2, color: '#1a1a1a', accent: '#00e0ff', lock: 'shop' },
+  { id: 'straw', name: 'Cappello di paglia', rarity: 1, color: '#e0c070', lock: 'shop' },
+  { id: 'tophat', name: 'Cilindro elegante', rarity: 3, color: '#151515', accent: '#a01a2a', lock: 'shop' },
+  { id: 'viking', name: 'Elmo vichingo', rarity: 3, color: '#8a8a90', accent: '#f0e8d0', lock: 'pass' },
+  { id: 'wizard', name: 'Cappello da mago', rarity: 3, color: '#3a2a8a', accent: '#ffd24a', lock: 'pass' },
+  { id: 'crown', name: 'Corona reale', rarity: 4, color: '#ffc830', accent: '#e0203a', lock: 'pass' },
+  { id: 'halo', name: 'Aureola', rarity: 4, color: '#fff2a0', lock: 'shop' },
+];
+
+/** Zaini e oggetti sulla schiena */
+export const BACKPACKS = [
+  { id: 'none', name: 'Nessuno', rarity: 0 },
+  { id: 'school', name: 'Zainetto', rarity: 0, color: '#3a7ad0', accent: '#f2c230' },
+  { id: 'hiker', name: 'Zaino da trekking', rarity: 1, color: '#4a6a3a', accent: '#c06030', lock: 'pass' },
+  { id: 'guitar', name: 'Chitarra', rarity: 2, color: '#b0602a', accent: '#2a1a12', lock: 'shop' },
+  { id: 'sword', name: 'Spada leggendaria', rarity: 3, color: '#c8d0e0', accent: '#ffd24a', lock: 'pass' },
+  { id: 'jetpack', name: 'Jetpack', rarity: 3, color: '#a0a8b8', accent: '#ff6a1a', lock: 'shop' },
+  { id: 'wings', name: "Ali d'angelo", rarity: 4, color: '#f8f8ff', accent: '#ffe8a0', lock: 'pass' },
+  { id: 'dragonwings', name: 'Ali di drago', rarity: 4, color: '#7a0a12', accent: '#ff8a1a', lock: 'shop' },
+];
+
+/** Modalità di gioco */
+export const MODES = [
+  { id: 'br', name: 'Battle Royale', icon: '👑', desc: "La classica isola con 18 località: l'ultimo sopravvissuto vince." },
+  { id: 'random', name: 'Random Map', icon: '🎲', desc: 'Ogni partita un\'isola nuova: città, montagne e laghi generati a caso.' },
 ];
 
 export const GLIDERS = [
@@ -98,6 +140,9 @@ export const GLIDERS = [
   { id: 'fiamma', name: 'Fiamma', color: '#ff4a1a', accent: '#ffd23a' },
   { id: 'notte', name: 'Notte', color: '#2a1a4a', accent: '#c04dff' },
   { id: 'smeraldo', name: 'Smeraldo', color: '#18a058', accent: '#e8ffe8' },
+  { id: 'arcobaleno', name: 'Arcobaleno', color: '#ff4ab0', accent: '#4affe0', rarity: 2, lock: 'pass' },
+  { id: 'oro', name: 'Ala Dorata', color: '#ffc830', accent: '#fff4c0', rarity: 4, lock: 'pass' },
+  { id: 'tigre', name: 'Tigre', color: '#ff8a1a', accent: '#1a1a1a', rarity: 3, lock: 'shop' },
 ];
 
 export const DIFFICULTY = {

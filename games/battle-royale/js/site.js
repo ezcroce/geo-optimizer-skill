@@ -1,7 +1,8 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
-import { SKINS, WEAPONS, RARITIES } from './config.js?v=7';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=7';
+import { SKINS, WEAPONS, RARITIES } from './config.js?v=8';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=8';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=8';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -122,11 +123,7 @@ function makeRenderer(canvas, opts = {}) {
   return r;
 }
 // posa "in mano un'arma", come nel gioco
-function holdPose(m, pitch = 0) {
-  m.arms[1].rotation.set(-Math.PI / 2 - pitch + 0.15, 0, 0.05);
-  m.arms[0].rotation.set(-Math.PI / 2 - pitch + 0.2, 0, 0.55);
-  m.gunPivot.rotation.set(-pitch, 0, 0);
-}
+function holdPose(m, pitch = 0) { poseHold(m, pitch, 0, 0, 0); }
 const SKIN_WEAPON = { recluta: 'ar', zombie: 'smg', agente: 'pistol', ninja: 'smg', pirata: 'shotgun', cyber: 'smg', astro: 'ar', banana: 'shotgun', cavaliere: 'sniper', drago: 'rocket' };
 
 // ─────────────── HERO: armadietto 3D rotante ───────────────
@@ -274,13 +271,15 @@ const hero = (() => {
 
     // respiro / idle
     const m = cur;
-    m.body.position.y = Math.sin(t * 2.2) * 0.015;
+    resetPose(m);
+    holdPose(m, -0.05 + Math.sin(t * 2.2) * 0.02);
+    m.body.position.y = Math.sin(t * 2.2) * 0.012;
     m.torso.rotation.y = Math.sin(t * 0.9) * 0.08;
+    m.torso.rotation.x = (Math.sin(t * 2.2) * 0.5 + 0.5) * 0.02;
     m.head.rotation.y = clamp(-smx * 0.6, -0.3, 0.3);
     m.head.rotation.x = smy * 0.3;
-    holdPose(m, -0.05 + Math.sin(t * 2.2) * 0.02);
     if (m.cape) m.cape.rotation.x = 0.12 + Math.sin(t * 1.8) * 0.06;
-    m.legs[0].rotation.x = 0.05; m.legs[1].rotation.x = -0.05;
+    setLeg(m, 0, -0.04, 0.08, 0.04); setLeg(m, 1, 0.06, 0.12, -0.06);
 
     // scintille
     for (let i = 0; i < N; i++) {
@@ -389,37 +388,18 @@ const demo = (() => {
 
     m.root.position.set(x, y, 0);
     m.root.rotation.y = yawR;
-    // reset
-    m.body.position.y = 0; m.torso.rotation.x = 0; m.head.rotation.x = 0;
-    for (const l of m.legs) l.rotation.z = 0;
-    for (const a of m.arms) a.rotation.set(0, 0, 0);
-
-    if (mode === 'climb') {
-      m.arms[0].rotation.set(-Math.PI + 0.35 + Math.sin(ph) * 0.45, 0, -0.18);
-      m.arms[1].rotation.set(-Math.PI + 0.35 - Math.sin(ph) * 0.45, 0, 0.18);
-      m.legs[0].rotation.x = -0.22 - Math.max(0, Math.sin(ph)) * 0.4;
-      m.legs[1].rotation.x = -0.22 - Math.max(0, -Math.sin(ph)) * 0.4;
-      m.torso.rotation.x = 0.08; m.head.rotation.x = -0.35;
-    } else if (mode === 'mantle') {
-      const k = mk;
-      m.arms[0].rotation.set(-Math.PI + 0.4 + k * 2.2, 0, -0.2);
-      m.arms[1].rotation.set(-Math.PI + 0.4 + k * 2.2, 0, 0.2);
-      m.legs[0].rotation.x = -1.2 * Math.sin(k * Math.PI);
-      m.legs[1].rotation.x = -0.4 * Math.sin(k * Math.PI);
-      m.torso.rotation.x = 0.35 * Math.sin(k * Math.PI);
-    } else if (mode === 'air') {
-      m.legs[0].rotation.x = -0.6; m.legs[1].rotation.x = 0.35;
-      m.arms[0].rotation.set(-2.2, 0, -0.5); m.arms[1].rotation.set(-2.2, 0, 0.5);
-    } else {
+    resetPose(m);
+    if (mode === 'climb') poseClimb(m, ph);
+    else if (mode === 'mantle') poseMantle(m, mk);
+    else if (mode === 'air') { legsAir(m, 0.6); setArm(m, 0, -2.2, -0.5, -0.4); setArm(m, 1, -2.2, 0.5, -0.4); }
+    else {
       demo.walkPhase = (demo.walkPhase || 0) + dt * (4 + walkSpeed * 8) * (walkSpeed > 0.05 ? 1 : 0);
-      const sw = Math.sin(demo.walkPhase) * 0.75 * walkSpeed;
       const ck = crouch;
-      m.legs[0].rotation.x = lerp(sw, -1.35 + sw * 0.35, ck);
-      m.legs[1].rotation.x = lerp(-sw, 0.95 - sw * 0.35, ck);
-      m.arms[0].rotation.x = -sw * 0.8 * (1 - ck) - ck * 0.9;
-      m.arms[1].rotation.x = sw * 0.8 * (1 - ck) - ck * 0.9;
-      m.body.position.y = -0.45 * ck - land * 0.5;
-      m.torso.rotation.x = 0.16 * ck + land * 0.6;
+      const bodyY = legsLocomotion(m, demo.walkPhase, walkSpeed, 0, ck);
+      armsSwing(m, demo.walkPhase, walkSpeed, 0, ck);
+      if (land > 0) for (let i = 0; i < 2; i++) { m.legs[i].rotation.x -= land * 1.6; m.knees[i].rotation.x += land * 3.2; m.feet[i].rotation.x -= land * 1.6; }
+      m.body.position.y = bodyY - land * 0.45;
+      m.torso.rotation.x = 0.3 * ck + land * 0.5;
     }
     if (m.cape) m.cape.rotation.x = mode === 'air' ? 0.9 : 0.1 + walkSpeed * 0.4;
 

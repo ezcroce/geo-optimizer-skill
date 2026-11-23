@@ -4,9 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=7" />
+<link rel="stylesheet" href="style.css?v=8" />
 <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=7", "three/addons/": "./vendor/addons/" } }
+  { "imports": { "three": "./vendor/three.module.js?v=8", "three/addons/": "./vendor/addons/" } }
 </script>
 </head>
 <body>
@@ -15,46 +15,122 @@
 
 <!-- ───────── MENU / LOBBY ───────── -->
 <div id="menu" class="screen">
-  <div class="menu-left">
-    <a href="index.html" class="backsite" data-transition>← Torna al sito</a>
-    <h1 class="logo">ARENA<span>ROYALE</span><small>3D</small></h1>
-    <div class="panel">
-      <label class="lbl">Il tuo nome</label>
-      <input id="playerName" maxlength="16" value="Giocatore" />
-      <label class="lbl">Difficoltà</label>
-      <div id="difficulty" class="seg">
-        <button data-d="facile">Facile</button>
-        <button data-d="normale" class="on">Normale</button>
-        <button data-d="difficile">Difficile</button>
-      </div>
-      <label class="lbl">Giocatori nella partita</label>
-      <div id="players" class="seg">
-        <button data-p="25">25</button>
-        <button data-p="50">50</button>
-        <button data-p="100" class="on">100</button>
-      </div>
-      <label class="lbl">Deltaplano</label>
-      <div id="gliders" class="seg"></div>
-    </div>
-    <button id="playBtn" class="play">GIOCA</button>
-    <div class="fsrow">
-      <button id="fsBtn" class="ghost" title="Tasto F">⛶ Schermo intero</button>
-      <label class="fsauto"><input type="checkbox" id="fsAuto" /> all'avvio</label>
-      <a id="newTab" class="ghost hidden" href="gioco.html" target="_blank" rel="noopener">↗ Apri in nuova scheda</a>
-    </div>
-    <div class="controls">
-      <b>Comandi</b>
-      <div><kbd>W A S D</kbd> muoviti · <kbd>Shift</kbd> corri · <kbd>Spazio</kbd> salta / paracadute</div>
-      <div><kbd>C</kbd> abbassati · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
-      <div><kbd>Mouse</kbd> mira · <kbd>Click sx</kbd> spara/usa · <kbd>Click dx</kbd> mira di precisione</div>
-      <div><kbd>1-5</kbd> / <kbd>Rotella</kbd> cambia slot · <kbd>R</kbd> ricarica · <kbd>E</kbd> raccogli / apri forziere</div>
-      <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>G</kbd> lascia oggetto · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>9</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
+  <div class="topbar">
+    <a href="index.html" class="backsite" data-transition>← Sito</a>
+    <h1 class="logo mini">ARENA<span>ROYALE 3D</span></h1>
+    <nav class="tabs" id="tabs">
+      <button data-tab="play" class="on">Gioca</button>
+      <button data-tab="locker">Armadietto<i class="dot hidden" id="lockerDot"></i></button>
+      <button data-tab="pass">Pass battaglia</button>
+      <button data-tab="shop">Negozio</button>
+      <button data-tab="missions">Missioni<i class="dot hidden" id="missionDot"></i></button>
+    </nav>
+    <div class="wallet">
+      <div class="lvl" title="Livello del pass battaglia"><b id="lvlNum">1</b><div><small>LIVELLO</small><div class="xpbar"><i id="xpFill"></i></div></div></div>
+      <div class="coins" title="Monete: si guadagnano giocando e con le missioni">🪙 <b id="coinNum">0</b></div>
     </div>
   </div>
-  <div class="menu-right">
-    <div class="locker-title">ARMADIETTO <span id="skinName"></span></div>
-    <div id="skins" class="skins"></div>
+
+  <!-- GIOCA -->
+  <div class="tabpage" data-page="play">
+    <div class="menu-left">
+      <div class="panel">
+        <label class="lbl">Il tuo nome</label>
+        <input id="playerName" maxlength="16" value="Giocatore" />
+        <label class="lbl">Modalità</label>
+        <div id="modes" class="modes"></div>
+        <div id="offlineOpts">
+          <label class="lbl">Difficoltà</label>
+          <div id="difficulty" class="seg">
+            <button data-d="facile">Facile</button>
+            <button data-d="normale" class="on">Normale</button>
+            <button data-d="difficile">Difficile</button>
+          </div>
+          <label class="lbl">Giocatori nella partita</label>
+          <div id="players" class="seg">
+            <button data-p="25">25</button>
+            <button data-p="50">50</button>
+            <button data-p="100" class="on">100</button>
+          </div>
+        </div>
+      </div>
+      <button id="playBtn" class="play">GIOCA</button>
+      <div class="panel online" id="onlinePanel">
+        <label class="lbl">🌐 Online con gli amici</label>
+        <div id="onlineIdle">
+          <button id="hostBtn" class="ghost wide">Crea una lobby</button>
+          <div class="joinrow"><input id="joinCode" maxlength="5" placeholder="CODICE" autocomplete="off" spellcheck="false" /><button id="joinBtn" class="ghost">Entra</button></div>
+          <div class="hint" id="netStatus">Fino a 8 giocatori: gli altri posti sono riempiti dai bot.</div>
+        </div>
+        <div id="onlineLobby" class="hidden">
+          <div class="roomcode">Codice stanza <b id="roomCode">-----</b><button id="copyCode" class="ghost tiny" title="Copia">⧉</button></div>
+          <div id="lobbyPlayers" class="lobbyplayers"></div>
+          <div id="chatLog" class="chatlog"></div>
+          <div class="joinrow"><input id="chatInput" maxlength="140" placeholder="Scrivi un messaggio…" autocomplete="off" /><button id="chatSend" class="ghost">Invia</button></div>
+          <button id="leaveBtn" class="ghost wide">Esci dalla lobby</button>
+        </div>
+      </div>
+      <div class="fsrow">
+        <button id="fsBtn" class="ghost" title="Tasto F">⛶ Schermo intero</button>
+        <label class="fsauto"><input type="checkbox" id="fsAuto" /> all'avvio</label>
+        <a id="newTab" class="ghost hidden" href="gioco.html" target="_blank" rel="noopener">↗ Apri in nuova scheda</a>
+      </div>
+      <div class="controls">
+        <b>Comandi</b>
+        <div><kbd>W A S D</kbd> muoviti · <kbd>Shift</kbd> corri · <kbd>Spazio</kbd> salta / paracadute</div>
+        <div><kbd>C</kbd> abbassati (nell'erba alta sei nascosto) · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
+        <div><kbd>Mouse</kbd> mira · <kbd>Click sx</kbd> spara/usa · <kbd>Click dx</kbd> mira di precisione</div>
+        <div><kbd>1-5</kbd> / <kbd>Rotella</kbd> cambia slot · <kbd>R</kbd> ricarica · <kbd>E</kbd> raccogli / apri forziere</div>
+        <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>G</kbd> lascia oggetto · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>9</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
+      </div>
+    </div>
+    <div class="menu-right">
+      <div class="card" id="playMissions"></div>
+      <div class="card" id="playPass"></div>
+    </div>
   </div>
+
+  <!-- ARMADIETTO -->
+  <div class="tabpage hidden" data-page="locker">
+    <div class="menu-right wide">
+      <div class="locker-title">ARMADIETTO <span id="skinName"></span></div>
+      <div id="lockerCats" class="seg">
+        <button data-cat="skin" class="on">Skin</button>
+        <button data-cat="hat">Cappelli</button>
+        <button data-cat="back">Zaini</button>
+        <button data-cat="glider">Deltaplani</button>
+      </div>
+      <div id="skins" class="skins"></div>
+    </div>
+  </div>
+
+  <!-- PASS BATTAGLIA -->
+  <div class="tabpage hidden" data-page="pass">
+    <div class="passhead">
+      <div><div class="season" id="seasonName"></div><div class="passlvl">Livello <b id="passLvl">1</b> / 40 · <span id="passXp"></span></div></div>
+      <button id="premiumBtn" class="play small">Pass premium · 950 🪙</button>
+    </div>
+    <div class="passtrack" id="passTrack"></div>
+    <div class="hint passhint">Le ricompense si sbloccano da sole salendo di livello: guadagni XP giocando e completando le missioni. Clicca un oggetto per vederlo addosso.</div>
+  </div>
+
+  <!-- NEGOZIO -->
+  <div class="tabpage hidden" data-page="shop">
+    <div class="menu-right wide">
+      <div class="locker-title">NEGOZIO <span>Nuove offerte tra <b id="shopTimer">--:--:--</b></span></div>
+      <div id="shopGrid" class="shopgrid"></div>
+      <div class="hint">Le monete si guadagnano a ogni partita (eliminazioni, piazzamento) e con le missioni settimanali.</div>
+    </div>
+  </div>
+
+  <!-- MISSIONI -->
+  <div class="tabpage hidden" data-page="missions">
+    <div class="menu-right wide">
+      <div class="locker-title">MISSIONI <span>Completale per salire di livello nel pass</span></div>
+      <div id="missionList" class="missionlist"></div>
+    </div>
+  </div>
+  <div id="menuToast" class="menutoast hidden"></div>
 </div>
 
 <!-- ───────── HUD ───────── -->
@@ -78,6 +154,7 @@
   <div id="vitals">
     <div class="vrow stamina" id="staminaRow"><div class="vbar st"><i id="staminaFill"></i></div><b>🧗</b></div>
     <div id="crouchBadge">⬇ ACCOVACCIATO</div>
+    <div id="hiddenBadge">🌾 NASCOSTO NELL'ERBA</div>
     <div class="vrow"><div class="vbar shield"><i id="shieldFill"></i></div><b id="shieldText">0</b></div>
     <div class="vrow"><div class="vbar hp"><i id="hpFill"></i></div><b id="hpText">100</b></div>
   </div>
@@ -89,6 +166,8 @@
   </div>
   <div id="buildHint" class="hidden">MODALITÀ COSTRUZIONE · Click sx: muro (10 🪵) · Q per uscire</div>
   <div id="damageLayer"></div>
+  <div id="toasts"></div>
+  <div id="netInfo" class="hidden"></div>
 </div>
 <div id="vignette"></div>
 <div id="stormTint"></div>
@@ -118,14 +197,15 @@
     <h2 id="endTitle"></h2>
     <p id="endSub"></p>
     <div class="stats" id="endStats"></div>
+    <div id="endXp" class="endxp"></div>
     <button id="againBtn" class="play small">GIOCA ANCORA</button>
-    <button id="menuBtn" class="ghost">Armadietto</button>
+    <button id="menuBtn" class="ghost">Torna alla lobby</button>
   </div>
 </div>
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
 
-<script type="module" src="js/main.js?v=7"></script>
-<script src="js/transition.js?v=7"></script>
+<script type="module" src="js/main.js?v=8"></script>
+<script src="js/transition.js?v=8"></script>
 </body>
 </html>

@@ -24,6 +24,18 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: online, pass battaglia, negozio, missioni, modalità
+
+- **Modalità**: *Battle Royale* (l'isola classica con 18 località) e *Random Map* (a ogni partita un'isola nuova con città, nomi, montagne, laghi ed erba alta generati a caso).
+- **Online con gli amici**: dal menu *Crea una lobby* ti dà un codice di 5 lettere (o un link da copiare, `gioco.html?lobby=CODICE`); gli amici lo inseriscono in *Entra*. Ci sono la chat, i compagni visibili nella lobby 3D e fino a 8 giocatori, mentre gli altri posti fino a 100 li riempiono i bot. Il collegamento è peer-to-peer (WebRTC con PeerJS): non serve un server di gioco e chi crea la lobby fa da host, cioè simula bot, tempesta e salute. Chi esce a metà partita diventa un bot. Per provarlo da soli con due schede: `gioco.html?net=local`.
+- **Pass battaglia** con 40 livelli, una fila gratuita e una premium (950 monete), con skin, cappelli, zaini, deltaplani e monete. Gli XP si guadagnano giocando (sopravvivenza, eliminazioni, forzieri, danni, piazzamento) e con le missioni.
+- **Negozio** a rotazione giornaliera, con 2 offerte in evidenza (una scontata) e 4 giornaliere, e **monete** guadagnate a ogni partita.
+- **Missioni**: 3 giornaliere e 3 settimanali (eliminazioni, forzieri, erba alta, arrampicata, colpi alla testa, partite in Random Map o online…), con notifiche durante la partita.
+- **Armadietto** con 21 skin, 11 cappelli, 8 zaini e 7 deltaplani: quelli bloccati si possono provare in anteprima e mostrano come sbloccarli.
+- **Erba alta**: macchie d'erba di circa 1,4 m nei prati. Se ti accovacci (C) dentro, sei *nascosto*: i bot ti vedono solo entro 10 m, o 25 m se hai appena sparato.
+- **Personaggi più realistici**: corpo arrotondato con articolazioni (gomiti, ginocchia, mani, piedi). Le animazioni sono nuove: camminata e corsa con le ginocchia, passo laterale, respiro, atterraggio, accovacciamento con il busto in avanti, arrampicata mano sopra mano e scavalcamento del bordo.
+- I progressi si salvano nel browser (localStorage).
+
 - **100 giocatori per partita** (99 bot; dal menu si può scegliere anche 25 o 50 per i PC più lenti). I bot fra loro si fanno meno danni, così la partita non si svuota nei primi minuti. I personaggi lontani usano un modello semplificato e quelli oltre la nebbia non vengono disegnati.
 - **Armadietto con 13 skin** di varie rarità (Recluta, Esploratrice, Zombie, Agente Segreto, Ninja, Soldato Tattico, Pirata, Meccanico, Cyber Neon, Astronauta, Agente Banana, Cavaliere d'Oro, Drago Rosso), più 4 deltaplani. Le tre nuove (Soldato Tattico con elmetto e giubbotto, Esploratrice con coda di cavallo, sciarpa e zaino, Meccanico con salopette, barba e cintura degli attrezzi) riprendono i tre personaggi del pacchetto di asset.
 - **6 armi con texture procedurali** (metallo spazzolato, polimero zigrinato, legno di noce venato, pannello della rarità con motivo diverso per livello: righe, chevron, esagoni, oro inciso) e dettagli come mirini, red dot, ottica con lenti, bipiede, freno di bocca e cartucce sul fianco. 5 livelli di rarità (Comune → Leggendario, il danno cresce con la rarità): pistola, mitraglietta, fucile d'assalto, fucile a pompa, cecchino con mirino e lanciarazzi con danno ad area. Colpi alla testa ×2.
@@ -94,7 +106,11 @@ index.html      sito del gioco (landing page)
 site.css        stile e animazioni del sito
 gioco.html      il gioco (menu, HUD, schermate)
 style.css       stile dell'interfaccia di gioco
-js/config.js    armi, rarità, skin, consumabili, tempesta, difficoltà
+js/config.js    armi, rarità, skin, cappelli, zaini, modalità, tempesta, difficoltà
+js/progress.js  pass battaglia, negozio, missioni, monete, XP (localStorage)
+js/net.js       lobby online peer-to-peer (PeerJS / BroadcastChannel)
+js/menu.js      menu a schede: Gioca, Armadietto, Pass, Negozio, Missioni
+js/anim.js      pose e animazioni condivise dei personaggi
 js/world.js     terreno, città, chunk (dettaglio + LOD), collisioni, raycast
 js/props.js     modelli low-poly (alberi, rocce, legna, mattoni, barili, casetta) e caricamento dei .glb
 models/         cartella facoltativa per i file .glb originali
@@ -103,5 +119,5 @@ js/audio.js     effetti sonori sintetizzati
 js/main.js      ciclo di gioco, giocatore, arrampicata, IA dei bot, combattimento, HUD
 js/site.js      scene 3D e animazioni del sito
 js/transition.js transizione animata fra sito e gioco
-vendor/         Three.js r187 (licenza MIT)
+vendor/         Three.js r187 e PeerJS 1.5 (licenza MIT)
 ```

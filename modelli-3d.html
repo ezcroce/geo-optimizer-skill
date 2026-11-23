@@ -10,7 +10,7 @@
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
     color: #e8ecf4;
-    background: radial-gradient(1100px 750px at 50% 30%, #1e2638 0%, #12161f 55%, #0c0f16 100%);
+    background: radial-gradient(1200px 800px at 50% 30%, #3a4878 0%, #232c4d 50%, #171d30 100%);
   }
   #scene, #scene canvas { position: fixed; inset: 0; display: block; }
   #vignette {
@@ -108,7 +108,7 @@
 
   <header class="topbar">
     <h1>Kit <em>3D</em> · Modello showcase</h1>
-    <p>Set di modelli procedurali per un gioco battle royale: albero, legna, mattoni, personaggio, casa, cassa e barile. Clicca un modello per metterlo a fuoco.</p>
+    <p>Set di modelli procedurali per un gioco battle royale — albero, legna, mattoni, personaggio, casa, cassa e barile — con texture generate al volo (legno, corteccia, tegole, camo, prato) e luci a colori. Clicca un modello per metterlo a fuoco.</p>
   </header>
 
   <nav class="nav" id="nav" aria-label="Modelli 3D"></nav>
@@ -1188,6 +1188,7 @@
 /* ============================================================
    Kit 3D — 7 modelli procedurali per un gioco battle royale
    Albero · Legna · Mattoni · Personaggio · Casa · Cassa · Barile
+   Con texture generate via canvas e palette a colori vivaci
    ============================================================ */
 (function () {
   'use strict';
@@ -1214,12 +1215,374 @@
   }
 
   function rnd() { return Math.random() - 0.5; }
+  function rr(a, b) { return a + Math.random() * (b - a); }
+
+  /* ---------------- Texture procedurali (canvas 2D) ---------------- */
+
+  // Crea una texture ripetibile da una funzione di disegno (nessuna in Node)
+  function canvasTex(size, draw, rx, ry) {
+    if (typeof document === 'undefined') return null;
+    var c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    var ctx = c.getContext('2d');
+    draw(ctx, size);
+    var t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(rx || 1, ry || 1);
+    t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = 4;
+    return t;
+  }
+
+  // pennellate/blocchi casuali
+  function blobs(ctx, size, n, tones, rMin, rMax, aMin, aMax) {
+    for (var i = 0; i < n; i++) {
+      ctx.fillStyle = tones[i % tones.length];
+      ctx.globalAlpha = rr(aMin, aMax);
+      ctx.beginPath();
+      ctx.ellipse(rr(0, size), rr(0, size), rr(rMin, rMax), rr(rMin, rMax), rr(0, Math.PI), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function speckle(ctx, size, n, tones, rMin, rMax, aMin, aMax) {
+    for (var i = 0; i < n; i++) {
+      ctx.fillStyle = tones[i % tones.length];
+      ctx.globalAlpha = rr(aMin, aMax);
+      ctx.beginPath();
+      ctx.arc(rr(0, size), rr(0, size), rr(rMin, rMax), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // assi di legno (assette orizzontali) — cassa, porta, calcio fucile
+  function texPlanks(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#c98d54';
+      ctx.fillRect(0, 0, s, s);
+      var bands = 4, bh = s / bands;
+      for (var b = 0; b < bands; b++) {
+        ctx.fillStyle = 'rgba(' + Math.round(rr(150, 195)) + ',' + Math.round(rr(100, 135)) + ',' + Math.round(rr(55, 85)) + ',0.5)';
+        ctx.fillRect(0, b * bh, s, bh);
+        ctx.fillStyle = 'rgba(58,34,16,0.75)';
+        ctx.fillRect(0, b * bh, s, 2.2);
+        for (var i = 0; i < 24; i++) {
+          var y = b * bh + 4 + Math.random() * (bh - 8);
+          ctx.strokeStyle = Math.random() < 0.5 ? 'rgba(74,44,20,0.17)' : 'rgba(244,210,160,0.14)';
+          ctx.lineWidth = rr(0.6, 2.1);
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          for (var x = 0; x <= s; x += 16) ctx.lineTo(x, y + Math.sin(x * 0.05 + i) * 2.4 + rr(-1.5, 1.5));
+          ctx.stroke();
+        }
+      }
+      for (var k = 0; k < 3; k++) {
+        var kx = rr(10, s - 10), ky = rr(10, s - 10);
+        for (var rad = 8; rad > 1.5; rad -= 2) {
+          ctx.strokeStyle = 'rgba(70,40,18,0.32)';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.ellipse(kx, ky, rad, rad * 0.6, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      speckle(ctx, s, 150, ['#5a3618', '#f0cf9e'], 0.4, 1.4, 0.04, 0.1);
+    }, rx, ry);
+  }
+
+  // corteccia (troncechi, albero) — venature verticali
+  function texBark(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#a5764c';
+      ctx.fillRect(0, 0, s, s);
+      blobs(ctx, s, 26, ['#8f6238', '#b98856', '#96693e'], 18, 55, 0.25, 0.45);
+      for (var i = 0; i < 90; i++) {
+        var x = rr(0, s);
+        ctx.strokeStyle = Math.random() < 0.55 ? 'rgba(56,32,14,0.28)' : 'rgba(228,196,150,0.16)';
+        ctx.lineWidth = rr(0.8, 3.2);
+        ctx.beginPath();
+        ctx.moveTo(x, -8);
+        for (var y = 0; y <= s + 8; y += 20) ctx.lineTo(x + Math.sin(y * 0.045 + i) * 4.5 + rr(-2, 2), y);
+        ctx.stroke();
+      }
+      // crepe orizzontali corte
+      for (var c = 0; c < 14; c++) {
+        var cy = rr(0, s), cx = rr(0, s - 30);
+        ctx.strokeStyle = 'rgba(45,25,10,0.4)';
+        ctx.lineWidth = rr(1, 2.4);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.quadraticCurveTo(cx + 15, cy + rr(-6, 6), cx + rr(20, 40), cy + rr(-4, 4));
+        ctx.stroke();
+      }
+      speckle(ctx, s, 200, ['#5a3618', '#d8b58a'], 0.4, 1.6, 0.05, 0.12);
+    }, rx, ry);
+  }
+
+  // anelli di accrescimento sulle sezioni tagliate
+  function texRings(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#ecd2a8';
+      ctx.fillRect(0, 0, s, s);
+      var cx = s / 2, cy = s / 2;
+      var r = 5;
+      while (r < s * 0.74) {
+        ctx.strokeStyle = Math.random() < 0.6 ? 'rgba(150,105,60,0.5)' : 'rgba(180,135,85,0.4)';
+        ctx.lineWidth = rr(1, 2.6);
+        ctx.beginPath();
+        ctx.ellipse(cx + rr(-2, 2), cy + rr(-2, 2), r, r * rr(0.9, 1), rr(-0.1, 0.1), 0, Math.PI * 2);
+        ctx.stroke();
+        r += rr(4, 9);
+      }
+      // crepe radiali
+      for (var i = 0; i < 5; i++) {
+        var a = rr(0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(120,80,45,0.5)';
+        ctx.lineWidth = rr(1, 2);
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8);
+        ctx.lineTo(cx + Math.cos(a) * s * 0.48, cy + Math.sin(a) * s * 0.48);
+        ctx.stroke();
+      }
+      // bordo più scuro
+      var edge = ctx.createRadialGradient(cx, cy, s * 0.36, cx, cy, s * 0.52);
+      edge.addColorStop(0, 'rgba(160,110,60,0)');
+      edge.addColorStop(1, 'rgba(120,75,35,0.55)');
+      ctx.fillStyle = edge;
+      ctx.fillRect(0, 0, s, s);
+      speckle(ctx, s, 90, ['#d9b98a', '#c9a06a'], 0.5, 1.6, 0.08, 0.16);
+    }, rx, ry);
+  }
+
+  // fogliame maculato (grigio chiaro, si tinge con il colore del materiale)
+  function texLeaves(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#e8e8e8';
+      ctx.fillRect(0, 0, s, s);
+      blobs(ctx, s, 420, ['#cfcfcc', '#ffffff', '#dcdcdc', '#bdbdbd', '#f4f4f4'], 2, 8, 0.3, 0.65);
+      blobs(ctx, s, 60, ['#a8a8a8', '#909090'], 4, 12, 0.2, 0.4);
+      speckle(ctx, s, 260, ['#989898', '#ffffff'], 0.5, 1.8, 0.1, 0.25);
+    }, rx, ry);
+  }
+
+  // faccia mattone (pori e granuli) — si tinge per ogni mattone
+  function texBrickFace(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#e8b49a';
+      ctx.fillRect(0, 0, s, s);
+      blobs(ctx, s, 40, ['#dfaa90', '#f2c9b2', '#d9a58c'], 10, 40, 0.3, 0.5);
+      // pori
+      for (var i = 0; i < 500; i++) {
+        ctx.fillStyle = Math.random() < 0.6 ? 'rgba(140,80,55,0.35)' : 'rgba(255,235,220,0.35)';
+        ctx.globalAlpha = rr(0.15, 0.4);
+        ctx.beginPath();
+        ctx.arc(rr(0, s), rr(0, s), rr(0.4, 1.6), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }, rx, ry);
+  }
+
+  // tessuto camo (grigio, si tinge) — abbigliamento del personaggio
+  function texCamo(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#ececec';
+      ctx.fillRect(0, 0, s, s);
+      var tones = ['#c4c4c4', '#9a9a9a', '#dedede', '#adadad'];
+      for (var i = 0; i < 80; i++) {
+        ctx.fillStyle = tones[i % tones.length];
+        ctx.globalAlpha = 0.9;
+        var x = rr(0, s), y = rr(0, s), w = rr(16, 48), h = rr(12, 34), rot = rr(0, Math.PI);
+        ctx.beginPath();
+        ctx.ellipse(x, y, w / 2, h / 2, rot, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x + rr(-14, 14), y + rr(-10, 10), w / 3, h / 3, rot, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // trama tessuto
+      ctx.strokeStyle = 'rgba(0,0,0,0.055)';
+      for (var t = 0; t < s; t += 3) {
+        ctx.beginPath(); ctx.moveTo(t, 0); ctx.lineTo(t, s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, t); ctx.lineTo(s, t); ctx.stroke();
+      }
+    }, rx || 2, ry || 2);
+  }
+
+  // tegole del tetto
+  function texRoof(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#a94630';
+      ctx.fillRect(0, 0, s, s);
+      var rows = 8, rh = s / rows, tw = s / 8;
+      var shades = ['#b14a2e', '#c15a38', '#a94630', '#cc6844', '#ba5234'];
+      for (var r = 0; r < rows; r++) {
+        var off = (r % 2) * tw / 2;
+        for (var c = -1; c <= 8; c++) {
+          var x = c * tw + off, y = r * rh;
+          ctx.fillStyle = shades[(r * 7 + (c + 1) * 3) % shades.length];
+          ctx.beginPath();
+          ctx.moveTo(x + 1.5, y + rh + 1);
+          ctx.lineTo(x + 1.5, y + 7);
+          ctx.quadraticCurveTo(x + tw / 2, y - 2, x + tw - 1.5, y + 7);
+          ctx.lineTo(x + tw - 1.5, y + rh + 1);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(60,25,15,0.55)';
+          ctx.lineWidth = 1.4;
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(60,25,15,0.32)';
+        ctx.fillRect(0, yOf(r, rh) + rh - 2, s, 2);
+      }
+      function yOf(r, rh) { return r * rh; }
+      blobs(ctx, s, 24, ['#8f3c28', '#d47a52'], 6, 22, 0.12, 0.28);
+      speckle(ctx, s, 130, ['#7e3624', '#e09877'], 0.5, 1.6, 0.08, 0.18);
+    }, rx, ry);
+  }
+
+  // intonaco / muri
+  function texPlaster(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#f4e7d2';
+      ctx.fillRect(0, 0, s, s);
+      blobs(ctx, s, 55, ['#e6d4b4', '#efe0c8', '#dcc9a6', '#f8efe0'], 14, 48, 0.1, 0.28);
+      speckle(ctx, s, 380, ['#d9c6a5', '#fffaf0', '#cbb896'], 0.4, 1.5, 0.08, 0.2);
+      // leggere colature verticali
+      for (var i = 0; i < 12; i++) {
+        var x = rr(0, s);
+        ctx.strokeStyle = 'rgba(160,140,110,0.1)';
+        ctx.lineWidth = rr(2, 7);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + rr(-8, 8), rr(s * 0.4, s));
+        ctx.stroke();
+      }
+    }, rx, ry);
+  }
+
+  // prato con fiorellini — terreno
+  function texGrass(rx, ry) {
+    return canvasTex(512, function (ctx, s) {
+      ctx.fillStyle = '#55883f';
+      ctx.fillRect(0, 0, s, s);
+      blobs(ctx, s, 42, ['#4a7a36', '#629a48', '#77ab55', '#456f33', '#6ba34e'], 22, 70, 0.3, 0.5);
+      // zone di terra
+      blobs(ctx, s, 7, ['#8a6f4a', '#7a6242'], 16, 44, 0.35, 0.55);
+      // fili d'erba
+      for (var i = 0; i < 900; i++) {
+        var x = rr(0, s), y = rr(0, s), len = rr(3, 9), a = -Math.PI / 2 + rr(-0.7, 0.7);
+        ctx.strokeStyle = ['#3d6b2e', '#67a04c', '#87b866', '#2f5726', '#9ecb78'][i % 5];
+        ctx.globalAlpha = rr(0.35, 0.7);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // fiorellini
+      var flowers = ['#ffe36e', '#fff3c4', '#ff9ecb', '#a8d8ff'];
+      for (var f = 0; f < 18; f++) {
+        ctx.fillStyle = flowers[f % flowers.length];
+        ctx.beginPath();
+        ctx.arc(rr(0, s), rr(0, s), rr(1.2, 2.4), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }, rx || 40, ry || 40);
+  }
+
+  // pietra (pedane, comignolo, sentiero)
+  function texStone(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#a8adb8';
+      ctx.fillRect(0, 0, s, s);
+      blobs(ctx, s, 46, ['#8d939e', '#c2c7d0', '#767c88', '#b6bcc6'], 10, 42, 0.25, 0.5);
+      // crepe
+      for (var i = 0; i < 10; i++) {
+        ctx.strokeStyle = 'rgba(60,65,75,0.45)';
+        ctx.lineWidth = rr(0.8, 1.8);
+        ctx.beginPath();
+        var x = rr(0, s), y = rr(0, s);
+        ctx.moveTo(x, y);
+        for (var k = 0; k < 5; k++) {
+          x += rr(-30, 30); y += rr(-30, 30);
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      speckle(ctx, s, 330, ['#6f7580', '#d7dbe2', '#9aa0ab'], 0.5, 1.8, 0.1, 0.25);
+    }, rx, ry);
+  }
+
+  // metallo spazzolato (cinghie, cerchi)
+  function texMetalFine(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#d8d8d8';
+      ctx.fillRect(0, 0, s, s);
+      for (var i = 0; i < 140; i++) {
+        var y = rr(0, s);
+        ctx.strokeStyle = Math.random() < 0.5 ? 'rgba(90,90,95,0.16)' : 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = rr(0.5, 1.6);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(s, y + rr(-4, 4));
+        ctx.stroke();
+      }
+      blobs(ctx, s, 18, ['#c0c0c4', '#e8e8ec'], 8, 30, 0.15, 0.3);
+      speckle(ctx, s, 90, ['#a8a8ac', '#ffffff'], 0.4, 1.4, 0.1, 0.22);
+    }, rx, ry);
+  }
+
+  // doghe verticali (barile)
+  function texStaves(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#c08a54';
+      ctx.fillRect(0, 0, s, s);
+      var n = 10, tw = s / n;
+      for (var i = 0; i < n; i++) {
+        ctx.fillStyle = 'rgba(' + Math.round(rr(150, 200)) + ',' + Math.round(rr(100, 140)) + ',' + Math.round(rr(55, 90)) + ',0.4)';
+        ctx.fillRect(i * tw, 0, tw, s);
+        ctx.fillStyle = 'rgba(58,34,16,0.7)';
+        ctx.fillRect(i * tw, 0, 2, s);
+        for (var k = 0; k < 8; k++) {
+          var x = i * tw + rr(4, tw - 4);
+          ctx.strokeStyle = Math.random() < 0.5 ? 'rgba(74,44,20,0.16)' : 'rgba(244,210,160,0.13)';
+          ctx.lineWidth = rr(0.6, 1.8);
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          for (var y = 0; y <= s; y += 18) ctx.lineTo(x + Math.sin(y * 0.05 + k) * 2, y);
+          ctx.stroke();
+        }
+      }
+      speckle(ctx, s, 140, ['#5a3618', '#f0cf9e'], 0.4, 1.4, 0.05, 0.12);
+    }, rx, ry);
+  }
+
+  // tela / telaio (zaino, rotolo)
+  function texFabric(rx, ry) {
+    return canvasTex(256, function (ctx, s) {
+      ctx.fillStyle = '#c9a86a';
+      ctx.fillRect(0, 0, s, s);
+      blobs(ctx, s, 30, ['#bd9c60', '#d4b576', '#b3924f'], 12, 40, 0.2, 0.4);
+      ctx.strokeStyle = 'rgba(80,60,30,0.16)';
+      for (var t = 0; t < s; t += 4) {
+        ctx.beginPath(); ctx.moveTo(t, 0); ctx.lineTo(t, s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, t); ctx.lineTo(s, t); ctx.stroke();
+      }
+      speckle(ctx, s, 200, ['#8a6f3f', '#e8d3a0'], 0.4, 1.4, 0.08, 0.18);
+    }, rx || 2, ry || 2);
+  }
 
   /* ---------------- 1. Albero ---------------- */
 
   function makeTree() {
     var g = new THREE.Group();
-    var trunkM = MAT(0x6b4423, { roughness: 0.95 });
+    var trunkM = MAT(0xffffff, { roughness: 0.95, map: texBark(1, 2) });
 
     g.add(M(new THREE.CylinderGeometry(0.16, 0.3, 1.5, 10), trunkM, 0, 0.75, 0));
 
@@ -1231,11 +1594,13 @@
       g.add(root);
     }
 
-    // chioma a coni sovrapposti
+    // chioma a coni sovrapposti (texture maculata tinta di verde)
     var greens = [0x2e7d43, 0x389151, 0x46a45e];
     var cones = [[1.15, 1.4, 1.55], [0.92, 1.2, 2.4], [0.64, 1.05, 3.1]];
+    var leafTex = texLeaves(2, 2);
     for (var c = 0; c < cones.length; c++) {
-      var cone = M(new THREE.ConeGeometry(cones[c][0], cones[c][1], 9), MAT(greens[c], { roughness: 0.9 }), 0, cones[c][2], 0);
+      var cone = M(new THREE.ConeGeometry(cones[c][0], cones[c][1], 9),
+        MAT(greens[c], { roughness: 0.9, map: leafTex }), 0, cones[c][2], 0);
       cone.rotation.y = c * 0.7;
       g.add(cone);
     }
@@ -1246,8 +1611,8 @@
 
   function makeFirewood() {
     var g = new THREE.Group();
-    var bark = MAT(0x74472a, { roughness: 0.95 });
-    var cut = MAT(0xd8b57e, { roughness: 0.85 });
+    var bark = MAT(0xffffff, { roughness: 0.95, map: texBark(1, 3) });
+    var cut = MAT(0xffffff, { roughness: 0.85, map: texRings() });
     var logMats = [bark, cut, cut]; // lati, faccia 1, faccia 2
 
     var r = 0.15, len = 1.3, gap = 0.02;
@@ -1288,7 +1653,8 @@
     var bw = 0.56, bh = 0.23, bd = 0.3, gap = 0.025;
     var rows = 4, per = 5;
     var totalW = per * bw + (per - 1) * gap;
-    var base = new THREE.Color(0xb14a2e);
+    var base = new THREE.Color(0xd86a45);
+    var face = texBrickFace();
 
     for (var r = 0; r < rows; r++) {
       var widths = [];
@@ -1304,7 +1670,7 @@
       var y = bh / 2 + r * (bh + gap);
       widths.forEach(function (w) {
         var col = base.clone().offsetHSL(rnd() * 0.015, rnd() * 0.06, rnd() * 0.09);
-        g.add(BOX(w, bh, bd, MAT(col, { roughness: 0.92 }), x + w / 2, y, 0));
+        g.add(BOX(w, bh, bd, MAT(col, { roughness: 0.92, map: face }), x + w / 2, y, 0));
         x += w + gap;
       });
     }
@@ -1313,7 +1679,7 @@
     var loose = new THREE.Group();
     loose.position.set(totalW / 2 + 0.42, 0, 0.4);
     loose.rotation.y = -0.55;
-    loose.add(BOX(bw, bh, bd, MAT(base.clone().offsetHSL(0, 0, 0.07), { roughness: 0.92 }), 0, bh / 2, 0));
+    loose.add(BOX(bw, bh, bd, MAT(base.clone().offsetHSL(0, 0, 0.07), { roughness: 0.92, map: face }), 0, bh / 2, 0));
     g.add(loose);
     return g;
   }
@@ -1322,15 +1688,18 @@
 
   function makeCharacter() {
     var g = new THREE.Group();
+    var camo = texCamo();
+    var fabric = texFabric();
     var skin = MAT(0xe8b98a, { roughness: 0.75 });
-    var shirt = MAT(0x5f6b45, { roughness: 0.9 });
-    var vest = MAT(0x444b33, { roughness: 0.9 });
-    var pants = MAT(0x39432f, { roughness: 0.95 });
+    var shirt = MAT(0x6d7a4e, { roughness: 0.9, map: camo });
+    var vest = MAT(0x4c5438, { roughness: 0.9, map: camo });
+    var pants = MAT(0x44503a, { roughness: 0.95, map: camo });
     var boots = MAT(0x2b2b2b, { roughness: 0.9 });
-    var helmetM = MAT(0x526033, { roughness: 0.85 });
+    var helmetM = MAT(0x5c6b3a, { roughness: 0.85, map: camo });
     var dark = MAT(0x23252a, { roughness: 0.8 });
-    var gun = MAT(0x2e2e33, { roughness: 0.5, metalness: 0.6 });
-    var woodG = MAT(0x5a4632, { roughness: 0.85 });
+    var gun = MAT(0x4a4f5a, { roughness: 0.5, metalness: 0.6, map: texMetalFine(3, 3) });
+    var woodG = MAT(0x8a6a44, { roughness: 0.85, map: texPlanks(2, 2) });
+    var accent = MAT(0x3ddc97, { roughness: 0.7 }); // tocco di colore UI
 
     // gambe e stivali
     g.add(BOX(0.28, 0.14, 0.36, boots, -0.17, 0.07, 0.03));
@@ -1346,16 +1715,24 @@
     g.add(BOX(0.76, 0.44, 0.4, vest, 0, 1.22, 0));
     g.add(BOX(0.15, 0.13, 0.07, dark, -0.19, 1.1, 0.21));
     g.add(BOX(0.15, 0.13, 0.07, dark, 0.19, 1.1, 0.21));
+    // tasca colorata sul gilet (accento)
+    g.add(BOX(0.15, 0.1, 0.075, accent, 0.19, 1.26, 0.21));
 
-    // zaino + rotolo
-    g.add(BOX(0.46, 0.5, 0.2, woodG, 0, 1.2, -0.28));
-    var roll = M(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 10), MAT(0x7a6a4a, { roughness: 0.95 }), 0, 1.5, -0.28);
+    // zaino + rotolo in tela
+    g.add(BOX(0.46, 0.5, 0.2, MAT(0x8a744f, { roughness: 0.9, map: fabric }), 0, 1.2, -0.28));
+    var roll = M(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 10),
+      MAT(0x9a8a66, { roughness: 0.95, map: fabric }), 0, 1.5, -0.28);
     roll.rotation.z = Math.PI / 2;
     g.add(roll);
 
     // spallacci
     g.add(BOX(0.26, 0.13, 0.34, shirt, -0.44, 1.46, 0));
     g.add(BOX(0.26, 0.13, 0.34, shirt, 0.44, 1.46, 0));
+
+    // braccio sinistro con fascia colorata
+    g.add(BOX(0.2, 0.6, 0.26, shirt, -0.5, 1.16, 0));
+    g.add(BOX(0.21, 0.09, 0.27, accent, -0.5, 1.34, 0));
+    g.add(BOX(0.18, 0.15, 0.22, skin, -0.5, 0.79, 0.02));
 
     // collo, testa, occhi
     g.add(BOX(0.16, 0.1, 0.16, skin, 0, 1.55, 0));
@@ -1366,10 +1743,7 @@
     // elmetto con visiera
     g.add(BOX(0.46, 0.22, 0.44, helmetM, 0, 1.9, 0));
     g.add(BOX(0.47, 0.06, 0.14, helmetM, 0, 1.8, 0.21));
-
-    // braccio sinistro disteso
-    g.add(BOX(0.2, 0.6, 0.26, shirt, -0.5, 1.16, 0));
-    g.add(BOX(0.18, 0.15, 0.22, skin, -0.5, 0.79, 0.02));
+    g.add(BOX(0.1, 0.045, 0.05, accent, 0, 1.99, 0.16)); // piastra colorata sull'elmetto
 
     // braccio destro che impugna il fucile
     g.add(BOX(0.2, 0.6, 0.26, shirt, 0.5, 1.16, 0.04));
@@ -1395,16 +1769,17 @@
 
   function makeHouse() {
     var g = new THREE.Group();
-    var wallM = MAT(0xefe0c8, { roughness: 0.95 });
-    var roofM = MAT(0x9c4a33, { roughness: 0.9 });
+    var wallM = MAT(0xfff3df, { roughness: 0.95, map: texPlaster(2, 2) });
+    var roofM = MAT(0xffffff, { roughness: 0.9, map: texRoof(1, 1) });
     var trimM = MAT(0xf7f2e8, { roughness: 0.9 });
-    var doorM = MAT(0x7a4a28, { roughness: 0.9 });
+    var doorM = MAT(0xffffff, { roughness: 0.9, map: texPlanks(1, 1) });
     var glassM = MAT(0xffd08a, { roughness: 0.3, emissive: 0xffb347, emissiveIntensity: 0.75 });
+    var stoneM = MAT(0xb9c0cc, { roughness: 0.95, map: texStone(2, 2) });
     var W = 2.4, H = 1.6, D = 1.8;
 
     g.add(BOX(W, H, D, wallM, 0, H / 2, 0));
 
-    // tetto a capriola (prisma estruso)
+    // tetto a capriola (prisma estruso) con texture tegole
     var shape = new THREE.Shape();
     shape.moveTo(-1.45, 0);
     shape.lineTo(1.45, 0);
@@ -1414,8 +1789,8 @@
     roofGeo.translate(0, 0, -1.15);
     g.add(M(roofGeo, roofM, 0, H, 0));
 
-    // comignolo
-    g.add(BOX(0.3, 0.8, 0.3, MAT(0x8d8d92, { roughness: 0.9 }), 0.7, H + 0.45, 0.3));
+    // comignolo in pietra
+    g.add(BOX(0.3, 0.8, 0.3, stoneM, 0.7, H + 0.45, 0.3));
     g.add(BOX(0.38, 0.1, 0.38, MAT(0x55555c, { roughness: 0.9 }), 0.7, H + 0.85, 0.3));
 
     // finestra: vetro + cornice + montanti
@@ -1452,8 +1827,13 @@
     g.add(M(new THREE.CircleGeometry(0.17, 24), glassM, 0, H + 0.42, 1.156));
     g.add(M(new THREE.RingGeometry(0.17, 0.22, 24), trimM, 0, H + 0.42, 1.158));
 
-    // sentiero d'ingresso
-    g.add(BOX(0.8, 0.08, 0.6, MAT(0x9a958c, { roughness: 1 }), -0.55, 0.04, 1.25));
+    // sentiero d'ingresso in pietra
+    g.add(BOX(0.8, 0.08, 0.6, stoneM, -0.55, 0.04, 1.25));
+
+    // luce calda che esce dalle finestre
+    var glow = new THREE.PointLight(0xffb347, 0.9, 5, 2);
+    glow.position.set(0.3, 1.1, 1.5);
+    g.add(glow);
 
     return g;
   }
@@ -1462,9 +1842,9 @@
 
   function makeChest() {
     var g = new THREE.Group();
-    var wood = MAT(0x8a5a33, { roughness: 0.9 });
+    var wood = MAT(0xd9a05f, { roughness: 0.9, map: texPlanks(1, 1) });
     var groove = MAT(0x5f3d20, { roughness: 0.95 });
-    var metal = MAT(0x3f4450, { roughness: 0.45, metalness: 0.7 });
+    var metal = MAT(0x8892a8, { roughness: 0.45, metalness: 0.7, map: texMetalFine(2, 2) });
     var gold = MAT(0xd9a520, { roughness: 0.35, metalness: 0.8 });
     var dark = MAT(0x1d1d22, { roughness: 0.8 });
     var BW = 1.0, BH = 0.55, BD = 0.65;
@@ -1513,9 +1893,9 @@
 
   function makeBarrel() {
     var g = new THREE.Group();
-    var wood = MAT(0x8a5a33, { roughness: 0.88 });
-    var hoopM = MAT(0x4a4f59, { roughness: 0.45, metalness: 0.75, side: THREE.DoubleSide });
-    var bungM = MAT(0x5a3d22, { roughness: 0.95 });
+    var wood = MAT(0xd9a05f, { roughness: 0.88, map: texStaves(2, 1) });
+    var hoopM = MAT(0x7e8798, { roughness: 0.45, metalness: 0.75, side: THREE.DoubleSide, map: texMetalFine(4, 1) });
+    var bungM = MAT(0x6a4a28, { roughness: 0.95, map: texPlanks(1, 1) });
 
     // profilo a lathe (bombatura)
     var pts = [
@@ -1549,13 +1929,13 @@
   /* ---------------- Definizioni modelli ---------------- */
 
   var MODELS = [
-    { id: 'albero', name: 'Albero', desc: 'Albero a coni con tronco e radici, ideale per le foreste della mappa.', build: makeTree, pos: [-6.9, -4] },
-    { id: 'legna', name: 'Legna', desc: 'Pila di legna da ardere per accampamenti e fuochi da campo.', build: makeFirewood, pos: [-2.3, -4] },
-    { id: 'mattoni', name: 'Mattoni', desc: 'Muro di mattoni a corsa alternata con un mattone sfuso davanti.', build: makeBricks, pos: [2.3, -4] },
-    { id: 'personaggio', name: 'Personaggio BR', desc: 'Guerriero stilizzato con elmetto, gilet, zaino e fucile.', build: makeCharacter, pos: [6.9, -4] },
-    { id: 'casa', name: 'Casa', desc: 'Casa con tetto a capriola, comignolo, porta e finestre illuminate.', build: makeHouse, pos: [-4.6, 3] },
-    { id: 'cassa', name: 'Cassa', desc: 'Cassa del bottino con cinghie metalliche e lucchetto d’oro.', build: makeChest, pos: [0, 3] },
-    { id: 'barile', name: 'Barile', desc: 'Barile di legno bombato con cinghie metalliche e tappo.', build: makeBarrel, pos: [4.6, 3] }
+    { id: 'albero', name: 'Albero', desc: 'Albero a coni con tronco di corteccia testurizzata, ideale per le foreste della mappa.', build: makeTree, pos: [-6.9, -4] },
+    { id: 'legna', name: 'Legna', desc: 'Pila di legna da ardere: corteccia e anelli di accrescimento sulle sezioni tagliate.', build: makeFirewood, pos: [-2.3, -4] },
+    { id: 'mattoni', name: 'Mattoni', desc: 'Muro di mattoni a corsa alternata, ognuno con la sua texture porosa e sfumatura.', build: makeBricks, pos: [2.3, -4] },
+    { id: 'personaggio', name: 'Personaggio BR', desc: 'Guerriero con camo, elmetto, zaino in tela, fucile e accenti colorati teal.', build: makeCharacter, pos: [6.9, -4] },
+    { id: 'casa', name: 'Casa', desc: 'Casa con intonaco, tetto di tegole, comignolo in pietra e luce calda dalle finestre.', build: makeHouse, pos: [-4.6, 3] },
+    { id: 'cassa', name: 'Cassa', desc: 'Cassa del bottino in assi di legno con cinghie metalliche e lucchetto d’oro.', build: makeChest, pos: [0, 3] },
+    { id: 'barile', name: 'Barile', desc: 'Barile di legno con doghe testurizzate, cerchi metallici spazzolati e tappo.', build: makeBarrel, pos: [4.6, 3] }
   ];
 
   /* ---------------- App (solo browser) ---------------- */
@@ -1577,18 +1957,18 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.12;
     container.appendChild(renderer.domElement);
 
     var scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0c0f16, 30, 80);
+    scene.fog = new THREE.Fog(0x171d30, 30, 80);
 
     var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 250);
     camera.position.set(0, 8.5, 16.5);
 
-    // luci
-    scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x2a2118, 0.55));
-    var sun = new THREE.DirectionalLight(0xfff2e0, 1.15);
+    // luci: sole caldo, riempimento freddo, rim luce arancio
+    scene.add(new THREE.HemisphereLight(0x9db8ff, 0x3a4a2a, 0.55));
+    var sun = new THREE.DirectionalLight(0xffd9a8, 1.3);
     sun.position.set(7, 12, 6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -1601,22 +1981,26 @@
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.02;
     scene.add(sun);
-    var fill = new THREE.DirectionalLight(0x8fb4ff, 0.3);
+    var fill = new THREE.DirectionalLight(0x6f9dff, 0.35);
     fill.position.set(-8, 6, -7);
     scene.add(fill);
+    var rim = new THREE.DirectionalLight(0xff7e5f, 0.5);
+    rim.position.set(-4, 5, -10);
+    scene.add(rim);
 
-    // terreno + griglia
-    var ground = M(new THREE.CircleGeometry(80, 64), MAT(0x141821, { roughness: 1, metalness: 0 }), 0, 0, 0);
+    // terreno erboso + griglia
+    var ground = M(new THREE.CircleGeometry(80, 64),
+      MAT(0xffffff, { roughness: 1, metalness: 0, map: texGrass(80, 80) }), 0, 0, 0);
     ground.rotation.x = -Math.PI / 2;
     ground.castShadow = false;
     scene.add(ground);
-    var grid = new THREE.GridHelper(70, 70, 0x2b3547, 0x1c2331);
+    var grid = new THREE.GridHelper(70, 70, 0x46597a, 0x2c3852);
     grid.position.y = 0.015;
     grid.material.transparent = true;
-    grid.material.opacity = 0.55;
+    grid.material.opacity = 0.4;
     scene.add(grid);
 
-    // costruzione modelli + pedane
+    // costruzione modelli + pedane in pietra
     var entries = [];
     MODELS.forEach(function (def) {
       var group = new THREE.Group();
@@ -1624,7 +2008,8 @@
       var model = def.build();
       group.add(model);
 
-      var ped = M(new THREE.CylinderGeometry(1.6, 1.7, 0.16, 40), MAT(0x1e2432, { roughness: 0.95 }), 0, -0.08, 0);
+      var ped = M(new THREE.CylinderGeometry(1.6, 1.7, 0.16, 40),
+        MAT(0x99a3b8, { roughness: 0.95, map: texStone(3, 1) }), 0, -0.08, 0);
       group.add(ped);
 
       var ringM = new THREE.MeshBasicMaterial({ color: 0x3ddc97, transparent: true, opacity: 0.28, side: THREE.DoubleSide });

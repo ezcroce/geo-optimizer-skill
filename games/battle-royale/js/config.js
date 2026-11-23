@@ -103,13 +103,14 @@ export const DIFFICULTY = {
 };
 
 // Fasi della tempesta: attesa, durata restringimento, raggio finale, danno/sec
+// Tempesta: raggi per la mappa grande (1200 m) e tempi più lunghi (partita di circa 15 minuti)
 export const STORM_PHASES = [
-  { wait: 70, shrink: 35, radius: 150, dps: 1 },
-  { wait: 40, shrink: 30, radius: 90, dps: 2 },
-  { wait: 35, shrink: 25, radius: 52, dps: 4 },
-  { wait: 30, shrink: 22, radius: 26, dps: 6 },
-  { wait: 25, shrink: 20, radius: 10, dps: 9 },
-  { wait: 20, shrink: 25, radius: 0, dps: 14 },
+  { wait: 150, shrink: 90, radius: 450, dps: 1 },
+  { wait: 100, shrink: 75, radius: 270, dps: 1 },
+  { wait: 80, shrink: 60, radius: 150, dps: 2 },
+  { wait: 65, shrink: 50, radius: 75, dps: 4 },
+  { wait: 50, shrink: 40, radius: 30, dps: 6 },
+  { wait: 40, shrink: 45, radius: 0, dps: 10 },
 ];
 
 export const BOT_NAMES = [

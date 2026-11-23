@@ -28,12 +28,14 @@ python3 -m http.server 8080
 - **6 armi** con 5 livelli di rarità (Comune → Leggendario, il danno cresce con la rarità): pistola, mitraglietta, fucile d'assalto, fucile a pompa, cecchino con mirino e lanciarazzi con danno ad area. Colpi alla testa ×2.
 - **Consumabili**: bende, medikit, mini scudo e pozione scudo.
 - **Battle Bus** volante → caduta libera → deltaplano.
-- **Isola** con 8 località (Centro Caos, Piazza Pulita, Torri Tremanti, Borgo Bottino, Villa Vertigine, Porto Pigro, Fattoria Felice, Deposito Dannato): case con porte e finestre, forzieri, container, torri, lago, alberi e rocce.
-- **Tempesta** che si restringe in 6 fasi, con danni crescenti.
+- **Isola grande 1,2 × 1,2 km** (3 volte la mappa originale) con **18 località** (fra cui Centro Caos, Piazza Pulita, Torri Tremanti, Borgo Bottino, Villa Vertigine, Porto Pigro, Fattoria Felice e Deposito Dannato), montagne, 3 laghi, strade, case con porte e finestre, forzieri, container, torri, alberi e rocce.
+- **Tempesta lenta**: si restringe in 6 fasi, con attese da 2 minuti e mezzo all'inizio e danni crescenti. Una partita completa dura circa 15 minuti.
+- **Mappa a chunk**: il mondo è diviso in blocchi da 100 m. Vicino al giocatore vengono costruiti i blocchi dettagliati (alberi, erba, interni delle case, bottino, forzieri), poco per volta per evitare scatti; quelli lontani vengono scaricati. In lontananza resta una versione semplificata dell'isola, così l'orizzonte non è mai vuoto. Le collisioni esistono su tutta la mappa, quindi i bot funzionano anche lontano da te.
 - **Fino a 29 bot** con IA: raccolgono bottino, aprono forzieri, si curano, scappano dalla tempesta, si combattono anche fra loro e distruggono i tuoi muri.
 - **Abbassarsi**: con `C` ci si accovaccia; la hitbox è più piccola, la dispersione più bassa e la telecamera scende. Anche i bot si abbassano quando sparano da fermi.
 - **Arrampicarsi**: con `W` + `Spazio` contro un muro, una cassa, un container o una casa ci si aggrappa e si sale; in cima il personaggio scavalca il bordo da solo, con un'animazione fluida. Si consuma **stamina**, visibile in una barra gialla. `S` serve a scendere e `Spazio` a staccarsi con un salto. Il personaggio può anche infilarsi nelle finestre. I bot scavalcano gli ostacoli bassi.
-- **Animazioni**: affondo e polvere quando si atterra da un salto alto, cambio arma animato, e passaggio morbido fra posizione in piedi e accovacciata.
+- **Animazioni**: respiro e sguardo che si guarda attorno da fermi; camminata e corsa con dondolio, spalle che ruotano e inclinazione in curva; arma in spalla mentre corri; rinculo a ogni colpo; ricarica con la mano al caricatore; sussulto quando vieni colpito; salto con gambe raccolte; affondo e polvere all'atterraggio; bracciate in acqua; deltaplano che si inclina in virata; morte con caduta e "puff" finale. In più: cambio arma animato e passaggio morbido fra posizione in piedi e accovacciata.
+- **Balletti (emote)**: con `B` scorri fra Ballo disco, Saluto, Floss ed Esultanza, oppure li scegli direttamente con `6`–`9`. Il personaggio si gira verso la telecamera; il balletto si interrompe se ti muovi, spari o vieni colpito. Quando vinci parte l'esultanza automatica.
 - **Costruzione**: muri di legno (10 materiali), che si ottengono colpendo alberi e rocce col piccone.
 - HUD completo: minimappa e mappa grande, kill feed, numeri dei danni, hitmarker, barre salute/scudo, munizioni.
 - Suoni sintetizzati con la Web Audio API (nessun file audio).
@@ -56,6 +58,7 @@ python3 -m http.server 8080
 | Q | Modalità costruzione |
 | G | Lascia l'oggetto in mano |
 | M | Mappa |
+| B / 6–9 | Balletti (emote) |
 | F | Schermo intero (si attiva anche da solo premendo GIOCA, disattivabile nel menu) |
 | Esc | Pausa |
 
@@ -67,7 +70,7 @@ site.css        stile e animazioni del sito
 gioco.html      il gioco (menu, HUD, schermate)
 style.css       stile dell'interfaccia di gioco
 js/config.js    armi, rarità, skin, consumabili, tempesta, difficoltà
-js/world.js     terreno, città, collisioni, raycast
+js/world.js     terreno, città, chunk (dettaglio + LOD), collisioni, raycast
 js/character.js modelli 3D di personaggi, armi, deltaplano e bus
 js/audio.js     effetti sonori sintetizzati
 js/main.js      ciclo di gioco, giocatore, arrampicata, IA dei bot, combattimento, HUD

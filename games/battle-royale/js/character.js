@@ -1,6 +1,6 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { WEAPONS, RARITIES } from './config.js?v=3';
+import { WEAPONS, RARITIES } from './config.js?v=4';
 
 const matCache = new Map();
 function mat(color, opts = {}) {

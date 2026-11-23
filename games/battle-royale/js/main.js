@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES,
-} from './config.js?v=3';
-import * as A from './audio.js?v=3';
+} from './config.js?v=4';
+import * as A from './audio.js?v=4';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
-  addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS,
-} from './world.js?v=3';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=3';
+  addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE,
+} from './world.js?v=4';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=4';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -57,8 +57,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog('#c4e0f6', 150, 560);
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2000);
+scene.fog = new THREE.Fog('#c4e0f6', 180, 700);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2600);
 
 const hemi = new THREE.HemisphereLight('#dceeff', '#5a7040', 1.15);
 scene.add(hemi);
@@ -488,37 +488,126 @@ function airMove(ch, mx, mz, dt, deploy) {
   ch.moveAmt = Math.hypot(ch.vel.x, ch.vel.z);
 }
 
+// ─────────────── Animazioni dei personaggi ───────────────
+const EMOTES = [
+  { id: 'ballo', name: 'Ballo disco', icon: '🕺', dur: 4.2 },
+  { id: 'saluto', name: 'Saluto', icon: '👋', dur: 2.4 },
+  { id: 'floss', name: 'Floss', icon: '💃', dur: 4.0 },
+  { id: 'tifo', name: 'Esultanza', icon: '🙌', dur: 2.6 },
+];
+const easeOutBounce = x => {
+  const n1 = 7.5625, d1 = 2.75;
+  if (x < 1 / d1) return n1 * x * x;
+  if (x < 2 / d1) return n1 * (x -= 1.5 / d1) * x + 0.75;
+  if (x < 2.5 / d1) return n1 * (x -= 2.25 / d1) * x + 0.9375;
+  return n1 * (x -= 2.625 / d1) * x + 0.984375;
+};
+const bump = x => Math.sin(clamp(x, 0, 1) * Math.PI);
+function angDelta(a, b) { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; }
+
+function startEmote(ch, id) {
+  if (!ch.alive || ch.mode !== 'ground' || ch.using || ch.reloading > 0) return;
+  const e = EMOTES.find(x => x.id === id) || EMOTES[0];
+  ch.emote = e; ch.emoteT = 0; ch.crouch = false;
+  if (ch.isPlayer) { toggleBuild(false); showMsg('', `${e.icon} ${e.name}`, 1.2); }
+}
+function stopEmote(ch) { ch.emote = null; }
+
+function resetPose(m) {
+  m.body.position.set(0, 0, 0);
+  m.body.rotation.set(m.body.rotation.x, 0, 0);
+  m.torso.rotation.set(0, 0, 0);
+  m.head.rotation.set(0, 0, 0);
+  for (const l of m.legs) l.rotation.set(0, 0, 0);
+  for (const a of m.arms) a.rotation.set(0, 0, 0);
+}
+
+function animateEmote(ch, m, dt) {
+  const e = ch.emote, T = ch.emoteT, k = Math.min(1, T * 4) * Math.min(1, (e.dur - T) * 4); // dissolvenza in entrata/uscita
+  m.gunPivot.visible = false;
+  // si gira verso la telecamera per farsi vedere
+  if (ch.isPlayer) { ch.emoteYaw = ch.emoteYaw === undefined ? ch.yaw : ch.emoteYaw; m.root.rotation.y = ch.yaw + Math.PI * easeInOut(Math.min(1, T * 2.5)); }
+  const b = T * (e.id === 'ballo' ? 7.5 : e.id === 'floss' ? 9 : 6);
+  if (e.id === 'ballo') {
+    const s = Math.sin(b);
+    m.body.position.y = Math.abs(Math.sin(b)) * 0.12 * k;
+    m.body.rotation.z = s * 0.12 * k;
+    m.torso.rotation.y = s * 0.3 * k;
+    const up = Math.sin(b * 0.5) > 0;
+    m.arms[1].rotation.set(lerp(0, up ? -2.7 : -0.4, k), 0, lerp(0, up ? -0.5 : 0.3, k));
+    m.arms[0].rotation.set(lerp(0, up ? -0.4 : -2.7, k), 0, lerp(0, up ? -0.3 : 0.5, k));
+    m.legs[0].rotation.set(Math.max(0, s) * -0.5 * k, 0, 0);
+    m.legs[1].rotation.set(Math.max(0, -s) * -0.5 * k, 0, 0);
+    m.head.rotation.set(0, s * 0.25 * k, Math.sin(b * 2) * 0.08 * k);
+  } else if (e.id === 'saluto') {
+    m.arms[1].rotation.set(-2.6 * k, 0, (-0.35 + Math.sin(b * 1.6) * 0.45) * k);
+    m.arms[0].rotation.set(0, 0, 0.1 * k);
+    m.body.rotation.z = Math.sin(b * 0.8) * 0.04 * k;
+    m.head.rotation.set(0, 0, Math.sin(b * 1.6) * 0.12 * k);
+  } else if (e.id === 'floss') {
+    const s = Math.sin(b);
+    const front = Math.sin(b * 0.5) > 0 ? 1 : -1;
+    m.arms[0].rotation.set(front * 0.45 * k, 0, s * 0.7 * k);
+    m.arms[1].rotation.set(-front * 0.45 * k, 0, s * 0.7 * k);
+    m.body.rotation.z = -s * 0.14 * k;
+    m.body.position.x = -s * 0.08 * k;
+    m.legs[0].rotation.z = s * 0.1 * k; m.legs[1].rotation.z = s * 0.1 * k;
+  } else if (e.id === 'tifo') {
+    const hop = Math.abs(Math.sin(b));
+    m.body.position.y = hop * 0.35 * k;
+    m.arms[0].rotation.set(-2.9 * k, 0, (0.35 + hop * 0.2) * k);
+    m.arms[1].rotation.set(-2.9 * k, 0, (-0.35 - hop * 0.2) * k);
+    m.legs[0].rotation.x = -hop * 0.5 * k; m.legs[1].rotation.x = -hop * 0.3 * k;
+    m.head.rotation.x = -0.3 * k;
+  }
+  if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.15 + Math.abs(Math.sin(b)) * 0.3, Math.min(1, dt * 6));
+}
+
 function animateChar(ch, dt) {
   const m = ch.m;
   m.root.position.copy(ch.pos);
   m.root.rotation.y = ch.yaw;
+  m.root.rotation.z = 0;
+  const t = G.time;
+  // ── morte: caduta all'indietro con rimbalzo e "puff" finale ──
   if (!ch.alive) {
     ch.deadT += dt;
-    m.body.rotation.x = lerp(m.body.rotation.x, -Math.PI / 2, Math.min(1, dt * 6));
-    m.body.position.y = lerp(m.body.position.y, 0.25, Math.min(1, dt * 6));
-    if (ch.deadT > 2.5) m.root.visible = false;
+    const k = easeOutBounce(Math.min(1, ch.deadT / 0.75));
+    m.body.rotation.x = -Math.PI / 2 * k;
+    m.body.position.y = 0.25 * k;
+    m.arms[0].rotation.set(-2.4 * k, 0, 0.6 * k); m.arms[1].rotation.set(-2.4 * k, 0, -0.6 * k);
+    m.legs[0].rotation.x = -0.3 * k; m.legs[1].rotation.x = 0.15 * k;
+    m.head.rotation.set(0.2 * k, 0, 0);
+    m.gunPivot.visible = false;
+    if (ch.deadT > 2.2 && m.root.visible) {
+      m.root.visible = false;
+      if (ch.pos.distanceToSquared(camera.position) < 90 * 90) {
+        emit(_p.copy(ch.pos).setY(ch.pos.y + 0.5), '#ffffff', 14, 3, 0.7, 0.18, -0.2);
+        emit(_p.copy(ch.pos).setY(ch.pos.y + 0.5), RARITIES[ch.skin.rarity].color, 10, 4, 0.8, 0.12, -0.3);
+      }
+    }
     return;
   }
-  const t = G.time;
+  // velocità di rotazione (per inclinarsi in curva)
+  const yawRate = dt > 0 ? angDelta(ch.yaw, ch._prevYaw ?? ch.yaw) / dt : 0;
+  ch._prevYaw = ch.yaw;
   if (ch.mode === 'fall') {
     m.body.rotation.x = lerp(m.body.rotation.x, 1.15, dt * 4);
     m.body.position.y = 1;
-    for (const [i, a] of m.arms.entries()) { a.rotation.x = -0.4 + Math.sin(t * 9 + i) * 0.08; a.rotation.z = (i ? 1 : -1) * 1.2; }
-    for (const [i, l] of m.legs.entries()) { l.rotation.x = 0.3 + Math.sin(t * 8 + i * 2) * 0.15; l.rotation.z = (i ? 1 : -1) * 0.25; }
+    m.body.rotation.z = lerp(m.body.rotation.z || 0, clamp(-yawRate * 0.15, -0.5, 0.5), dt * 4);
+    for (const [i, a] of m.arms.entries()) { a.rotation.x = -0.4 + Math.sin(t * 9 + i) * 0.12; a.rotation.z = (i ? 1 : -1) * (1.2 + Math.sin(t * 7 + i) * 0.1); }
+    for (const [i, l] of m.legs.entries()) { l.rotation.x = 0.3 + Math.sin(t * 8 + i * 2) * 0.2; l.rotation.z = (i ? 1 : -1) * 0.25; }
     m.gunPivot.visible = false;
     return;
   }
   m.body.rotation.x = lerp(m.body.rotation.x, 0, Math.min(1, dt * 8));
-  m.body.position.y = 0;
-  for (const l of m.legs) l.rotation.z = 0;
-  m.torso.rotation.x = 0;
+  resetPose(m);
   ch.crouchK = lerp(ch.crouchK, ch.crouch && ch.mode === 'ground' ? 1 : 0, Math.min(1, dt * 12));
   if (ch.mode === 'climb') {
     m.root.rotation.y = Math.atan2(ch.climbDir.x, ch.climbDir.z);
     m.gunPivot.visible = false;
     const ph = ch.climbPhase;
     if (ch.mantle) {
-      // spinta con le braccia sul bordo
       const k = ch.mantle.t;
       m.arms[0].rotation.set(-Math.PI + 0.4 + k * 2.2, 0, -0.2);
       m.arms[1].rotation.set(-Math.PI + 0.4 + k * 2.2, 0, 0.2);
@@ -531,47 +620,106 @@ function animateChar(ch, dt) {
       m.legs[0].rotation.x = -0.22 - Math.max(0, Math.sin(ph)) * 0.4;
       m.legs[1].rotation.x = -0.22 - Math.max(0, -Math.sin(ph)) * 0.4;
       m.torso.rotation.x = 0.08;
+      m.body.position.z = Math.sin(ph * 2) * 0.02;
     }
     m.head.rotation.x = -0.35;
     if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.15, dt * 4);
     return;
   }
   if (ch.mode === 'glide') {
+    ch.leanSide = lerp(ch.leanSide || 0, clamp(-yawRate * 0.25, -0.45, 0.45), Math.min(1, dt * 4));
+    m.root.rotation.z = ch.leanSide;
     for (const [i, a] of m.arms.entries()) { a.rotation.x = -Math.PI + 0.15; a.rotation.z = (i ? 1 : -1) * 0.35; }
-    for (const [i, l] of m.legs.entries()) l.rotation.x = Math.sin(t * 2 + i * 3) * 0.2;
+    for (const [i, l] of m.legs.entries()) l.rotation.x = Math.sin(t * 2 + i * 3) * 0.25;
+    m.body.position.y = Math.sin(t * 1.6) * 0.05;
     m.gunPivot.visible = false;
-    if (m.cape) m.cape.rotation.x = 1.0;
+    if (m.cape) m.cape.rotation.x = 1.0 + Math.sin(t * 9) * 0.08;
     return;
   }
+
+  // ── emote ──
+  if (ch.emote) {
+    ch.emoteT += dt;
+    if (ch.emoteT >= ch.emote.dur || ch.moveAmt > 1.2 || !ch.onGround) ch.emote = null;
+    else { animateEmote(ch, m, dt); return; }
+  }
+
+  // ── a terra ──
   m.gunPivot.visible = true;
-  const mv = Math.min(1, ch.moveAmt / 6);
-  ch.walkPhase += dt * (4 + ch.moveAmt * 1.6) * (mv > 0.05 ? 1 : 0);
-  const sw = Math.sin(ch.walkPhase) * 0.75 * mv;
+  ch.animSpd = lerp(ch.animSpd || 0, ch.moveAmt, Math.min(1, dt * 10));
+  const spd = ch.animSpd;
+  const mv = Math.min(1, spd / 5.2);
+  const run = clamp((spd - 5.6) / 2, 0, 1);
+  const ck = ch.crouchK;
+  const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw);
+  const fwd = ch.vel.x * fx + ch.vel.z * fz;
+  const side = ch.vel.x * -fz + ch.vel.z * fx;   // positivo = verso destra
+  ch.walkPhase += dt * (3.6 + spd * 1.55) * (mv > 0.05 ? 1 : 0);
+  const amp = 0.75 + run * 0.3;
+  const sw = Math.sin(ch.walkPhase) * amp * mv;
   if (ch.isPlayer && mv > 0.3 && ch.onGround) {
     const step = Math.floor(ch.walkPhase / Math.PI);
     if (step !== ch._lastStep) { ch._lastStep = step; A.playStep(); }
   }
-  const ck = ch.crouchK;
-  if (!ch.onGround) { m.legs[0].rotation.x = -0.5; m.legs[1].rotation.x = 0.3; }
-  else {
-    // in piedi ↔ accovacciato (un ginocchio avanti, uno indietro)
+  // inclinazioni morbide: avanti quando corri, di lato quando ti sposti o giri
+  ch.leanFwd = lerp(ch.leanFwd || 0, clamp(fwd * 0.018, -0.1, 0.12) + run * 0.12, Math.min(1, dt * 8));
+  ch.leanSide = lerp(ch.leanSide || 0, clamp(-side * 0.025 - yawRate * 0.03, -0.22, 0.22), Math.min(1, dt * 8));
+  m.body.rotation.x = ch.leanFwd * (1 - ck * 0.5);
+  m.body.rotation.z = ch.leanSide;
+
+  // gambe
+  if (!ch.onGround && !ch.inWater) {
+    // salto: gambe raccolte in salita, aperte in discesa
+    const up = clamp(ch.vel.y / 6, -1, 1);
+    m.legs[0].rotation.x = lerp(-0.25, -0.95, Math.max(0, up));
+    m.legs[1].rotation.x = lerp(0.35, -0.35, Math.max(0, up));
+  } else {
     m.legs[0].rotation.x = lerp(sw, -1.35 + sw * 0.35, ck);
     m.legs[1].rotation.x = lerp(-sw, 0.95 - sw * 0.35, ck);
   }
+  // respiro e spostamento del peso da fermo
+  const idle = 1 - mv;
+  const breath = Math.sin(t * 2.1 + ch.walkPhase * 0) * 0.5 + 0.5;
+  // dondolio della camminata
+  const bob = Math.abs(Math.sin(ch.walkPhase)) * (0.05 + run * 0.05) * mv;
   // atterraggio: piccolo affondo elastico
   if (ch.landT > 0) ch.landT = Math.max(0, ch.landT - dt);
   const land = Math.sin((ch.landT / 0.3) * Math.PI) * ch.landT;
-  m.body.position.y = -0.45 * ck - land * 0.5;
-  m.torso.rotation.x = 0.16 * ck + land * 0.6;
+  m.body.position.y = -0.45 * ck - land * 0.5 + bob + breath * 0.012 * idle;
+  m.torso.rotation.x = 0.16 * ck + land * 0.6 + breath * 0.025 * idle;
+  m.torso.rotation.y = Math.sin(ch.walkPhase) * 0.12 * mv * (1 - ck);   // le spalle ruotano opposte alle gambe
+  m.body.rotation.z += Math.sin(t * 0.9) * 0.02 * idle;
+
+  // la testa ogni tanto si guarda attorno quando sei fermo
+  ch.lookT = (ch.lookT ?? rand(2, 5)) - dt;
+  if (ch.lookT <= 0) { ch.lookT = rand(2.5, 6); ch.lookYaw = idle > 0.8 && !G.ads ? rand(-0.55, 0.55) : 0; }
+  ch.lookCur = lerp(ch.lookCur || 0, idle > 0.8 && !(ch.isPlayer && (mouse.left || G.ads)) ? (ch.lookYaw || 0) : 0, Math.min(1, dt * 3));
+
+  // in acqua: bracciate
+  if (ch.inWater) {
+    m.gunPivot.visible = false;
+    const sp = t * 4.5;
+    m.arms[0].rotation.set(-Math.PI / 2 + Math.sin(sp) * 1.3, 0, -0.2);
+    m.arms[1].rotation.set(-Math.PI / 2 - Math.sin(sp) * 1.3, 0, 0.2);
+    m.legs[0].rotation.x = Math.sin(sp * 2) * 0.35; m.legs[1].rotation.x = -Math.sin(sp * 2) * 0.35;
+    m.body.rotation.x = 0.5; m.body.position.y = 0.15 + Math.sin(sp) * 0.04;
+    m.head.rotation.x = -0.5;
+    if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 1.2, dt * 4);
+    return;
+  }
+
   const p = ch.pitch;
   const s = ch.slot;
   m.gunPivot.rotation.set(-p, 0, 0);
   m.gunPivot.position.set(0.2, 0.5, 0.32);
+  const sprinting = run > 0.5 && ch.onGround && ck < 0.3 && !(ch.isPlayer && (mouse.left || G.ads));
+  ch.sprintK = lerp(ch.sprintK || 0, sprinting ? 1 : 0, Math.min(1, dt * 9));
+  const sk = ch.sprintK;
   if (!s) {
-    // piccone: oscillazione
+    // piccone: oscillazione + braccia che pompano quando corri
     const k = ch.swing > 0 ? Math.sin((1 - ch.swing / 0.45) * Math.PI) : 0;
-    m.arms[1].rotation.set(-0.9 - k * 1.2 + sw * 0.2, 0, 0);
-    m.arms[0].rotation.set(-sw * 0.6, 0, -0.1);
+    m.arms[1].rotation.set(-0.9 - k * 1.2 + sw * 0.2 - sk * 0.2, 0, 0);
+    m.arms[0].rotation.set(-sw * (0.6 + sk * 0.5), 0, -0.1);
     m.gunPivot.position.set(0.32, 0.25 + k * 0.3, 0.3);
     m.gunPivot.rotation.set(-0.6 + k * 1.6, 0, 0);
   } else if (s.kind === 'cons') {
@@ -580,10 +728,32 @@ function animateChar(ch, dt) {
     m.arms[0].rotation.set(-1.0 - k, 0, 0.3);
     m.gunPivot.position.set(0.1, 0.35, 0.4);
   } else {
-    const rel = ch.reloading > 0 ? Math.sin(G.time * 12) * 0.3 : 0;
-    m.arms[1].rotation.set(-Math.PI / 2 - p + 0.15, 0, 0.05);
-    m.arms[0].rotation.set(-Math.PI / 2 - p + 0.2 + rel, 0, 0.55);
-    if (ch.reloading > 0) m.gunPivot.rotation.x = -p + 0.5;
+    // arma: posa di mira, oppure "arma in spalla" mentre corri
+    m.arms[1].rotation.set(lerp(-Math.PI / 2 - p + 0.15, -0.75 + sw * 0.25, sk), 0, lerp(0.05, -0.15, sk));
+    m.arms[0].rotation.set(lerp(-Math.PI / 2 - p + 0.2, -1.0 - sw * 0.25, sk), 0, lerp(0.55, 0.65, sk));
+    m.gunPivot.rotation.set(lerp(-p, 0.75, sk), lerp(0, -0.5, sk), lerp(0, 0.35, sk));
+    m.gunPivot.position.set(lerp(0.2, 0.05, sk), lerp(0.5, 0.3, sk), lerp(0.32, 0.3, sk));
+    // ricarica: la mano sinistra scende al caricatore e torna su, l'arma si inclina
+    if (ch.reloading > 0) {
+      const dur = WEAPONS[s.id].reload;
+      const ph = 1 - ch.reloading / dur;
+      const dip = bump(ph / 0.55), push = bump((ph - 0.55) / 0.45);
+      m.arms[0].rotation.x += dip * 1.1 - push * 0.25;
+      m.arms[0].rotation.z += dip * 0.3;
+      m.gunPivot.rotation.z += 0.55 * bump(ph);
+      m.gunPivot.rotation.x += 0.35 * bump(ph);
+      m.head.rotation.x = 0.25 * bump(ph);
+    }
+  }
+  // rinculo
+  if (ch.recoilT > 0) {
+    ch.recoilT = Math.max(0, ch.recoilT - dt);
+    const r = ch.recoilT / 0.14;
+    const kick = r * r * (ch.recoilK || 1);
+    m.gunPivot.position.z -= kick * 0.12;
+    m.gunPivot.rotation.x += kick * 0.3;
+    m.arms[0].rotation.x += kick * 0.18; m.arms[1].rotation.x += kick * 0.18;
+    m.torso.rotation.x -= kick * 0.06;
   }
   // cambio arma: l'oggetto scende e risale con un'animazione morbida
   if (ch.equipT > 0) {
@@ -594,9 +764,17 @@ function animateChar(ch, dt) {
     m.arms[1].rotation.x += e * 0.8;
     m.arms[0].rotation.x += e * 0.8;
   }
-  m.head.rotation.x = -p * 0.5;
-  m.torso.rotation.y = 0;
-  if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.08 + mv * 0.55 + Math.sin(t * 6) * 0.04 * mv, Math.min(1, dt * 6));
+  // colpito: sussulto
+  if (ch.hitT > 0) {
+    ch.hitT = Math.max(0, ch.hitT - dt);
+    const h = bump(1 - ch.hitT / 0.3);
+    m.torso.rotation.z += h * 0.22 * (ch.hitDir || 1);
+    m.torso.rotation.x -= h * 0.12;
+    m.head.rotation.z = h * 0.25 * (ch.hitDir || 1);
+  }
+  m.head.rotation.x += -p * 0.5;
+  m.head.rotation.y = ch.lookCur - m.torso.rotation.y;
+  if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.08 + mv * 0.55 + run * 0.25 + Math.sin(t * 6) * 0.04 * mv + (ch.onGround ? 0 : 0.5), Math.min(1, dt * 6));
 }
 
 // ─────────────── Raycast su personaggi ───────────────
@@ -678,6 +856,8 @@ function fireWeapon(ch, aimFn) {
   }
   s.mag--;
   ch.fireCd = def.rate;
+  ch.emote = null;
+  ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : 0.7;
   const mult = RARITIES[s.rarity].mult * (ch.isPlayer ? 1 : G.diff.dmgMult);
   const muzzle = muzzlePos(ch);
   A.playGun(def.sound, ch.isPlayer ? 0 : muzzle.distanceTo(camera.position));
@@ -737,6 +917,8 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
   t.hp -= (amount - sh);
   if (attacker && attacker !== t) {
     t.lastAttacker = attacker;
+    t.hitT = 0.3; t.emote = null;
+    { const dx = attacker.pos.x - t.pos.x, dz = attacker.pos.z - t.pos.z; t.hitDir = (dx * Math.cos(t.yaw) - dz * Math.sin(t.yaw)) > 0 ? -1 : 1; }
     attacker.damageDealt += amount;
   }
   if (attacker === G.player && t !== G.player) {
@@ -958,6 +1140,13 @@ function itemLabel(it) {
 }
 
 function spawnLoot(item, pos, pop = false) {
+  const L = { item, pos: pos.clone(), mesh: null, model: null, bob: Math.random() * 6, pop: pop ? 0.35 : 0 };
+  G.loot.push(L);
+  if (pop || pos.distanceToSquared(camera.position) < 150 * 150) buildLootMesh(L);
+  return L;
+}
+function buildLootMesh(L) {
+  const item = L.item, pos = L.pos;
   const g = new THREE.Group();
   let model;
   if (item.kind === 'weapon') { model = buildWeaponMesh(item.id, item.rarity); model.rotation.y = Math.PI / 2; model.rotation.z = 0.15; }
@@ -974,14 +1163,12 @@ function spawnLoot(item, pos, pop = false) {
   }
   g.position.copy(pos);
   scene.add(g);
-  const L = { item, pos: pos.clone(), mesh: g, model, bob: Math.random() * 6, pop: pop ? 0.35 : 0 };
-  G.loot.push(L);
-  return L;
+  L.mesh = g; L.model = model;
 }
 function removeLoot(L) {
   const i = G.loot.indexOf(L);
   if (i >= 0) G.loot.splice(i, 1);
-  scene.remove(L.mesh);
+  if (L.mesh) scene.remove(L.mesh);
 }
 function slotFromItem(it) {
   return it.kind === 'weapon' ? { kind: 'weapon', id: it.id, rarity: it.rarity, mag: it.mag } : { kind: 'cons', id: it.id, count: it.count };
@@ -1032,8 +1219,10 @@ function updateLoot(dt) {
   const cp = camera.position;
   for (const L of G.loot) {
     const d2 = L.pos.distanceToSquared(cp);
-    L.mesh.visible = d2 < 150 * 150;
-    if (!L.mesh.visible) { if (L.pop > 0) L.pop -= dt; continue; }
+    const near = d2 < 150 * 150;
+    if (near && !L.mesh) buildLootMesh(L);
+    if (L.mesh) L.mesh.visible = near;
+    if (!near) { if (L.pop > 0) L.pop -= dt; continue; }
     L.bob += dt;
     L.model.rotation.y += dt * 1.2;
     L.model.position.y = 0.45 + Math.sin(L.bob * 2) * 0.08;
@@ -1078,12 +1267,15 @@ function buildChestMesh() {
   g.add(lid);
   return { g, lid };
 }
-for (const cs of world.chestSpots) {
+for (const cs of world.chestSpots) G.chests.push({ pos: cs.pos.clone(), rot: cs.rot, mesh: null, lid: null, opened: false, t: 0 });
+function ensureChestMesh(c) {
+  if (c.mesh) return;
   const { g, lid } = buildChestMesh();
-  g.position.copy(cs.pos);
-  g.rotation.y = cs.rot;
+  g.position.copy(c.pos);
+  g.rotation.y = c.rot;
   scene.add(g);
-  G.chests.push({ pos: cs.pos.clone(), mesh: g, lid, opened: false, t: 0 });
+  c.mesh = g; c.lid = lid;
+  if (c.opened) lid.rotation.x = -1.9;
 }
 function openChest(ch, c) {
   if (c.opened) return;
@@ -1091,7 +1283,7 @@ function openChest(ch, c) {
   const w = randomWeapon(1);
   const items = [w, ammoFor(w.id), randomCons(), { kind: 'mats', count: 30 }];
   items.forEach((it, i) => {
-    const a = c.mesh.rotation.y + (i - 1.5) * 0.6;
+    const a = c.rot + (i - 1.5) * 0.6;
     const x = c.pos.x + Math.sin(a) * 1.3, z = c.pos.z + Math.cos(a) * 1.3;
     spawnLoot(it, new THREE.Vector3(x, groundAt(x, z, c.pos.y + 1), z), true);
   });
@@ -1099,7 +1291,12 @@ function openChest(ch, c) {
   if (c.pos.distanceTo(camera.position) < 40) A.playChest();
 }
 function updateChests(dt) {
+  const cp = camera.position;
   for (const c of G.chests) {
+    const near = c.pos.distanceToSquared(cp) < 160 * 160;
+    if (near) ensureChestMesh(c);
+    if (c.mesh) c.mesh.visible = near;
+    if (!near) continue;
     if (c.opened) { c.lid.rotation.x = lerp(c.lid.rotation.x, -1.9, Math.min(1, dt * 6)); continue; }
     c.lid.rotation.x = 0;
     c.t -= dt;
@@ -1130,14 +1327,14 @@ stormWall.renderOrder = 2;
 scene.add(stormWall);
 
 function newStorm() {
-  const s = { phase: 0, state: 'wait', timer: STORM_PHASES[0].wait, cx: 0, cz: 0, r: 300, dps: 1, fx: 0, fz: 0, fr: 300, tx: 0, tz: 0, tr: 150, tick: 0 };
+  const s = { phase: 0, state: 'wait', timer: STORM_PHASES[0].wait, cx: 0, cz: 0, r: 300 * SCALE, dps: 1, fx: 0, fz: 0, fr: 300 * SCALE, tx: 0, tz: 0, tr: 150 * SCALE, tick: 0 };
   pickNextCircle(s);
   return s;
 }
 function pickNextCircle(s) {
   const ph = STORM_PHASES[s.phase];
   s.tr = ph.radius;
-  const maxOff = Math.max(0, Math.min(s.r, 190) - ph.radius) * 0.8;
+  const maxOff = Math.max(0, Math.min(s.r, 190 * SCALE) - ph.radius) * 0.8;
   for (let i = 0; i < 30; i++) {
     const a = Math.random() * Math.PI * 2, d = Math.random() * maxOff;
     const x = s.cx + Math.cos(a) * d, z = s.cz + Math.sin(a) * d;
@@ -1194,15 +1391,16 @@ function safeTarget() {
 let busMesh = null;
 function newBus() {
   const ang = Math.random() * Math.PI * 2;
-  const off = rand(-50, 50);
+  const off = rand(-50, 50) * SCALE;
   const nx = -Math.sin(ang), nz = Math.cos(ang);
-  const a = new THREE.Vector3(Math.cos(ang) * 235 + nx * off, 130, Math.sin(ang) * 235 + nz * off);
-  const b = new THREE.Vector3(-Math.cos(ang) * 235 + nx * off, 130, -Math.sin(ang) * 235 + nz * off);
+  const R = 235 * SCALE, Y = 200;
+  const a = new THREE.Vector3(Math.cos(ang) * R + nx * off, Y, Math.sin(ang) * R + nz * off);
+  const b = new THREE.Vector3(-Math.cos(ang) * R + nx * off, Y, -Math.sin(ang) * R + nz * off);
   if (!busMesh) { busMesh = buildBus(); scene.add(busMesh); }
   busMesh.visible = true;
   busMesh.position.copy(a);
   busMesh.lookAt(b);
-  return { a, b, t: 0, dur: a.distanceTo(b) / 30, pos: a.clone() };
+  return { a, b, t: 0, dur: a.distanceTo(b) / 62, pos: a.clone() };
 }
 function jumpFromBus(ch) {
   ch.mode = 'fall';
@@ -1742,6 +1940,8 @@ function updatePlayer(dt) {
   // slot
   for (let i = 0; i < SLOT_COUNT; i++) if (pressed.has('Digit' + (i + 1))) { p.setActive(i); if (G.build.on) toggleBuild(false); }
   if (pressed.has('KeyQ')) toggleBuild();
+  if (pressed.has('KeyB')) { const i = ((p._emoteIdx ?? -1) + 1) % EMOTES.length; p._emoteIdx = i; startEmote(p, EMOTES[i].id); }
+  for (let i = 0; i < EMOTES.length; i++) if (pressed.has('Digit' + (6 + i))) startEmote(p, EMOTES[i].id);
   if (pressed.has('KeyR')) startReload(p);
   if (pressed.has('KeyG') && p.slot) { dropAt(p, itemFromSlot(p.slot)); p.slots[p.active] = null; p.using = null; p.reloading = 0; p.updateHeld(); }
   const inter = nearestInteract(p);
@@ -1863,10 +2063,15 @@ function updateCamera(dt) {
   sun.position.copy(focus).add(SUN_OFF);
   sun.target.position.copy(focus);
   sky.position.copy(camera.position);
+  {
+    const alt = clamp((camera.position.y - terrainHeight(camera.position.x, camera.position.z)) / 160, 0, 1);
+    scene.fog.near = lerp(160, 420, alt);
+    scene.fog.far = lerp(620, 1500, alt);
+  }
   // tetti trasparenti se sei dentro una casa
   for (const h of world.houses) {
     const inside = p.alive && Math.abs(p.pos.x - h.cx) < h.w / 2 && Math.abs(p.pos.z - h.cz) < h.d / 2 && p.pos.y < h.roofTop - 0.5;
-    h.roof.visible = !inside;
+    if (h.roofMesh) h.roofMesh.visible = !inside;
   }
 }
 
@@ -2016,7 +2221,7 @@ const mmCanvas = $('#minimap');
 const mmCtx = mmCanvas.getContext('2d');
 function w2m(v, center, view, S) { return (v - center) / view * S + S / 2; }
 function drawMinimap() {
-  const S = 200, view = 150;
+  const S = 200, view = 220;
   const p = G.player;
   const c = p.mode === 'bus' ? G.bus.pos : (p.alive ? p.pos : camera.position);
   const MM = world.minimap.width, k = MM / (HALF * 2);
@@ -2095,13 +2300,13 @@ function drawBigMap() {
 function clearMatch() {
   for (const c of G.chars) scene.remove(c.m.root);
   G.chars = [];
-  for (const L of G.loot) scene.remove(L.mesh);
+  for (const L of G.loot) if (L.mesh) scene.remove(L.mesh);
   G.loot = [];
   for (const pr of G.projectiles) scene.remove(pr.mesh);
   G.projectiles = [];
   for (const w of [...G.walls]) { removeCollider(w); scene.remove(w.mesh); }
   G.walls = [];
-  for (const c of G.chests) { c.opened = false; c.lid.rotation.x = 0; }
+  for (const c of G.chests) { c.opened = false; if (c.lid) c.lid.rotation.x = 0; }
   for (const d of G.dmgNums) d.el.remove();
   G.dmgNums = [];
   hud.feed.innerHTML = '';
@@ -2170,6 +2375,7 @@ function startMatch() {
 }
 
 function endMatch(win) {
+  if (win && G.player && G.player.alive && G.player.mode === 'ground') startEmote(G.player, 'tifo');
   if (G.endShown) return;
   G.endShown = true;
   G.state = 'end';
@@ -2340,11 +2546,13 @@ function update(dt) {
   updateHUD(dt);
 }
 
+const _menuStream = new THREE.Vector3(0, 0, 0);
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  world.update(G.state === 'menu' ? _menuStream : camera.position, G.state === 'menu' ? 8 : 5);
   if (G.state === 'menu') { renderLobby(dt); pressed.clear(); return; }
   if (!G.paused) update(dt);
   renderer.render(scene, camera);
@@ -2363,4 +2571,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb };
+window.__game = { G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

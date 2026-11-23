@@ -1,18 +1,34 @@
 // Mondo di gioco: terreno, città, alberi, collisioni e raycast
+// La parte "logica" (collisioni, posizioni di case/alberi/bottino) è calcolata all'avvio perché
+// serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
+// un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 
-export const HALF = 200;          // la mappa va da -200 a +200
+export const SCALE = 3;               // la mappa è 3 volte più grande della versione originale
+export const HALF = 200 * SCALE;      // la mappa va da -600 a +600
 export const WATER_LEVEL = -2.6;
+export const CHUNK = 100;             // lato di un chunk (m)
+const EDGE = HALF + 60;               // il terreno continua un po' nel mare
 
 export const TOWNS = [
-  { name: 'Centro Caos', x: 5, z: 0, r: 40, houses: 9 },
-  { name: 'Piazza Pulita', x: -105, z: -95, r: 32, houses: 6 },
-  { name: 'Torri Tremanti', x: 100, z: -105, r: 30, houses: 4, towers: true },
-  { name: 'Borgo Bottino', x: -110, z: 95, r: 32, houses: 6 },
-  { name: 'Villa Vertigine', x: 112, z: 92, r: 28, houses: 5 },
-  { name: 'Porto Pigro', x: -140, z: 0, r: 22, houses: 3, containers: true },
-  { name: 'Fattoria Felice', x: 40, z: 130, r: 22, houses: 3 },
-  { name: 'Deposito Dannato', x: 30, z: -140, r: 24, houses: 2, containers: true },
+  { name: 'Centro Caos', x: 15, z: 0, r: 52, houses: 12 },
+  { name: 'Piazza Pulita', x: -315, z: -285, r: 34, houses: 7 },
+  { name: 'Torri Tremanti', x: 300, z: -315, r: 32, houses: 4, towers: true },
+  { name: 'Borgo Bottino', x: -330, z: 285, r: 34, houses: 7 },
+  { name: 'Villa Vertigine', x: 336, z: 276, r: 30, houses: 5 },
+  { name: 'Porto Pigro', x: -430, z: 0, r: 26, houses: 3, containers: true },
+  { name: 'Fattoria Felice', x: 120, z: 390, r: 26, houses: 3 },
+  { name: 'Deposito Dannato', x: 90, z: -430, r: 28, houses: 2, containers: true },
+  { name: 'Lido Lampo', x: 470, z: -20, r: 30, houses: 5 },
+  { name: 'Castello Cosmico', x: -130, z: -175, r: 34, houses: 6, towers: true },
+  { name: 'Miniera Matta', x: -440, z: -420, r: 26, houses: 3, containers: true },
+  { name: 'Bosco Brivido', x: -200, z: 430, r: 28, houses: 4 },
+  { name: 'Faro Folle', x: 460, z: 460, r: 24, houses: 3, towers: true },
+  { name: 'Campeggio Caos', x: 190, z: 170, r: 28, houses: 4 },
+  { name: 'Valle Vortice', x: -470, z: 190, r: 26, houses: 3 },
+  { name: 'Stazione Strana', x: 230, z: -170, r: 32, houses: 5, containers: true },
+  { name: 'Paese Pazzo', x: -10, z: 250, r: 32, houses: 6 },
+  { name: 'Rocca Ribelle', x: -20, z: -290, r: 28, houses: 4 },
 ];
 
 // ── generatore pseudo-casuale con seme (mappa sempre uguale) ──
@@ -32,14 +48,32 @@ function smoothstep(e0, e1, x) {
   return t * t * (3 - 2 * t);
 }
 
+const MOUNTAINS = [
+  { x: -290, z: -60, r: 120, h: 36 },
+  { x: 340, z: 70, r: 105, h: 32 },
+  { x: -90, z: 470, r: 85, h: 26 },
+  { x: 150, z: -300, r: 70, h: 20 },
+];
+const LAKES = [
+  { x: -150, z: 110, r: 90, d: 10 },
+  { x: 300, z: -60, r: 50, d: 9 },
+  { x: -300, z: 420, r: 45, d: 9 },
+];
+
 function baseHeight(x, z) {
-  let h = 7 * Math.sin(x * 0.018 + 0.5) * Math.cos(z * 0.015 - 0.3)
-    + 3.2 * Math.sin(x * 0.047 + 1.3) * Math.sin(z * 0.041 + 0.7)
+  const X = x / 1.8, Z = z / 1.8;   // colline più ampie
+  let h = 7 * Math.sin(X * 0.018 + 0.5) * Math.cos(Z * 0.015 - 0.3)
+    + 3.2 * Math.sin(X * 0.047 + 1.3) * Math.sin(Z * 0.041 + 0.7)
     + 1.1 * Math.sin(x * 0.12) * Math.cos(z * 0.105)
     + 0.4 * Math.sin(x * 0.31 + z * 0.27);
-  // un lago a sud-ovest del centro
-  const ld = Math.hypot(x + 50, z - 40);
-  h -= 9 * (1 - smoothstep(0, 32, ld));
+  for (const m of MOUNTAINS) {
+    const d = Math.hypot(x - m.x, z - m.z);
+    if (d < m.r) { const k = 1 - d / m.r; h += m.h * k * k * (3 - 2 * k) * (0.85 + 0.15 * Math.sin(x * 0.07 + z * 0.05)); }
+  }
+  for (const l of LAKES) {
+    const d = Math.hypot(x - l.x, z - l.z);
+    if (d < l.r) h -= l.d * (1 - smoothstep(0, l.r, d));
+  }
   return h;
 }
 
@@ -48,15 +82,19 @@ for (const t of TOWNS) t.h = Math.max(1.2, baseHeight(t.x, t.z) + 0.5);
 export function terrainHeight(x, z) {
   let h = baseHeight(x, z);
   for (const t of TOWNS) {
-    const d = Math.hypot(x - t.x, z - t.z);
-    if (d < t.r + 18) {
-      const k = 1 - smoothstep(t.r, t.r + 18, d);
+    const dx = x - t.x, dz = z - t.z;
+    const R = t.r + 18;
+    if (dx > R || dx < -R || dz > R || dz < -R) continue;
+    const d = Math.hypot(dx, dz);
+    if (d < R) {
+      const k = 1 - smoothstep(t.r, R, d);
       h = h + (t.h - h) * k;
     }
   }
   // isola: la costa scende nel mare oltre il bordo della mappa
-  const e = Math.max(Math.abs(x), Math.abs(z)) + 6 * Math.sin(x * 0.05 + z * 0.03);
-  if (e > 176) h = h + (-9 - h) * smoothstep(176, 200, e);
+  const e = Math.max(Math.abs(x), Math.abs(z)) + 14 * Math.sin(x * 0.02 + z * 0.013) + 6 * Math.sin(x * 0.05 - z * 0.04);
+  const c0 = HALF - 72;
+  if (e > c0) h = h + (-9 - h) * smoothstep(c0, HALF, e);
   return h;
 }
 
@@ -66,7 +104,7 @@ const CELL = 16;
 const grid = new Map();
 let stamp = 0;
 
-function cellKey(ix, iz) { return ix * 4096 + iz; }
+function cellKey(ix, iz) { return (ix + 2048) * 4096 + (iz + 2048); }
 
 export function addCollider(c) {
   if (c.type === 'cyl') {
@@ -191,8 +229,10 @@ function rayCyl(o, d, c) {
   const a = d.x * d.x + d.z * d.z;
   const cc = dx * dx + dz * dz - c.r * c.r;
   if (a < 1e-9) {
+    // raggio verticale: colpisce solo se parte dentro il cilindro
     if (cc > 0) return -1;
-    return -1;
+    const t = d.y > 0 ? c.minY - o.y : o.y - c.maxY;
+    return t >= 0 ? t : (o.y >= c.minY && o.y <= c.maxY ? 0 : -1);
   }
   const b = 2 * (dx * d.x + dz * d.z);
   const disc = b * b - 4 * a * cc;
@@ -204,13 +244,35 @@ function rayCyl(o, d, c) {
   return t;
 }
 
-/** Raycast contro i collisori. Ritorna {t, collider} oppure null */
+/** Raycast contro i collisori, attraversando solo le celle della griglia toccate dal raggio (DDA).
+ *  Ritorna {t, collider} oppure null */
 export function rayColliders(o, d, maxDist, ignore = null) {
+  stamp++;
   let best = maxDist, hit = null;
-  for (const c of colliders) {
-    if (c === ignore) continue;
-    const t = c.type === 'box' ? rayBox(o, d, c) : rayCyl(o, d, c);
-    if (t >= 0 && t < best) { best = t; hit = c; }
+  const test = (arr) => {
+    for (const c of arr) {
+      if (c._s === stamp || c === ignore) continue;
+      c._s = stamp;
+      const t = c.type === 'box' ? rayBox(o, d, c) : rayCyl(o, d, c);
+      if (t >= 0 && t < best) { best = t; hit = c; }
+    }
+  };
+  let ix = Math.floor(o.x / CELL), iz = Math.floor(o.z / CELL);
+  const hl = Math.hypot(d.x, d.z);
+  if (hl < 1e-6) { const a = grid.get(cellKey(ix, iz)); if (a) test(a); return hit ? { t: best, collider: hit } : null; }
+  const stepX = d.x > 0 ? 1 : -1, stepZ = d.z > 0 ? 1 : -1;
+  const tdx = Math.abs(d.x) > 1e-9 ? CELL / Math.abs(d.x) : Infinity;
+  const tdz = Math.abs(d.z) > 1e-9 ? CELL / Math.abs(d.z) : Infinity;
+  let tmx = Math.abs(d.x) > 1e-9 ? ((d.x > 0 ? (ix + 1) * CELL - o.x : o.x - ix * CELL) / Math.abs(d.x)) : Infinity;
+  let tmz = Math.abs(d.z) > 1e-9 ? ((d.z > 0 ? (iz + 1) * CELL - o.z : o.z - iz * CELL) / Math.abs(d.z)) : Infinity;
+  let tEnter = 0;
+  for (let n = 0; n < 4000; n++) {
+    if (tEnter > best) break;
+    const a = grid.get(cellKey(ix, iz));
+    if (a) test(a);
+    if (tmx < tmz) { tEnter = tmx; tmx += tdx; ix += stepX; }
+    else { tEnter = tmz; tmz += tdz; iz += stepZ; }
+    if (tEnter > maxDist) break;
   }
   return hit ? { t: best, collider: hit } : null;
 }
@@ -222,7 +284,7 @@ export function rayTerrain(o, d, maxDist) {
   for (let t = step; t <= maxDist + step; t += step) {
     const tt = Math.min(t, maxDist);
     const y = o.y + d.y * tt;
-    if (d.y > 0 && y > 60) return -1;
+    if (d.y > 0 && y > 80) return -1;
     if (y < terrainHeight(o.x + d.x * tt, o.z + d.z * tt)) {
       let a = prevT, b = tt;
       for (let i = 0; i < 8; i++) {
@@ -246,7 +308,7 @@ export function rayWorld(o, d, maxDist, ignore = null) {
   return c;
 }
 
-// ─────────────── Costruzione della scena ───────────────
+// ─────────────── Materiali e texture condivisi ───────────────
 const M = {};
 function m(name, color, opts = {}) {
   if (!M[name]) M[name] = new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts });
@@ -288,10 +350,19 @@ function makeWoodTexture() {
   return t;
 }
 
+// ─────────────── Strade (collegano ogni città alle 2 più vicine) ───────────────
 const roads = [];
 function buildRoads() {
-  const order = [[0, 1], [0, 2], [0, 3], [0, 4], [1, 5], [5, 3], [3, 6], [6, 4], [2, 7], [7, 1], [4, 2]];
-  for (const [a, b] of order) roads.push([TOWNS[a], TOWNS[b]]);
+  const seen = new Set();
+  TOWNS.forEach((a, i) => {
+    const near = TOWNS.map((b, j) => ({ j, d: Math.hypot(a.x - b.x, a.z - b.z) })).filter(o => o.j !== i).sort((p, q) => p.d - q.d).slice(0, 2);
+    for (const { j } of near) {
+      const key = Math.min(i, j) + '-' + Math.max(i, j);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      roads.push([a, TOWNS[j]]);
+    }
+  });
 }
 function roadDist(x, z) {
   let best = Infinity;
@@ -309,93 +380,70 @@ function inTown(x, z, pad = 0) {
   return null;
 }
 
+// colore del terreno in un punto (usato sia dai chunk dettagliati sia da quelli lontani)
+const _gc = { grass1: new THREE.Color('#5d9c3f'), grass2: new THREE.Color('#7cb84a'), sand: new THREE.Color('#d9c48a'), rock: new THREE.Color('#8a8578'), dirt: new THREE.Color('#a68a5a'), snow: new THREE.Color('#f2f2f2'), town: new THREE.Color('#9aa36b') };
+function groundColor(x, z, h, out) {
+  const n = 0.5 + 0.5 * Math.sin(x * 0.21 + Math.cos(z * 0.17) * 2);
+  out.copy(_gc.grass1).lerp(_gc.grass2, n * 0.8);
+  if (inTown(x, z, 4)) out.lerp(_gc.town, 0.45);
+  const rd = roadDist(x, z);
+  if (rd < 3.5) out.lerp(_gc.dirt, 1 - rd / 3.5);
+  if (h < WATER_LEVEL + 1.2) out.lerp(_gc.sand, Math.min(1, (WATER_LEVEL + 1.2 - h) / 1.2));
+  if (h > 14) out.lerp(_gc.rock, Math.min(1, (h - 14) / 6));
+  if (h > 28) out.lerp(_gc.snow, Math.min(1, (h - 28) / 8));
+  return out;
+}
+
+// ═════════════════════════ COSTRUZIONE ═════════════════════════
 export function buildWorld(scene) {
   buildRoads();
   const lootSpots = [];
   const chestSpots = [];
   const houses = [];
 
-  // ── Terreno ──
-  const SEG = 160;
-  const geo = new THREE.PlaneGeometry(HALF * 2 + 60, HALF * 2 + 60, SEG, SEG);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  const col = new THREE.Color();
-  const grass1 = new THREE.Color('#5d9c3f'), grass2 = new THREE.Color('#7cb84a'), sand = new THREE.Color('#d9c48a');
-  const rock = new THREE.Color('#8a8578'), dirt = new THREE.Color('#a68a5a'), snow = new THREE.Color('#f2f2f2'), town = new THREE.Color('#9aa36b');
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    const h = terrainHeight(x, z);
-    pos.setY(i, h);
-    const n = 0.5 + 0.5 * Math.sin(x * 0.21 + Math.cos(z * 0.17) * 2);
-    col.copy(grass1).lerp(grass2, n * 0.8);
-    if (inTown(x, z, 4)) col.lerp(town, 0.45);
-    const rd = roadDist(x, z);
-    if (rd < 3.5) col.lerp(dirt, 1 - rd / 3.5);
-    if (h < WATER_LEVEL + 1.2) col.lerp(sand, Math.min(1, (WATER_LEVEL + 1.2 - h) / 1.2));
-    if (h > 14) col.lerp(rock, Math.min(1, (h - 14) / 6));
-    if (h > 28) col.lerp(snow, Math.min(1, (h - 28) / 8));
-    colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+  // ── griglia dei chunk ──
+  const NC = Math.ceil(EDGE / CHUNK);            // chunk per lato da 0 al bordo
+  const chunks = new Map();
+  const chunkKey = (cx, cz) => cx + ',' + cz;
+  for (let cx = -NC; cx < NC; cx++) for (let cz = -NC; cz < NC; cz++) {
+    chunks.set(chunkKey(cx, cz), { cx, cz, x0: cx * CHUNK, z0: cz * CHUNK, boxes: [], trees: [], rocks: [], specials: [], houses: [], detail: null, lod: null, state: 0 });
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.computeVertexNormals();
-  const terrain = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: false }));
-  terrain.receiveShadow = true;
-  scene.add(terrain);
+  const chunkAt = (x, z) => chunks.get(chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK)));
 
-  // ── Acqua ──
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
-    new THREE.MeshStandardMaterial({ color: '#2a7fc0', transparent: true, opacity: 0.75, roughness: 0.1, metalness: 0.3 }));
-  water.rotation.x = -Math.PI / 2;
-  water.position.y = WATER_LEVEL;
-  scene.add(water);
-
-  // ── Materiali edifici ──
+  // ── materiali ──
   const wallColors = ['#e8dcc0', '#d9b48a', '#c9d6df', '#e6c3b0', '#cfe0c0', '#f0e0a0'];
   const wallMats = wallColors.map(c => new THREE.MeshStandardMaterial({ map: makeWallTexture(c, 'rgba(0,0,0,0.12)'), roughness: 0.9 }));
-  const roofMats = ['#a33b2a', '#5a5f6a', '#3b5a8a', '#7a4a2a'].map(c => m('roof' + c, c));
+  const roofColors = ['#a33b2a', '#5a5f6a', '#3b5a8a', '#7a4a2a'];
+  const roofMats = roofColors.map(c => m('roof' + c, c));
   const floorMat = m('floor', '#8a6a4a');
   const woodTex = makeWoodTexture();
   const crateMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.9 });
   const metalMat = m('metal', '#6a6f78', { metalness: 0.6, roughness: 0.4 });
-  const containerMats = ['#c0392b', '#2471a3', '#d68910', '#1e8449'].map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
+  const contColors = ['#c0392b', '#2471a3', '#d68910', '#1e8449'];
+  const containerMats = contColors.map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
+  const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const lodMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const blockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
 
-  const staticMeshes = [];
+  /** Registra un box: il collisore subito, la mesh quando il chunk viene generato */
   function addBox(w, h, d, x, y, z, material, opts = {}) {
-    const g = new THREE.BoxGeometry(w, h, d);
-    if (material.map && opts.uv !== false) {
-      // ripeti la texture in base alla dimensione
-      const uv = g.attributes.uv;
-      const normal = g.attributes.normal;
-      for (let i = 0; i < uv.count; i++) {
-        const nx = Math.abs(normal.getX(i)), ny = Math.abs(normal.getY(i));
-        const sx = nx > 0.5 ? d : w, sy = ny > 0.5 ? d : h;
-        uv.setXY(i, uv.getX(i) * sx / 2, uv.getY(i) * sy / 2);
-      }
-    }
-    const mesh = new THREE.Mesh(g, material);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = opts.cast !== false;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-    staticMeshes.push(mesh);
-    let c = null;
+    const spec = { w, h, d, x, y, z, material, cast: opts.cast !== false, lodColor: opts.lodColor, house: opts.house, roof: opts.roof, mesh: null };
+    chunkAt(x, z).boxes.push(spec);
     if (opts.collide !== false) {
-      c = addCollider({ type: 'box', minX: x - w / 2, maxX: x + w / 2, minY: y - h / 2, maxY: y + h / 2, minZ: z - d / 2, maxZ: z + d / 2, mesh, noStand: opts.noStand });
+      spec.c = addCollider({ type: 'box', minX: x - w / 2, maxX: x + w / 2, minY: y - h / 2, maxY: y + h / 2, minZ: z - d / 2, maxZ: z + d / 2, noStand: opts.noStand });
     }
-    return { mesh, c };
+    return spec;
   }
 
   function placeHouse(cx, cz, w, d, baseY, rot90) {
     if (rot90) { const t = w; w = d; d = t; }
     const H = 3.8, T = 0.35, door = 2.2;
-    const wm = wallMats[Math.floor(srand() * wallMats.length)];
-    const parts = [];
-    // pavimento
-    parts.push(addBox(w, 0.2, d, cx, baseY + 0.1, cz, floorMat, { cast: false }).mesh);
+    const wi = Math.floor(srand() * wallMats.length);
+    const wm = wallMats[wi];
+    const house = { cx, cz, w, d, baseY, roofMesh: null, roofTop: baseY + H + 0.3, doors: [], wallColor: wallColors[wi] };
+    const ho = { house };
+    addBox(w, 0.2, d, cx, baseY + 0.1, cz, floorMat, { cast: false, ...ho });
     const doorSide = Math.floor(srand() * 4);
-    const doors = [];
     const normals = [[0, -1], [0, 1], [-1, 0], [1, 0]];
     const sides = [
       { x: cx, z: cz - d / 2 + T / 2, len: w, horiz: true },
@@ -406,49 +454,47 @@ export function buildWorld(scene) {
     sides.forEach((s, i) => {
       const hasDoor = i === doorSide || (i === (doorSide ^ 1) && srand() < 0.5);
       const hasWindow = !hasDoor && srand() < 0.7;
-      if (hasDoor) doors.push({ x: s.x, z: s.z, nx: normals[i][0], nz: normals[i][1] });
+      if (hasDoor) house.doors.push({ x: s.x, z: s.z, nx: normals[i][0], nz: normals[i][1] });
       if (hasDoor || hasWindow) {
         const gap = hasDoor ? door : 1.6;
         const seg = (s.len - gap) / 2;
         const off = gap / 2 + seg / 2;
         for (const sgn of [-1, 1]) {
-          if (s.horiz) parts.push(addBox(seg, H, T, s.x + sgn * off, baseY + H / 2, s.z, wm).mesh);
-          else parts.push(addBox(T, H, seg, s.x, baseY + H / 2, s.z + sgn * off, wm).mesh);
+          if (s.horiz) addBox(seg, H, T, s.x + sgn * off, baseY + H / 2, s.z, wm, ho);
+          else addBox(T, H, seg, s.x, baseY + H / 2, s.z + sgn * off, wm, ho);
         }
         if (hasDoor) {
           const lh = H - 2.6;
-          if (s.horiz) parts.push(addBox(gap, lh, T, s.x, baseY + 2.6 + lh / 2, s.z, wm).mesh);
-          else parts.push(addBox(T, lh, gap, s.x, baseY + 2.6 + lh / 2, s.z, wm).mesh);
+          if (s.horiz) addBox(gap, lh, T, s.x, baseY + 2.6 + lh / 2, s.z, wm, ho);
+          else addBox(T, lh, gap, s.x, baseY + 2.6 + lh / 2, s.z, wm, ho);
         } else {
-          // finestra: muro sotto e sopra
           if (s.horiz) {
-            parts.push(addBox(gap, 1.1, T, s.x, baseY + 0.55, s.z, wm).mesh);
-            parts.push(addBox(gap, 1.1, T, s.x, baseY + H - 0.55, s.z, wm).mesh);
+            addBox(gap, 1.1, T, s.x, baseY + 0.55, s.z, wm, ho);
+            addBox(gap, 1.1, T, s.x, baseY + H - 0.55, s.z, wm, ho);
           } else {
-            parts.push(addBox(T, 1.1, gap, s.x, baseY + 0.55, s.z, wm).mesh);
-            parts.push(addBox(T, 1.1, gap, s.x, baseY + H - 0.55, s.z, wm).mesh);
+            addBox(T, 1.1, gap, s.x, baseY + 0.55, s.z, wm, ho);
+            addBox(T, 1.1, gap, s.x, baseY + H - 0.55, s.z, wm, ho);
           }
         }
       } else {
-        if (s.horiz) parts.push(addBox(s.len, H, T, s.x, baseY + H / 2, s.z, wm).mesh);
-        else parts.push(addBox(T, H, s.len, s.x, baseY + H / 2, s.z, wm).mesh);
+        if (s.horiz) addBox(s.len, H, T, s.x, baseY + H / 2, s.z, wm, ho);
+        else addBox(T, H, s.len, s.x, baseY + H / 2, s.z, wm, ho);
       }
     });
-    // tetto
-    const roofM = roofMats[Math.floor(srand() * roofMats.length)];
-    const roof = addBox(w + 0.6, 0.3, d + 0.6, cx, baseY + H + 0.15, cz, roofM);
-    const house = { cx, cz, w, d, baseY, roof: roof.mesh, roofTop: baseY + H + 0.3, doors };
+    const ri = Math.floor(srand() * roofMats.length);
+    addBox(w + 0.6, 0.3, d + 0.6, cx, baseY + H + 0.15, cz, roofMats[ri], { ...ho, roof: true });
+    house.roofColor = roofColors[ri];
     houses.push(house);
+    chunkAt(cx, cz).houses.push(house);
     // loot e casse dentro la casa
     const nLoot = 1 + Math.floor(srand() * 3);
     for (let i = 0; i < nLoot; i++) {
       lootSpots.push(new THREE.Vector3(cx + sr(-w / 2 + 1.2, w / 2 - 1.2), baseY + 0.2, cz + sr(-d / 2 + 1.2, d / 2 - 1.2)));
     }
     if (srand() < 0.55) chestSpots.push({ pos: new THREE.Vector3(cx + sr(-w / 2 + 1.3, w / 2 - 1.3), baseY + 0.2, cz + sr(-d / 2 + 1.3, d / 2 - 1.3)), rot: srand() * Math.PI });
-    // un tavolo
     if (srand() < 0.6) {
       const tx = cx + sr(-w / 4, w / 4), tz = cz + sr(-d / 4, d / 4);
-      addBox(1.6, 0.9, 0.9, tx, baseY + 0.55, tz, crateMat);
+      addBox(1.6, 0.9, 0.9, tx, baseY + 0.55, tz, crateMat, ho);
     }
     return house;
   }
@@ -460,9 +506,10 @@ export function buildWorld(scene) {
     return false;
   }
 
+  // ── città ──
   for (const t of TOWNS) {
     let placed = 0, tries = 0;
-    while (placed < t.houses && tries < 200) {
+    while (placed < t.houses && tries < 300) {
       tries++;
       const w = Math.round(sr(8, 13)), d = Math.round(sr(8, 12));
       const a = srand() * Math.PI * 2, rr = placed === 0 && t.houses > 6 ? sr(14, 20) : sr(4, t.r - 8);
@@ -473,29 +520,28 @@ export function buildWorld(scene) {
       placeHouse(x, z, w, d, t.h, rot);
       placed++;
     }
-    // torri
     if (t.towers) {
       for (let i = 0; i < 4; i++) {
         const a = i * Math.PI / 2 + 0.4;
         const x = t.x + Math.cos(a) * (t.r - 6), z = t.z + Math.sin(a) * (t.r - 6);
-        addBox(5, 18, 5, x, t.h + 9, z, wallMats[2]);
-        addBox(6, 0.6, 6, x, t.h + 18.3, z, metalMat);
+        addBox(5, 18, 5, x, t.h + 9, z, wallMats[2], { lodColor: wallColors[2] });
+        addBox(6, 0.6, 6, x, t.h + 18.3, z, metalMat, { lodColor: '#6a6f78' });
         lootSpots.push(new THREE.Vector3(x + 3.5, t.h + 0.2, z));
       }
     }
     if (t.containers) {
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 8; i++) {
         const x = t.x + sr(-t.r + 4, t.r - 4), z = t.z + sr(-t.r + 4, t.r - 4);
         if (overlapsHouse(x, z, 7, 7)) continue;
         const rot = srand() < 0.5;
         const stack = srand() < 0.35 ? 2 : 1;
         for (let s = 0; s < stack; s++) {
-          addBox(rot ? 2.5 : 6.5, 2.6, rot ? 6.5 : 2.5, x, t.h + 1.3 + s * 2.6, z, containerMats[Math.floor(srand() * 4)]);
+          const ci = Math.floor(srand() * 4);
+          addBox(rot ? 2.5 : 6.5, 2.6, rot ? 6.5 : 2.5, x, t.h + 1.3 + s * 2.6, z, containerMats[ci], { lodColor: contColors[ci] });
         }
         lootSpots.push(new THREE.Vector3(x + (rot ? 2 : 0), t.h + 0.2, z + (rot ? 0 : 2)));
       }
     }
-    // casse di legno come copertura
     const nCrates = Math.floor(t.r / 3);
     for (let i = 0; i < nCrates; i++) {
       const a = srand() * Math.PI * 2, rr = sr(3, t.r);
@@ -509,111 +555,301 @@ export function buildWorld(scene) {
     }
   }
 
-  // Fontana al centro
+  // ── fontana al centro ──
   {
     const t = TOWNS[0];
-    const f = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 1, 20), m('stone', '#b8b4a8'));
-    f.position.set(t.x, t.h + 0.5, t.z); f.castShadow = f.receiveShadow = true; scene.add(f);
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 0.1, 20), m('fwater', '#4aa8e0', { metalness: 0.3, roughness: 0.1 }));
-    w.position.set(t.x, t.h + 0.95, t.z); scene.add(w);
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 3, 10), m('stone', '#b8b4a8'));
-    p.position.set(t.x, t.h + 2, t.z); p.castShadow = true; scene.add(p);
+    chunkAt(t.x, t.z).specials.push({ type: 'fountain', x: t.x, z: t.z, h: t.h });
     addCollider({ type: 'cyl', x: t.x, z: t.z, r: 3.3, minY: t.h - 1, maxY: t.h + 1 });
     addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.5, minY: t.h, maxY: t.h + 3.5, noStand: true });
     lootSpots.push(new THREE.Vector3(t.x, t.h + 1.05, t.z + 1.8));
   }
 
-  // ── Alberi (instanced) ──
+  // ── alberi (solo dati + collisori) ──
   const trees = [];
   let tries = 0;
-  while (trees.length < 420 && tries < 5000) {
+  const NTREES = 420 * SCALE * SCALE * 0.95;
+  while (trees.length < NTREES && tries < NTREES * 12) {
     tries++;
     const x = sr(-HALF + 8, HALF - 8), z = sr(-HALF + 8, HALF - 8);
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL + 0.8 || h > 26) continue;
     if (inTown(x, z, 6)) continue;
     if (roadDist(x, z) < 4) continue;
-    trees.push({ x, z, h, s: sr(0.8, 1.35), pine: srand() < 0.55 });
+    const t = { x, z, h, s: sr(0.8, 1.35), pine: srand() < 0.55, rot: srand() * 6.28, hue: 0.28 + sr(-0.04, 0.05), light: sr(0.28, 0.4) };
+    trees.push(t);
+    chunkAt(x, z).trees.push(t);
+    addCollider({ type: 'cyl', x, z, r: 0.4 * t.s, minY: h - 1, maxY: h + 3.2 * t.s, noStand: true, tree: true });
   }
-  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 3, 6);
-  trunkGeo.translate(0, 1.5, 0);
-  const pineGeo = new THREE.ConeGeometry(1.9, 5, 7);
-  pineGeo.translate(0, 5, 0);
-  const roundGeo = new THREE.IcosahedronGeometry(2.2, 0);
-  roundGeo.translate(0, 4.2, 0);
-  const trunkMesh = new THREE.InstancedMesh(trunkGeo, m('trunk', '#6b4524'), trees.length);
-  const pines = trees.filter(t => t.pine), rounds = trees.filter(t => !t.pine);
-  const pineMesh = new THREE.InstancedMesh(pineGeo, m('pine', '#2f6b34', { flatShading: true }), pines.length);
-  const roundMesh = new THREE.InstancedMesh(roundGeo, m('leaf', '#4f9a3a', { flatShading: true }), rounds.length);
-  const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
-  const tcol = new THREE.Color();
-  let pi = 0, ri = 0;
-  trees.forEach((t, i) => {
-    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), srand() * 6.28);
-    sc.set(t.s, t.s, t.s); p.set(t.x, t.h - 0.2, t.z);
-    mat4.compose(p, q, sc);
-    trunkMesh.setMatrixAt(i, mat4);
-    tcol.setHSL(0.28 + sr(-0.04, 0.05), 0.5, sr(0.28, 0.4));
-    if (t.pine) { pineMesh.setMatrixAt(pi, mat4); pineMesh.setColorAt(pi++, tcol); }
-    else { roundMesh.setMatrixAt(ri, mat4); roundMesh.setColorAt(ri++, tcol); }
-    addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.4 * t.s, minY: t.h - 1, maxY: t.h + 3.2 * t.s, noStand: true, tree: true });
-  });
-  for (const im of [trunkMesh, pineMesh, roundMesh]) { im.castShadow = true; im.receiveShadow = true; scene.add(im); }
 
-  // ── Rocce ──
-  const rocks = [];
+  // ── rocce ──
+  const NROCKS = 140 * SCALE * SCALE * 0.9;
   tries = 0;
-  while (rocks.length < 140 && tries < 3000) {
+  let nr = 0;
+  while (nr < NROCKS && tries < NROCKS * 20) {
     tries++;
     const x = sr(-HALF + 6, HALF - 6), z = sr(-HALF + 6, HALF - 6);
     if (inTown(x, z, 3)) continue;
     const h = terrainHeight(x, z);
-    rocks.push({ x, z, h, s: sr(0.7, 2.4) });
+    if (h < WATER_LEVEL - 1) continue;
+    const r = { x, z, h, s: sr(0.7, 2.4), e: [srand() * 3, srand() * 3, srand() * 3], k: [sr(0.9, 1.4), sr(0.6, 1), sr(0.9, 1.3)] };
+    chunkAt(x, z).rocks.push(r); nr++;
+    addCollider({ type: 'cyl', x, z, r: r.s * 0.95, minY: h - 2, maxY: h + r.s * 0.9 });
+    if (srand() < 0.15) lootSpots.push(new THREE.Vector3(x + r.s + 0.8, h, z));
   }
-  const rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), m('rock', '#8f8b82', { flatShading: true }), rocks.length);
-  rocks.forEach((r, i) => {
-    q.setFromEuler(new THREE.Euler(srand() * 3, srand() * 3, srand() * 3));
-    sc.set(r.s * sr(0.9, 1.4), r.s * sr(0.6, 1), r.s * sr(0.9, 1.3));
-    p.set(r.x, r.h + r.s * 0.25, r.z);
-    mat4.compose(p, q, sc);
-    rockMesh.setMatrixAt(i, mat4);
-    addCollider({ type: 'cyl', x: r.x, z: r.z, r: r.s * 0.95, minY: r.h - 2, maxY: r.h + r.s * 0.9 });
-    if (srand() < 0.15) lootSpots.push(new THREE.Vector3(r.x + r.s + 0.8, r.h, r.z));
-  });
-  rockMesh.castShadow = rockMesh.receiveShadow = true;
-  scene.add(rockMesh);
 
-  // ── Erba decorativa ──
-  const grassGeo = new THREE.ConeGeometry(0.12, 0.6, 3);
-  grassGeo.translate(0, 0.3, 0);
-  const grassMesh = new THREE.InstancedMesh(grassGeo, m('grass', '#6fae45'), 2500);
-  for (let i = 0; i < 2500; i++) {
-    const x = sr(-HALF, HALF), z = sr(-HALF, HALF);
-    const h = terrainHeight(x, z);
-    p.set(x, h < WATER_LEVEL ? -100 : h, z);
-    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), srand() * 6);
-    const s = sr(0.6, 1.4); sc.set(s, s, s);
-    mat4.compose(p, q, sc);
-    grassMesh.setMatrixAt(i, mat4);
-  }
-  scene.add(grassMesh);
-
-  // Loot sparso per la mappa
-  for (let i = 0; i < 45; i++) {
+  // ── bottino sparso ──
+  for (let i = 0; i < 45 * SCALE * SCALE; i++) {
     const x = sr(-HALF + 15, HALF - 15), z = sr(-HALF + 15, HALF - 15);
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL + 0.3) continue;
     lootSpots.push(new THREE.Vector3(x, h, z));
   }
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 10 * SCALE * SCALE; i++) {
     const x = sr(-HALF + 20, HALF - 20), z = sr(-HALF + 20, HALF - 20);
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL + 0.3 || inTown(x, z, 5)) continue;
     chestSpots.push({ pos: new THREE.Vector3(x, h, z), rot: srand() * 3 });
   }
 
-  // ── Minimappa pre-renderizzata ──
-  const MM = 300;
+  // ── acqua (unica, enorme e leggera) ──
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000),
+    new THREE.MeshStandardMaterial({ color: '#2a7fc0', transparent: true, opacity: 0.75, roughness: 0.1, metalness: 0.3 }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = WATER_LEVEL;
+  scene.add(water);
+
+  // ═════════ generazione grafica per chunk ═════════
+  const col = new THREE.Color();
+  const DSEG = 40;     // dettaglio: 2,5 m tra i vertici
+  const LSEG = 10;     // lontano: 10 m tra i vertici
+
+  function terrainGeo(ch, seg, skirt) {
+    const geo = new THREE.PlaneGeometry(CHUNK, CHUNK, seg, seg);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(ch.x0 + CHUNK / 2, 0, ch.z0 + CHUNK / 2);
+    const pos = geo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const h = terrainHeight(x, z);
+      pos.setY(i, h - skirt);
+      groundColor(x, z, h, col);
+      colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  // unisce tanti box colorati in un'unica geometria (per i chunk lontani)
+  function mergedBlocks(list) {
+    const pos = [], nor = [], colr = [];
+    const c = new THREE.Color();
+    for (const b of list) {
+      const g = new THREE.BoxGeometry(b.w, b.h, b.d).toNonIndexed();
+      g.translate(b.x, b.y, b.z);
+      const p = g.attributes.position.array, n = g.attributes.normal.array;
+      c.set(b.color);
+      for (let i = 0; i < p.length; i += 3) {
+        pos.push(p[i], p[i + 1], p[i + 2]); nor.push(n[i], n[i + 1], n[i + 2]);
+        // la faccia superiore usa il colore del tetto
+        if (b.top && n[i + 1] > 0.5) { const t = new THREE.Color(b.top); colr.push(t.r, t.g, t.b); } else colr.push(c.r, c.g, c.b);
+      }
+      g.dispose();
+    }
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+    return geo;
+  }
+
+  function buildLod(ch) {
+    const group = new THREE.Group();
+    const t = new THREE.Mesh(terrainGeo(ch, LSEG, 0.35), lodMat);
+    t.receiveShadow = false;
+    group.add(t);
+    const blocks = [];
+    for (const h of ch.houses) blocks.push({ w: h.w, h: 4.1, d: h.d, x: h.cx, y: h.baseY + 2.05, z: h.cz, color: h.wallColor, top: h.roofColor });
+    for (const b of ch.boxes) if (b.lodColor) blocks.push({ w: b.w, h: b.h, d: b.d, x: b.x, y: b.y, z: b.z, color: b.lodColor });
+    // alberi lontani: un cono semplice ogni 3 alberi
+    for (let i = 0; i < ch.trees.length; i += 3) {
+      const tr = ch.trees[i];
+      blocks.push({ w: 2.6 * tr.s, h: 6 * tr.s, d: 2.6 * tr.s, x: tr.x, y: tr.h + 4 * tr.s, z: tr.z, color: tr.pine ? '#2f5f30' : '#457f35' });
+    }
+    const bg = mergedBlocks(blocks);
+    if (bg) group.add(new THREE.Mesh(bg, blockMat));
+    scene.add(group);
+    ch.lod = group;
+  }
+
+  // geometrie condivise per alberi/rocce/erba
+  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 3, 6); trunkGeo.translate(0, 1.5, 0);
+  const pineGeo = new THREE.ConeGeometry(1.9, 5, 7); pineGeo.translate(0, 5, 0);
+  const roundGeo = new THREE.IcosahedronGeometry(2.2, 0); roundGeo.translate(0, 4.2, 0);
+  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+  const grassGeo = new THREE.ConeGeometry(0.12, 0.6, 3); grassGeo.translate(0, 0.3, 0);
+  const trunkM = m('trunk', '#6b4524'), pineM = m('pine', '#2f6b34', { flatShading: true }), leafM = m('leaf', '#4f9a3a', { flatShading: true });
+  const rockM = m('rock', '#8f8b82', { flatShading: true }), grassM = m('grass', '#6fae45');
+  const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
+  const boxGeoCache = new Map();
+
+  function boxGeometry(b) {
+    const key = `${b.w.toFixed(2)}|${b.h.toFixed(2)}|${b.d.toFixed(2)}|${b.material.map ? 1 : 0}`;
+    let g = boxGeoCache.get(key);
+    if (g) return g;
+    g = new THREE.BoxGeometry(b.w, b.h, b.d);
+    if (b.material.map) {
+      const uv = g.attributes.uv, normal = g.attributes.normal;
+      for (let i = 0; i < uv.count; i++) {
+        const nx = Math.abs(normal.getX(i)), ny = Math.abs(normal.getY(i));
+        const sx = nx > 0.5 ? b.d : b.w, sy = ny > 0.5 ? b.d : b.h;
+        uv.setXY(i, uv.getX(i) * sx / 2, uv.getY(i) * sy / 2);
+      }
+    }
+    g.userData.shared = true;
+    boxGeoCache.set(key, g);
+    return g;
+  }
+
+  function buildDetail(ch) {
+    const group = new THREE.Group();
+    const terrain = new THREE.Mesh(terrainGeo(ch, DSEG, 0), terrainMat);
+    terrain.receiveShadow = true;
+    group.add(terrain);
+    for (const b of ch.boxes) {
+      const mesh = new THREE.Mesh(boxGeometry(b), b.material);
+      mesh.position.set(b.x, b.y, b.z);
+      mesh.castShadow = b.cast; mesh.receiveShadow = true;
+      group.add(mesh);
+      b.mesh = mesh;
+      if (b.roof && b.house) b.house.roofMesh = mesh;
+    }
+    // alberi
+    const pines = ch.trees.filter(t => t.pine), rounds = ch.trees.filter(t => !t.pine);
+    if (ch.trees.length) {
+      const trunk = new THREE.InstancedMesh(trunkGeo, trunkM, ch.trees.length);
+      const pine = pines.length ? new THREE.InstancedMesh(pineGeo, pineM, pines.length) : null;
+      const round = rounds.length ? new THREE.InstancedMesh(roundGeo, leafM, rounds.length) : null;
+      let pi = 0, ri = 0;
+      ch.trees.forEach((t, i) => {
+        q.setFromAxisAngle(up, t.rot); sc.set(t.s, t.s, t.s); p.set(t.x, t.h - 0.2, t.z);
+        mat4.compose(p, q, sc);
+        trunk.setMatrixAt(i, mat4);
+        col.setHSL(t.hue, 0.5, t.light);
+        if (t.pine) { pine.setMatrixAt(pi, mat4); pine.setColorAt(pi++, col); }
+        else { round.setMatrixAt(ri, mat4); round.setColorAt(ri++, col); }
+      });
+      for (const im of [trunk, pine, round]) if (im) { im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); }
+    }
+    // rocce
+    if (ch.rocks.length) {
+      const rk = new THREE.InstancedMesh(rockGeo, rockM, ch.rocks.length);
+      ch.rocks.forEach((r, i) => {
+        q.setFromEuler(eul.set(r.e[0], r.e[1], r.e[2]));
+        sc.set(r.s * r.k[0], r.s * r.k[1], r.s * r.k[2]);
+        p.set(r.x, r.h + r.s * 0.25, r.z);
+        mat4.compose(p, q, sc);
+        rk.setMatrixAt(i, mat4);
+      });
+      rk.castShadow = rk.receiveShadow = true; rk.computeBoundingSphere();
+      group.add(rk);
+    }
+    // erba decorativa (casuale ma con seme del chunk: sempre uguale)
+    {
+      const rnd = mulberry32((ch.cx * 73856093) ^ (ch.cz * 19349663));
+      const N = 170, gm = new THREE.InstancedMesh(grassGeo, grassM, N);
+      let n = 0;
+      for (let i = 0; i < N; i++) {
+        const x = ch.x0 + rnd() * CHUNK, z = ch.z0 + rnd() * CHUNK;
+        const h = terrainHeight(x, z);
+        if (h < WATER_LEVEL + 0.2 || h > 20) continue;
+        q.setFromAxisAngle(up, rnd() * 6);
+        const s = 0.6 + rnd() * 0.8; sc.set(s, s, s); p.set(x, h, z);
+        mat4.compose(p, q, sc);
+        gm.setMatrixAt(n++, mat4);
+      }
+      gm.count = n; gm.computeBoundingSphere();
+      group.add(gm);
+    }
+    // oggetti speciali
+    for (const s of ch.specials) {
+      if (s.type === 'fountain') {
+        const f = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 1, 20), m('stone', '#b8b4a8'));
+        f.position.set(s.x, s.h + 0.5, s.z); f.castShadow = f.receiveShadow = true; group.add(f);
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 0.1, 20), m('fwater', '#4aa8e0', { metalness: 0.3, roughness: 0.1 }));
+        w.position.set(s.x, s.h + 0.95, s.z); group.add(w);
+        const pp = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 3, 10), m('stone', '#b8b4a8'));
+        pp.position.set(s.x, s.h + 2, s.z); pp.castShadow = true; group.add(pp);
+      }
+    }
+    scene.add(group);
+    ch.detail = group;
+  }
+
+  function disposeGroup(g) {
+    scene.remove(g);
+    g.traverse(o => { if (o.geometry && !o.geometry.userData.shared && o.geometry !== trunkGeo && o.geometry !== pineGeo && o.geometry !== roundGeo && o.geometry !== rockGeo && o.geometry !== grassGeo) o.geometry.dispose(); if (o.isInstancedMesh) o.dispose(); });
+  }
+  function unloadDetail(ch) {
+    if (!ch.detail) return;
+    disposeGroup(ch.detail);
+    ch.detail = null;
+    for (const b of ch.boxes) b.mesh = null;
+    for (const h of ch.houses) h.roofMesh = null;
+  }
+
+  // ── streaming: costruisce i chunk vicini un po' per frame ──
+  const DETAIL_IN = 240, DETAIL_OUT = 310;   // raggio di caricamento / scaricamento del dettaglio
+  const stats = { detail: 0, lod: 0, built: 0 };
+  let lastKey = '';
+  let order = [];
+  const chunkList = [...chunks.values()];
+
+  function update(camPos, budgetMs = 6) {
+    const t0 = performance.now();
+    const ccx = Math.floor(camPos.x / 25), ccz = Math.floor(camPos.z / 25);
+    const key = ccx + ',' + ccz;
+    if (key !== lastKey) {
+      lastKey = key;
+      for (const ch of chunkList) {
+        const dx = Math.max(ch.x0 - camPos.x, 0, camPos.x - (ch.x0 + CHUNK));
+        const dz = Math.max(ch.z0 - camPos.z, 0, camPos.z - (ch.z0 + CHUNK));
+        ch.dist = Math.hypot(dx, dz);
+      }
+      order = chunkList.slice().sort((a, b) => a.dist - b.dist);
+      // scarica il dettaglio dei chunk lontani
+      for (const ch of chunkList) if (ch.detail && ch.dist > DETAIL_OUT) unloadDetail(ch);
+    }
+    // priorità: dettaglio vicino → orizzonte lontano
+    let work = 0;
+    for (const ch of order) {
+      if (performance.now() - t0 > budgetMs && work > 0) break;
+      if (ch.dist <= DETAIL_IN && !ch.detail) { buildDetail(ch); stats.built++; work++; continue; }
+      if (!ch.lod && ch.dist < 1400) { buildLod(ch); work++; }
+    }
+    // il terreno lontano si nasconde dove c'è quello dettagliato
+    let nd = 0, nl = 0;
+    for (const ch of chunkList) {
+      if (ch.lod) { ch.lod.visible = !ch.detail; nl++; }
+      if (ch.detail) nd++;
+    }
+    stats.detail = nd; stats.lod = nl;
+    return work;
+  }
+  /** costruisce subito tutto ciò che serve attorno a un punto (es. prima di atterrare) */
+  function prewarm(pos, radius = 120) {
+    for (const ch of chunkList) {
+      const dx = Math.max(ch.x0 - pos.x, 0, pos.x - (ch.x0 + CHUNK));
+      const dz = Math.max(ch.z0 - pos.z, 0, pos.z - (ch.z0 + CHUNK));
+      if (Math.hypot(dx, dz) <= radius && !ch.detail) buildDetail(ch);
+    }
+    lastKey = '';
+  }
+
+  // ── minimappa pre-renderizzata ──
+  const MM = 600;
   const mm = document.createElement('canvas');
   mm.width = mm.height = MM;
   const g = mm.getContext('2d');
@@ -626,16 +862,18 @@ export function buildWorld(scene) {
     else if (h < WATER_LEVEL + 1) { r = 210; gg = 195; b = 140; }
     else if (h > 24) { const k = Math.min(1, (h - 24) / 10); r = 130 + 110 * k; gg = 125 + 115 * k; b = 115 + 125 * k; }
     else { const s = Math.max(0, Math.min(1, (h + 4) / 22)); r = 70 + 40 * s; gg = 130 + 40 * s; b = 55 + 20 * s; }
-    if (roadDist(x, z) < 2.5) { r = 170; gg = 145; b = 100; }
     const i = (py * MM + px) * 4;
     img.data[i] = r; img.data[i + 1] = gg; img.data[i + 2] = b; img.data[i + 3] = 255;
   }
   g.putImageData(img, 0, 0);
   const k = MM / (HALF * 2);
-  g.fillStyle = 'rgba(60,40,30,0.85)';
-  for (const h of houses) g.fillRect((h.cx - h.w / 2 + HALF) * k, (h.cz - h.d / 2 + HALF) * k, h.w * k, h.d * k);
-  g.fillStyle = 'rgba(30,80,30,0.55)';
-  for (const t of trees) g.fillRect((t.x + HALF) * k - 1, (t.z + HALF) * k - 1, 2, 2);
+  // strade disegnate come linee (molto più veloce che calcolarle per pixel)
+  g.strokeStyle = 'rgb(170,145,100)'; g.lineWidth = 2.2; g.lineCap = 'round';
+  for (const [a, b] of roads) { g.beginPath(); g.moveTo((a.x + HALF) * k, (a.z + HALF) * k); g.lineTo((b.x + HALF) * k, (b.z + HALF) * k); g.stroke(); }
+  g.fillStyle = 'rgba(30,80,30,0.5)';
+  for (const t of trees) g.fillRect((t.x + HALF) * k - 0.75, (t.z + HALF) * k - 0.75, 1.5, 1.5);
+  g.fillStyle = 'rgba(60,40,30,0.9)';
+  for (const h of houses) g.fillRect((h.cx - h.w / 2 + HALF) * k, (h.cz - h.d / 2 + HALF) * k, Math.max(2, h.w * k), Math.max(2, h.d * k));
 
-  return { lootSpots, chestSpots, houses, minimap: mm, crateMat, woodTex };
+  return { lootSpots, chestSpots, houses, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks };
 }

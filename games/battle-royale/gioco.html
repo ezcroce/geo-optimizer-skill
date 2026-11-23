@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Arena Royale 3D</title>
+<link rel="stylesheet" href="style.css?v=3" />
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js?v=3" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="pageWipe"></div>
+
+<!-- ───────── MENU / LOBBY ───────── -->
+<div id="menu" class="screen">
+  <div class="menu-left">
+    <a href="index.html" class="backsite" data-transition>← Torna al sito</a>
+    <h1 class="logo">ARENA<span>ROYALE</span><small>3D</small></h1>
+    <div class="panel">
+      <label class="lbl">Il tuo nome</label>
+      <input id="playerName" maxlength="16" value="Giocatore" />
+      <label class="lbl">Difficoltà</label>
+      <div id="difficulty" class="seg">
+        <button data-d="facile">Facile</button>
+        <button data-d="normale" class="on">Normale</button>
+        <button data-d="difficile">Difficile</button>
+      </div>
+      <label class="lbl">Deltaplano</label>
+      <div id="gliders" class="seg"></div>
+    </div>
+    <button id="playBtn" class="play">GIOCA</button>
+    <div class="fsrow">
+      <button id="fsBtn" class="ghost" title="Tasto F">⛶ Schermo intero</button>
+      <label class="fsauto"><input type="checkbox" id="fsAuto" /> all'avvio</label>
+      <a id="newTab" class="ghost hidden" href="gioco.html" target="_blank" rel="noopener">↗ Apri in nuova scheda</a>
+    </div>
+    <div class="controls">
+      <b>Comandi</b>
+      <div><kbd>W A S D</kbd> muoviti · <kbd>Shift</kbd> corri · <kbd>Spazio</kbd> salta / paracadute</div>
+      <div><kbd>C</kbd> abbassati · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
+      <div><kbd>Mouse</kbd> mira · <kbd>Click sx</kbd> spara/usa · <kbd>Click dx</kbd> mira di precisione</div>
+      <div><kbd>1-5</kbd> / <kbd>Rotella</kbd> cambia slot · <kbd>R</kbd> ricarica · <kbd>E</kbd> raccogli / apri forziere</div>
+      <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>G</kbd> lascia oggetto · <kbd>M</kbd> mappa · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
+    </div>
+  </div>
+  <div class="menu-right">
+    <div class="locker-title">ARMADIETTO <span id="skinName"></span></div>
+    <div id="skins" class="skins"></div>
+  </div>
+</div>
+
+<!-- ───────── HUD ───────── -->
+<div id="hud" class="hidden">
+  <div id="killfeed"></div>
+  <div id="topinfo">
+    <div class="pill"><span class="ico">👤</span><b id="aliveCount">0</b> vivi</div>
+    <div class="pill"><span class="ico">💀</span><b id="killCount">0</b> uccisioni</div>
+    <div class="pill storm" id="stormInfo">⛈ La tempesta arriva…</div>
+  </div>
+  <div id="minimapWrap"><canvas id="minimap" width="200" height="200"></canvas><div id="poiName"></div></div>
+
+  <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+  <div id="hitmarker"></div>
+  <div id="centerMsg"></div>
+  <div id="subMsg"></div>
+  <div id="prompt"></div>
+  <div id="progress" class="hidden"><div class="bar"><i id="progressFill"></i></div><span id="progressText"></span></div>
+
+  <div id="vitals">
+    <div class="vrow stamina" id="staminaRow"><div class="vbar st"><i id="staminaFill"></i></div><b>🧗</b></div>
+    <div id="crouchBadge">⬇ ACCOVACCIATO</div>
+    <div class="vrow"><div class="vbar shield"><i id="shieldFill"></i></div><b id="shieldText">0</b></div>
+    <div class="vrow"><div class="vbar hp"><i id="hpFill"></i></div><b id="hpText">100</b></div>
+  </div>
+  <div id="hotbar"></div>
+  <div id="ammoInfo">
+    <div id="magText"></div>
+    <div id="reserves"></div>
+    <div id="mats">🪵 <b id="matsText">0</b></div>
+  </div>
+  <div id="buildHint" class="hidden">MODALITÀ COSTRUZIONE · Click sx: muro (10 🪵) · Q per uscire</div>
+  <div id="damageLayer"></div>
+</div>
+<div id="vignette"></div>
+<div id="stormTint"></div>
+<div id="scope" class="hidden"><div class="ring"></div></div>
+
+<div id="bigmap" class="screen hidden">
+  <div class="bigmap-box"><canvas id="bigmapCanvas" width="640" height="640"></canvas><div class="hint">M per chiudere</div></div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="box">
+    <h2>PAUSA</h2>
+    <p>Clicca per riprendere</p>
+    <label class="lbl">Sensibilità mouse</label>
+    <input type="range" id="sens" min="0.3" max="3" step="0.1" value="1" />
+    <label class="lbl">Volume</label>
+    <input type="range" id="vol" min="0" max="1" step="0.05" value="0.5" />
+    <button id="resumeBtn" class="play small">RIPRENDI</button>
+    <button id="fsPauseBtn" class="ghost">⛶ Schermo intero</button>
+    <button id="quitBtn" class="ghost">Torna al menu</button>
+  </div>
+</div>
+
+<div id="end" class="screen hidden">
+  <div class="box">
+    <div id="endPlace"></div>
+    <h2 id="endTitle"></h2>
+    <p id="endSub"></p>
+    <div class="stats" id="endStats"></div>
+    <button id="againBtn" class="play small">GIOCA ANCORA</button>
+    <button id="menuBtn" class="ghost">Armadietto</button>
+  </div>
+</div>
+
+<div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
+
+<script type="module" src="js/main.js?v=3"></script>
+<script src="js/transition.js?v=3"></script>
+</body>
+</html>

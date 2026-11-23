@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES,
-} from './config.js?v=6';
-import * as A from './audio.js?v=6';
+} from './config.js?v=7';
+import * as A from './audio.js?v=7';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
-  addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE,
-} from './world.js?v=6';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=6';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=6';
+  addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER,
+} from './world.js?v=7';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus } from './character.js?v=7';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=7';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -2734,6 +2734,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   world.update(G.state === 'menu' ? _menuStream : camera.position, G.state === 'menu' ? 8 : 5);
+  if (G.player && G.player.alive && G.state === 'play') GRASS_PLAYER.value.copy(G.player.pos); else GRASS_PLAYER.value.set(0, -9999, 0);
   if (G.state === 'menu') { renderLobby(dt); pressed.clear(); return; }
   if (!G.paused) update(dt);
   renderer.render(scene, camera);
@@ -2752,4 +2753,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

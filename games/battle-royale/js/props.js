@@ -134,13 +134,128 @@ function makeBirch() {
   return mergeParts(parts, 303);
 }
 
+// versioni semplificate per la media distanza (stessa sagoma e colori, molti meno triangoli)
+function makePineLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.2, 0.3, 3.2, 5, 1, true), '#5e3d22', { y: 1.6 }),
+    part(new THREE.ConeGeometry(2.3, 3.6, 6, 1, true), '#2f6834', { y: 3.6, jit: 0.1 }),
+    part(new THREE.ConeGeometry(1.5, 3.0, 6, 1, true), '#3b7c3e', { y: 5.5, ry: 0.5, jit: 0.1 }),
+  ], 111);
+}
+function makeOakLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.24, 0.4, 3.4, 5, 1, true), '#6a4526', { y: 1.7 }),
+    part(new THREE.IcosahedronGeometry(2.3, 0), '#4f9a3a', { y: 4.7, sy: 0.85, jit: 0.12 }),
+    part(new THREE.IcosahedronGeometry(1.3, 0), '#5aa842', { y: 5.8, x: 0.3, jit: 0.12 }),
+  ], 222);
+}
+function makeBirchLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 5, 1, true), '#e6e2d6', { y: 2.1 }),
+    part(new THREE.IcosahedronGeometry(1.3, 0), '#86bf4e', { y: 5.2, sy: 1.6, jit: 0.12 }),
+  ], 333);
+}
+
 // ═════════════ rocce ═════════════
-function makeRock(seed) {
-  const g = wobble(new THREE.DodecahedronGeometry(1, 1), 0.16, seed);
-  return mergeParts([part(g, '#8f8b82', {
+function makeRock(seed, kind = 0) {
+  const rnd = mulberry32(seed * 7 + 3);
+  // 0 = masso tondeggiante, 1 = lastra piatta, 2 = spuntone, 3 = masso spaccato
+  const base = kind === 2 ? new THREE.OctahedronGeometry(1, 1) : new THREE.DodecahedronGeometry(1, 1);
+  let g = wobble(base, kind === 3 ? 0.24 : 0.16, seed);
+  if (kind === 1) g.scale(1.35, 0.5, 1.1);
+  if (kind === 2) g.scale(0.75, 1.45, 0.8);
+  if (kind === 3) { g.scale(1.15, 0.85, 1); }
+  const moss = rnd() < 0.5 ? '#6f8a4a' : '#7b9450';
+  return withUV(mergeParts([part(g, '#8f8b82', {
     jit: 0.1,
-    colorFn: (nx, ny, nz, x, y, z, rnd) => ny > 0.6 && rnd() < 0.6 ? '#6f8a4a' : (rnd() < 0.2 ? '#7d7970' : '#928e85'),
-  })], seed);
+    colorFn: (nx, ny, nz, x, y, z, r) => ny > 0.55 && r() < 0.65 ? moss : (ny < -0.2 ? '#6e6a62' : (r() < 0.25 ? '#7d7970' : (r() < 0.3 ? '#9d988c' : '#928e85'))),
+  })], seed));
+}
+function makePebbles() {
+  const parts = [];
+  const rnd = mulberry32(77);
+  for (let i = 0; i < 4; i++) {
+    const a = rnd() * 6.28, d = 0.12 + rnd() * 0.3, s = 0.07 + rnd() * 0.1;
+    parts.push(part(wobble(new THREE.DodecahedronGeometry(1, 0), 0.15, 80 + i), rnd() < 0.5 ? '#8a867c' : '#a29d92', { x: Math.cos(a) * d, y: s * 0.35, z: Math.sin(a) * d, sx: s * 1.3, sy: s * 0.7, sz: s, jit: 0.12 }));
+  }
+  return withUV(mergeParts(parts, 78));
+}
+/** aggiunge coordinate uv fittizie (servono per usare lo slot `map`) */
+function withUV(g) {
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+  return g;
+}
+
+// ═════════════ cespugli ═════════════
+function makeBush(seed, flowers = null) {
+  const rnd = mulberry32(seed);
+  const parts = [];
+  const n = 4 + Math.floor(rnd() * 3);
+  const greens = ['#3f8a33', '#4a9a3a', '#55a540', '#3a7d2f'];
+  const blobs = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 6.28 + rnd(), d = i === 0 ? 0 : 0.35 + rnd() * 0.25, r = i === 0 ? 0.62 : 0.38 + rnd() * 0.2;
+    const x = Math.cos(a) * d, y = (i === 0 ? 0.6 : 0.4 + rnd() * 0.25), z = Math.sin(a) * d;
+    blobs.push([x, y, z, r]);
+    const g = wobble(new THREE.IcosahedronGeometry(r, 0), r * 0.18, seed + i);
+    parts.push(part(g, greens[i % greens.length], { x, y, z, sy: 0.85, jit: 0.14, colorFn: (nx, ny) => (ny < -0.4 ? '#2c5e25' : null) }));
+  }
+  // fiori: piccole gemme sulla parte alta della chioma
+  if (flowers) {
+    for (let k = 0; k < 14; k++) {
+      const [bx, by, bz, br] = blobs[Math.floor(rnd() * blobs.length)];
+      const th = rnd() * 6.283, ph = rnd() * 1.1;              // solo emisfero superiore
+      const x = bx + Math.sin(ph) * Math.cos(th) * br * 0.98, y = by + Math.cos(ph) * br * 0.85 * 0.98, z = bz + Math.sin(ph) * Math.sin(th) * br * 0.98;
+      parts.push(part(new THREE.OctahedronGeometry(0.09, 0), flowers[k % flowers.length], { x, y, z, jit: 0.05, noSky: true }));
+    }
+  }
+  return mergeParts(parts, seed);
+}
+
+// ═════════════ texture della pietra (dati lineari, media ~0,5) ═════════════
+function makeStoneTexture() {
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, S, S);
+  const wrap = (fn) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) fn(ox, oy); };
+  const rnd = mulberry32(999);
+  // macchie morbide chiare/scure
+  for (let i = 0; i < 90; i++) {
+    const x = rnd() * S, y = rnd() * S, r = 8 + rnd() * 30, v = rnd() < 0.5 ? 0 : 255;
+    wrap((ox, oy) => {
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      gr.addColorStop(0, `rgba(${v},${v},${v},0.16)`); gr.addColorStop(1, `rgba(${v},${v},${v},0)`);
+      g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+    });
+  }
+  // crepe
+  g.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    let x = rnd() * S, y = rnd() * S, a = rnd() * 6.28;
+    const pts = [[x, y]];
+    for (let k = 0; k < 6 + rnd() * 8; k++) { a += (rnd() - 0.5) * 1.2; x += Math.cos(a) * 7; y += Math.sin(a) * 7; pts.push([x, y]); }
+    wrap((ox, oy) => {
+      g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.4;
+      g.beginPath(); pts.forEach(([px, py], k) => k ? g.lineTo(px + ox, py + oy) : g.moveTo(px + ox, py + oy)); g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,0.18)'; g.lineWidth = 1;
+      g.beginPath(); pts.forEach(([px, py], k) => k ? g.lineTo(px + ox + 1, py + oy + 1) : g.moveTo(px + ox + 1, py + oy + 1)); g.stroke();
+    });
+  }
+  // grana e puntini (granito)
+  const img = g.getImageData(0, 0, S, S), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let v = (rnd() - 0.5) * 34;
+    const q = rnd();
+    if (q < 0.025) v -= 50; else if (q > 0.985) v += 45;
+    d[i] += v; d[i + 1] += v; d[i + 2] += v;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.NoColorSpace;
+  t.anisotropy = 4;
+  return t;
 }
 
 // ═════════════ 02 · CATASTA DI LEGNA ═════════════
@@ -289,7 +404,10 @@ function makeShed() {
 // ═════════════ catalogo ═════════════
 export const PROPS = {
   pine: makePine(), oak: makeOak(), birch: makeBirch(),
-  rocks: [makeRock(5), makeRock(17), makeRock(29)],
+  pineLow: makePineLow(), oakLow: makeOakLow(), birchLow: makeBirchLow(),
+  rocks: [makeRock(5, 0), makeRock(17, 0), makeRock(29, 1), makeRock(41, 2), makeRock(53, 3)],
+  pebbles: makePebbles(),
+  bushes: [makeBush(401), makeBush(433), makeBush(467, ['#f2f2f2', '#ffe066']), makeBush(491, ['#e86fa8', '#c77dff'])],
   logs: makeLogs(), bricks: makeBricks(),
   barrelWood: makeBarrel('wood'), barrelBlue: makeBarrel('blue'), barrelRed: makeBarrel('red'),
   shed: makeShed(),
@@ -302,6 +420,60 @@ export const PROP_DIMS = {
   shed: PROPS.shed.userData.dims,
 };
 export const propMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.02, flatShading: true });
+/** tempo del vento, aggiornato ogni frame dal gioco */
+export const WIND = { value: 0 };
+
+/**
+ * Vento per vegetazione instanziata: oscilla i vertici sopra `from` metri,
+ * con fase diversa per ogni istanza (presa dalla sua posizione).
+ */
+function addWind(mat, from, amount, key) {
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, r) => {
+    if (prev) prev(sh, r);
+    sh.uniforms.uWind = WIND;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uWind;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        {
+          #ifdef USE_INSTANCING
+            vec2 ip = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
+          #else
+            vec2 ip = vec2(0.0);
+          #endif
+          float hh = max(0.0, transformed.y - ${from.toFixed(2)});
+          float k = hh * hh * ${amount.toFixed(4)};
+          float ph = uWind * 1.35 + ip.x * 0.11 + ip.y * 0.083;
+          transformed.x += (sin(ph) * 0.7 + sin(ph * 2.3 + 1.7) * 0.3) * k;
+          transformed.z += (cos(ph * 0.83 + 0.6) * 0.5) * k;
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'wind-' + key;
+  return mat;
+}
+export const treeMaterial = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.02, flatShading: true }), 2.2, 0.0045, 'tree');
+export const bushMaterial = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, flatShading: true }), 0.3, 0.07, 'bush');
+
+/** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
+const stoneTex = makeStoneTexture();
+export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.0, flatShading: true, map: stoneTex });
+rockMaterial.onBeforeCompile = (sh) => {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position; vON = normal;');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;')
+    .replace('#include <map_fragment>', `
+      {
+        vec3 w = abs(normalize(vON)); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z);
+        vec3 p = vOP * 0.9;
+        float t = texture2D(map, p.yz).r * w.x + texture2D(map, p.xz).r * w.y + texture2D(map, p.xy).r * w.z;
+        float t2 = texture2D(map, p.zx * 0.31 + 0.5).r;
+        diffuseColor.rgb *= (0.35 + 1.3 * t) * (0.8 + 0.4 * t2);
+      }`);
+};
+rockMaterial.customProgramCacheKey = () => 'rock-triplanar';
+
 export const metalPropMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.35, flatShading: true });
 export const MODEL_SOURCE = { tree: 'procedurale', logs: 'procedurale', bricks: 'procedurale', shed: 'procedurale', barrel: 'procedurale' };
 
@@ -402,7 +574,7 @@ export async function loadModelOverrides(base = 'models/') {
       const geo = gltfToGeometry(gltf.scene, key);
       if (!geo) return;
       const s = geo.boundingBox.getSize(new THREE.Vector3());
-      if (key === 'tree') { PROPS.pine = PROPS.oak = PROPS.birch = geo; }
+      if (key === 'tree') { PROPS.pine = PROPS.oak = PROPS.birch = PROPS.pineLow = PROPS.oakLow = PROPS.birchLow = geo; }
       else if (key === 'barrel') { PROPS.barrelWood = PROPS.barrelBlue = PROPS.barrelRed = geo; PROP_DIMS.barrel = { r: Math.max(s.x, s.z) / 2 + 0.02, h: s.y }; }
       else if (key === 'shed') { PROPS.shed = geo; PROP_DIMS.shed = { w: s.x, d: s.z, wallH: s.y * 0.6, h: s.y }; }
       else { PROPS[key] = geo; PROP_DIMS[key] = { w: s.x, h: s.y, d: s.z }; }

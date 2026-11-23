@@ -3,7 +3,10 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial } from './props.js?v=6';
+import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=7';
+
+/** posizione del giocatore: l'erba vicina si piega al suo passaggio */
+export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
 
 export const SCALE = 3;               // la mappa è 3 volte più grande della versione originale
 export const HALF = 200 * SCALE;      // la mappa va da -600 a +600
@@ -586,7 +589,7 @@ export function buildWorld(scene) {
   const chunks = new Map();
   const chunkKey = (cx, cz) => cx + ',' + cz;
   for (let cx = -NC; cx < NC; cx++) for (let cz = -NC; cz < NC; cz++) {
-    chunks.set(chunkKey(cx, cz), { cx, cz, x0: cx * CHUNK, z0: cz * CHUNK, boxes: [], trees: [], rocks: [], specials: [], houses: [], props: [], detail: null, lod: null, state: 0 });
+    chunks.set(chunkKey(cx, cz), { cx, cz, x0: cx * CHUNK, z0: cz * CHUNK, boxes: [], trees: [], rocks: [], bushes: [], specials: [], houses: [], props: [], detail: null, lod: null, state: 0 });
   }
   const chunkAt = (x, z) => chunks.get(chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK)));
 
@@ -794,22 +797,40 @@ export function buildWorld(scene) {
   // ── alberi (solo dati + collisori) ──
   const trees = [];
   let tries = 0;
-  const NTREES = 420 * SCALE * SCALE * 0.95;
-  while (trees.length < NTREES && tries < NTREES * 12) {
+  const NTREES = Math.round(420 * SCALE * SCALE * 0.95 * 1.7);
+  // densità dei boschi: alberi fitti nelle macchie scure, radi nei prati
+  const forestK = (x, z) => 0.18 + 0.82 * smoothstep(0.42, 0.72, patch(x, z, 0.0085, 2.1) * 0.75 + patch(x, z, 0.031, 5.3) * 0.25);
+  while (trees.length < NTREES && tries < NTREES * 14) {
     tries++;
     const x = sr(-HALF + 8, HALF - 8), z = sr(-HALF + 8, HALF - 8);
+    if (srand() > forestK(x, z)) continue;
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL + 0.8 || h > 26) continue;
     if (inTown(x, z, 6)) continue;
     if (roadDist(x, z) < 4) continue;
-    const t = { x, z, h, s: sr(0.8, 1.35), pine: srand() < 0.55, rot: srand() * 6.28, hue: 0.28 + sr(-0.04, 0.05), light: sr(0.28, 0.4) };
+    const t = { x, z, h, s: sr(0.8, 1.45), pine: srand() < (h > 12 ? 0.8 : 0.5), rot: srand() * 6.28, hue: 0.28 + sr(-0.04, 0.05), light: sr(0.28, 0.4) };
     trees.push(t);
     chunkAt(x, z).trees.push(t);
     addCollider({ type: 'cyl', x, z, r: 0.4 * t.s, minY: h - 1, maxY: h + 3.2 * t.s, noStand: true, tree: true });
   }
 
+  // ── cespugli (nessuna collisione: ci si può nascondere dentro) ──
+  const NBUSH = Math.round(520 * SCALE * SCALE);
+  tries = 0;
+  let nb = 0;
+  while (nb < NBUSH && tries < NBUSH * 8) {
+    tries++;
+    const x = sr(-HALF + 6, HALF - 6), z = sr(-HALF + 6, HALF - 6);
+    if (srand() > 0.35 + forestK(x, z) * 0.65) continue;
+    const h = terrainHeight(x, z);
+    if (h < WATER_LEVEL + 0.9 || h > 24) continue;
+    if (inTown(x, z, 2) || roadDist(x, z) < 3.5) continue;
+    chunkAt(x, z).bushes.push({ x, z, h, s: sr(0.7, 1.4), rot: srand() * 6.28, v: Math.floor(srand() * 4) });
+    nb++;
+  }
+
   // ── rocce ──
-  const NROCKS = 140 * SCALE * SCALE * 0.9;
+  const NROCKS = Math.round(140 * SCALE * SCALE * 0.9 * 1.4);
   tries = 0;
   let nr = 0;
   while (nr < NROCKS && tries < NROCKS * 20) {
@@ -819,8 +840,21 @@ export function buildWorld(scene) {
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL - 1) continue;
     const r = { x, z, h, s: sr(0.7, 2.4), e: [srand() * 3, srand() * 3, srand() * 3], k: [sr(0.9, 1.4), sr(0.6, 1), sr(0.9, 1.3)] };
+    r.shape = Math.floor(srand() * 5);
     chunkAt(x, z).rocks.push(r); nr++;
     addCollider({ type: 'cyl', x, z, r: r.s * 0.95, minY: h - 2, maxY: h + r.s * 0.9 });
+    // a volte qualche masso più piccolo accanto (gruppi di rocce)
+    if (srand() < 0.35) {
+      const nk = 1 + Math.floor(srand() * 3);
+      for (let k = 0; k < nk; k++) {
+        const a2 = srand() * 6.28, d2 = r.s * sr(1.1, 1.8), x2 = x + Math.cos(a2) * d2, z2 = z + Math.sin(a2) * d2;
+        const h2 = terrainHeight(x2, z2);
+        if (h2 < WATER_LEVEL - 1 || inTown(x2, z2, 3)) continue;
+        const r2 = { x: x2, z: z2, h: h2, s: r.s * sr(0.3, 0.55), e: [srand() * 3, srand() * 3, srand() * 3], k: [sr(0.9, 1.4), sr(0.6, 1), sr(0.9, 1.3)], shape: Math.floor(srand() * 5) };
+        chunkAt(x2, z2).rocks.push(r2);
+        if (r2.s > 0.45) addCollider({ type: 'cyl', x: x2, z: z2, r: r2.s * 0.95, minY: h2 - 2, maxY: h2 + r2.s * 0.9 });
+      }
+    }
     if (srand() < 0.15) lootSpots.push(new THREE.Vector3(x + r.s + 0.8, h, z));
   }
 
@@ -948,8 +982,48 @@ export function buildWorld(scene) {
   // ── acqua (unica, enorme e leggera) ──
   const waterNormal = makeWaterNormal();
   waterNormal.repeat.set(6000 / 22, 6000 / 22);
-  const waterMat = new THREE.MeshStandardMaterial({ color: '#2384c4', transparent: true, opacity: 0.8, roughness: 0.16, metalness: 0.25,
+  // mappa di profondità dell'acqua (R = profondità/8 m) per colore, trasparenza e schiuma sulla riva
+  const depthTex = (() => {
+    const S = 256, c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d'), img = g.createImageData(S, S), d = img.data;
+    for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+      const x = -800 + (i + 0.5) / S * 1600, z = -800 + (j + 0.5) / S * 1600;
+      const dep = Math.max(0, Math.min(1, (WATER_LEVEL - terrainHeight(x, z)) / 8));
+      const k = (j * S + i) * 4;
+      d[k] = dep * 255; d[k + 1] = 0; d[k + 2] = 0; d[k + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.NoColorSpace;
+    t.flipY = false;
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    return t;
+  })();
+  const waterMat = new THREE.MeshStandardMaterial({ color: '#ffffff', map: depthTex, transparent: true, opacity: 0.86, roughness: 0.14, metalness: 0.2,
     normalMap: waterNormal, normalScale: new THREE.Vector2(0.45, 0.45) });
+  waterMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <map_fragment>', `
+        float wDep = texture2D(map, (vWPos.xz + 800.0) / 1600.0).r;
+        float wN = texture2D(normalMap, vNormalMapUv * 2.7).r;
+        float wN2 = texture2D(normalMap, vNormalMapUv * 0.9 + 0.4).g;
+        vec3 wShallow = vec3(0.05, 0.50, 0.50), wDeep = vec3(0.012, 0.12, 0.33), wOcean = vec3(0.006, 0.055, 0.18);
+        vec3 wCol = mix(wShallow, wDeep, smoothstep(0.0, 0.4, wDep));
+        wCol = mix(wCol, wOcean, smoothstep(0.45, 1.0, wDep));
+        float wFoam = smoothstep(0.55, 1.0, (1.0 - smoothstep(0.0, 0.1, wDep)) * 1.15 + (wN - 0.5) * 0.9 + (wN2 - 0.5) * 0.5);
+        diffuseColor.rgb = mix(wCol, vec3(0.92, 0.96, 1.0), wFoam * 0.85);
+        diffuseColor.a = clamp(mix(0.5, 0.93, smoothstep(0.0, 0.35, wDep)) + wFoam * 0.4, 0.0, 1.0);`)
+      .replace('#include <opaque_fragment>', `
+        float wFres = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 4.0);
+        outgoingLight = mix(outgoingLight, vec3(0.45, 0.66, 0.88), wFres * 0.4);
+        #include <opaque_fragment>`);
+  };
+  waterMat.customProgramCacheKey = () => 'water-depth';
   const water = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.y = WATER_LEVEL;
@@ -1032,8 +1106,202 @@ export function buildWorld(scene) {
   }
 
   // geometrie condivise per alberi/rocce/erba
-  const grassGeo = new THREE.ConeGeometry(0.12, 0.6, 3); grassGeo.translate(0, 0.3, 0); grassGeo.userData.shared = true;
-  const grassM = m('grass', '#6fae45');
+  // ── erba: ciuffi di fili sottili (colori per vertice: scuri alla base, chiari in punta) ──
+  function makeTuft(blades, seed) {
+    const rnd = mulberry32(seed);
+    const P = [], C = [], N = [];
+    for (let b = 0; b < blades; b++) {
+      const a = rnd() * 6.283, r0 = rnd() * 0.16, h = 0.32 + rnd() * 0.42, w = 0.035 + rnd() * 0.025;
+      const lean = 0.08 + rnd() * 0.28, la = a + (rnd() - 0.5) * 0.8;
+      const bx = Math.cos(a) * r0, bz = Math.sin(a) * r0;
+      const px = -Math.sin(a) * w, pz = Math.cos(a) * w;          // larghezza perpendicolare
+      const lx = Math.cos(la) * lean, lz = Math.sin(la) * lean;  // inclinazione
+      const tone = 0.92 + rnd() * 0.22, dry = rnd() < 0.18 ? 1 : 0;
+      const v = [
+        [bx - px, 0, bz - pz, 0.42], [bx + px, 0, bz + pz, 0.42],
+        [bx + lx * 0.35 + px * 0.6, h * 0.5, bz + lz * 0.35 + pz * 0.6, 0.78], [bx + lx * 0.35 - px * 0.6, h * 0.5, bz + lz * 0.35 - pz * 0.6, 0.78],
+        [bx + lx, h, bz + lz, 1.12],
+      ];
+      for (const tri of [[0, 1, 2], [0, 2, 3], [3, 2, 4]]) for (const k of tri) {
+        const [x, y, z, c] = v[k];
+        P.push(x, y, z); N.push(0, 1, 0);
+        const cc = c * tone;
+        C.push(cc * (dry ? 1.18 : 1), cc * (dry ? 1.05 : 1), cc * (dry ? 0.7 : 1));
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+    g.computeBoundingSphere();
+    g.userData.shared = true;
+    return g;
+  }
+  // fiore: stelo + corolla a croce (colore dall'istanza)
+  function makeFlower() {
+    const P = [], C = [], N = [];
+    const push = (x, y, z, r, gg, b) => { P.push(x, y, z); N.push(0, 1, 0); C.push(r, gg, b); };
+    const h = 0.3;
+    push(-0.012, 0, 0, 0.35, 0.55, 0.3); push(0.012, 0, 0, 0.35, 0.55, 0.3); push(0, h, 0, 0.45, 0.65, 0.35);
+    for (let i = 0; i < 5; i++) {
+      const a0 = i / 5 * 6.283, a1 = a0 + 0.9;
+      push(0, h, 0, 1, 0.92, 0.5);
+      push(Math.cos(a0) * 0.07, h + 0.015, Math.sin(a0) * 0.07, 1, 1, 1);
+      push(Math.cos(a1) * 0.07, h + 0.015, Math.sin(a1) * 0.07, 1, 1, 1);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+    g.computeBoundingSphere(); g.userData.shared = true;
+    return g;
+  }
+  const tuftGeo = makeTuft(5, 9001);
+  const flowerGeo = makeFlower();
+  /** materiale dell'erba: vento a raffiche, si piega attorno al giocatore e sfuma con la distanza */
+  function grassMaterial(fade0, fade1, key) {
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uWind = WIND;
+      sh.uniforms.uPlayer = GRASS_PLAYER;
+        // i fili sono sottili e a doppia faccia: la normale resta sempre verso l'alto (niente retro scuro)
+      sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('float faceDirection = gl_FrontFacing ? 1.0 : - 1.0;', 'float faceDirection = 1.0;'));
+    sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uWind;\nuniform vec3 uPlayer;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          {
+            vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+            float hg = max(transformed.y, 0.0);
+            float gust = 0.55 + 0.45 * sin(uWind * 0.6 + ip.x * 0.018 + ip.z * 0.013);
+            float ph = uWind * 2.2 + ip.x * 0.23 + ip.z * 0.19;
+            float sw = (sin(ph) * 0.6 + sin(ph * 2.7 + 1.3) * 0.25) * gust * hg * hg * 0.55;
+            transformed.x += sw; transformed.z += sw * 0.45;
+            vec2 away = ip.xz - uPlayer.xz;
+            float dp = length(away);
+            if (dp < 1.4 && abs(ip.y - uPlayer.y) < 1.5) {
+              float push = (1.0 - dp / 1.4) * hg * 0.9;
+              vec2 dir = dp > 0.01 ? away / dp : vec2(1.0, 0.0);
+              transformed.xz += dir * push;
+              transformed.y *= 1.0 - (1.0 - dp / 1.4) * 0.45;
+            }
+            float dc = distance(ip, cameraPosition);
+            transformed *= 1.0 - smoothstep(${fade0.toFixed(1)}, ${fade1.toFixed(1)}, dc);
+          }`);
+    };
+    mat.customProgramCacheKey = () => 'grass-' + key;
+    return mat;
+  }
+  const grassNearMat = grassMaterial(42, 62, 'near');
+  const grassFarMat = grassMaterial(140, 190, 'far');
+  const flowerMat = grassMaterial(40, 60, 'flower');
+  /** dove può crescere l'erba (niente acqua, sabbia, rocce ripide, neve, strade e piazze) */
+  function grassOK(x, z, h, slope = 0) {
+    if (h < WATER_LEVEL + 1.2 || h > 24 || slope > 0.7) return false;
+    if (inTown(x, z, -5)) return false;
+    if (roadDist(x, z) < 2.8) return false;
+    return true;
+  }
+  /** true se in (x,z) c'è un box a livello del suolo (pavimenti, casette, casse) */
+  function underBox(x, z, h) {
+    for (const c of queryColliders(x, z, 0.3)) {
+      if (c.type === 'cyl') continue;
+      if (c.minY < h + 0.4 && x > c.minX - 0.2 && x < c.maxX + 0.2 && z > c.minZ - 0.2 && z < c.maxZ + 0.2) return true;
+    }
+    return false;
+  }
+  // campo d'erba fitta attorno alla telecamera, a celle da 32 m costruite poco per volta
+  const GCELL = 32, GR = 64, GDENS = 0.55;
+  const TREE_HI = 110;       // alberi dettagliati fin qui, poi la versione semplificata
+  const NEAR_ONLY = 150;      // oltre questa distanza i cespugli e l'erba media non si disegnano
+  const grassCells = new Map();
+  function buildGrassCell(gx, gz) {
+    const rnd = mulberry32((gx * 92837111) ^ (gz * 689287499) ^ 0x5bd1e995);
+    const x0 = gx * GCELL, z0 = gz * GCELL;
+    const NT = Math.round(GCELL * GCELL * GDENS), NF = 70, NP = 16;
+    const grp = new THREE.Group();
+    const gm = new THREE.InstancedMesh(tuftGeo, grassNearMat, NT);
+    const fm = new THREE.InstancedMesh(flowerGeo, flowerMat, NF);
+    const pm = new THREE.InstancedMesh(PROPS.pebbles, rockMaterial, NP);
+    let n = 0, nf = 0, np = 0;
+    const flowerCols = ['#ffffff', '#ffe14d', '#ff7eb6', '#b48cff', '#ff6a4d'];
+    const fpatch = patch(x0 + 16, z0 + 16, 0.05, 3.3);      // alcune zone più fiorite
+    for (let i = 0; i < NT + NF + NP; i++) {
+      const x = x0 + rnd() * GCELL, z = z0 + rnd() * GCELL;
+      const r1 = rnd(), r2 = rnd(), r3 = rnd();
+      const h = terrainHeight(x, z);
+      if (i >= NT + NF) {                                      // sassolini: anche su sabbia e sterrato
+        if (h < WATER_LEVEL - 0.3 || h > 30 || inTown(x, z, -5) || underBox(x, z, h)) continue;
+        q.setFromAxisAngle(up, r1 * 6.28); const s = 0.7 + r2 * 1.1; sc.set(s, s, s); p.set(x, h - 0.02, z);
+        mat4.compose(p, q, sc); pm.setMatrixAt(np++, mat4);
+        continue;
+      }
+      if (!grassOK(x, z, h)) continue;
+      const slope = Math.hypot(terrainHeight(x + 1, z) - h, terrainHeight(x, z + 1) - h);
+      if (slope > 0.7 || underBox(x, z, h)) continue;
+      if (i >= NT) {                                           // fiori
+        if (r3 > 0.25 + fpatch * 0.75) continue;
+        q.setFromAxisAngle(up, r1 * 6.28); const s = 0.8 + r2 * 0.6; sc.set(s, s * (0.8 + r3 * 0.6), s); p.set(x, h - 0.02, z);
+        mat4.compose(p, q, sc); fm.setMatrixAt(nf, mat4);
+        fm.setColorAt(nf, col.set(flowerCols[Math.floor(r2 * 997) % flowerCols.length]));
+        nf++;
+        continue;
+      }
+      q.setFromAxisAngle(up, r1 * 6.28);
+      const s = 0.75 + r2 * 0.65; sc.set(s, s * (0.75 + r3 * 0.6), s); p.set(x, h - 0.03, z);
+      mat4.compose(p, q, sc);
+      gm.setMatrixAt(n, mat4);
+      groundColor(x, z, h, col, slope);
+      gm.setColorAt(n, col.multiplyScalar(1.05 + r3 * 0.2));
+      n++;
+    }
+    for (const [im, cnt] of [[gm, n], [fm, nf], [pm, np]]) {
+      im.count = cnt;
+      if (!cnt) continue;
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      im.receiveShadow = true;
+      im.computeBoundingSphere();
+      grp.add(im);
+    }
+    scene.add(grp);
+    return { grp, ims: [gm, fm, pm] };
+  }
+  function disposeGrassCell(c) {
+    scene.remove(c.grp);
+    for (const im of c.ims) im.dispose();
+  }
+  function updateGrass(camPos, t0, budgetMs) {
+    const groundY = terrainHeight(camPos.x, camPos.z);
+    const high = camPos.y - groundY > 70;            // dal bus / in caduta l'erba fitta non serve
+    // scarica le celle lontane
+    for (const [k, c] of grassCells) {
+      const cx = (c.gx + 0.5) * GCELL - camPos.x, cz = (c.gz + 0.5) * GCELL - camPos.z;
+      if (high || Math.hypot(cx, cz) > GR + GCELL) { disposeGrassCell(c); grassCells.delete(k); }
+    }
+    if (high) return;
+    // costruisce la cella mancante più vicina (al massimo 2 per frame)
+    let built = 0;
+    while (built < 2) {
+      let best = null, bd = 1e9;
+      const g0x = Math.floor((camPos.x - GR) / GCELL), g1x = Math.floor((camPos.x + GR) / GCELL);
+      const g0z = Math.floor((camPos.z - GR) / GCELL), g1z = Math.floor((camPos.z + GR) / GCELL);
+      for (let gx = g0x; gx <= g1x; gx++) for (let gz = g0z; gz <= g1z; gz++) {
+        if (grassCells.has(gx + ',' + gz)) continue;
+        const dx = Math.max(gx * GCELL - camPos.x, 0, camPos.x - (gx + 1) * GCELL);
+        const dz = Math.max(gz * GCELL - camPos.z, 0, camPos.z - (gz + 1) * GCELL);
+        const d = Math.hypot(dx, dz);
+        if (d < GR && d < bd) { bd = d; best = [gx, gz]; }
+      }
+      if (!best) break;
+      if (built > 0 && performance.now() - t0 > budgetMs) break;
+      const tb = performance.now();
+      const c = buildGrassCell(best[0], best[1]);
+      stats.grassMs = +(performance.now() - tb).toFixed(2);
+      c.gx = best[0]; c.gz = best[1];
+      grassCells.set(best[0] + ',' + best[1], c);
+      built++;
+    }
+    stats.grass = grassCells.size;
+  }
   const mat4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
   const boxGeoCache = new Map();
 
@@ -1125,31 +1393,54 @@ export function buildWorld(scene) {
     if (ch.trees.length) {
       const kinds = { pine: [], oak: [], birch: [] };
       for (const t of ch.trees) kinds[t.pine ? 'pine' : (t.rot > 4.4 ? 'birch' : 'oak')].push(t);
+      ch.treeHi = []; ch.treeLo = [];
       for (const [k, list] of Object.entries(kinds)) {
-        const im = instanced(PROPS[k], propMaterial, list, (t, i, im) => {
-          q.setFromAxisAngle(up, t.rot); sc.set(t.s, t.s * (0.92 + (t.light - 0.28) * 1.2), t.s); p.set(t.x, t.h - 0.15, t.z);
-          mat4.compose(p, q, sc);
-          im.setMatrixAt(i, mat4);
-          const v = 0.86 + (t.light - 0.28) * 1.1, hs = (t.hue - 0.28) * 2.2;
-          im.setColorAt(i, col.setRGB(v * (1 + hs * 0.6), v, v * (1 - hs * 0.4)));
-        });
-        if (im) group.add(im);
+        for (const low of [false, true]) {
+          const im = instanced(PROPS[low ? k + 'Low' : k], treeMaterial, list, (t, i, im) => {
+            q.setFromAxisAngle(up, t.rot); sc.set(t.s, t.s * (0.92 + (t.light - 0.28) * 1.2), t.s); p.set(t.x, t.h - 0.15, t.z);
+            mat4.compose(p, q, sc);
+            im.setMatrixAt(i, mat4);
+            const v = 0.86 + (t.light - 0.28) * 1.1, hs = (t.hue - 0.28) * 2.2;
+            im.setColorAt(i, col.setRGB(v * (1 + hs * 0.6), v, v * (1 - hs * 0.4)));
+          });
+          if (!im) continue;
+          if (low) { im.castShadow = false; im.visible = false; }
+          group.add(im);
+          (low ? ch.treeLo : ch.treeHi).push(im);
+        }
       }
     }
-    // rocce (3 forme diverse)
+    // rocce (5 forme): sono statiche, quindi vengono unite in un'unica geometria per chunk (1 draw call)
     if (ch.rocks.length) {
-      const lists = [[], [], []];
-      ch.rocks.forEach((r, i) => lists[Math.floor(r.e[0] * 0.999) % 3].push(r));
-      lists.forEach((list, k) => {
-        const im = instanced(PROPS.rocks[k], propMaterial, list, (r, i, im) => {
-          q.setFromEuler(eul.set(r.e[0] * 0.3, r.e[1], r.e[2] * 0.3));
-          sc.set(r.s * r.k[0], r.s * r.k[1], r.s * r.k[2]);
-          p.set(r.x, r.h + r.s * 0.15, r.z);
-          mat4.compose(p, q, sc);
-          im.setMatrixAt(i, mat4);
-        });
-        if (im) group.add(im);
-      });
+      const nm = new THREE.Matrix3();
+      let total = 0;
+      for (const r of ch.rocks) total += PROPS.rocks[(r.shape ?? 0) % PROPS.rocks.length].attributes.position.count;
+      const P = new Float32Array(total * 3), Nn = new Float32Array(total * 3), C = new Float32Array(total * 3);
+      let o = 0;
+      const v = new THREE.Vector3();
+      for (const r of ch.rocks) {
+        const g = PROPS.rocks[(r.shape ?? 0) % PROPS.rocks.length];
+        q.setFromEuler(eul.set(r.e[0] * 0.3, r.e[1], r.e[2] * 0.3));
+        sc.set(r.s * r.k[0], r.s * r.k[1], r.s * r.k[2]);
+        p.set(r.x, r.h + r.s * 0.15, r.z);
+        mat4.compose(p, q, sc);
+        nm.getNormalMatrix(mat4);
+        const gp = g.attributes.position, gn = g.attributes.normal, gc = g.attributes.color;
+        for (let i = 0; i < gp.count; i++, o++) {
+          v.fromBufferAttribute(gp, i).applyMatrix4(mat4); P[o * 3] = v.x; P[o * 3 + 1] = v.y; P[o * 3 + 2] = v.z;
+          v.fromBufferAttribute(gn, i).applyMatrix3(nm).normalize(); Nn[o * 3] = v.x; Nn[o * 3 + 1] = v.y; Nn[o * 3 + 2] = v.z;
+          C[o * 3] = gc.getX(i); C[o * 3 + 1] = gc.getY(i); C[o * 3 + 2] = gc.getZ(i);
+        }
+      }
+      const rg = new THREE.BufferGeometry();
+      rg.setAttribute('position', new THREE.BufferAttribute(P, 3));
+      rg.setAttribute('normal', new THREE.BufferAttribute(Nn, 3));
+      rg.setAttribute('color', new THREE.BufferAttribute(C, 3));
+      rg.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(total * 2), 2));
+      rg.computeBoundingSphere();
+      const rm = new THREE.Mesh(rg, rockMaterial);
+      rm.castShadow = rm.receiveShadow = true;
+      group.add(rm);
     }
     // oggetti di scena
     if (ch.props.length) {
@@ -1170,22 +1461,44 @@ export function buildWorld(scene) {
         if (im) group.add(im);
       }
     }
-    // erba decorativa (casuale ma con seme del chunk: sempre uguale)
+    // cespugli (4 varianti, due con fiori) ed erba media: visibili solo nei chunk vicini
+    ch.nearOnly = [];
+    if (ch.bushes.length) {
+      const lists = PROPS.bushes.map(() => []);
+      for (const b of ch.bushes) lists[b.v].push(b);
+      lists.forEach((list, k) => {
+        const im = instanced(PROPS.bushes[k], bushMaterial, list, (b, i, im) => {
+          q.setFromAxisAngle(up, b.rot); sc.set(b.s, b.s * 0.9, b.s); p.set(b.x, b.h - 0.1, b.z);
+          mat4.compose(p, q, sc);
+          im.setMatrixAt(i, mat4);
+          groundColor(b.x, b.z, b.h, col, 0.2);
+          const v = 0.85 + (col.g - 0.45) * 0.6;
+          im.setColorAt(i, col.setRGB(v * (col.r > 0.45 ? 1.08 : 1), v, v * 0.95));
+        });
+        if (im) { im.castShadow = false; group.add(im); ch.nearOnly.push(im); }
+      });
+    }
+    // ciuffi d'erba radi per la media distanza (quelli fitti li gestisce grassField)
     {
       const rnd = mulberry32((ch.cx * 73856093) ^ (ch.cz * 19349663));
-      const N = 170, gm = new THREE.InstancedMesh(grassGeo, grassM, N);
+      const N = 150, gm = new THREE.InstancedMesh(tuftGeo, grassFarMat, N);
       let n = 0;
       for (let i = 0; i < N; i++) {
         const x = ch.x0 + rnd() * CHUNK, z = ch.z0 + rnd() * CHUNK;
         const h = terrainHeight(x, z);
-        if (h < WATER_LEVEL + 0.2 || h > 20) continue;
-        q.setFromAxisAngle(up, rnd() * 6);
-        const s = 0.6 + rnd() * 0.8; sc.set(s, s, s); p.set(x, h, z);
+        if (!grassOK(x, z, h)) continue;
+        q.setFromAxisAngle(up, rnd() * 6.28);
+        const s = 1.1 + rnd() * 0.7; sc.set(s, s * (0.9 + rnd() * 0.4), s); p.set(x, h - 0.03, z);
         mat4.compose(p, q, sc);
-        gm.setMatrixAt(n++, mat4);
+        gm.setMatrixAt(n, mat4);
+        groundColor(x, z, h, col, 0.1);
+        gm.setColorAt(n, col.multiplyScalar(1.12));
+        n++;
       }
-      gm.count = n; gm.computeBoundingSphere();
-      group.add(gm);
+      gm.count = n; gm.receiveShadow = true;
+      if (gm.instanceColor) gm.instanceColor.needsUpdate = true;
+      gm.computeBoundingSphere();
+      group.add(gm); ch.nearOnly.push(gm);
     }
     // oggetti speciali
     for (const s of ch.specials) {
@@ -1244,7 +1557,7 @@ export function buildWorld(scene) {
   const chunkList = [...chunks.values()];
 
   function update(camPos, budgetMs = 6) {
-    { const t = performance.now() * 0.001; waterNormal.offset.set(t * 0.012, t * 0.007); }
+    { const t = performance.now() * 0.001; waterNormal.offset.set(t * 0.012, t * 0.007); WIND.value = t % 1800; }
     const t0 = performance.now();
     const ccx = Math.floor(camPos.x / 25), ccz = Math.floor(camPos.z / 25);
     const key = ccx + ',' + ccz;
@@ -1270,9 +1583,17 @@ export function buildWorld(scene) {
     let nd = 0, nl = 0;
     for (const ch of chunkList) {
       if (ch.lod) { ch.lod.visible = !ch.detail; nl++; }
-      if (ch.detail) nd++;
+      if (ch.detail) {
+        nd++;
+        const dx = Math.max(ch.x0 - camPos.x, 0, camPos.x - (ch.x0 + CHUNK)), dz = Math.max(ch.z0 - camPos.z, 0, camPos.z - (ch.z0 + CHUNK));
+        const near = Math.hypot(dx, dz) < NEAR_ONLY;
+        if (ch.nearOnly) for (const im of ch.nearOnly) im.visible = near;
+        const dTree = Math.hypot(dx, dz) < TREE_HI;
+        if (ch.treeHi) { for (const im of ch.treeHi) im.visible = dTree; for (const im of ch.treeLo) im.visible = !dTree; }
+      }
     }
     stats.detail = nd; stats.lod = nl;
+    updateGrass(camPos, t0, budgetMs + 2);
     return work;
   }
   /** costruisce subito tutto ciò che serve attorno a un punto (es. prima di atterrare) */

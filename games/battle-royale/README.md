@@ -45,10 +45,15 @@ python3 -m http.server 8080
 - **Grafica low-poly semi-realistica** (dal pacchetto di asset, ricreata nel codice in `js/props.js`): abeti a strati, querce e betulle; rocce irregolari con muschio; cataste di legna; pile di mattoni su pallet; barili di legno, blu e rossi; circa 50 casette di legno con tetto a falde, comignolo e fioriera. Le case delle città hanno tetti a tegole, comignoli in mattoni, zoccolo in pietra, cornici, davanzali, persiane e zerbini. Se nella cartella `models/` metti i file `.glb` originali, il gioco usa quelli (vedi `models/LEGGIMI.md`).
 - **Barili esplosivi**: i barili rossi esplodono dopo qualche colpo e possono far esplodere quelli vicini a catena. Col piccone si raccolgono materiali anche da cataste di legna, pile di mattoni e barili di legno.
 - **Colori e texture**:
-  - **Terreno**: una texture di dettaglio con fili d'erba e chiazze, su due scale per non far vedere le ripetizioni. Il colore varia fra prato scuro, erba secca e zone fiorite; i pendii ripidi diventano roccia, la sabbia vicino all'acqua è bagnata e le strade sterrate hanno il bordo erboso.
-  - **Acqua**: increspature animate.
-  - **Cielo**: un alone e un disco del sole, più la foschia all'orizzonte.
-  - **Materiali**: intonaco con grana, tegole e mattoni in rilievo, vestiti con trama di tessuto.
+  - **Terreno**: una texture di dettaglio con fili d'erba e chiazze, su due scale per non far vedere le ripetizioni. Il colore varia fra prato scuro, erba secca e zone fiorite; i pendii ripidi diventano roccia e le strade sterrate hanno il bordo erboso.
+  - **Acqua**: colore in base alla profondità (turchese a riva, blu scuro al largo), schiuma che si muove sulla battigia, increspature animate e riflesso del cielo sulle superfici viste di taglio.
+  - **Rocce**: texture di pietra con crepe e grana di granito, proiettata sui 3 assi (niente stiramenti), più muschio sulla parte alta. Ci sono 5 forme diverse (masso, lastra, spuntone, masso spaccato) e spesso compaiono a gruppi.
+  - **Cielo e materiali**: alone e disco del sole con foschia all'orizzonte; intonaco con grana, tegole e mattoni in rilievo; vestiti con trama di tessuto.
+- **Un mondo più vivo**:
+  - **Erba fitta**: vicino a te crescono ciuffi di fili sottili, scuri alla base e chiari in punta, che prendono il colore del terreno sotto (verde, secco, fiorito). Ondeggiano nel vento a raffiche, si piegano quando ci passi in mezzo e sfumano con la distanza. Fra l'erba ci sono fiori colorati e sassolini.
+  - **Più alberi**: circa il 70% in più, raggruppati in veri boschi fitti alternati a prati aperti, con le chiome che ondeggiano al vento. In montagna prevalgono gli abeti.
+  - **Cespugli**: circa 4.700, in 4 varianti (due con fiori bianchi e gialli o rosa e viola). Non bloccano il passaggio, quindi ci si può nascondere dentro.
+  - **Prestazioni**: l'erba fitta viene generata a celle da 32 m attorno alla telecamera, poco per volta, e scaricata quando ti allontani. Oltre 110 m gli alberi passano a una versione semplificata; cespugli ed erba media spariscono oltre 150 m, e le rocce di ogni chunk sono unite in un'unica geometria.
 - **Tempesta lenta**: si restringe in 6 fasi, con attese da 2 minuti e mezzo all'inizio e danni crescenti. Una partita completa dura circa 15 minuti.
 - **Mappa a chunk**: il mondo è diviso in blocchi da 100 m; dentro ogni blocco gli oggetti fissi sono uniti per materiale, così servono poche draw call. Vicino al giocatore vengono costruiti i blocchi dettagliati (alberi, erba, interni delle case, bottino, forzieri), poco per volta per evitare scatti; quelli lontani vengono scaricati. In lontananza resta una versione semplificata dell'isola, così l'orizzonte non è mai vuoto. Le collisioni esistono su tutta la mappa, quindi i bot funzionano anche lontano da te.
 - **99 bot** con IA: raccolgono bottino, aprono forzieri, si curano, scappano dalla tempesta, si combattono anche fra loro e distruggono i tuoi muri.

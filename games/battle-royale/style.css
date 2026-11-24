@@ -306,3 +306,42 @@ input#playerName:focus { border-color: #ffcf2e; }
 
 @media (max-width: 1100px) { .tabs button { font-size: 13px; padding: 8px 8px; } .logo.mini { display: none; } }
 @media (max-width: 900px) { .menu-right.wide { width: 100%; display: flex; } .tabpage { padding: 10px 14px; } .wallet .lvl > div { display: none; } }
+
+/* ───────── Impostazioni ───────── */
+#settings { z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(5,8,25,.62); backdrop-filter: blur(4px); }
+#settings.hidden { display: none; }
+.setbox { width: min(760px, 94vw); max-height: 90vh; display: flex; flex-direction: column; background: rgba(10,16,45,.95); border: 1px solid rgba(255,255,255,.15); border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,.6); overflow: hidden; }
+.sethead { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 6px; }
+.sethead h2 { margin: 0; letter-spacing: 2px; }
+.settabs { display: flex; gap: 4px; padding: 6px 20px 0; border-bottom: 1px solid rgba(255,255,255,.12); }
+.settabs button { background: none; border: 0; color: rgba(255,255,255,.65); font-weight: 800; font-size: 14px; padding: 10px 14px; cursor: pointer; border-bottom: 3px solid transparent; text-transform: uppercase; letter-spacing: 1px; }
+.settabs button.on { color: #fff; border-bottom-color: #ffcf2e; }
+.setbody { overflow-y: auto; padding: 8px 24px 12px; min-height: min(420px, 55vh); }
+.setrow { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.setrow.segrow { flex-direction: column; align-items: stretch; gap: 8px; }
+.setlbl { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.setlbl b { font-size: 14px; }
+.setlbl small { font-size: 11.5px; opacity: .6; }
+.setctl { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.setctl input[type=range] { width: 200px; accent-color: #ffcf2e; }
+.setctl output { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
+.setctl select { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.25); border-radius: 8px; padding: 6px 10px; font-weight: 700; min-width: 190px; }
+.setctl select option { background: #10183a; }
+.setrow.segrow .setctl { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.setrow.segrow .setctl button { padding: 9px 6px; border-radius: 9px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.05); color: #fff; font-weight: 800; cursor: pointer; }
+.setrow.segrow .setctl button.on { background: #ffcf2e; color: #1a1430; border-color: #ffcf2e; }
+.tgl { width: 46px; height: 26px; border-radius: 13px; border: 0; background: rgba(255,255,255,.2); position: relative; cursor: pointer; transition: background .15s; }
+.tgl i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.tgl.on { background: #3ad06a; }
+.tgl.on i { transform: translateX(20px); }
+.sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); background: var(--c); cursor: pointer; }
+.sw.on { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,207,46,.8); }
+.setfoot { display: flex; align-items: center; gap: 10px; padding: 12px 24px 18px; border-top: 1px solid rgba(255,255,255,.1); }
+.setfoot #setNote { flex: 1; font-size: 12.5px; opacity: .85; text-align: left; }
+.gearbtn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.3); background: rgba(10,16,45,.55); color: #fff; display: grid; place-items: center; cursor: pointer; transition: transform .25s, background .15s; }
+.gearbtn:hover { background: rgba(255,255,255,.14); transform: rotate(45deg); }
+#fps { position: fixed; left: 10px; top: 8px; z-index: 55; font: 700 12px/1.2 monospace; color: #b8ff9a; background: rgba(0,0,0,.45); padding: 3px 7px; border-radius: 6px; pointer-events: none; }
+#fps.hidden { display: none; }
+#crosshair { transform: scale(var(--k, 1)); }
+#crosshair i { background: var(--cc, #fff); }
+@media (max-width: 640px) { .setrow { flex-direction: column; align-items: stretch; } .setctl input[type=range] { flex: 1; } }

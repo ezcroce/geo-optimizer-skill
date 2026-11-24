@@ -2,9 +2,9 @@
 //  Menu principale: Gioca · Armadietto · Pass battaglia · Negozio · Missioni
 //  + lobby online (codice stanza, chat, compagni)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES } from './config.js?v=8';
-import * as PR from './progress.js?v=8';
-import * as N from './net.js?v=8';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES } from './config.js?v=9';
+import * as PR from './progress.js?v=9';
+import * as N from './net.js?v=9';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);

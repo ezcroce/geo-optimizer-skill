@@ -5,18 +5,21 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=8';
-import * as PR from './progress.js?v=8';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=8';
-import { initMenu } from './menu.js?v=8';
-import * as A from './audio.js?v=8';
+} from './config.js?v=9';
+import * as PR from './progress.js?v=9';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=9';
+import { initMenu } from './menu.js?v=9';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=9';
+import { initSettingsUI } from './settings-ui.js?v=9';
+import { applyAnisotropy } from './texgen.js?v=9';
+import * as A from './audio.js?v=9';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
-  addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt,
-} from './world.js?v=8';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=8';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=8';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=8';
+  addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
+} from './world.js?v=9';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=9';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=9';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=9';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -47,8 +50,14 @@ function rollRarity(weights) {
 }
 
 // ─────────────── Impostazioni salvate ───────────────
-const settings = Object.assign({ name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', players: 100, sens: 1, vol: 0.5, mode: 'br', hat: 'none', back: 'none' },
-  JSON.parse(localStorage.getItem('arenaRoyale') || '{}'));
+const SETTINGS_DEFAULT = () => ({
+  name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', players: 100, sens: 1, vol: 0.5, mode: 'br', hat: 'none', back: 'none',
+  // controlli, audio e interfaccia
+  adsSens: 1, invertY: false, fov: 70, crouchHold: false, shake: true, amb: 1, chColor: '#ffffff', chSize: 1, minimap: 'normal',
+  gfx: { ...GFX_DEFAULT },
+});
+const settings = Object.assign(SETTINGS_DEFAULT(), JSON.parse(localStorage.getItem('arenaRoyale') || '{}'));
+settings.gfx = { ...GFX_DEFAULT, ...(settings.gfx || {}) };
 // oggetti equipaggiati ma non (più) posseduti → torna a quelli base
 if (!PR.owns('skin', settings.skin)) settings.skin = 'recluta';
 if (!PR.owns('glider', settings.glider)) settings.glider = 'classico';
@@ -59,7 +68,8 @@ function saveSettings() { localStorage.setItem('arenaRoyale', JSON.stringify(set
 
 // ─────────────── Renderer & scena ───────────────
 const canvas = $('#game');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+// l'anti-aliasing è fatto nel post-processing (MSAA nel render target, FXAA o SMAA)
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -110,6 +120,21 @@ function gradientMaterial(top, bottom) {
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 20), gradientMaterial('#2f72d2', '#cfe6fb'));
 sky.renderOrder = -1;
 scene.add(sky);
+// riflessi ambientali dal cielo (metalli, vetri, acqua): mappa d'ambiente prefiltrata una volta sola
+{
+  const envScene = new THREE.Scene();
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), gradientMaterial('#2f72d2', '#cfe6fb')));
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(100, 24), new THREE.MeshBasicMaterial({ color: '#56653a' }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -8;
+  envScene.add(ground);
+  const pm = new THREE.PMREMGenerator(renderer);
+  scene.environment = pm.fromScene(envScene, 0.02, 0.1, 400).texture;
+  scene.environmentIntensity = 0.22;
+  pm.dispose();
+}
+hemi.intensity = 1.02;
+renderer.info.autoReset = false;   // con il post-processing si contano tutti i passaggi del frame
+const gfx = createGfx(renderer, scene, camera, sun);
 
 // Nuvole
 const clouds = [];
@@ -1210,7 +1235,7 @@ function placeWall(p) {
 }
 function makeWall(s) {
   const hw = s.alongX ? 2 : 0.125, hd = s.alongX ? 0.125 : 2;
-  const mat = new THREE.MeshStandardMaterial({ map: world.woodTex, roughness: 0.9, color: '#ffffff' });
+  const mat = new THREE.MeshStandardMaterial({ map: world.woodTex, normalMap: world.woodTex.userData.normal || null, roughness: 0.85, color: '#ffffff' });
   const mesh = new THREE.Mesh(wallGeoX, mat);
   mesh.position.set(s.x, s.g + 1.8 - 0.1, s.z);
   mesh.rotation.y = s.alongX ? 0 : Math.PI / 2;
@@ -1934,7 +1959,7 @@ const pressed = new Set();
 const mouse = { left: false, right: false, leftPressed: false };
 let pointerLocked = false;
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (!keys[e.code]) pressed.add(e.code);
   keys[e.code] = true;
   if (['Space', 'Tab'].includes(e.code) && G.state !== 'menu') e.preventDefault();
@@ -1958,10 +1983,10 @@ addEventListener('mousemove', e => {
   if (!pointerLocked && !(e.buttons & 1) && !(e.buttons & 2)) { if (!lockFailed) return; }
   // Chrome a volte invia salti enormi subito dopo il pointer lock: ignorali
   if (performance.now() - lockTime < 120 || Math.abs(e.movementX) > 300 || Math.abs(e.movementY) > 300) return;
-  const zoomK = G.ads ? 1 / currentZoom() : 1;
+  const zoomK = G.ads ? settings.adsSens / currentZoom() : 1;
   const s = 0.0022 * settings.sens * zoomK;
   G.camYaw -= e.movementX * s;
-  G.camPitch = clamp(G.camPitch - e.movementY * s, -1.35, 1.35);
+  G.camPitch = clamp(G.camPitch - e.movementY * s * (settings.invertY ? -1 : 1), -1.35, 1.35);
 });
 addEventListener('wheel', e => {
   if (G.state !== 'play' || !G.player || !G.player.alive) return;
@@ -2030,10 +2055,46 @@ function togglePause(force) {
 $('#resumeBtn').onclick = e => { e.stopPropagation(); togglePause(false); requestLock(); };
 $('#pause').addEventListener('click', e => { if (e.target.id === 'pause' || e.target.tagName === 'P' || e.target.tagName === 'H2') { togglePause(false); requestLock(); } });
 $('#quitBtn').onclick = () => { togglePause(false); toMenu(); };
-$('#sens').value = settings.sens;
-$('#vol').value = settings.vol;
-$('#sens').oninput = e => { settings.sens = +e.target.value; saveSettings(); };
-$('#vol').oninput = e => { settings.vol = +e.target.value; A.setVolume(settings.vol); saveSettings(); };
+// ─────────────── Impostazioni (grafica, controlli, audio, interfaccia) ───────────────
+let fogK = 1;
+function applySettings(key = '*') {
+  const g = settings.gfx, all = key === '*';
+  if (all || ['preset', 'scale', 'shadows', 'aa', 'bloom', 'ao'].includes(key)) gfx.apply(g);
+  if (all || key === 'preset' || key === 'aniso') applyAnisotropy(scene, Math.min(g.aniso, gfx.maxAniso || 1));
+  if (all || key === 'preset' || key === 'view' || key === 'grass') {
+    const v = g.view;
+    fogK = v;
+    QUALITY.detailIn = 240 * v; QUALITY.detailOut = 310 * v; QUALITY.treeHi = 110 * v; QUALITY.nearOnly = 150 * v;
+    QUALITY.grassOn = g.grass > 0.01;
+    QUALITY.grassDens = 0.55 * Math.max(0.1, g.grass);
+    QUALITY.grassR = 64 * clamp(0.6 + g.grass * 0.4, 0.6, 1.25);
+    GRASS_FADE.value = QUALITY.grassR / 64;
+    QUALITY.version++;
+  }
+  if (all || key === 'vol') A.setVolume(settings.vol);
+  if (all || key === 'amb') A.setAmbience(settings.amb);
+  if (all || key === 'shake') { if (!settings.shake) G.shake = 0; }
+  if (all || key === 'chColor' || key === 'chSize') {
+    const ch = $('#crosshair');
+    ch.style.setProperty('--cc', settings.chColor);
+    ch.style.setProperty('--k', settings.chSize);
+  }
+  if (all || key === 'minimap') {
+    const px = { small: 150, normal: 200, big: 260 }[settings.minimap] || 200;
+    mmCanvas.width = mmCanvas.height = px;
+    mmCanvas.style.width = mmCanvas.style.height = px + 'px';
+  }
+  if (all || key === 'fpsShow') $('#fps').classList.toggle('hidden', !g.fpsShow);
+}
+const settingsUI = initSettingsUI({
+  settings, presets: PRESETS,
+  save: saveSettings,
+  apply: applySettings,
+  defaults: () => { const d = SETTINGS_DEFAULT(); for (const k of ['name', 'skin', 'glider', 'difficulty', 'players', 'mode', 'hat', 'back']) delete d[k]; return d; },
+  onReload: () => location.reload(),
+});
+$('#setPauseBtn').onclick = e => { e.stopPropagation(); settingsUI.open(); };
+$('#setMenuBtn').onclick = () => { A.playUI(); settingsUI.open(); };
 
 function currentZoom() {
   const w = G.player && G.player.weapon;
@@ -2112,9 +2173,12 @@ function updatePlayer(dt) {
     G.climbHint = hit;
   }
   // abbassarsi
-  if (pressed.has('KeyC')) { p.crouch = !p.crouch; if (p.crouch) A.playStep(); }
+  if (settings.crouchHold) {
+    const want = !!keys.KeyC && !p.inWater;
+    if (want !== p.crouch) { p.crouch = want; if (want) A.playStep(); }
+  } else if (pressed.has('KeyC')) { p.crouch = !p.crouch; if (p.crouch) A.playStep(); }
   let stoodUp = false;
-  if (p.crouch && (pressed.has('Space') || (keys.ShiftLeft || keys.ShiftRight))) { p.crouch = false; stoodUp = pressed.has('Space'); }
+  if (p.crouch && !settings.crouchHold && (pressed.has('Space') || (keys.ShiftLeft || keys.ShiftRight))) { p.crouch = false; stoodUp = pressed.has('Space'); }
   // slot
   for (let i = 0; i < SLOT_COUNT; i++) if (pressed.has('Digit' + (i + 1))) { p.setActive(i); if (G.build.on) toggleBuild(false); }
   if (pressed.has('KeyQ')) toggleBuild();
@@ -2192,7 +2256,8 @@ function toggleBuild(force) {
 const camTarget = new THREE.Vector3();
 function updateCamera(dt) {
   const p = G.player;
-  let pivot, dist, shoulder = 0.75, wantFov = 70;
+  const F0 = settings.fov;
+  let pivot, dist, shoulder = 0.75, wantFov = F0;
   let yaw = G.camYaw, pitch = G.camPitch;
   if (!p.alive) {
     const t = G.spectate && G.spectate.alive ? G.spectate : p;
@@ -2200,16 +2265,16 @@ function updateCamera(dt) {
     G.camYaw += dt * 0.25; yaw = G.camYaw; pitch = -0.35; dist = 7; shoulder = 0;
   } else if (p.mode === 'bus') {
     pivot = camTarget.copy(G.bus.pos).add(new THREE.Vector3(0, 3, 0));
-    dist = 26; shoulder = 0; wantFov = 75;
+    dist = 26; shoulder = 0; wantFov = F0 + 5;
   } else if (p.mode === 'fall' || p.mode === 'glide') {
     pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, 1.5, 0));
-    dist = p.mode === 'fall' ? 7 : 6; shoulder = 0; wantFov = p.mode === 'fall' ? 85 : 75;
+    dist = p.mode === 'fall' ? 7 : 6; shoulder = 0; wantFov = p.mode === 'fall' ? F0 + 15 : F0 + 5;
   } else {
     pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, 1.8 - 0.55 * p.crouchK, 0));
     dist = G.ads ? 2.2 : 3.8;
     shoulder = G.ads ? 0.75 : 1.0;
-    if (G.ads) wantFov = 70 / currentZoom();
-    if (p.moveAmt > 6.5) wantFov = 76;
+    if (G.ads) wantFov = F0 / currentZoom();
+    if (p.moveAmt > 6.5) wantFov = F0 + 6;
   }
   G.fov = lerp(G.fov, wantFov, Math.min(1, dt * 12));
   if (Math.abs(camera.fov - G.fov) > 0.01) { camera.fov = G.fov; camera.updateProjectionMatrix(); }
@@ -2226,6 +2291,7 @@ function updateCamera(dt) {
   const hit = rayWorld(base, back, d + 0.3);
   if (hit) d = Math.max(0.4, hit.t - 0.3);
   camera.position.copy(base).addScaledVector(back, d);
+  if (!settings.shake) G.shake = 0;
   if (G.shake > 0) {
     camera.position.x += rand(-1, 1) * G.shake * 0.25;
     camera.position.y += rand(-1, 1) * G.shake * 0.25;
@@ -2243,8 +2309,8 @@ function updateCamera(dt) {
   sky.position.copy(camera.position);
   {
     const alt = clamp((camera.position.y - terrainHeight(camera.position.x, camera.position.z)) / 160, 0, 1);
-    scene.fog.near = lerp(160, 420, alt);
-    scene.fog.far = lerp(620, 1500, alt);
+    scene.fog.near = lerp(160, 420, alt) * fogK;
+    scene.fog.far = lerp(620, 1500, alt) * fogK;
   }
   // tetti trasparenti se sei dentro una casa
   for (const h of world.houses) {
@@ -2420,7 +2486,7 @@ const mmCanvas = $('#minimap');
 const mmCtx = mmCanvas.getContext('2d');
 function w2m(v, center, view, S) { return (v - center) / view * S + S / 2; }
 function drawMinimap() {
-  const S = 200, view = 220;
+  const S = mmCanvas.width, view = 220;
   const p = G.player;
   const c = p.mode === 'bus' ? G.bus.pos : (p.alive ? p.pos : camera.position);
   const MM = world.minimap.width, k = MM / (HALF * 2);
@@ -2847,7 +2913,7 @@ function renderLobby(dt) {
   lobby._ly = (lobby._ly ?? ly) + (ly - (lobby._ly ?? ly)) * Math.min(1, dt * 6);
   lobby.cam.position.y = 1.25;
   lobby.cam.lookAt(lobby.cam.position.x, lobby._ly, 0);
-  renderer.render(lobby.scene, lobby.cam);
+  gfx.render(lobby.scene, lobby.cam);
 }
 
 let menuApi = null;
@@ -3131,28 +3197,40 @@ function update(dt) {
 
 const _menuStream = new THREE.Vector3(0, 0, 0);
 let last = performance.now();
+const fpsEl = $('#fps');
+let fpsN = 0, fpsT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
+  // limite FPS (1 ms di tolleranza: rAF non è preciso)
+  const cap = settings.gfx.fpsCap;
+  if (cap > 0 && now - last < 1000 / cap - 1) return;
+  const lastCalls = renderer.info.render.calls;
+  renderer.info.reset();
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  if (settings.gfx.fpsShow) {
+    fpsN++; fpsT += dt;
+    if (fpsT >= 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsT)} FPS · ${lastCalls} draw`; fpsN = 0; fpsT = 0; }
+  }
   world.update(G.state === 'menu' ? _menuStream : camera.position, G.state === 'menu' ? 8 : 5);
   if (G.player && G.player.alive && G.state === 'play') GRASS_PLAYER.value.copy(G.player.pos); else GRASS_PLAYER.value.set(0, -9999, 0);
   if (G.state === 'menu') { renderLobby(dt); pressed.clear(); return; }
   if (!G.paused) update(dt);
-  renderer.render(scene, camera);
+  gfx.render(scene, camera);
   pressed.clear();
   mouse.leftPressed = false;
 }
 
 addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight);
+  gfx.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   lobby.cam.aspect = innerWidth / innerHeight; lobby.cam.updateProjectionMatrix();
 });
 
+applySettings();
 buildMenu();
 $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

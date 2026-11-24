@@ -4,6 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
+import { normalFromHeight, NORMALS } from './texgen.js?v=9';
 
 function mulberry32(a) {
   return function () {
@@ -456,7 +457,7 @@ export const bushMaterial = addWind(new THREE.MeshStandardMaterial({ vertexColor
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
 const stoneTex = makeStoneTexture();
-export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.0, flatShading: true, map: stoneTex });
+export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.0, flatShading: true, map: stoneTex, normalMap: NORMALS ? normalFromHeight(stoneTex.image, 3) : null, normalScale: new THREE.Vector2(0.8, 0.8) });
 rockMaterial.onBeforeCompile = (sh) => {
   sh.vertexShader = sh.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;')

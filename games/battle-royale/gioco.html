@@ -4,9 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=8" />
+<link rel="stylesheet" href="style.css?v=9" />
 <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=8", "three/addons/": "./vendor/addons/" } }
+  { "imports": { "three": "./vendor/three.module.js?v=9", "three/addons/": "./vendor/addons/" } }
 </script>
 </head>
 <body>
@@ -28,6 +28,7 @@
     <div class="wallet">
       <div class="lvl" title="Livello del pass battaglia"><b id="lvlNum">1</b><div><small>LIVELLO</small><div class="xpbar"><i id="xpFill"></i></div></div></div>
       <div class="coins" title="Monete: si guadagnano giocando e con le missioni">🪙 <b id="coinNum">0</b></div>
+      <button id="setMenuBtn" class="gearbtn" title="Impostazioni" aria-label="Impostazioni"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.9a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
     </div>
   </div>
 
@@ -181,15 +182,22 @@
   <div class="box">
     <h2>PAUSA</h2>
     <p>Clicca per riprendere</p>
-    <label class="lbl">Sensibilità mouse</label>
-    <input type="range" id="sens" min="0.3" max="3" step="0.1" value="1" />
-    <label class="lbl">Volume</label>
-    <input type="range" id="vol" min="0" max="1" step="0.05" value="0.5" />
     <button id="resumeBtn" class="play small">RIPRENDI</button>
+    <button id="setPauseBtn" class="ghost">⚙ Impostazioni</button>
     <button id="fsPauseBtn" class="ghost">⛶ Schermo intero</button>
     <button id="quitBtn" class="ghost">Torna al menu</button>
   </div>
 </div>
+
+<div id="settings" class="screen hidden">
+  <div class="setbox">
+    <div class="sethead"><h2>IMPOSTAZIONI</h2><button id="setClose" class="ghost tiny" aria-label="Chiudi">✕</button></div>
+    <nav class="settabs" id="setTabs"></nav>
+    <div class="setbody" id="setBody"></div>
+    <div class="setfoot"><span id="setNote"></span><button id="setReset" class="ghost">Ripristina</button><button id="setDone" class="play small">FATTO</button></div>
+  </div>
+</div>
+<div id="fps" class="hidden"></div>
 
 <div id="end" class="screen hidden">
   <div class="box">
@@ -205,7 +213,7 @@
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
 
-<script type="module" src="js/main.js?v=8"></script>
-<script src="js/transition.js?v=8"></script>
+<script type="module" src="js/main.js?v=9"></script>
+<script src="js/transition.js?v=9"></script>
 </body>
 </html>

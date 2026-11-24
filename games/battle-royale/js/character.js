@@ -1,7 +1,10 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=8';
-import { mergeParts } from './props.js?v=8';
+import { normalFromHeight, NORMALS } from './texgen.js?v=9';
+/** normal map ricavata dalla trama (cache per texture) */
+function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=9';
+import { mergeParts } from './props.js?v=9';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -34,7 +37,7 @@ function fabricTex() {
 function clothMat(color) {
   const key = 'cloth' + color;
   if (matCache.has(key)) return matCache.get(key);
-  const m = new THREE.MeshStandardMaterial({ color, map: fabricTex(), roughness: 0.85, metalness: 0.02 });
+  const m = new THREE.MeshStandardMaterial({ color, map: fabricTex(), normalMap: nrm(fabricTex(), 0.9), normalScale: new THREE.Vector2(0.7, 0.7), roughness: 0.85, metalness: 0.02 });
   matCache.set(key, m);
   return m;
 }
@@ -157,7 +160,7 @@ function texMat(kind, color, opts = {}) {
   const key = kind + color + JSON.stringify(opts);
   if (matCache.has(key)) return matCache.get(key);
   const map = kind === 'denim' ? denimTex() : kind === 'leather' ? leatherTex() : kind === 'knit' ? knitTex() : brushedTex();
-  const m = new THREE.MeshStandardMaterial({ color, map, roughness: kind === 'metal' ? 0.3 : kind === 'leather' ? 0.55 : 0.85, metalness: kind === 'metal' ? 0.85 : 0.03, ...opts });
+  const m = new THREE.MeshStandardMaterial({ color, map, normalMap: nrm(map, kind === 'metal' ? 0.4 : 1.2), normalScale: new THREE.Vector2(0.6, 0.6), roughness: kind === 'metal' ? 0.3 : kind === 'leather' ? 0.55 : 0.85, metalness: kind === 'metal' ? 0.85 : 0.03, ...opts });
   matCache.set(key, m);
   return m;
 }
@@ -920,7 +923,7 @@ export function buildWeaponMesh(id, rarity = 0) {
       m: new THREE.MeshStandardMaterial({ map: gm, bumpMap: gm, bumpScale: 0.6, metalness: 0.4, roughness: 0.38 }),
       b: new THREE.MeshStandardMaterial({ map: pl, bumpMap: pl, bumpScale: 1.2, metalness: 0.05, roughness: 0.75 }),
       r: new THREE.MeshStandardMaterial({ map: rt, emissive: rc, emissiveMap: rt, emissiveIntensity: rarity >= 3 ? 0.45 : 0.15, metalness: rarity === 4 ? 0.5 : 0.2, roughness: rarity === 4 ? 0.3 : 0.42 }),
-      w: new THREE.MeshStandardMaterial({ map: walnutTex(), roughness: 0.55, metalness: 0.02 }),
+      w: new THREE.MeshStandardMaterial({ map: walnutTex(), bumpMap: walnutTex(), bumpScale: 0.5, roughness: 0.55, metalness: 0.02 }),
       k: mat('#25272c', { metalness: 0.2, roughness: 0.6 }),
       g: new THREE.MeshStandardMaterial({ color: '#7fd0ff', emissive: '#1a5a8a', emissiveIntensity: 0.6, metalness: 0.9, roughness: 0.05 }),
       dot: glowMat('#ff2a2a'),

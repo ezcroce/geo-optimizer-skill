@@ -3,7 +3,8 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=8';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=9';
+import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=9';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -12,6 +13,9 @@ export const SCALE = 3;               // la mappa è 3 volte più grande della v
 export const HALF = 200 * SCALE;      // la mappa va da -600 a +600
 export const WATER_LEVEL = -2.6;
 export const CHUNK = 100;             // lato di un chunk (m)
+/** qualità grafica regolabile dalle impostazioni (distanze di dettaglio, erba) */
+export const GRASS_FADE = { value: 1 };
+export const QUALITY = { detailIn: 240, detailOut: 310, grassR: 64, grassDens: 0.55, treeHi: 110, nearOnly: 150, grassOn: true, version: 0 };
 const EDGE = HALF + 60;               // il terreno continua un po' nel mare
 
 const DEFAULT_TOWNS = [
@@ -399,50 +403,60 @@ function m(name, color, opts = {}) {
   return M[name];
 }
 
+// ── texture degli edifici: colore + rilievo (normal map), risoluzione secondo la qualità scelta ──
+function withNormal(color, height, strength) {
+  const t = colorTex(color);
+  if (NORMALS) t.userData.normal = normalFromHeight(height, strength);
+  return t;
+}
 function makeWallTexture(base, line) {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d');
+  const { c, g, S } = canvas2d(128), H = canvas2d(128), h = H.g;
   g.fillStyle = base; g.fillRect(0, 0, 128, 128);
-  // blocchi con leggere variazioni di tono
+  h.fillStyle = 'rgb(150,150,150)'; h.fillRect(0, 0, 128, 128);
+  // blocchi con leggere variazioni di tono e di sporgenza
   for (let y = 0; y < 128; y += 16) {
     const off = (y / 16) % 2 ? 16 : 0;
     for (let x = off - 32; x < 128; x += 32) {
       const k = Math.random();
       g.fillStyle = k < 0.5 ? `rgba(0,0,0,${0.02 + k * 0.06})` : `rgba(255,255,255,${(k - 0.5) * 0.12})`;
       g.fillRect(x, y, 32, 16);
+      const hv = 140 + Math.floor(Math.random() * 30);
+      h.fillStyle = `rgb(${hv},${hv},${hv})`; h.fillRect(x + 1, y + 1, 30, 14);
     }
   }
-  // grana dell'intonaco
-  const img = g.getImageData(0, 0, 128, 128), d = img.data;
-  for (let i = 0; i < d.length; i += 4) { const v = (Math.random() - 0.5) * 14; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
-  g.putImageData(img, 0, 0);
+  // macchie di umidità e sporco in basso
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * 128, y = 70 + Math.random() * 58, r = 6 + Math.random() * 16;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(60,50,30,0.10)'); gr.addColorStop(1, 'rgba(60,50,30,0)');
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  addGrain(g, S, 14); addGrain(h, H.S, 40);
   for (let i = 0; i < 260; i++) {
-    g.fillStyle = `rgba(0,0,0,${Math.random() * 0.07})`;
-    g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 3, 1 + Math.random() * 3);
+    const x = Math.random() * 128, y = Math.random() * 128, w = 1 + Math.random() * 3, hh = 1 + Math.random() * 3;
+    g.fillStyle = `rgba(0,0,0,${Math.random() * 0.07})`; g.fillRect(x, y, w, hh);
+    h.fillStyle = 'rgba(0,0,0,0.25)'; h.fillRect(x, y, w, hh);
   }
-  // fughe con un filo di luce sotto (effetto rilievo)
-  g.lineWidth = 2;
+  // fughe
   for (let y = 0; y < 128; y += 16) {
-    g.strokeStyle = line; g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke();
-    g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, y + 1.5); g.lineTo(128, y + 1.5); g.stroke(); g.lineWidth = 2;
+    g.lineWidth = 2; g.strokeStyle = line; g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, y + 1.5); g.lineTo(128, y + 1.5); g.stroke();
+    h.lineWidth = 2.2; h.strokeStyle = 'rgb(40,40,40)'; h.beginPath(); h.moveTo(0, y); h.lineTo(128, y); h.stroke();
     const off = (y / 16) % 2 ? 16 : 0;
-    g.strokeStyle = line;
-    for (let x = off; x < 128; x += 32) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 16); g.stroke(); }
+    g.lineWidth = 2; g.strokeStyle = line;
+    for (let x = off; x < 128; x += 32) {
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 16); g.stroke();
+      h.beginPath(); h.moveTo(x, y); h.lineTo(x, y + 16); h.stroke();
+    }
   }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
+  return withNormal(c, H.c, 2.2);
 }
 
 function makeRoofTexture(base) {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d');
+  const { c, g, S } = canvas2d(128), H = canvas2d(128), h = H.g;
   g.fillStyle = base; g.fillRect(0, 0, 128, 128);
-  // file di tegole sfalsate con ombra sotto ogni fila
+  h.fillStyle = '#000'; h.fillRect(0, 0, 128, 128);
+  // file di tegole sfalsate: ogni tegola è più alta in basso (si sovrappone a quella sotto)
   for (let row = 0; row < 8; row++) {
     const y = row * 16, off = row % 2 ? 8 : 0;
     for (let x = -off; x < 128; x += 16) {
@@ -452,22 +466,24 @@ function makeRoofTexture(base) {
       g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(x, y + 13, 16, 3);
       g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x, y, 1.5, 14);
       g.fillStyle = 'rgba(255,255,255,0.10)'; g.fillRect(x + 2, y + 2, 11, 2);
+      if (Math.random() < 0.18) { g.fillStyle = 'rgba(70,90,40,0.25)'; g.fillRect(x + 2 + Math.random() * 8, y + 6, 4, 6); }   // muschio
+      const gr = h.createLinearGradient(0, y, 0, y + 15);
+      gr.addColorStop(0, 'rgb(70,70,70)'); gr.addColorStop(0.85, 'rgb(220,220,220)'); gr.addColorStop(1, 'rgb(40,40,40)');
+      h.fillStyle = gr; h.fillRect(x + 1, y, 14, 15);
+      // tegola curva (coppo): più alta al centro
+      const gx = h.createLinearGradient(x, 0, x + 16, 0);
+      gx.addColorStop(0, 'rgba(0,0,0,0.35)'); gx.addColorStop(0.5, 'rgba(255,255,255,0.15)'); gx.addColorStop(1, 'rgba(0,0,0,0.35)');
+      h.fillStyle = gx; h.fillRect(x + 1, y, 14, 15);
     }
   }
-  { const img = g.getImageData(0, 0, 128, 128), d = img.data;
-    for (let i = 0; i < d.length; i += 4) { const v = (Math.random() - 0.5) * 12; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
-    g.putImageData(img, 0, 0); }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  addGrain(g, S, 12); addGrain(h, H.S, 22);
+  return withNormal(c, H.c, 2.6);
 }
 
 function makeBrickTexture(base = '#9a4a3a') {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
+  const { c, g, S } = canvas2d(64), H = canvas2d(64), h = H.g;
   g.fillStyle = '#d8cfc0'; g.fillRect(0, 0, 64, 64);
+  h.fillStyle = 'rgb(50,50,50)'; h.fillRect(0, 0, 64, 64);
   for (let row = 0; row < 8; row++) {
     const off = row % 2 ? 8 : 0;
     for (let x = -off; x < 64; x += 16) {
@@ -477,28 +493,49 @@ function makeBrickTexture(base = '#9a4a3a') {
       g.fillRect(x + 1, row * 8 + 1, 14, 6);
       g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(x + 1, row * 8 + 1, 14, 1);
       g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x + 1, row * 8 + 6, 14, 1);
+      if (Math.random() < 0.15) { g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x + 3 + Math.random() * 8, row * 8 + 2, 2, 2); }   // scheggiature
+      const hv = 190 + Math.floor(Math.random() * 40);
+      h.fillStyle = `rgb(${hv},${hv},${hv})`; h.fillRect(x + 1.2, row * 8 + 1.2, 13.6, 5.6);
     }
   }
-  { const img = g.getImageData(0, 0, 64, 64), d = img.data;
-    for (let i = 0; i < d.length; i += 4) { const v = (Math.random() - 0.5) * 16; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
-    g.putImageData(img, 0, 0); }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  addGrain(g, S, 16); addGrain(h, H.S, 50);
+  return withNormal(c, H.c, 2.4);
 }
 
 function makeWoodTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
+  const { c, g, S } = canvas2d(64), H = canvas2d(64), h = H.g;
   g.fillStyle = '#9a6a35'; g.fillRect(0, 0, 64, 64);
+  h.fillStyle = 'rgb(150,150,150)'; h.fillRect(0, 0, 64, 64);
+  // assi verticali con venature
+  for (let x = 0; x < 64; x += 12.8) {
+    const k = 0.9 + Math.random() * 0.2;
+    g.fillStyle = `rgba(${k > 1 ? 255 : 40},${k > 1 ? 220 : 20},${k > 1 ? 160 : 0},${Math.abs(k - 1) * 0.6})`; g.fillRect(x, 0, 12.8, 64);
+    for (let i = 0; i < 9; i++) {
+      const vx = x + 1 + Math.random() * 10.8;
+      g.strokeStyle = `rgba(70,35,10,${0.08 + Math.random() * 0.15})`; g.lineWidth = 0.6;
+      g.beginPath(); g.moveTo(vx, 0); g.bezierCurveTo(vx + 1.5, 20, vx - 1.5, 44, vx + 0.5, 64); g.stroke();
+      h.strokeStyle = 'rgba(0,0,0,0.25)'; h.lineWidth = 0.7;
+      h.beginPath(); h.moveTo(vx, 0); h.bezierCurveTo(vx + 1.5, 20, vx - 1.5, 44, vx + 0.5, 64); h.stroke();
+    }
+    g.fillStyle = 'rgba(40,20,5,0.55)'; g.fillRect(x, 0, 0.8, 64);
+    h.fillStyle = 'rgb(20,20,20)'; h.fillRect(x, 0, 0.9, 64);
+  }
+  // cornice e traversa diagonale (cassa)
   g.strokeStyle = '#6e4620'; g.lineWidth = 3;
   g.strokeRect(2, 2, 60, 60);
   g.beginPath(); g.moveTo(2, 2); g.lineTo(62, 62); g.stroke();
-  for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(60,30,10,${Math.random() * 0.15})`; g.fillRect(Math.random() * 64, Math.random() * 64, 8, 1); }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
+  h.strokeStyle = 'rgb(235,235,235)'; h.lineWidth = 3;
+  h.strokeRect(2, 2, 60, 60);
+  h.beginPath(); h.moveTo(2, 2); h.lineTo(62, 62); h.stroke();
+  // chiodi
+  for (const [x, y] of [[4, 4], [60, 4], [4, 60], [60, 60], [32, 32]]) {
+    g.fillStyle = '#3a3a3a'; g.beginPath(); g.arc(x, y, 1, 0, 7); g.fill();
+    h.fillStyle = '#fff'; h.beginPath(); h.arc(x, y, 1, 0, 7); h.fill();
+  }
+  addGrain(g, S, 10); addGrain(h, H.S, 18);
+  const t = withNormal(c, H.c, 2.4);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  if (t.userData.normal) t.userData.normal.wrapS = t.userData.normal.wrapT = THREE.ClampToEdgeWrapping;
   return t;
 }
 
@@ -611,7 +648,7 @@ function makeGroundDetail() {
 
 /** aggiunge la texture di dettaglio (coordinate mondo, due scale) a un materiale del terreno.
  *  Usa lo slot `map` integrato (binding affidabile) ma sostituisce il campionamento. */
-function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1) {
+function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = false) {
   mat.map = tex;
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
@@ -620,6 +657,7 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1) {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
       .replace('#include <map_fragment>', `
+        float gdNear = 1.0 - smoothstep(${near.toFixed(1)}, ${far.toFixed(1)}, length(vWPos - cameraPosition));
         {
           float dist = length(vWPos - cameraPosition);
           float fine = texture2D(map, vWPos.xz * 0.17).r;
@@ -629,9 +667,18 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1) {
           float d = mix(1.0, 0.45 + 0.95 * fine, nearK * 0.9) * mix(1.0, 0.62 + 0.75 * fine2, 0.6);
           d *= 0.72 + 0.5 * blot;
           diffuseColor.rgb *= mix(1.0, d, ${amount.toFixed(2)});
-        }`);
+        }`)
+      .replace('#include <normal_fragment_maps>', bump ? `#include <normal_fragment_maps>
+        {
+          // micro-rilievo del terreno: pendenza della texture di dettaglio → normale inclinata
+          vec2 uv = vWPos.xz * 0.17, uv2 = vWPos.xz * 0.071 + vec2(0.31, 0.67);
+          float h0 = texture2D(map, uv).r, hx = texture2D(map, uv + vec2(0.012, 0.0)).r, hz = texture2D(map, uv + vec2(0.0, 0.012)).r;
+          float g0 = texture2D(map, uv2).r, gx = texture2D(map, uv2 + vec2(0.01, 0.0)).r, gz = texture2D(map, uv2 + vec2(0.0, 0.01)).r;
+          vec3 b = vec3(h0 - hx, 0.0, h0 - hz) * 1.6 * gdNear + vec3(g0 - gx, 0.0, g0 - gz) * 0.9 * (0.4 + 0.6 * gdNear);
+          normal = normalize(normal + (viewMatrix * vec4(b, 0.0)).xyz);
+        }` : '#include <normal_fragment_maps>');
   };
-  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount;
+  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount + (bump ? 'b' : '');
 }
 
 /** normal map affiancabile per l'acqua (somma di onde con frequenze intere) */
@@ -676,25 +723,26 @@ export function buildWorld(scene, opts = {}) {
 
   // ── materiali ──
   const wallColors = ['#e8dcc0', '#d9b48a', '#c9d6df', '#e6c3b0', '#cfe0c0', '#f0e0a0'];
-  const wallMats = wallColors.map(c => new THREE.MeshStandardMaterial({ map: makeWallTexture(c, 'rgba(0,0,0,0.12)'), roughness: 0.9 }));
+  const texMat = (t, opts = {}) => new THREE.MeshStandardMaterial({ map: t, normalMap: t.userData.normal || null, normalScale: new THREE.Vector2(0.9, 0.9), ...opts });
+  const wallMats = wallColors.map(c => texMat(makeWallTexture(c, 'rgba(0,0,0,0.12)'), { roughness: 0.9 }));
   const roofColors = ['#a33b2a', '#5a5f6a', '#3b5a8a', '#7a4a2a'];
-  const roofMats = roofColors.map(c => new THREE.MeshStandardMaterial({ map: makeRoofTexture(c), roughness: 0.8 }));
-  const stoneMat = new THREE.MeshStandardMaterial({ map: makeWallTexture('#a39d92', 'rgba(0,0,0,0.25)'), roughness: 0.95 });
+  const roofMats = roofColors.map(c => texMat(makeRoofTexture(c), { roughness: 0.72 }));
+  const stoneMat = texMat(makeWallTexture('#a39d92', 'rgba(0,0,0,0.25)'), { roughness: 0.95 });
   const trimMat = m('trim', '#f1ede2');
-  const brickMat = new THREE.MeshStandardMaterial({ map: makeBrickTexture(), roughness: 0.9 });
+  const brickMat = texMat(makeBrickTexture(), { roughness: 0.9 });
   const capMat = m('cap', '#55575c');
   const shutterColors = ['#3f6e4a', '#3c5f8a', '#7a4a2a', '#8a3a3a', '#5f6a3a'];
   const shutterMats = shutterColors.map(c => m('shut' + c, c));
   const matMat = m('doormat', '#7a3b2a');
   const floorMat = m('floor', '#8a6a4a');
   const woodTex = makeWoodTexture();
-  const crateMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.9 });
+  const crateMat = texMat(woodTex, { roughness: 0.85 });
   const metalMat = m('metal', '#6a6f78', { metalness: 0.6, roughness: 0.4 });
   const contColors = ['#c0392b', '#2471a3', '#d68910', '#1e8449'];
   const containerMats = contColors.map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
   const groundDetail = makeGroundDetail();
   const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
-  addGroundDetail(terrainMat, groundDetail, 70, 260, 1);
+  addGroundDetail(terrainMat, groundDetail, 70, 260, 1, NORMALS);
   const lodMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
   addGroundDetail(lodMat, groundDetail, 0, 1, 0.7);
   const blockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
@@ -1258,15 +1306,16 @@ export function buildWorld(scene, opts = {}) {
   const tallGeo = makeTuft(7, 4242, 0.85, 0.6, 0.3, 1.5, 0.3);   // erba alta: fili fino a 1,45 m
   const flowerGeo = makeFlower();
   /** materiale dell'erba: vento a raffiche, si piega attorno al giocatore e sfuma con la distanza */
-  function grassMaterial(fade0, fade1, key, sway = 0.55) {
+  function grassMaterial(fade0, fade1, key, sway = 0.55, scaled = true) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uWind = WIND;
       sh.uniforms.uPlayer = GRASS_PLAYER;
+      sh.uniforms.uFadeK = GRASS_FADE;
         // i fili sono sottili e a doppia faccia: la normale resta sempre verso l'alto (niente retro scuro)
       sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('float faceDirection = gl_FrontFacing ? 1.0 : - 1.0;', 'float faceDirection = 1.0;'));
     sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uWind;\nuniform vec3 uPlayer;')
+        .replace('#include <common>', '#include <common>\nuniform float uWind;\nuniform vec3 uPlayer;\nuniform float uFadeK;')
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           {
             vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
@@ -1284,16 +1333,16 @@ export function buildWorld(scene, opts = {}) {
               transformed.y *= 1.0 - (1.0 - dp / 1.4) * 0.45;
             }
             float dc = distance(ip, cameraPosition);
-            transformed *= 1.0 - smoothstep(${fade0.toFixed(1)}, ${fade1.toFixed(1)}, dc);
+            transformed *= 1.0 - smoothstep(${fade0.toFixed(1)}${scaled ? ' * uFadeK' : ''}, ${fade1.toFixed(1)}${scaled ? ' * uFadeK' : ''}, dc);
           }`);
     };
     mat.customProgramCacheKey = () => 'grass-' + key;
     return mat;
   }
   const grassNearMat = grassMaterial(42, 62, 'near');
-  const grassFarMat = grassMaterial(140, 190, 'far');
+  const grassFarMat = grassMaterial(140, 190, 'far', 0.55, false);
   const flowerMat = grassMaterial(40, 60, 'flower');
-  const tallMat = grassMaterial(95, 135, 'tall', 0.16);
+  const tallMat = grassMaterial(95, 135, 'tall', 0.16, false);
   /** dove può crescere l'erba (niente acqua, sabbia, rocce ripide, neve, strade e piazze) */
   function grassOK(x, z, h, slope = 0) {
     if (h < WATER_LEVEL + 1.2 || h > 24 || slope > 0.7) return false;
@@ -1310,14 +1359,13 @@ export function buildWorld(scene, opts = {}) {
     return false;
   }
   // campo d'erba fitta attorno alla telecamera, a celle da 32 m costruite poco per volta
-  const GCELL = 32, GR = 64, GDENS = 0.55;
-  const TREE_HI = 110;       // alberi dettagliati fin qui, poi la versione semplificata
-  const NEAR_ONLY = 150;      // oltre questa distanza i cespugli e l'erba media non si disegnano
+  const GCELL = 32;
+  let grassVer = QUALITY.version;
   const grassCells = new Map();
   function buildGrassCell(gx, gz) {
     const rnd = mulberry32((gx * 92837111) ^ (gz * 689287499) ^ 0x5bd1e995);
     const x0 = gx * GCELL, z0 = gz * GCELL;
-    const NT = Math.round(GCELL * GCELL * GDENS), NF = 70, NP = 16;
+    const NT = Math.max(1, Math.round(GCELL * GCELL * QUALITY.grassDens)), NF = Math.round(70 * Math.min(1, QUALITY.grassDens / 0.55)), NP = 16;
     const grp = new THREE.Group();
     const gm = new THREE.InstancedMesh(tuftGeo, grassNearMat, NT);
     const fm = new THREE.InstancedMesh(flowerGeo, flowerMat, NF);
@@ -1371,7 +1419,9 @@ export function buildWorld(scene, opts = {}) {
   }
   function updateGrass(camPos, t0, budgetMs) {
     const groundY = terrainHeight(camPos.x, camPos.z);
-    const high = camPos.y - groundY > 70;            // dal bus / in caduta l'erba fitta non serve
+    const GR = QUALITY.grassR;
+    if (grassVer !== QUALITY.version) { grassVer = QUALITY.version; for (const c of grassCells.values()) disposeGrassCell(c); grassCells.clear(); }
+    const high = camPos.y - groundY > 70 || !QUALITY.grassOn;            // dal bus / in caduta l'erba fitta non serve
     // scarica le celle lontane
     for (const [k, c] of grassCells) {
       const cx = (c.gx + 0.5) * GCELL - camPos.x, cz = (c.gz + 0.5) * GCELL - camPos.z;
@@ -1681,7 +1731,6 @@ export function buildWorld(scene, opts = {}) {
   }
 
   // ── streaming: costruisce i chunk vicini un po' per frame ──
-  const DETAIL_IN = 240, DETAIL_OUT = 310;   // raggio di caricamento / scaricamento del dettaglio
   const stats = { detail: 0, lod: 0, built: 0 };
   let lastKey = '';
   let order = [];
@@ -1701,13 +1750,13 @@ export function buildWorld(scene, opts = {}) {
       }
       order = chunkList.slice().sort((a, b) => a.dist - b.dist);
       // scarica il dettaglio dei chunk lontani
-      for (const ch of chunkList) if (ch.detail && ch.dist > DETAIL_OUT) unloadDetail(ch);
+      for (const ch of chunkList) if (ch.detail && ch.dist > QUALITY.detailOut) unloadDetail(ch);
     }
     // priorità: dettaglio vicino → orizzonte lontano
     let work = 0;
     for (const ch of order) {
       if (performance.now() - t0 > budgetMs && work > 0) break;
-      if (ch.dist <= DETAIL_IN && !ch.detail) { buildDetail(ch); stats.built++; work++; continue; }
+      if (ch.dist <= QUALITY.detailIn && !ch.detail) { buildDetail(ch); stats.built++; work++; continue; }
       if (!ch.lod && ch.dist < 1400) { buildLod(ch); work++; }
     }
     // il terreno lontano si nasconde dove c'è quello dettagliato
@@ -1717,9 +1766,9 @@ export function buildWorld(scene, opts = {}) {
       if (ch.detail) {
         nd++;
         const dx = Math.max(ch.x0 - camPos.x, 0, camPos.x - (ch.x0 + CHUNK)), dz = Math.max(ch.z0 - camPos.z, 0, camPos.z - (ch.z0 + CHUNK));
-        const near = Math.hypot(dx, dz) < NEAR_ONLY;
+        const near = Math.hypot(dx, dz) < QUALITY.nearOnly;
         if (ch.nearOnly) for (const im of ch.nearOnly) im.visible = near;
-        const dTree = Math.hypot(dx, dz) < TREE_HI;
+        const dTree = Math.hypot(dx, dz) < QUALITY.treeHi;
         if (ch.treeHi) { for (const im of ch.treeHi) im.visible = dTree; for (const im of ch.treeLo) im.visible = !dTree; }
       }
     }
@@ -1777,7 +1826,7 @@ export function buildWorld(scene, opts = {}) {
     for (const ch of chunkList) { if (ch.detail) unloadDetail(ch); if (ch.lod) { disposeGroup(ch.lod); ch.lod = null; } }
     for (const c of grassCells.values()) disposeGrassCell(c);
     grassCells.clear();
-    for (const m of [terrainMat, lodMat, blockMat, stoneMat, brickMat, crateMat, ...wallMats, ...roofMats]) { if (m.map) m.map.dispose(); m.dispose(); }
+    for (const m of [terrainMat, lodMat, blockMat, stoneMat, brickMat, crateMat, ...wallMats, ...roofMats]) { if (m.map) m.map.dispose(); if (m.normalMap) m.normalMap.dispose(); m.dispose(); }
     for (const g of boxGeoCache.values()) g.dispose();
     boxGeoCache.clear();
   }

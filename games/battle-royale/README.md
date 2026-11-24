@@ -24,6 +24,17 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: grafica migliorata e impostazioni complete
+
+- **Texture in alta risoluzione con rilievo**: muri, tetti, mattoni, casse, rocce, tessuti e terreno hanno ora una *normal map* generata dal rilievo (fughe, tegole, venature, intrecci) e sono disegnate al doppio della risoluzione; il terreno ha un micro-rilievo che reagisce al sole.
+- **Post-processing**: bagliore (bloom) su sole, spari ed esplosioni, occlusione ambientale (GTAO), anti-aliasing FXAA / SMAA / MSAA 4×, rendering HDR.
+- **Ombre morbide** (fino a 4096 px) e **riflessi ambientali** del cielo su metalli e vetri.
+- **Pannello Impostazioni** (⚙ nel menu o *Impostazioni* nella pausa), con quattro schede:
+  - *Grafica*: preset Bassa / Media / Alta / Ultra, risoluzione di rendering (50–200%), ombre, qualità texture, filtro anisotropico, anti-aliasing, bloom, occlusione ambientale, distanza visiva, densità erba, limite FPS;
+  - *Controlli*: sensibilità del mouse e in mira, inversione asse Y, campo visivo (FOV), abbassarsi premendo o tenendo premuto C, scossa della telecamera;
+  - *Audio*: volume generale e suoni d'ambiente;
+  - *Interfaccia*: colore e dimensione del mirino, dimensione della minimappa, contatore FPS.
+
 ### Novità: online, pass battaglia, negozio, missioni, modalità
 
 - **Modalità**: *Battle Royale* (l'isola classica con 18 località) e *Random Map* (a ogni partita un'isola nuova con città, nomi, montagne, laghi ed erba alta generati a caso).
@@ -111,6 +122,9 @@ js/progress.js  pass battaglia, negozio, missioni, monete, XP (localStorage)
 js/net.js       lobby online peer-to-peer (PeerJS / BroadcastChannel)
 js/menu.js      menu a schede: Gioca, Armadietto, Pass, Negozio, Missioni
 js/anim.js      pose e animazioni condivise dei personaggi
+js/gfx.js       post-processing, ombre, risoluzione e preset di qualità
+js/settings-ui.js pannello impostazioni a schede
+js/texgen.js    texture procedurali: qualità, normal map dal rilievo
 js/world.js     terreno, città, chunk (dettaglio + LOD), collisioni, raycast
 js/props.js     modelli low-poly (alberi, rocce, legna, mattoni, barili, casetta) e caricamento dei .glb
 models/         cartella facoltativa per i file .glb originali
@@ -119,5 +133,5 @@ js/audio.js     effetti sonori sintetizzati
 js/main.js      ciclo di gioco, giocatore, arrampicata, IA dei bot, combattimento, HUD
 js/site.js      scene 3D e animazioni del sito
 js/transition.js transizione animata fra sito e gioco
-vendor/         Three.js r187 e PeerJS 1.5 (licenza MIT)
+vendor/         Three.js r187 (+ addons di post-processing) e PeerJS 1.5 (licenza MIT)
 ```

@@ -11,14 +11,17 @@ export function initAudio() {
   if (!AC) return;
   ctx = new AC();
   master = ctx.createGain();
-  master.gain.value = 0.5;
+  master.gain.value = volK;
   master.connect(ctx.destination);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 }
 
-export function setVolume(v) { if (master) master.gain.value = v; }
+let volK = 0.5, ambK = 1;
+export function setVolume(v) { volK = v; if (master) master.gain.value = v; }
+/** volume dei suoni d'ambiente (vento, tempesta), 0–1 */
+export function setAmbience(v) { ambK = v; }
 
 function noise(dur, freq, q, vol, type = 'lowpass', when = 0, decay = dur) {
   if (!ctx) return;
@@ -110,7 +113,8 @@ export function playVictory() {
 export function playDefeat() { [392, 330, 262].forEach((f, i) => tone(f, 0.45, 0.22, 'sawtooth', i * 0.25)); }
 export function playWind(intensity) {
   if (!ctx) return;
-  noise(0.3, 500 + intensity * 600, 0.4, 0.06 * intensity, 'bandpass');
+  if (ambK <= 0) return;
+  noise(0.3, 500 + intensity * 600, 0.4, 0.06 * intensity * ambK, 'bandpass');
 }
 
 export function setStormSound(level) {
@@ -123,7 +127,7 @@ export function setStormSound(level) {
     stormNode.connect(f); f.connect(stormGain); stormGain.connect(master);
     stormNode.start();
   }
-  stormGain.gain.setTargetAtTime(level * 0.5, ctx.currentTime, 0.3);
+  stormGain.gain.setTargetAtTime(level * 0.5 * ambK, ctx.currentTime, 0.3);
 }
 
 /** sibilo di un proiettile che passa vicino (rumore filtrato con frequenza che scende) */

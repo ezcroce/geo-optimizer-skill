@@ -24,6 +24,18 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: biomi, montagne, meteo, eventi e città tematiche
+
+- **Mappa più irregolare**: rilievo generato con rumore frattale e *domain warping*, coste frastagliate con isolotti, fiumi che scendono dalle montagne, colline e creste ovunque.
+- **Montagne alte** (fino a ~95 m) con roccia sui versanti ripidi e cime innevate; la quota della neve cambia con il bioma.
+- **5 biomi** con terreno, alberi ed erba propri: *prati* (centro), *montagne innevate* (nord-ovest: abeti carichi di neve), *deserto* (sud-est: cactus, alberi secchi, rocce color sabbia), *bosco autunnale* (nord-est: querce e betulle rosse e arancioni), *costa tropicale* (sud-ovest: palme). Anche la minimappa mostra i biomi, la profondità dell'acqua e l'ombreggiatura dei rilievi.
+- **Meteo locale**: la neve cade solo nella zona innevata e in alta quota, nel bosco autunnale cadono le foglie, nel deserto soffia la polvere; nebbia e colore del cielo cambiano con il bioma.
+- **Profondità**: nebbia d'altezza (valli velate, cime nitide), prospettiva aerea e due catene montuose all'orizzonte oltre il mare.
+- **Città tematiche**: *villaggio alpino* (case in legno con tetti innevati, pupazzi di neve, abeti), *città western* (facciate a falso fronte, torre dell'acqua, cactus, balle di fieno), *fattoria* (case rosse, silos, balle di fieno, staccionate), *borgo marinaro* (case colorate con tendoni, palme, ombrelloni), *porto* e *zona industriale* (ciminiere, container; il porto ha un faro), *castello* (case in pietra con merli e una torre con bandiera), *paese* classico; anche le località che iniziano con "Faro" hanno il loro faro. Il nome della località e il suo tema compaiono nell'HUD quando ci entri.
+- **Eventi durante la partita** (annunciati con un banner e segnati sulla mappa): *rifornimento aereo* (cassa leggendaria col paracadute), *pioggia di meteoriti* (cerchi di avviso prima dell'impatto), *nebbia fitta*, *bufera di neve*, *ora d'oro* (casse con bottino migliore), *bassa gravità*. Online li decide l'host e arrivano a tutti.
+- **Personaggi più curati**: mani con dita, polsini, colletto, bottoni, tasche, lacci e suole, frangia, viso più dettagliato e occhi che sbattono le palpebre.
+- Gli alberi molto vicini alla telecamera si dissolvono, così la chioma non copre più la visuale.
+
 ### Novità: grafica migliorata e impostazioni complete
 
 - **Texture in alta risoluzione con rilievo**: muri, tetti, mattoni, casse, rocce, tessuti e terreno hanno ora una *normal map* generata dal rilievo (fughe, tegole, venature, intrecci) e sono disegnate al doppio della risoluzione; il terreno ha un micro-rilievo che reagisce al sole.
@@ -125,7 +137,10 @@ js/anim.js      pose e animazioni condivise dei personaggi
 js/gfx.js       post-processing, ombre, risoluzione e preset di qualità
 js/settings-ui.js pannello impostazioni a schede
 js/texgen.js    texture procedurali: qualità, normal map dal rilievo
-js/world.js     terreno, città, chunk (dettaglio + LOD), collisioni, raycast
+js/noise.js     rumore simplex / frattale per il terreno
+js/world.js     terreno, biomi, città tematiche, chunk (dettaglio + LOD), collisioni, raycast
+js/weather.js   nebbia d'altezza, montagne all'orizzonte, neve / foglie / polvere locali
+js/events.js    eventi della partita (rifornimento, meteoriti, nebbia, bufera, ora d'oro, bassa gravità)
 js/props.js     modelli low-poly (alberi, rocce, legna, mattoni, barili, casetta) e caricamento dei .glb
 models/         cartella facoltativa per i file .glb originali
 js/character.js modelli 3D di personaggi, armi, deltaplano e bus

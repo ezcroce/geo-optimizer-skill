@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=9';
+import { normalFromHeight, NORMALS } from './texgen.js?v=10';
 
 function mulberry32(a) {
   return function () {
@@ -155,6 +155,119 @@ function makeBirchLow() {
     part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 5, 1, true), '#e6e2d6', { y: 2.1 }),
     part(new THREE.IcosahedronGeometry(1.3, 0), '#86bf4e', { y: 5.2, sy: 1.6, jit: 0.12 }),
   ], 333);
+}
+
+// ═════════════ alberi dei biomi ═════════════
+const SNOWC = '#f1f5fa';
+function makeSnowPine() {
+  const parts = trunkParts(3.0, 0.3, 0.17, '#4e3420');
+  const tiers = [[2.3, 2.2, 2.0], [1.85, 2.0, 3.1], [1.4, 1.8, 4.1], [0.95, 1.6, 5.05], [0.55, 1.2, 5.9]];
+  const greens = ['#1f4a2c', '#24522f', '#2a5b33', '#2f6437', '#356d3c'];
+  tiers.forEach(([r, h, y], i) => {
+    const cone = wobble(new THREE.ConeGeometry(r, h, 8, 1), 0.12, 15 + i);
+    // neve sulle facce rivolte verso l'alto
+    parts.push(part(cone, greens[i], { y: y + h / 2 - 0.2, ry: i * 0.7, jit: 0.1, colorFn: (nx, ny, nz, x, yy, z, rnd) => ny > 0.3 && rnd() < 0.85 ? SNOWC : (ny < -0.3 ? '#173a22' : null) }));
+  });
+  parts.push(part(wobble(new THREE.ConeGeometry(0.32, 0.6, 6, 1), 0.04, 9), SNOWC, { y: 6.7, jit: 0.04 }));
+  return mergeParts(parts, 121);
+}
+function makeSnowPineLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.2, 0.3, 3, 5, 1, true), '#4e3420', { y: 1.5 }),
+    part(new THREE.ConeGeometry(2.2, 3.5, 6, 1, true), '#24522f', { y: 3.5, jit: 0.1, colorFn: (nx, ny) => ny > 0.45 ? SNOWC : null }),
+    part(new THREE.ConeGeometry(1.4, 2.9, 6, 1, true), '#2f6437', { y: 5.3, ry: 0.5, jit: 0.1, colorFn: (nx, ny) => ny > 0.45 ? SNOWC : null }),
+  ], 131);
+}
+function makeAutumnOak() {
+  const parts = trunkParts(3.3, 0.4, 0.24, '#5e3b22');
+  parts.push(part(new THREE.CylinderGeometry(0.08, 0.13, 1.6, 6), '#5e3b22', { x: 0.45, y: 3.2, rz: -0.8, jit: 0.1 }));
+  parts.push(part(new THREE.CylinderGeometry(0.07, 0.12, 1.4, 6), '#5e3b22', { x: -0.4, y: 3.3, z: 0.2, rz: 0.75, ry: 0.4, jit: 0.1 }));
+  const blobs = [[0, 4.6, 0, 1.85], [1.2, 4.2, 0.3, 1.3], [-1.15, 4.3, -0.2, 1.35], [0.3, 4.3, 1.15, 1.25], [-0.2, 4.2, -1.15, 1.25], [0.2, 5.6, 0.1, 1.25]];
+  const cols = ['#d9822b', '#c8562a', '#e0a030', '#b8452a', '#d97a2a', '#e8b040'];
+  blobs.forEach(([x, y, z, r], i) => {
+    const g = wobble(new THREE.IcosahedronGeometry(r, 0), r * 0.13, 70 + i);
+    parts.push(part(g, cols[i], { x, y, z, jit: 0.16, colorFn: (nx, ny) => ny < -0.4 ? '#8a3a1c' : null }));
+  });
+  return mergeParts(parts, 212);
+}
+function makeAutumnOakLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.24, 0.4, 3.3, 5, 1, true), '#5e3b22', { y: 1.65 }),
+    part(new THREE.IcosahedronGeometry(2.25, 0), '#d27a2a', { y: 4.6, sy: 0.85, jit: 0.14 }),
+    part(new THREE.IcosahedronGeometry(1.25, 0), '#e2a434', { y: 5.7, x: 0.3, jit: 0.12 }),
+  ], 232);
+}
+function makeAutumnBirch() {
+  const parts = [part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 7, 6), '#e6e2d6', { y: 2.1, jit: 0.05, colorFn: (nx, ny, nz, x, y, z, rnd) => (rnd() < 0.22 ? '#3a3a36' : '#e8e4d8') })];
+  const blobs = [[0, 4.4, 0, 1.25, 1.5], [0.15, 5.6, -0.1, 1.05, 1.4], [-0.1, 6.6, 0.1, 0.75, 1.3]];
+  const cols = ['#e8c02c', '#f0cf3a', '#f2b632'];
+  blobs.forEach(([x, y, z, r, sy], i) => parts.push(part(wobble(new THREE.DodecahedronGeometry(r, 0), r * 0.1, 64 + i), cols[i], { x, y, z, sy, jit: 0.14 })));
+  return mergeParts(parts, 313);
+}
+function makeAutumnBirchLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 5, 1, true), '#e6e2d6', { y: 2.1 }),
+    part(new THREE.IcosahedronGeometry(1.3, 0), '#eec636', { y: 5.2, sy: 1.6, jit: 0.12 }),
+  ], 343);
+}
+function makePalm() {
+  const parts = [];
+  // tronco curvo ad anelli
+  let x = 0, y = 0, lean = 0;
+  for (let i = 0; i < 7; i++) {
+    const h = 0.95, r = 0.27 - i * 0.017;
+    parts.push(part(new THREE.CylinderGeometry(r * 0.9, r, h, 7, 1), i % 2 ? '#8a6a44' : '#7a5c3a', { x, y: y + h / 2, rz: -lean, jit: 0.06 }));
+    y += h * Math.cos(lean); x += h * Math.sin(lean); lean += 0.045;
+  }
+  // foglie: lunghe lame inclinate verso il basso
+  for (let k = 0; k < 8; k++) {
+    const a = k / 8 * Math.PI * 2 + 0.2, len = 2.9 + (k % 3) * 0.3;
+    const leaf = wobble(new THREE.BoxGeometry(len, 0.06, 0.7, 4, 1, 1), 0.04, 500 + k);
+    // piega la foglia: le punte scendono
+    const P = leaf.attributes.position;
+    for (let i = 0; i < P.count; i++) { const u = (P.getX(i) + len / 2) / len; P.setY(i, P.getY(i) - u * u * 1.3); P.setZ(i, P.getZ(i) * (1 - u * 0.75)); }
+    leaf.translate(len / 2, 0, 0);
+    parts.push(part(leaf, k % 2 ? '#3f9a3a' : '#4fae44', { x, y: y + 0.05, ry: a, rz: 0.25, jit: 0.12, colorFn: (nx, ny) => ny < -0.5 ? '#2c6e2a' : null }));
+  }
+  for (let k = 0; k < 3; k++) parts.push(part(new THREE.IcosahedronGeometry(0.17, 0), '#6a4a22', { x: x + Math.cos(k * 2.1) * 0.22, y: y - 0.25, z: Math.sin(k * 2.1) * 0.22 }));
+  return mergeParts(parts, 404);
+}
+function makePalmLow() {
+  const parts = [part(new THREE.CylinderGeometry(0.18, 0.27, 6.6, 5, 1, true), '#7a5c3a', { y: 3.3, x: 0.35, rz: -0.12 })];
+  for (let k = 0; k < 5; k++) parts.push(part(new THREE.BoxGeometry(2.8, 0.06, 0.6), '#46a43f', { x: 0.75 + Math.cos(k * 1.256) * 1.2, y: 6.2, z: Math.sin(k * 1.256) * 1.2, ry: -k * 1.256, rz: -0.35 }));
+  return mergeParts(parts, 414);
+}
+function makeCactus() {
+  const g = '#4f8a3a', parts = [];
+  const rib = (nx, ny, nz, x, y, z, rnd) => (rnd() < 0.3 ? '#447a32' : (ny > 0.7 ? '#62a048' : null));
+  parts.push(part(new THREE.CylinderGeometry(0.34, 0.4, 4.2, 8, 3), g, { y: 2.1, jit: 0.06, colorFn: rib }));
+  parts.push(part(new THREE.SphereGeometry(0.34, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), g, { y: 4.2, colorFn: rib }));
+  for (const [s, y0, h] of [[1, 1.6, 1.5], [-1, 2.3, 1.2]]) {
+    parts.push(part(new THREE.CylinderGeometry(0.2, 0.2, 0.8, 7), g, { x: s * 0.5, y: y0, rz: Math.PI / 2, colorFn: rib }));
+    parts.push(part(new THREE.CylinderGeometry(0.21, 0.22, h, 7, 2), g, { x: s * 0.85, y: y0 + h / 2 - 0.1, colorFn: rib }));
+    parts.push(part(new THREE.SphereGeometry(0.21, 7, 3, 0, Math.PI * 2, 0, Math.PI / 2), g, { x: s * 0.85, y: y0 + h - 0.1 }));
+  }
+  parts.push(part(new THREE.IcosahedronGeometry(0.12, 0), '#f07aa0', { y: 4.5, noSky: true }));
+  return mergeParts(parts, 505);
+}
+function makeCactusLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.34, 0.4, 4.4, 5, 1), '#4f8a3a', { y: 2.2 }),
+    part(new THREE.BoxGeometry(1.7, 0.36, 0.36), '#4f8a3a', { y: 1.8 }),
+    part(new THREE.BoxGeometry(0.36, 1.4, 0.36), '#4f8a3a', { x: 0.85, y: 2.5 }),
+  ], 515);
+}
+function makeDeadTree() {
+  const c = '#6b5a4a', parts = trunkParts(3.6, 0.32, 0.14, c, 0.05);
+  const br = [[0.6, 2.4, 0, -0.9, 1.6], [-0.55, 2.9, 0.2, 0.85, 1.5], [0.2, 3.3, -0.5, 0.6, 1.3], [-0.1, 3.7, 0.45, -0.5, 1.1], [0.45, 3.9, 0.1, -0.35, 0.9]];
+  br.forEach(([x, y, z, rz, h], i) => parts.push(part(new THREE.CylinderGeometry(0.035, 0.09, h, 5), i % 2 ? '#5f4f40' : c, { x, y, z, rz, ry: i * 1.3, jit: 0.08 })));
+  return mergeParts(parts, 606);
+}
+function makeDeadTreeLow() {
+  return mergeParts([
+    part(new THREE.CylinderGeometry(0.14, 0.32, 3.6, 4, 1, true), '#6b5a4a', { y: 1.8 }),
+    part(new THREE.BoxGeometry(1.8, 0.12, 0.12), '#6b5a4a', { y: 2.9, rz: 0.5 }),
+  ], 616);
 }
 
 // ═════════════ rocce ═════════════
@@ -406,6 +519,9 @@ function makeShed() {
 export const PROPS = {
   pine: makePine(), oak: makeOak(), birch: makeBirch(),
   pineLow: makePineLow(), oakLow: makeOakLow(), birchLow: makeBirchLow(),
+  snowPine: makeSnowPine(), snowPineLow: makeSnowPineLow(), autumnOak: makeAutumnOak(), autumnOakLow: makeAutumnOakLow(),
+  autumnBirch: makeAutumnBirch(), autumnBirchLow: makeAutumnBirchLow(), palm: makePalm(), palmLow: makePalmLow(),
+  cactus: makeCactus(), cactusLow: makeCactusLow(), deadTree: makeDeadTree(), deadTreeLow: makeDeadTreeLow(),
   rocks: [makeRock(5, 0), makeRock(17, 0), makeRock(29, 1), makeRock(41, 2), makeRock(53, 3)],
   pebbles: makePebbles(),
   bushes: [makeBush(401), makeBush(433), makeBush(467, ['#f2f2f2', '#ffe066']), makeBush(491, ['#e86fa8', '#c77dff'])],
@@ -414,6 +530,8 @@ export const PROPS = {
   shed: makeShed(),
 };
 // dimensioni di riferimento (per i collisori)
+/** tutti i tipi di albero (ognuno ha anche la versione Low) */
+export const TREE_KINDS = ['pine', 'oak', 'birch', 'snowPine', 'autumnOak', 'autumnBirch', 'palm', 'cactus', 'deadTree'];
 export const PROP_DIMS = {
   logs: { w: 2.35, h: 1.2, d: 1.75 },
   bricks: { w: 1.25, h: 0.75, d: 1.05 },
@@ -448,6 +566,18 @@ function addWind(mat, from, amount, key) {
           transformed.x += (sin(ph) * 0.7 + sin(ph * 2.3 + 1.7) * 0.3) * k;
           transformed.z += (cos(ph * 0.83 + 0.6) * 0.5) * k;
         }`);
+    // vicino alla telecamera (terza persona contro un albero) la chioma si dissolve a retino
+    // invece di riempire lo schermo con il suo lato in ombra
+    sh.fragmentShader = sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+      {
+        float camD = length( vViewPosition );
+        if ( camD < 6.5 ) {
+          float a = smoothstep( 3.0, 6.5, camD );
+          vec2 q = floor( mod( gl_FragCoord.xy, 4.0 ) );
+          float th = ( mod( q.x * 2.0 + q.y * 3.0, 4.0 ) * 4.0 + mod( q.x + q.y * 2.0, 4.0 ) + 0.5 ) / 16.0;
+          if ( a < th ) discard;
+        }
+      }`);
   };
   mat.customProgramCacheKey = () => 'wind-' + key;
   return mat;
@@ -575,7 +705,7 @@ export async function loadModelOverrides(base = 'models/') {
       const geo = gltfToGeometry(gltf.scene, key);
       if (!geo) return;
       const s = geo.boundingBox.getSize(new THREE.Vector3());
-      if (key === 'tree') { PROPS.pine = PROPS.oak = PROPS.birch = PROPS.pineLow = PROPS.oakLow = PROPS.birchLow = geo; }
+      if (key === 'tree') { for (const k of TREE_KINDS) PROPS[k] = PROPS[k + 'Low'] = geo; }
       else if (key === 'barrel') { PROPS.barrelWood = PROPS.barrelBlue = PROPS.barrelRed = geo; PROP_DIMS.barrel = { r: Math.max(s.x, s.z) / 2 + 0.02, h: s.y }; }
       else if (key === 'shed') { PROPS.shed = geo; PROP_DIMS.shed = { w: s.x, d: s.z, wallH: s.y * 0.6, h: s.y }; }
       else { PROPS[key] = geo; PROP_DIMS[key] = { w: s.x, h: s.y, d: s.z }; }

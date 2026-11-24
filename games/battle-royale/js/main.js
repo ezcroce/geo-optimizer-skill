@@ -5,21 +5,24 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=9';
-import * as PR from './progress.js?v=9';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=9';
-import { initMenu } from './menu.js?v=9';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=9';
-import { initSettingsUI } from './settings-ui.js?v=9';
-import { applyAnisotropy } from './texgen.js?v=9';
-import * as A from './audio.js?v=9';
+} from './config.js?v=10';
+import * as PR from './progress.js?v=10';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=10';
+import { initMenu } from './menu.js?v=10';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=10';
+import { initSettingsUI } from './settings-ui.js?v=10';
+import { applyAnisotropy } from './texgen.js?v=10';
+import * as A from './audio.js?v=10';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
-} from './world.js?v=9';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=9';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=9';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=9';
+  biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
+} from './world.js?v=10';
+import { createWeather } from './weather.js?v=10';
+import { createEvents } from './events.js?v=10';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=10';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=10';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=10';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -120,6 +123,9 @@ function gradientMaterial(top, bottom) {
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 20), gradientMaterial('#2f72d2', '#cfe6fb'));
 sky.renderOrder = -1;
 scene.add(sky);
+// meteo e atmosfera: nebbia d'altezza, montagne all'orizzonte, neve/foglie/polvere locali
+const weather = createWeather(scene, { biomeAt, terrainHeight });
+const SUN_BASE = new THREE.Color('#ffeccc'), SUN_GOLD = new THREE.Color('#ffb84a');
 // riflessi ambientali dal cielo (metalli, vetri, acqua): mappa d'ambiente prefiltrata una volta sola
 {
   const envScene = new THREE.Scene();
@@ -499,7 +505,7 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   ch.pos.x = clamp(ch.pos.x, -lim, lim);
   ch.pos.z = clamp(ch.pos.z, -lim, lim);
   if (jump && ch.onGround) { ch.vel.y = JUMP_V; ch.onGround = false; }
-  ch.vel.y -= GRAVITY * dt;
+  ch.vel.y -= GRAVITY * (G.gravK ?? 1) * dt;
   ch.pos.y += ch.vel.y * dt;
   let g = groundAt(ch.pos.x, ch.pos.z, Math.max(prevY, ch.pos.y));
   const swimY = WATER_LEVEL - 1.25;
@@ -625,8 +631,18 @@ function animateEmote(ch, m, dt) {
 }
 
 /** vicino: modello completo animato · lontano: modello semplificato · oltre la nebbia: nascosto */
+/** sbattere le palpebre: ogni 2–5 s, per 0,12 s (gli occhi restano chiusi da morti) */
+function blink(c, dt) {
+  const L = c.m.lids;
+  if (!L) return;
+  if (!c.alive) { L.visible = true; return; }
+  c.blinkT = (c.blinkT ?? Math.random() * 4) - dt;
+  if (c.blinkT < 0) { L.visible = c.blinkT > -0.12; if (c.blinkT <= -0.12) c.blinkT = 2 + Math.random() * 3; }
+  else L.visible = false;
+}
 function updateCharVisual(c, dt) {
   const m = c.m;
+  blink(c, dt);
   if (c.isPlayer || !c.alive) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
   const d2 = c.pos.distanceToSquared(camera.position);
   if (d2 < 85 * 85) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
@@ -1476,7 +1492,7 @@ function openChest(ch, c) {
   if (ch && ch.isPlayer) { PR.track('chest', 1); G.matchStats.chests++; }
   if (G.net && ch) netSend({ t: 'chest', k: G.chests.indexOf(c) });
   if (!ch) { emit(c.pos.clone().setY(c.pos.y + 0.7), '#ffd24a', 20, 4, 0.8, 0.1, 0.4); if (c.pos.distanceTo(camera.position) < 40) A.playChest(); return; }
-  const w = randomWeapon(1);
+  const w = randomWeapon(G.goldT > 0 ? 2 : 1);   // evento "bottino d'oro": rarità superiore
   const items = [w, ammoFor(w.id), randomCons(), { kind: 'mats', count: 30 }];
   items.forEach((it, i) => {
     const a = c.rot + (i - 1.5) * 0.6;
@@ -2070,6 +2086,8 @@ function applySettings(key = '*') {
     QUALITY.grassR = 64 * clamp(0.6 + g.grass * 0.4, 0.6, 1.25);
     GRASS_FADE.value = QUALITY.grassR / 64;
     QUALITY.version++;
+    // particelle meteo (neve/foglie/polvere) in proporzione alla qualità dell'erba
+    weather.setQuality(clamp(0.3 + g.grass * 0.6, 0.3, 1));
   }
   if (all || key === 'vol') A.setVolume(settings.vol);
   if (all || key === 'amb') A.setAmbience(settings.amb);
@@ -2309,8 +2327,9 @@ function updateCamera(dt) {
   sky.position.copy(camera.position);
   {
     const alt = clamp((camera.position.y - terrainHeight(camera.position.x, camera.position.z)) / 160, 0, 1);
-    scene.fog.near = lerp(160, 420, alt) * fogK;
-    scene.fog.far = lerp(620, 1500, alt) * fogK;
+    scene.fog.near = lerp(160, 420, alt) * fogK * weather.fogMul;
+    scene.fog.far = lerp(620, 1500, alt) * fogK * lerp(weather.fogMul, 1, 0.15);
+    scene.fog.color.copy(weather.fogTint);
   }
   // tetti trasparenti se sei dentro una casa
   for (const h of world.houses) {
@@ -2326,7 +2345,7 @@ const hud = {
   hotbar: $('#hotbar'), mag: $('#magText'), res: $('#reserves'), mats: $('#matsText'),
   prompt: $('#prompt'), progress: $('#progress'), progFill: $('#progressFill'), progText: $('#progressText'),
   cross: $('#crosshair'), hit: $('#hitmarker'), center: $('#centerMsg'), sub: $('#subMsg'),
-  vignette: $('#vignette'), stRow: $('#staminaRow'), stFill: $('#staminaFill'), crouch: $('#crouchBadge'), hidden: $('#hiddenBadge'), poi: $('#poiName'), dmg: $('#damageLayer'), feed: $('#killfeed'),
+  vignette: $('#vignette'), stRow: $('#staminaRow'), stFill: $('#staminaFill'), crouch: $('#crouchBadge'), hidden: $('#hiddenBadge'), poi: $('#poiName'), evt: $('#eventBar'), dmg: $('#damageLayer'), feed: $('#killfeed'),
 };
 const cache = {};
 function setHTML(el, key, html) { if (cache[key] !== html) { cache[key] = html; el.innerHTML = html; } }
@@ -2475,8 +2494,11 @@ function updateHUD(dt) {
   if (G.msgT > 0) { G.msgT -= dt; if (G.msgT <= 0) { hud.center.textContent = ''; hud.sub.textContent = ''; } }
   // luogo
   let poi = '';
-  for (const t of TOWNS) if (Math.hypot(p.pos.x - t.x, p.pos.z - t.z) < t.r + 8) poi = t.name;
+  for (const t of TOWNS) if (Math.hypot(p.pos.x - t.x, p.pos.z - t.z) < t.r + 8) poi = t.name + (t.theme && t.theme !== 'classic' ? `<small>${THEME_LABEL[t.theme]}</small>` : '');
+  if (!poi && p.mode !== 'bus') { const b = biomeName(p.pos.x, p.pos.z); if (b !== 'meadow') poi = `<small>${BIOME_NAMES[b]}</small>`; }
   setHTML(hud.poi, 'poi', poi);
+  setHTML(hud.evt, 'evt', events.hudText());
+  hud.evt.style.display = hud.evt.innerHTML ? '' : 'none';
   updateDmgNums(dt);
   drawMinimap();
   if ($('#bigmap').classList.contains('hidden') === false) drawBigMap();
@@ -2494,6 +2516,7 @@ function drawMinimap() {
   mmCtx.fillRect(0, 0, S, S);
   mmCtx.drawImage(world.minimap, (c.x - view / 2 + HALF) * k, (c.z - view / 2 + HALF) * k, view * k, view * k, 0, 0, S, S);
   drawStormOn(mmCtx, S, c.x, c.z, view);
+  events.drawMarkers(mmCtx, S, c.x, c.z, view, w2m);
   drawBusLine(mmCtx, S, c.x, c.z, view);
   mmCtx.font = 'bold 10px sans-serif'; mmCtx.textAlign = 'center';
   for (const t of TOWNS) {
@@ -2549,6 +2572,7 @@ function drawBigMap() {
   const S = 640, view = HALF * 2;
   bmCtx.drawImage(world.minimap, 0, 0, S, S);
   drawStormOn(bmCtx, S, 0, 0, view);
+  events.drawMarkers(bmCtx, S, 0, 0, view, w2m);
   drawBusLine(bmCtx, S, 0, 0, view);
   bmCtx.font = 'bold 14px sans-serif'; bmCtx.textAlign = 'center';
   for (const t of TOWNS) {
@@ -2575,6 +2599,8 @@ function makeBotNames(n) {
 }
 
 function clearMatch() {
+  events.reset();
+  weather.hide();
   world.resetProps();
   for (const c of G.chars) scene.remove(c.m.root);
   G.chars = [];
@@ -3100,6 +3126,7 @@ function onNetMessage(from, m) {
       }
       case 'pick': { const L = G.loot.find(x => x.id === m.id); if (L) removeLoot(L, true); break; }
       case 'chest': { const c = G.chests[m.k]; if (c && !c.opened) openChest(null, c); break; }
+      case 'evt': if (NET.role === 'client') events.start(m); break;
       case 'wall': {
         const g = m.g;
         makeWall({ x: m.x, z: m.z, g, alongX: !!m.ax });
@@ -3152,6 +3179,14 @@ PR.onProgress(e => {
 });
 
 // ─────────────── Ciclo principale ───────────────
+// eventi della mappa (decisi dall'host o dal gioco offline)
+const events = createEvents({
+  scene, G, weather, sun, sunBase: SUN_BASE, sunGold: SUN_GOLD, TOWNS, HALF, WATER_LEVEL,
+  isAuthority: () => !G.net || NET.role === 'host', send: (m) => netSend(m),
+  explode, spawnLoot, randomWeapon, ammoFor, emit, showMsg, addFeed, terrainHeight, groundAt,
+  playAlert: () => { A.playUI(); setTimeout(() => A.playUI(), 140); },
+});
+
 function update(dt) {
   G.time += dt;
   if (pressed.has('KeyM')) $('#bigmap').classList.toggle('hidden');
@@ -3188,10 +3223,12 @@ function update(dt) {
   updateProjectiles(dt);
   updateBullets(dt);
   updateStorm(dt);
+  events.update(dt);
   updateParticles(dt);
   updateEffects(dt);
   for (const cl of clouds) { cl.position.x += dt * 2; if (cl.position.x > 450) cl.position.x = -450; }
   updateCamera(dt);
+  weather.update(dt, G.time, camera, renderer, true);
   updateHUD(dt);
 }
 
@@ -3233,4 +3270,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

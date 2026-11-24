@@ -4,9 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=9" />
+<link rel="stylesheet" href="style.css?v=10" />
 <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=9", "three/addons/": "./vendor/addons/" } }
+  { "imports": { "three": "./vendor/three.module.js?v=10", "three/addons/": "./vendor/addons/" } }
 </script>
 </head>
 <body>
@@ -142,6 +142,7 @@
     <div class="pill"><span class="ico">💀</span><b id="killCount">0</b> uccisioni</div>
     <div class="pill storm" id="stormInfo">⛈ La tempesta arriva…</div>
   </div>
+  <div id="eventBar" style="display:none"></div>
   <div id="minimapWrap"><canvas id="minimap" width="200" height="200"></canvas><div id="poiName"></div></div>
 
   <div id="crosshair"><i></i><i></i><i></i><i></i></div>
@@ -213,7 +214,7 @@
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
 
-<script type="module" src="js/main.js?v=9"></script>
-<script src="js/transition.js?v=9"></script>
+<script type="module" src="js/main.js?v=10"></script>
+<script src="js/transition.js?v=10"></script>
 </body>
 </html>

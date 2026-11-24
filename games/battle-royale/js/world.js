@@ -3,8 +3,9 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=9';
-import { PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=9';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=10';
+import { makeNoise, fbm, ridged } from './noise.js?v=10';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=10';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -44,7 +45,7 @@ export const TOWNS = DEFAULT_TOWNS.map(t => ({ ...t }));
 export const MAP = { seed: 1337, random: false };
 
 // ── generatore pseudo-casuale con seme (mappa sempre uguale) ──
-function mulberry32(a) {
+export function mulberry32(a) {
   return function () {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -60,11 +61,28 @@ function smoothstep(e0, e1, x) {
   return t * t * (3 - 2 * t);
 }
 
+const P1 = ['Borgo', 'Villa', 'Porto', 'Monte', 'Valle', 'Bosco', 'Rocca', 'Lago', 'Piana', 'Forte', 'Colle', 'Riva', 'Torre', 'Campo', 'Baia', 'Poggio', 'Pieve', 'Cava'];
+const P2 = ['Pazzo', 'Perduto', 'Ruggente', 'Nebbioso', 'Dorato', 'Selvaggio', 'Tranquillo', 'Ventoso', 'Fiorito', 'Stregato', 'Felice', 'Lucente', 'Brontolone', 'Segreto', 'Gelato', 'Rovente', 'Spettrale', 'Sonnolento', 'Lampo', 'Bizzarro'];
+// ─────────────── Biomi ───────────────
+// pesi per punto: [prateria, neve, deserto, autunno, tropicale]
+export const BIOME_IDS = ['meadow', 'snow', 'desert', 'autumn', 'tropic'];
+export const BIOME_NAMES = { meadow: 'Prateria', snow: 'Montagne innevate', desert: 'Deserto', autumn: "Bosco d'autunno", tropic: 'Costa tropicale' };
+const BI = { meadow: 0, snow: 1, desert: 2, autumn: 3, tropic: 4 };
+const DEFAULT_BIOMES = [
+  { b: 'snow', x: -350, z: -320, r: 300 },
+  { b: 'desert', x: 340, z: 340, r: 270 },
+  { b: 'autumn', x: 330, z: -320, r: 250 },
+  { b: 'tropic', x: -380, z: 340, r: 240 },
+];
+const BIOME_CENTERS = DEFAULT_BIOMES.map(b => ({ ...b }));
+
 const DEFAULT_MOUNTAINS = [
-  { x: -290, z: -60, r: 120, h: 36 },
-  { x: 340, z: 70, r: 105, h: 32 },
-  { x: -90, z: 470, r: 85, h: 26 },
-  { x: 150, z: -300, r: 70, h: 20 },
+  { x: -390, z: -170, r: 175, h: 95 },    // massiccio innevato
+  { x: -200, z: -470, r: 120, h: 62 },
+  { x: 380, z: 90, r: 120, h: 52 },
+  { x: -110, z: 470, r: 95, h: 38 },
+  { x: 150, z: -300, r: 90, h: 40 },
+  { x: 440, z: -190, r: 85, h: 42 },
 ];
 const DEFAULT_LAKES = [
   { x: -150, z: 110, r: 90, d: 10 },
@@ -73,44 +91,291 @@ const DEFAULT_LAKES = [
 ];
 const MOUNTAINS = DEFAULT_MOUNTAINS.map(m => ({ ...m }));
 const LAKES = DEFAULT_LAKES.map(l => ({ ...l }));
-// sfasamenti delle colline (la mappa classica usa quelli originali)
-const TP = { a: 0.5, b: -0.3, c: 1.3, d: 0.7, e: 0, lift: 0 };
+/** fiumi: polilinee che scavano canyon fino al mare */
+export const RIVERS = [];
 
-function baseHeight(x, z) {
-  const X = x / 1.8, Z = z / 1.8;   // colline più ampie
-  let h = 7 * Math.sin(X * 0.018 + TP.a) * Math.cos(Z * 0.015 + TP.b)
-    + 3.2 * Math.sin(X * 0.047 + TP.c) * Math.sin(Z * 0.041 + TP.d)
-    + 1.1 * Math.sin(x * 0.12 + TP.e) * Math.cos(z * 0.105)
-    + 0.4 * Math.sin(x * 0.31 + z * 0.27) + TP.lift;
+const TP = { lift: 0 };
+// rumori della mappa corrente (cambiano con il seme)
+let NZ = null;
+function makeNoises(seed) {
+  NZ = {
+    a: makeNoise(seed ^ 0x1a2b), b: makeNoise(seed ^ 0x3c4d), c: makeNoise(seed ^ 0x5e6f),
+    ridge: makeNoise(seed ^ 0x7788), shape: makeNoise(seed ^ 0x99aa), coast: makeNoise(seed ^ 0xbbcc),
+    coast2: makeNoise(seed ^ 0xddee), isl: makeNoise(seed ^ 0x1357), mesa: makeNoise(seed ^ 0x2468),
+    dune: makeNoise(seed ^ 0x3579), warp: makeNoise(seed ^ 0x4680), lake: makeNoise(seed ^ 0x5791),
+  };
+}
+
+function riverDist(x, z) {
+  let best = Infinity, w = 0;
+  for (const rv of RIVERS) {
+    if (x < rv.minX || x > rv.maxX || z < rv.minZ || z > rv.maxZ) continue;
+    const P = rv.pts;
+    for (let i = 0; i < P.length - 1; i++) {
+      const ax = P[i][0], az = P[i][1], bx = P[i + 1][0], bz = P[i + 1][1];
+      const vx = bx - ax, vz = bz - az;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
+      const d = Math.hypot(x - ax - vx * t, z - az - vz * t);
+      if (d < best) { best = d; w = rv.w; }
+    }
+  }
+  return [best, w];
+}
+
+/** pesi dei biomi calcolati (lento: serve solo a riempire la griglia) */
+function biomeRaw(x, z, out) {
+  out.fill(0);
+  const wx = fbm(NZ.warp, x * 0.004, z * 0.004, 3) * 85, wz = fbm(NZ.warp, z * 0.004 + 7.7, x * 0.004 - 3.1, 3) * 85;
+  let sum = 0;
+  for (const c of BIOME_CENTERS) {
+    const d = Math.hypot(x + wx - c.x, z + wz - c.z);
+    const w = smoothstep(c.r, c.r * 0.55, d);
+    out[BI[c.b]] += w; sum += w;
+  }
+  if (sum > 1) for (let i = 1; i < 5; i++) out[i] /= sum;
+  out[0] = Math.max(0, 1 - Math.min(1, sum));
+  return out;
+}
+
+// griglia dei biomi (8 m) e dell'altezza (2,5 m, allineata ai vertici dei chunk)
+const BSTEP = 8, BN = 177, BOFF = 704;
+const BGRID = new Float32Array(BN * BN * 5);
+const HSTEP = 2.5, HN = 561, HOFF = 700;
+const HF = new Float32Array(HN * HN);
+const _bw = new Float32Array(5), _bo = new Float32Array(5);
+
+/** pesi dei biomi in (x,z) (interpolati; l'array restituito è condiviso) */
+export function biomeAt(x, z, out = _bo) {
+  const fx = Math.min(BN - 1.001, Math.max(0, (x + BOFF) / BSTEP)), fz = Math.min(BN - 1.001, Math.max(0, (z + BOFF) / BSTEP));
+  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz;
+  const i00 = (iz * BN + ix) * 5, i10 = i00 + 5, i01 = i00 + BN * 5, i11 = i01 + 5;
+  for (let k = 0; k < 5; k++) {
+    out[k] = (BGRID[i00 + k] * (1 - tx) + BGRID[i10 + k] * tx) * (1 - tz) + (BGRID[i01 + k] * (1 - tx) + BGRID[i11 + k] * tx) * tz;
+  }
+  return out;
+}
+/** biomi con il peso maggiore in (x,z) */
+export function biomeName(x, z) {
+  const b = biomeAt(x, z);
+  let best = 0;
+  for (let k = 1; k < 5; k++) if (b[k] > b[best]) best = k;
+  return BIOME_IDS[best];
+}
+
+/** altezza "naturale" (colline, biomi, montagne, laghi, fiumi), senza città né costa */
+function rawHeight(x, z, bw) {
+  const N = NZ;
+  let h = 9 * fbm(N.a, x * 0.0028, z * 0.0028, 4) + 2.4 * fbm(N.b, x * 0.011, z * 0.011, 3) + 0.45 * N.c(x * 0.06, z * 0.06) + 3.6 + TP.lift;
+  // le città stanno in conche più tranquille
+  let calm = 1;
+  for (const t of TOWNS) {
+    const dx = x - t.x, dz = z - t.z, R = t.r + 120;
+    if (dx > R || dx < -R || dz > R || dz < -R) continue;
+    calm = Math.min(calm, smoothstep(t.r + 25, t.r + 115, Math.hypot(dx, dz)));
+  }
+  const wS = bw[1], wD = bw[2], wA = bw[3], wT = bw[4];
+  if (wA > 0) h += wA * 4.5 * (fbm(N.c, x * 0.006, z * 0.006, 3) + 0.6) * calm;
+  if (wT > 0) h = h + (h * 0.55 + 0.6 - h) * wT;
+  if (wS > 0) h += wS * 7 * calm;
+  if (wD > 0) {
+    // dune e mese a gradoni (canyon nel deserto)
+    const dune = 1.7 * (1 - Math.abs(N.dune(x * 0.016 + 0.35 * N.warp(x * 0.004, z * 0.004), z * 0.0065)));
+    const mm = fbm(N.mesa, x * 0.0052, z * 0.0052, 3);
+    const mesa = (smoothstep(0.16, 0.22, mm) * 13 + smoothstep(0.38, 0.43, mm) * 9) * calm;
+    h = h + ((h * 0.45 + 2.2 + dune + mesa) - h) * wD;
+  }
   for (const m of MOUNTAINS) {
-    const d = Math.hypot(x - m.x, z - m.z);
-    if (d < m.r) { const k = 1 - d / m.r; h += m.h * k * k * (3 - 2 * k) * (0.85 + 0.15 * Math.sin(x * 0.07 + z * 0.05)); }
+    const dx = x - m.x, dz = z - m.z;
+    if (dx > m.r * 1.4 || dx < -m.r * 1.4 || dz > m.r * 1.4 || dz < -m.r * 1.4) continue;
+    const d = Math.hypot(dx, dz) * (1 + 0.3 * N.shape(x * 0.0045 + m.x * 0.01, z * 0.0045));
+    if (d >= m.r) continue;
+    const k = 1 - d / m.r, shape = k * k * (3 - 2 * k);
+    const rid = ridged(N.ridge, x * 0.0046, z * 0.0046, 4);
+    h += m.h * (shape * (0.58 + 0.42 * rid) + 0.22 * shape * shape * (rid - 0.45)) * (0.25 + 0.75 * calm);
   }
   for (const l of LAKES) {
-    const d = Math.hypot(x - l.x, z - l.z);
+    const dx = x - l.x, dz = z - l.z;
+    if (dx > l.r * 1.3 || dx < -l.r * 1.3 || dz > l.r * 1.3 || dz < -l.r * 1.3) continue;
+    const d = Math.hypot(dx, dz) * (1 + 0.22 * N.lake(x * 0.012, z * 0.012));
     if (d < l.r) h -= l.d * (1 - smoothstep(0, l.r, d));
+  }
+  if (RIVERS.length) {
+    const [rd, rw] = riverDist(x, z);
+    const bank = 9 + Math.max(0, h) * (wD > 0.5 ? 0.05 : 0.16);
+    if (rd < rw + bank) {
+      const bed = WATER_LEVEL - 2.6 - 1.2 * smoothstep(rw, 0, rd);
+      const k = 1 - smoothstep(rw * 0.6, rw + bank, rd);
+      h = h + (Math.min(h, bed) - h) * k;
+    }
   }
   return h;
 }
+function baseHeight(x, z) { return rawHeight(x, z, biomeRaw(x, z, _bw)); }
 
-for (const t of TOWNS) t.h = Math.max(1.2, baseHeight(t.x, t.z) + 0.5);
+/** costa irregolare: baie, penisole e isolotti */
+function coastMask(x, z) {
+  const ex = Math.abs(x) / HALF, ez = Math.abs(z) / HALF;
+  let e = Math.pow(ex ** 8 + ez ** 8, 1 / 8);
+  e += 0.12 * fbm(NZ.coast, x * 0.003, z * 0.003, 4) + 0.018 * NZ.coast2(x * 0.011, z * 0.011);
+  for (const t of TOWNS) {
+    const d = Math.hypot(x - t.x, z - t.z);
+    if (d < t.r + 110) e -= 0.13 * (1 - smoothstep(t.r + 20, t.r + 110, d));
+  }
+  return e;
+}
 
-// ─────────────── Mappa casuale ───────────────
-const P1 = ['Borgo', 'Villa', 'Porto', 'Monte', 'Valle', 'Bosco', 'Rocca', 'Lago', 'Piana', 'Forte', 'Colle', 'Riva', 'Torre', 'Campo', 'Baia', 'Poggio', 'Pieve', 'Cava'];
-const P2 = ['Pazzo', 'Perduto', 'Ruggente', 'Nebbioso', 'Dorato', 'Selvaggio', 'Tranquillo', 'Ventoso', 'Fiorito', 'Stregato', 'Felice', 'Lucente', 'Brontolone', 'Segreto', 'Gelato', 'Rovente', 'Spettrale', 'Sonnolento', 'Lampo', 'Bizzarro'];
-/** prepara le città, le montagne, i laghi e le colline per il seme indicato */
+function buildBiomeGrid() {
+  for (let j = 0; j < BN; j++) for (let i = 0; i < BN; i++) {
+    biomeRaw(i * BSTEP - BOFF, j * BSTEP - BOFF, _bw);
+    BGRID.set(_bw, (j * BN + i) * 5);
+  }
+}
+/** le strade restano percorribili: tagliano le colline e scavalcano i fiumi su un argine */
+function roadCarve(x, z, h) {
+  let best = 1e9, lin = 0;
+  for (const [a, b] of roads) {
+    const vx = b.x - a.x, vz = b.z - a.z;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz)));
+    const d = Math.hypot(x - a.x - vx * t, z - a.z - vz * t);
+    if (d < best) { best = d; lin = a.h + (b.h - a.h) * t; }
+  }
+  if (best > 10) return h;
+  const k = (1 - smoothstep(3.5, 10, best)) * smoothstep(15, 5, Math.abs(h - lin));
+  return h + (Math.max(lin, WATER_LEVEL + 1.2) - h) * k;
+}
+function buildHeightGrid() {
+  for (let j = 0; j < HN; j++) {
+    const z = j * HSTEP - HOFF;
+    for (let i = 0; i < HN; i++) {
+      const x = i * HSTEP - HOFF;
+      let h = rawHeight(x, z, biomeAt(x, z, _bw));
+      h = roadCarve(x, z, h);
+      for (const t of TOWNS) {
+        const dx = x - t.x, dz = z - t.z, R = t.r + 18;
+        if (dx > R || dx < -R || dz > R || dz < -R) continue;
+        const d = Math.hypot(dx, dz);
+        if (d < R) h = h + (t.h - h) * (1 - smoothstep(t.r, R, d));
+      }
+      const e = coastMask(x, z);
+      if (e > 0.82) {
+        h = h + (-12 - h) * smoothstep(0.82, 0.97, e);
+        const isl = fbm(NZ.isl, x * 0.009, z * 0.009, 3);
+        if (isl > 0.3 && e < 1.2) h = Math.max(h, WATER_LEVEL - 2 + Math.min(8, (isl - 0.3) * 60) * smoothstep(1.2, 1.05, e));
+      }
+      HF[j * HN + i] = h;
+    }
+  }
+}
+
+let fieldsReady = false;
+function ensureFields() {
+  if (fieldsReady) return;
+  fieldsReady = true;
+  makeNoises(MAP.seed);
+  buildBiomeGrid();
+  for (const t of TOWNS) t.h = Math.max(1.2, rawHeight(t.x, t.z, biomeAt(t.x, t.z, _bw)) + 0.5);
+  roads.length = 0; buildRoads();
+  makeRivers(mulberry32(MAP.seed ^ 0x5eed), MAP.random ? 1 + (MAP.seed % 3) : 2);
+  buildHeightGrid();
+  assignThemes(mulberry32(MAP.seed ^ 0x7e3a), MAP.random);
+}
+
+/** altezza del terreno (griglia precalcolata da 2,5 m, interpolazione bilineare) */
+export function terrainHeight(x, z) {
+  if (!fieldsReady) ensureFields();
+  let fx = (x + HOFF) / HSTEP, fz = (z + HOFF) / HSTEP;
+  if (fx < 0) fx = 0; else if (fx > HN - 1.0001) fx = HN - 1.0001;
+  if (fz < 0) fz = 0; else if (fz > HN - 1.0001) fz = HN - 1.0001;
+  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * HN + ix;
+  const a = HF[i], b = HF[i + 1], c = HF[i + HN], d = HF[i + HN + 1];
+  return (a + (b - a) * tx) * (1 - tz) + (c + (d - c) * tx) * tz;
+}
+
+/** fiumi: dalle zone interne verso il mare, evitando le città */
+function makeRivers(r, count) {
+  RIVERS.length = 0;
+  for (let n = 0, att = 0; n < count && att < 60; att++) {
+    const a0 = r() * Math.PI * 2, d0 = 110 + r() * 200;
+    let x = Math.cos(a0) * d0, z = Math.sin(a0) * d0;
+    if (TOWNS.some(t => Math.hypot(t.x - x, t.z - z) < t.r + 60)) continue;
+    if (RIVERS.some(rv => rv.pts.some(p => Math.hypot(p[0] - x, p[1] - z) < 160))) continue;
+    let dir = Math.atan2(z, x) + (r() - 0.5) * 1.2;
+    const pts = [[x, z]];
+    let ok = false;
+    for (let s = 0; s < 70; s++) {
+      let placed = false;
+      for (let tr = 0; tr < 9 && !placed; tr++) {
+        const nd = dir + (r() - 0.5) * 0.55 + (tr ? (tr % 2 ? 1 : -1) * Math.ceil(tr / 2) * 0.38 : 0);
+        const nx = x + Math.cos(nd) * 26, nz = z + Math.sin(nd) * 26;
+        if (TOWNS.some(t => Math.hypot(t.x - nx, t.z - nz) < t.r + 42)) continue;
+        // si allontana dal centro (verso il mare)
+        if (Math.hypot(nx, nz) < Math.hypot(x, z) - 8) continue;
+        x = nx; z = nz; dir = nd * 0.8 + Math.atan2(z, x) * 0.2; placed = true;
+      }
+      if (!placed) break;
+      pts.push([x, z]);
+      if (Math.max(Math.abs(x), Math.abs(z)) > HALF + 50) { ok = true; break; }
+    }
+    if (!ok || pts.length < 6) continue;
+    const w = 6 + r() * 3;
+    const xs = pts.map(p => p[0]), zs = pts.map(p => p[1]), pad = w + 40;
+    LAKES.push({ x: pts[0][0], z: pts[0][1], r: 26 + r() * 10, d: 7 });
+    RIVERS.push({ pts, w, minX: Math.min(...xs) - pad, maxX: Math.max(...xs) + pad, minZ: Math.min(...zs) - pad, maxZ: Math.max(...zs) + pad });
+    n++;
+  }
+}
+
+// ─────────────── Città tematiche ───────────────
+const THEME_NAMES = {
+  alpine: [['Baita', 'Malga', 'Rifugio', 'Passo', 'Vetta', 'Slitta'], ['Gelata', 'Nevosa', 'Bianca', 'Ghiacciata', 'Polare', 'Brinata']],
+  western: [['Saloon', 'Ranch', 'Canyon', 'Miniera', 'Forte', 'Oasi'], ['Rovente', 'Polverosa', 'Sabbiosa', 'Arida', 'Dorata', 'Selvaggia']],
+  coastal: [['Laguna', 'Baia', 'Porto', 'Lido', 'Spiaggia', 'Scogliera'], ['Tropicale', 'Azzurra', 'Smeraldo', 'Soleggiata', 'Corallina', 'Salata']],
+  farm: [['Fattoria', 'Mulino', 'Cascina', 'Vigna', 'Granaio', 'Frutteto'], ['Dorata', 'Ramata', 'Rossa', 'Frizzante', 'Croccante', 'Matura']],
+  industrial: [['Deposito', 'Fabbrica', 'Raffineria', 'Cantiere', 'Officina', 'Scalo'], ['Fumoso', 'Arrugginito', 'Rumoroso', 'Elettrico', 'Metallico', 'Oleoso']],
+  castle: [['Castello', 'Rocca', 'Fortezza', 'Torrione', 'Bastione', 'Maniero'], ['Cosmico', 'Ribelle', 'Antico', 'Fantasma', 'Reale', 'Oscuro']],
+  classic: [P1, P2],
+};
+export const THEME_LABEL = { classic: 'Paese', alpine: 'Villaggio alpino', western: 'Città western', coastal: 'Borgo marinaro', farm: 'Fattoria', industrial: 'Zona industriale', castle: 'Castello', port: 'Porto' };
+function assignThemes(r, random) {
+  const used = new Set();
+  for (const t of TOWNS) {
+    const b = biomeAt(t.x, t.z, _bw);
+    let theme = 'classic';
+    // vicino al mare? (campiona attorno alla città)
+    let sea = false;
+    for (let k = 0; k < 8 && !sea; k++) { const a = k / 8 * Math.PI * 2; if (coastMask(t.x + Math.cos(a) * (t.r + 70), t.z + Math.sin(a) * (t.r + 70)) > 0.86) sea = true; }
+    const nm = t.name || '';
+    if (b[1] > 0.5) theme = 'alpine';
+    else if (!random && /^Porto|^Molo/.test(nm) || t.containers && sea) theme = 'port';
+    else if (!random && /^Fattoria/.test(nm)) theme = 'farm';
+    else if (!random && /^Castello|^Rocca/.test(nm)) theme = 'castle';
+    else if (b[2] > 0.5) theme = 'western';
+    else if (b[4] > 0.5) theme = 'coastal';
+    else if (t.containers) theme = 'industrial';
+    else if (t.towers && b[3] <= 0.5) theme = 'castle';
+    else if (b[3] > 0.5) theme = 'farm';
+    else if (sea) theme = 'coastal';
+    t.theme = theme;
+    if (random && THEME_NAMES[theme] && theme !== 'classic') {
+      const [A, B] = THEME_NAMES[theme];
+      for (let k = 0; k < 30; k++) { const s = A[Math.floor(r() * A.length)] + ' ' + B[Math.floor(r() * B.length)]; if (!used.has(s)) { used.add(s); t.name = s; break; } }
+    }
+  }
+}
+
+
+/** prepara le città, le montagne, i laghi, i biomi e i fiumi per il seme indicato */
 function configureMap(seed, random) {
   MAP.seed = seed; MAP.random = random;
   srand = mulberry32(seed);
-  TOWNS.length = 0; MOUNTAINS.length = 0; LAKES.length = 0;
+  TOWNS.length = 0; MOUNTAINS.length = 0; LAKES.length = 0; BIOME_CENTERS.length = 0;
   if (!random) {
-    Object.assign(TP, { a: 0.5, b: -0.3, c: 1.3, d: 0.7, e: 0, lift: 0 });
     for (const t of DEFAULT_TOWNS) TOWNS.push({ ...t });
     for (const m of DEFAULT_MOUNTAINS) MOUNTAINS.push({ ...m });
     for (const l of DEFAULT_LAKES) LAKES.push({ ...l });
+    for (const bc of DEFAULT_BIOMES) BIOME_CENTERS.push({ ...bc });
   } else {
     const r = mulberry32(seed ^ 0x9e3779b9), R = (a, b) => a + r() * (b - a);
-    Object.assign(TP, { a: R(0, 6.28), b: R(0, 6.28), c: R(0, 6.28), d: R(0, 6.28), e: R(0, 6.28), lift: 3.2 });
     // città: una grande vicino al centro, le altre sparse con distanza minima
     const n = 14 + Math.floor(r() * 5), used = new Set();
     const name = () => { for (let k = 0; k < 50; k++) { const s = P1[Math.floor(r() * P1.length)] + ' ' + P2[Math.floor(r() * P2.length)]; if (!used.has(s)) { used.add(s); return s; } } return 'Paese ' + used.size; };
@@ -121,12 +386,21 @@ function configureMap(seed, random) {
       const tr = Math.round(R(24, 36)), kind = r();
       TOWNS.push({ name: name(), x, z, r: tr, houses: Math.max(2, Math.round(tr / 5.5 + R(-1, 1.5))), towers: kind < 0.2, containers: kind > 0.78 });
     }
-    // montagne e laghi lontani dalle città
-    for (let k = 0; MOUNTAINS.length < 3 + Math.floor(seed % 3) && k < 500; k++) {
-      const m = { x: R(-HALF + 100, HALF - 100), z: R(-HALF + 100, HALF - 100), r: R(70, 125), h: R(20, 38) };
-      if (TOWNS.some(t => Math.hypot(t.x - m.x, t.z - m.z) < m.r * 0.55 + t.r)) continue;
-      if (MOUNTAINS.some(o => Math.hypot(o.x - m.x, o.z - m.z) < o.r + m.r * 0.6)) continue;
-      MOUNTAINS.push(m);
+    // biomi: uno per quadrante, in ordine e posizione casuali
+    const kinds = ['snow', 'desert', 'autumn', 'tropic'];
+    for (let i = kinds.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+    const a0 = R(0, 6.28);
+    kinds.forEach((bk, k) => { const a = a0 + k * Math.PI / 2 + R(-0.35, 0.35), d = R(300, 400); BIOME_CENTERS.push({ b: bk, x: Math.cos(a) * d, z: Math.sin(a) * d, r: R(230, 300) }); });
+    const okM = (m) => !TOWNS.some(t => Math.hypot(t.x - m.x, t.z - m.z) < m.r * 0.55 + t.r) && !MOUNTAINS.some(o => Math.hypot(o.x - m.x, o.z - m.z) < o.r * 0.7 + m.r * 0.6);
+    // il massiccio più alto sta nel bioma innevato
+    const sn = BIOME_CENTERS.find(bc => bc.b === 'snow');
+    for (let k = 0; k < 400; k++) {
+      const m = { x: Math.max(-HALF + 130, Math.min(HALF - 130, sn.x * R(0.5, 1) + R(-90, 90))), z: Math.max(-HALF + 130, Math.min(HALF - 130, sn.z * R(0.5, 1) + R(-90, 90))), r: R(140, 180), h: R(75, 100) };
+      if (okM(m) || k === 399) { MOUNTAINS.push(m); break; }
+    }
+    for (let k = 0; MOUNTAINS.length < 4 + (seed % 3) && k < 600; k++) {
+      const m = { x: R(-HALF + 100, HALF - 100), z: R(-HALF + 100, HALF - 100), r: R(70, 130), h: R(28, 62) };
+      if (okM(m)) MOUNTAINS.push(m);
     }
     for (let k = 0; LAKES.length < 2 + Math.floor((seed >> 3) % 3) && k < 500; k++) {
       const l = { x: R(-HALF + 100, HALF - 100), z: R(-HALF + 100, HALF - 100), r: R(40, 85), d: R(8, 11) };
@@ -136,10 +410,10 @@ function configureMap(seed, random) {
       LAKES.push(l);
     }
   }
-  // le città stanno sopra il livello del mare
-  for (const t of TOWNS) t.h = Math.max(1.2, baseHeight(t.x, t.z) + 0.5);
   colliders.length = 0; grid.clear(); roads.length = 0; stamp = 0;
   TALL.length = 0; tallGrid.clear();
+  // biomi, altezze (le città stanno sopra il livello del mare), strade, fiumi e temi
+  fieldsReady = false; ensureFields();
 }
 
 // ─────────────── Erba alta (ci si nasconde dentro) ───────────────
@@ -166,25 +440,6 @@ export function tallGrassAt(x, z) {
   return false;
 }
 export function tallGrassPatches() { return TALL; }
-
-export function terrainHeight(x, z) {
-  let h = baseHeight(x, z);
-  for (const t of TOWNS) {
-    const dx = x - t.x, dz = z - t.z;
-    const R = t.r + 18;
-    if (dx > R || dx < -R || dz > R || dz < -R) continue;
-    const d = Math.hypot(dx, dz);
-    if (d < R) {
-      const k = 1 - smoothstep(t.r, R, d);
-      h = h + (t.h - h) * k;
-    }
-  }
-  // isola: la costa scende nel mare oltre il bordo della mappa
-  const e = Math.max(Math.abs(x), Math.abs(z)) + 14 * Math.sin(x * 0.02 + z * 0.013) + 6 * Math.sin(x * 0.05 - z * 0.04);
-  const c0 = HALF - 72;
-  if (e > c0) h = h + (-9 - h) * smoothstep(c0, HALF, e);
-  return h;
-}
 
 // ─────────────── Collisioni ───────────────
 export const colliders = [];
@@ -575,7 +830,15 @@ const _gc = {
   dry: new THREE.Color('#b5b65a'), flower: new THREE.Color('#9fc95a'), sand: new THREE.Color('#e3cf92'), wetSand: new THREE.Color('#a8956a'),
   rock: new THREE.Color('#878274'), rockDark: new THREE.Color('#6a665c'), dirt: new THREE.Color('#a8865a'), dirtEdge: new THREE.Color('#7f8a48'),
   snow: new THREE.Color('#f4f7fb'), town: new THREE.Color('#9aa36b'),
+  // biomi
+  snowA: new THREE.Color('#eef3f9'), snowB: new THREE.Color('#d4e0ee'), frost: new THREE.Color('#a9b9a4'), iceRock: new THREE.Color('#6f7682'),
+  sandA: new THREE.Color('#e2c387'), sandB: new THREE.Color('#d1a866'), redRock: new THREE.Color('#b8693a'), redRock2: new THREE.Color('#d39a5c'), dryBush: new THREE.Color('#a39a58'),
+  autA: new THREE.Color('#b48a3a'), autB: new THREE.Color('#9a6a2c'), leaves: new THREE.Color('#c25a26'), autGreen: new THREE.Color('#7f8c3a'),
+  tropA: new THREE.Color('#3fb04a'), tropB: new THREE.Color('#5cc44e'), whiteSand: new THREE.Color('#f3e7c4'),
+  townSnow: new THREE.Color('#e4e9ef'), townSand: new THREE.Color('#d8b98a'), townStone: new THREE.Color('#b9b1a0'), townDirt: new THREE.Color('#a8865a'),
 };
+const _bc = new THREE.Color();
+const TOWN_GROUND = { alpine: 'townSnow', western: 'townSand', coastal: 'townStone', castle: 'townStone', farm: 'townDirt', industrial: 'townStone', port: 'townStone' };
 // rumore liscio economico (somma di seni sfasati, deterministico)
 function patch(x, z, f, o) {
   return 0.5 + 0.25 * Math.sin(x * f + Math.sin(z * f * 0.7 + o) * 1.7) + 0.25 * Math.sin(z * f * 1.13 - Math.cos(x * f * 0.6 - o) * 1.9);
@@ -588,23 +851,49 @@ function groundColor(x, z, h, out, slope = null) {
   out.lerp(_gc.meadow, smoothstep(0.55, 0.85, big) * 0.6);
   out.lerp(_gc.dry, smoothstep(0.62, 0.9, mid) * smoothstep(0.35, 0.15, big) * 0.75);
   out.lerp(_gc.flower, smoothstep(0.7, 0.95, patch(x, z, 0.09, 7.7)) * 0.35);
-  if (inTown(x, z, 4)) out.lerp(_gc.town, 0.45);
+  // biomi: neve, deserto, bosco d'autunno, costa tropicale
+  const bw = biomeAt(x, z), wS = bw[1], wD = bw[2], wA = bw[3], wT = bw[4];
+  if (wA > 0.01) {
+    _bc.copy(_gc.autA).lerp(_gc.autB, mid).lerp(_gc.leaves, smoothstep(0.55, 0.85, patch(x, z, 0.05, 2.7)) * 0.55).lerp(_gc.autGreen, smoothstep(0.6, 0.9, big) * 0.5);
+    out.lerp(_bc, smoothstep(0, 0.8, wA));
+  }
+  if (wT > 0.01) { _bc.copy(_gc.tropA).lerp(_gc.tropB, n * 0.8); out.lerp(_bc, smoothstep(0, 0.8, wT)); }
+  if (wD > 0.01) {
+    _bc.copy(_gc.sandA).lerp(_gc.sandB, mid * 0.8 + 0.2 * Math.sin(x * 0.09 + z * 0.03));
+    _bc.lerp(_gc.dryBush, smoothstep(0.65, 0.9, patch(x, z, 0.07, 3.3)) * 0.35);
+    out.lerp(_bc, smoothstep(0.05, 0.75, wD));
+  }
+  if (wS > 0.01) {
+    _bc.copy(_gc.frost).lerp(_gc.snowA, smoothstep(0.3, 0.75, wS));
+    _bc.lerp(_gc.snowB, smoothstep(0.45, 0.8, patch(x, z, 0.06, 1.1)) * 0.5);
+    out.lerp(_bc, smoothstep(0.05, 0.6, wS));
+  }
+  const tw = inTown(x, z, 4);
+  if (tw) out.lerp(TOWN_GROUND[tw.theme] ? _gc[TOWN_GROUND[tw.theme]] : _gc.town, 0.45);
   // strade sterrate con bordo erboso più scuro
   const rd = roadDist(x, z);
   if (rd < 5) out.lerp(_gc.dirtEdge, smoothstep(5, 3.5, rd) * 0.5);
   if (rd < 3.5) out.lerp(_gc.dirt, 1 - rd / 3.5);
   // spiagge, con sabbia bagnata vicino all'acqua
-  if (h < WATER_LEVEL + 1.4) out.lerp(_gc.sand, Math.min(1, (WATER_LEVEL + 1.4 - h) / 1.2));
+  if (h < WATER_LEVEL + 1.4 + wT * 1.6) out.lerp(wT > 0.4 ? _gc.whiteSand : _gc.sand, Math.min(1, (WATER_LEVEL + 1.4 + wT * 1.6 - h) / 1.2));
   if (h < WATER_LEVEL + 0.35) out.lerp(_gc.wetSand, Math.min(1, (WATER_LEVEL + 0.35 - h) / 0.6));
   // pendii ripidi → roccia (pendenza stimata dalle differenze dell'altezza)
   if (slope === null) {
     const gx = terrainHeight(x + 1.5, z) - terrainHeight(x - 1.5, z), gz = terrainHeight(x, z + 1.5) - terrainHeight(x, z - 1.5);
     slope = Math.hypot(gx, gz) / 3;
   }
-  if (h > WATER_LEVEL + 0.5) out.lerp(_gc.rock, smoothstep(0.55, 1.0, slope) * 0.85);
-  if (h > 14) out.lerp(_gc.rock, Math.min(1, (h - 14) / 6));
-  if (h > 16) out.lerp(_gc.rockDark, smoothstep(0.5, 0.8, mid) * 0.4);
-  if (h > 28) out.lerp(_gc.snow, Math.min(1, (h - 28) / 8) * (1 - smoothstep(0.7, 1.2, slope) * 0.6));
+  // roccia: nel deserto arenaria rossa a strati, sulle montagne innevate roccia fredda
+  if (wD > 0.3) {
+    _bc.copy(_gc.redRock).lerp(_gc.redRock2, 0.5 + 0.5 * Math.sin(h * 1.7 + Math.sin(x * 0.02) * 0.8));
+    _gc._rk = _bc;
+  } else if (wS > 0.4) _gc._rk = _gc.iceRock;
+  else _gc._rk = _gc.rock;
+  if (h > WATER_LEVEL + 0.5) out.lerp(_gc._rk, smoothstep(0.55, 1.0, slope) * 0.85);
+  if (h > 24) out.lerp(_gc._rk, Math.min(1, (h - 24) / 10) * (1 - wS * 0.6));
+  if (h > 28) out.lerp(_gc.rockDark, smoothstep(0.5, 0.8, mid) * 0.35 * (1 - wD));
+  // neve sulle cime (più in basso nel bioma innevato), meno sui pendii ripidi
+  const snowLine = 46 - wS * 30;
+  if (h > snowLine) out.lerp(_gc.snow, Math.min(1, (h - snowLine) / 8) * (1 - smoothstep(0.8, 1.4, slope) * 0.65));
   return out;
 }
 
@@ -704,10 +993,72 @@ function makeWaterNormal() {
   return t;
 }
 
+// ─────────────── decorazioni delle città tematiche (geometrie condivise, colori per vertice) ───────────────
+const P = (geo, color, o = {}) => ({ geo, color, o });
+const SPECIAL_GEO = {
+  snowman: () => mergeParts([
+    P(new THREE.IcosahedronGeometry(0.55, 1), '#f4f7fb', { y: 0.45, jit: 0.04 }),
+    P(new THREE.IcosahedronGeometry(0.4, 1), '#f4f7fb', { y: 1.12, jit: 0.04 }),
+    P(new THREE.IcosahedronGeometry(0.28, 1), '#f4f7fb', { y: 1.6, jit: 0.04 }),
+    P(new THREE.ConeGeometry(0.06, 0.32, 5), '#f08a24', { y: 1.6, z: 0.36, rx: Math.PI / 2 }),
+    P(new THREE.BoxGeometry(0.06, 0.06, 0.04), '#222222', { x: -0.1, y: 1.7, z: 0.24 }),
+    P(new THREE.BoxGeometry(0.06, 0.06, 0.04), '#222222', { x: 0.1, y: 1.7, z: 0.24 }),
+    P(new THREE.CylinderGeometry(0.2, 0.2, 0.28, 8), '#2a2a30', { y: 1.95 }),
+    P(new THREE.CylinderGeometry(0.3, 0.3, 0.03, 10), '#2a2a30', { y: 1.82 }),
+    P(new THREE.TorusGeometry(0.3, 0.06, 4, 10), '#c83a3a', { y: 1.36, rx: Math.PI / 2 }),
+    P(new THREE.BoxGeometry(0.05, 0.75, 0.05), '#5a3a20', { x: 0.55, y: 1.25, rz: -0.9 }),
+    P(new THREE.BoxGeometry(0.05, 0.75, 0.05), '#5a3a20', { x: -0.55, y: 1.25, rz: 0.9 }),
+  ], 901),
+  waterTower: () => {
+    const parts = [];
+    for (const [x, z] of [[1.2, 1.2], [-1.2, 1.2], [1.2, -1.2], [-1.2, -1.2]]) parts.push(P(new THREE.BoxGeometry(0.25, 5.2, 0.25), '#6e4a2a', { x, y: 2.6, z }));
+    parts.push(P(new THREE.BoxGeometry(2.6, 0.12, 0.15), '#6e4a2a', { y: 2.2, z: 1.2, rz: 0.9 }), P(new THREE.BoxGeometry(2.6, 0.12, 0.15), '#6e4a2a', { y: 2.2, z: -1.2, rz: -0.9 }));
+    parts.push(P(new THREE.CylinderGeometry(1.8, 1.8, 2.6, 12), '#9a6a3a', { y: 6.5, colorFn: (nx, ny, nz, x, y) => (Math.abs(y - 5.6) < 0.12 || Math.abs(y - 7.4) < 0.12 ? '#3a3a3a' : null) }));
+    parts.push(P(new THREE.ConeGeometry(2.0, 1.1, 12), '#6a4a2a', { y: 8.35 }));
+    parts.push(P(new THREE.BoxGeometry(2.6, 0.15, 2.6), '#6e4a2a', { y: 5.2 }));
+    return mergeParts(parts, 902);
+  },
+  umbrella: (c = 0) => {
+    const cols = ['#e04848', '#2a8ad8', '#f0b030', '#3aa860'], cc = cols[c % 4];
+    return mergeParts([
+      P(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6), '#f2f2f2', { y: 1.2 }),
+      P(new THREE.ConeGeometry(1.5, 0.55, 10, 1, true), cc, { y: 2.45, colorFn: (nx, ny, nz, x, y, z) => (Math.floor((Math.atan2(z, x) + 3.15) / 0.628) % 2 ? '#f6f6f0' : cc) }),
+      P(new THREE.BoxGeometry(0.7, 0.08, 1.6), '#f2e6c8', { x: 1.0, y: 0.25, z: 0.3, ry: 0.4 }),
+    ], 903 + c);
+  },
+  silo: () => mergeParts([
+    P(new THREE.CylinderGeometry(2, 2, 9, 14, 6), '#c9cdd2', { y: 4.5, colorFn: (nx, ny, nz, x, y, z, r) => (Math.abs(((y % 1.5) + 1.5) % 1.5) < 0.12 ? '#9aa0a6' : null) }),
+    P(new THREE.SphereGeometry(2.05, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), '#b04032', { y: 9 }),
+    P(new THREE.BoxGeometry(0.5, 9, 0.12), '#7a7f86', { x: 0, y: 4.5, z: 2.05 }),
+  ], 904),
+  stack: () => mergeParts([
+    P(new THREE.CylinderGeometry(1.1, 1.6, 22, 12, 11), '#9a5a42', { y: 11, colorFn: (nx, ny, nz, x, y) => (y > 18.5 && y < 20.5 ? '#f2f2f2' : (y > 16.5 && y < 18.5 ? '#c83a32' : null)) }),
+    P(new THREE.CylinderGeometry(1.25, 1.25, 0.4, 12), '#3a3a3a', { y: 22 }),
+  ], 905),
+  lighthouse: () => mergeParts([
+    P(new THREE.CylinderGeometry(1.1, 1.7, 13, 12, 6), '#f4f4f0', { y: 6.5, colorFn: (nx, ny, nz, x, y) => (Math.floor(y / 2.2) % 2 ? '#d23a32' : null) }),
+    P(new THREE.CylinderGeometry(1.5, 1.5, 0.3, 12), '#3a3a3a', { y: 13.1 }),
+    P(new THREE.CylinderGeometry(0.85, 0.85, 1.3, 10), '#ffe9a0', { y: 13.9, noSky: true, jit: 0 }),
+    P(new THREE.ConeGeometry(1.1, 1, 10), '#d23a32', { y: 15 }),
+  ], 906),
+  flag: (c = 0) => {
+    const cols = ['#c83a3a', '#3a5ac8', '#e0b030', '#3aa860'];
+    return mergeParts([
+      P(new THREE.CylinderGeometry(0.06, 0.06, 4, 6), '#3a3a3a', { y: 2 }),
+      P(new THREE.BoxGeometry(1.8, 1.1, 0.05, 4, 1, 1), cols[c % 4], { x: 0.95, y: 3.4, colorFn: (nx, ny, nz, x) => (Math.abs(x - 0.95) < 0.18 ? '#f2f2f2' : null) }),
+    ], 907 + c);
+  },
+};
+const _specialCache = new Map();
+function specialGeo(type, c = 0) {
+  const key = type + ':' + (c || 0);
+  if (!_specialCache.has(key)) _specialCache.set(key, SPECIAL_GEO[type](c || 0));
+  return _specialCache.get(key);
+}
+
 // ═════════════════════════ COSTRUZIONE ═════════════════════════
 export function buildWorld(scene, opts = {}) {
   configureMap(opts.seed ?? 1337, !!opts.random);
-  buildRoads();
   const lootSpots = [];
   const chestSpots = [];
   const houses = [];
@@ -740,6 +1091,26 @@ export function buildWorld(scene, opts = {}) {
   const metalMat = m('metal', '#6a6f78', { metalness: 0.6, roughness: 0.4 });
   const contColors = ['#c0392b', '#2471a3', '#d68910', '#1e8449'];
   const containerMats = contColors.map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
+  // ── città tematiche: tavolozze di muri e tetti (materiali creati solo per i temi presenti) ──
+  const THEMES = {
+    classic: { walls: wallColors, roofs: roofColors },
+    alpine: { walls: ['#8a5a32', '#a06a3a', '#efe8dc'], roofs: ['#5a3a24', '#4a4f5a'], snowRoof: true },
+    western: { walls: ['#c89a62', '#b9824e', '#d8b27a'], roofs: ['#7a5230', '#8a6a44'], facade: true },
+    coastal: { walls: ['#f4b6a8', '#a8d8e8', '#f6e3a1', '#f7f4ee'], roofs: ['#c8643a', '#3a7ab8'], awning: true },
+    farm: { walls: ['#a83a2a', '#b84a32', '#efe6d2'], roofs: ['#4a4f5a', '#6a3a2a'] },
+    industrial: { walls: ['#8f969c', '#a0a6aa', '#9a6a4a'], roofs: ['#5a5f6a', '#3f444c'], bigChimney: true },
+    port: { walls: ['#8fa4b4', '#c9d6df', '#e8dcc0'], roofs: ['#3b5a8a', '#5a5f6a'], bigChimney: true },
+    castle: { walls: ['stone'], roofs: ['#4a4f5a', '#3b3f48'], merlons: true },
+  };
+  const wallCache = new Map(wallColors.map((c, i) => [c, wallMats[i]])), roofCache = new Map(roofColors.map((c, i) => [c, roofMats[i]]));
+  wallCache.set('stone', stoneMat);
+  const wallMatFor = (c) => { if (!wallCache.has(c)) wallCache.set(c, texMat(makeWallTexture(c, 'rgba(0,0,0,0.12)'), { roughness: 0.9 })); return wallCache.get(c); };
+  const roofMatFor = (c) => { if (!roofCache.has(c)) roofCache.set(c, texMat(makeRoofTexture(c), { roughness: 0.72 })); return roofCache.get(c); };
+  const snowMat = m('snowroof', '#f3f6fa', { roughness: 0.8 });
+  const signMat = m('sign', '#5a3a1e');
+  const awningMats = ['#e04848', '#2a8ad8', '#f0b030', '#3aa860'].map(c => m('awn' + c, c));
+  const hayMat = m('hay', '#e2c25a', { roughness: 1 });
+  const fenceMat = m('fence', '#a37a4a');
   const groundDetail = makeGroundDetail();
   const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
   addGroundDetail(terrainMat, groundDetail, 70, 260, 1, NORMALS);
@@ -757,12 +1128,13 @@ export function buildWorld(scene, opts = {}) {
     return spec;
   }
 
-  function placeHouse(cx, cz, w, d, baseY, rot90) {
+  function placeHouse(cx, cz, w, d, baseY, rot90, theme = 'classic') {
     if (rot90) { const t = w; w = d; d = t; }
     const H = 3.8, T = 0.35, door = 2.2;
-    const wi = Math.floor(srand() * wallMats.length);
-    const wm = wallMats[wi];
-    const house = { cx, cz, w, d, baseY, roofMesh: null, roofTop: baseY + H + 0.3, doors: [], wallColor: wallColors[wi] };
+    const TH = THEMES[theme] || THEMES.classic;
+    const wi = Math.floor(srand() * TH.walls.length);
+    const wm = wallMatFor(TH.walls[wi]);
+    const house = { cx, cz, w, d, baseY, roofMesh: null, roofTop: baseY + H + 0.3, doors: [], wallColor: TH.walls[wi] === 'stone' ? '#a39d92' : TH.walls[wi], theme };
     const ho = { house };
     const deco = { house, collide: false };
     const shutM = shutterMats[Math.floor(srand() * shutterMats.length)];
@@ -832,17 +1204,39 @@ export function buildWorld(scene, opts = {}) {
         plinth(s, s.len, s.x, s.z);
       }
     });
-    const ri = Math.floor(srand() * roofMats.length);
-    addBox(w + 0.6, 0.3, d + 0.6, cx, baseY + H + 0.15, cz, roofMats[ri], { ...ho, roof: true });
+    const ri = Math.floor(srand() * TH.roofs.length);
+    addBox(w + 0.6, 0.3, d + 0.6, cx, baseY + H + 0.15, cz, roofMatFor(TH.roofs[ri]), { ...ho, roof: true });
+    // dettagli del tema
+    const ds = sides[doorSide], dn = normals[doorSide];
+    if (TH.snowRoof) {
+      addBox(w + 0.75, 0.28, d + 0.75, cx, baseY + H + 0.44, cz, snowMat, { ...ho, roof: true, collide: false, cast: false });
+      addBox(w * 0.6, 0.18, d * 0.6, cx, baseY + H + 0.64, cz, snowMat, { ...ho, roof: true, collide: false, cast: false });
+    }
+    if (TH.facade) {
+      // falsa facciata western con insegna
+      const fl = ds.len + 0.4;
+      if (ds.horiz) addBox(fl, 1.9, T, ds.x, baseY + H + 0.95, ds.z, wm, { ...ho, roof: true });
+      else addBox(T, 1.9, fl, ds.x, baseY + H + 0.95, ds.z, wm, { ...ho, roof: true });
+      outer(ds, dn, 0, baseY + H + 0.9, ds.len * 0.55, 0.75, 0.08, signMat);
+      outer(ds, dn, 0, baseY + H + 1.95, fl, 0.14, 0.14, trimMat);
+    }
+    if (TH.awning) outer(ds, dn, 0, baseY + 3.0, door + 1.6, 0.1, 1.4, awningMats[Math.floor(srand() * awningMats.length)]);
+    if (TH.merlons) {
+      for (let u = -w / 2; u <= w / 2 + 0.01; u += 1.5) for (const zz of [-1, 1]) addBox(0.6, 0.7, 0.6, cx + u, baseY + H + 0.65, cz + zz * (d / 2 + 0.05), stoneMat, { ...ho, roof: true, collide: false });
+      for (let u = -d / 2 + 1.5; u <= d / 2 - 1.49; u += 1.5) for (const xx of [-1, 1]) addBox(0.6, 0.7, 0.6, cx + xx * (w / 2 + 0.05), baseY + H + 0.65, cz + u, stoneMat, { ...ho, roof: true, collide: false });
+    }
     // cornicione sotto il tetto e comignolo (fanno parte del "tetto": spariscono quando entri)
     addBox(w + 0.3, 0.22, d + 0.3, cx, baseY + H - 0.08, cz, trimMat, { ...ho, roof: true, collide: false, cast: false });
     {
       const sx = srand() < 0.5 ? -1 : 1, sz = srand() < 0.5 ? -1 : 1;
       const chx = cx + sx * (w / 2 - 1.1), chz = cz + sz * (d / 2 - 1.1);
-      addBox(0.8, 1.4, 0.8, chx, baseY + H + 0.3 + 0.7, chz, brickMat, { ...ho, roof: true });
-      addBox(0.95, 0.14, 0.95, chx, baseY + H + 0.3 + 1.45, chz, capMat, { ...ho, roof: true, collide: false });
+      const chH = TH.bigChimney ? 4.5 : 1.4;
+      if (!TH.merlons) {
+        addBox(0.8, chH, 0.8, chx, baseY + H + 0.3 + chH / 2, chz, brickMat, { ...ho, roof: true });
+        addBox(0.95, 0.14, 0.95, chx, baseY + H + 0.3 + chH + 0.05, chz, capMat, { ...ho, roof: true, collide: false });
+      }
     }
-    house.roofColor = roofColors[ri];
+    house.roofColor = TH.roofs[ri];
     houses.push(house);
     chunkAt(cx, cz).houses.push(house);
     // loot e casse dentro la casa
@@ -865,6 +1259,51 @@ export function buildWorld(scene, opts = {}) {
     return false;
   }
 
+  /** decorazioni tipiche di ogni tema (pupazzi di neve, serbatoi, silos, palme, ciminiere…) */
+  const extraTrees = [];
+  function townSpot(t, r, rMin = 4, rMax = t.r - 2) {
+    for (let k = 0; k < 40; k++) {
+      const a = srand() * Math.PI * 2, rr = sr(rMin, rMax);
+      const x = t.x + Math.cos(a) * rr, z = t.z + Math.sin(a) * rr;
+      if (overlapsHouse(x, z, r * 2, r * 2) || roadDist(x, z) < r + 2.5) continue;
+      if (queryColliders(x, z, r).some(c => c.type === 'cyl' ? Math.hypot(c.x - x, c.z - z) < c.r + r : (x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ))) continue;
+      return [x, z];
+    }
+    return null;
+  }
+  function special(type, x, z, h, col, extra = {}) {
+    chunkAt(x, z).specials.push({ type, x, z, h, rot: srand() * 6.28, ...extra });
+    if (col) addCollider({ type: 'cyl', x, z, r: col[0], minY: h - 1, maxY: h + col[1], noStand: col[2] });
+  }
+  function townExtras(t) {
+    const th = t.theme;
+    if (th === 'alpine') {
+      for (let i = 0; i < 3; i++) { const s = townSpot(t, 0.8); if (s) special('snowman', s[0], s[1], t.h, [0.55, 1.7, true]); }
+      for (let i = 0; i < 5; i++) { const s = townSpot(t, 1.2, t.r * 0.6, t.r + 4); if (s) extraTrees.push({ x: s[0], z: s[1], k: 'snowPine' }); }
+    } else if (th === 'western') {
+      { const s = townSpot(t, 2.4); if (s) { special('waterTower', s[0], s[1], t.h, [1.9, 8.2, false]); lootSpots.push(new THREE.Vector3(s[0] + 2.6, t.h + 0.2, s[1])); } }
+      for (let i = 0; i < 6; i++) { const s = townSpot(t, 1, t.r * 0.5, t.r + 6); if (s) extraTrees.push({ x: s[0], z: s[1], k: 'cactus' }); }
+      for (let i = 0; i < 3; i++) { const s = townSpot(t, 0.9); if (s) addBox(1.6, 1.0, 1.0, s[0], t.h + 0.5, s[1], hayMat, { lodColor: '#e2c25a' }); }
+    } else if (th === 'coastal') {
+      for (let i = 0; i < 7; i++) { const s = townSpot(t, 1.2, 4, t.r + 6); if (s) extraTrees.push({ x: s[0], z: s[1], k: 'palm' }); }
+      for (let i = 0; i < 4; i++) { const s = townSpot(t, 1.3); if (s) special('umbrella', s[0], s[1], t.h, [0.12, 2.4, true], { c: i }); }
+    } else if (th === 'farm') {
+      { const s = townSpot(t, 2.3); if (s) { special('silo', s[0], s[1], t.h, [2.1, 10.5, false]); lootSpots.push(new THREE.Vector3(s[0] + 2.8, t.h + 0.2, s[1])); } }
+      for (let i = 0; i < 6; i++) { const s = townSpot(t, 0.9); if (s) { addBox(1.5, 1.2, 1.2, s[0], t.h + 0.6, s[1], hayMat, { lodColor: '#e2c25a' }); if (srand() < 0.4) addBox(1.5, 1.2, 1.2, s[0] + 0.1, t.h + 1.8, s[1], hayMat); } }
+      // staccionate (decorative: ci si passa attraverso)
+      for (let i = 0; i < 4; i++) {
+        const s = townSpot(t, 3); if (!s) continue;
+        const along = srand() < 0.5;
+        for (let k = -2; k <= 2; k++) addBox(0.15, 1.1, 0.15, s[0] + (along ? k * 1.4 : 0), t.h + 0.55, s[1] + (along ? 0 : k * 1.4), fenceMat, { collide: false });
+        for (const y of [0.45, 0.9]) addBox(along ? 5.8 : 0.08, 0.12, along ? 0.08 : 5.8, s[0], t.h + y, s[1], fenceMat, { collide: false, cast: false });
+      }
+    } else if (th === 'industrial' || th === 'port') {
+      for (let i = 0; i < (th === 'port' ? 1 : 2); i++) { const s = townSpot(t, 2); if (s) special('stack', s[0], s[1], t.h, [1.6, 22, false]); }
+      if (th === 'port') { const s = townSpot(t, 1.5); if (s) special('lighthouse', s[0], s[1], t.h, [1.7, 14, false]); }
+    }
+    if (/^Faro/.test(t.name) && th !== 'port') { const s = townSpot(t, 1.5); if (s) special('lighthouse', s[0], s[1], t.h, [1.7, 14, false]); }
+  }
+
   // ── città ──
   for (const t of TOWNS) {
     let placed = 0, tries = 0;
@@ -876,15 +1315,27 @@ export function buildWorld(scene, opts = {}) {
       const rot = srand() < 0.5;
       const ww = rot ? d : w, dd = rot ? w : d;
       if (overlapsHouse(x, z, ww, dd)) continue;
-      placeHouse(x, z, w, d, t.h, rot);
+      placeHouse(x, z, w, d, t.h, rot, t.theme);
       placed++;
     }
+    townExtras(t);
     if (t.towers) {
       for (let i = 0; i < 4; i++) {
         const a = i * Math.PI / 2 + 0.4;
         const x = t.x + Math.cos(a) * (t.r - 6), z = t.z + Math.sin(a) * (t.r - 6);
-        addBox(5, 18, 5, x, t.h + 9, z, wallMats[2], { lodColor: wallColors[2] });
-        addBox(6, 0.6, 6, x, t.h + 18.3, z, metalMat, { lodColor: '#6a6f78' });
+        if (t.theme === 'castle') {
+          // torre di pietra con merli e bandiera
+          addBox(5, 18, 5, x, t.h + 9, z, stoneMat, { lodColor: '#a39d92' });
+          addBox(6, 0.6, 6, x, t.h + 18.3, z, stoneMat, { lodColor: '#a39d92' });
+          for (let k = 0; k < 4; k++) for (let u = -2.4; u <= 2.41; u += 1.6) {
+            const mx = k < 2 ? u : (k === 2 ? -2.75 : 2.75), mz = k < 2 ? (k === 0 ? -2.75 : 2.75) : u;
+            addBox(0.6, 0.8, 0.6, x + mx, t.h + 19, z + mz, stoneMat, { collide: false });
+          }
+          chunkAt(x, z).specials.push({ type: 'flag', x, z, h: t.h + 18.6, c: i });
+        } else {
+          addBox(5, 18, 5, x, t.h + 9, z, wallMats[2], { lodColor: wallColors[2] });
+          addBox(6, 0.6, 6, x, t.h + 18.3, z, metalMat, { lodColor: '#6a6f78' });
+        }
         lootSpots.push(new THREE.Vector3(x + 3.5, t.h + 0.2, z));
       }
     }
@@ -932,15 +1383,38 @@ export function buildWorld(scene, opts = {}) {
   while (trees.length < NTREES && tries < NTREES * 14) {
     tries++;
     const x = sr(-HALF + 8, HALF - 8), z = sr(-HALF + 8, HALF - 8);
-    if (srand() > forestK(x, z)) continue;
+    const bw = biomeAt(x, z), wS = bw[1], wD = bw[2], wA = bw[3], wT = bw[4];
+    // il deserto ha pochi cactus, la costa tropicale palme sparse
+    const dens = forestK(x, z) * (1 - wD * 0.82) * (1 - wT * 0.35);
+    if (srand() > dens) continue;
     const h = terrainHeight(x, z);
-    if (h < WATER_LEVEL + 0.8 || h > 26) continue;
+    if (h < WATER_LEVEL + 0.8 || h > 58 - wD * 20) continue;
     if (inTown(x, z, 6)) continue;
     if (roadDist(x, z) < 4) continue;
-    const t = { x, z, h, s: sr(0.8, 1.45), pine: srand() < (h > 12 ? 0.8 : 0.5), rot: srand() * 6.28, hue: 0.28 + sr(-0.04, 0.05), light: sr(0.28, 0.4) };
+    const slope = Math.hypot(terrainHeight(x + 1.5, z) - h, terrainHeight(x, z + 1.5) - h) / 1.5;
+    if (slope > 1.1) continue;
+    const t = { x, z, h, s: sr(0.8, 1.45), rot: srand() * 6.28, hue: 0.28 + sr(-0.04, 0.05), light: sr(0.28, 0.4) };
+    // tipo di albero in base al bioma dominante e all'altitudine
+    const r = srand(), pick = srand();
+    if (wD > pick && wD > 0.25) t.k = r < 0.8 ? 'cactus' : 'deadTree';
+    else if (wS > pick && wS > 0.2) t.k = r < 0.93 ? 'snowPine' : 'deadTree';
+    else if (wT > pick && wT > 0.2) t.k = r < 0.62 ? 'palm' : (r < 0.85 ? 'oak' : 'birch');
+    else if (wA > pick && wA > 0.2) t.k = r < 0.5 ? 'autumnOak' : (r < 0.78 ? 'autumnBirch' : (r < 0.95 ? 'pine' : 'deadTree'));
+    else t.k = r < (h > 12 ? 0.8 : 0.5) ? 'pine' : (t.rot > 4.4 ? 'birch' : 'oak');
+    if (h > 34 && t.k !== 'cactus') t.k = h > 42 || wS > 0.3 ? 'snowPine' : 'pine';
+    t.pine = t.k === 'pine' || t.k === 'snowPine';
+    if (t.k === 'cactus') t.s *= 0.85;
     trees.push(t);
     chunkAt(x, z).trees.push(t);
-    addCollider({ type: 'cyl', x, z, r: 0.4 * t.s, minY: h - 1, maxY: h + 3.2 * t.s, noStand: true, tree: true });
+    addCollider({ type: 'cyl', x, z, r: (t.k === 'cactus' ? 0.45 : 0.4) * t.s, minY: h - 1, maxY: h + 3.2 * t.s, noStand: true, tree: true });
+  }
+
+  for (const e of extraTrees) {
+    const h = terrainHeight(e.x, e.z);
+    const t = { x: e.x, z: e.z, h, s: sr(0.85, 1.25), rot: srand() * 6.28, hue: 0.28 + sr(-0.03, 0.04), light: sr(0.3, 0.38), k: e.k, pine: e.k === 'snowPine' };
+    trees.push(t);
+    chunkAt(t.x, t.z).trees.push(t);
+    addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.42 * t.s, minY: h - 1, maxY: h + 3.2 * t.s, noStand: true, tree: true });
   }
 
   // ── cespugli (nessuna collisione: ci si può nascondere dentro) ──
@@ -950,9 +1424,9 @@ export function buildWorld(scene, opts = {}) {
   while (nb < NBUSH && tries < NBUSH * 8) {
     tries++;
     const x = sr(-HALF + 6, HALF - 6), z = sr(-HALF + 6, HALF - 6);
-    if (srand() > 0.35 + forestK(x, z) * 0.65) continue;
+    if (srand() > (0.35 + forestK(x, z) * 0.65) * (1 - biomeAt(x, z)[1] * 0.75) * (1 - biomeAt(x, z)[2] * 0.6)) continue;
     const h = terrainHeight(x, z);
-    if (h < WATER_LEVEL + 0.9 || h > 24) continue;
+    if (h < WATER_LEVEL + 0.9 || h > 40) continue;
     if (inTown(x, z, 2) || roadDist(x, z) < 3.5) continue;
     chunkAt(x, z).bushes.push({ x, z, h, s: sr(0.7, 1.4), rot: srand() * 6.28, v: Math.floor(srand() * 4) });
     nb++;
@@ -994,7 +1468,8 @@ export function buildWorld(scene, opts = {}) {
     for (let k = 0, n = 0; n < NTALL && k < 6000; k++) {
       const x = R(-HALF + 25, HALF - 25), z = R(-HALF + 25, HALF - 25);
       const h = terrainHeight(x, z);
-      if (h < WATER_LEVEL + 1.6 || h > 19) continue;
+      if (h < WATER_LEVEL + 1.6 || h > 26) continue;
+      { const bw = biomeAt(x, z); if (bw[1] > 0.25 || bw[2] > 0.4) continue; }
       if (inTown(x, z, 9) || roadDist(x, z) < 7) continue;
       if (Math.hypot(terrainHeight(x + 3, z) - h, terrainHeight(x, z + 3) - h) / 3 > 0.33) continue;
       const r = R(5, 11.5);
@@ -1228,6 +1703,7 @@ export function buildWorld(scene, opts = {}) {
     return geo;
   }
 
+  const LOD_TREE = { pine: ['#2f5f30', 2.6, 6, 4], oak: ['#457f35', 2.6, 6, 4], birch: ['#6fa645', 2, 5, 4.4], snowPine: ['#9fb3ad', 2.5, 6, 4], autumnOak: ['#c8702a', 2.8, 5, 4.4], autumnBirch: ['#e0b830', 2, 5, 4.4], palm: ['#4a9a40', 3.2, 1.2, 6.2], cactus: ['#4f8a3a', 0.8, 4, 2], deadTree: ['#6b5a4a', 0.6, 3.5, 1.8] };
   function buildLod(ch) {
     const group = new THREE.Group();
     const t = new THREE.Mesh(terrainGeo(ch, LSEG, 0.35), lodMat);
@@ -1243,7 +1719,8 @@ export function buildWorld(scene, opts = {}) {
     // alberi lontani: un cono semplice ogni 3 alberi
     for (let i = 0; i < ch.trees.length; i += 3) {
       const tr = ch.trees[i];
-      blocks.push({ w: 2.6 * tr.s, h: 6 * tr.s, d: 2.6 * tr.s, x: tr.x, y: tr.h + 4 * tr.s, z: tr.z, color: tr.pine ? '#2f5f30' : '#457f35' });
+      const lc = LOD_TREE[tr.k] || LOD_TREE.oak;
+      blocks.push({ w: lc[1] * tr.s, h: lc[2] * tr.s, d: lc[1] * tr.s, x: tr.x, y: tr.h + lc[3] * tr.s, z: tr.z, color: lc[0] });
     }
     const bg = mergedBlocks(blocks);
     if (bg) group.add(new THREE.Mesh(bg, blockMat));
@@ -1345,7 +1822,10 @@ export function buildWorld(scene, opts = {}) {
   const tallMat = grassMaterial(95, 135, 'tall', 0.16, false);
   /** dove può crescere l'erba (niente acqua, sabbia, rocce ripide, neve, strade e piazze) */
   function grassOK(x, z, h, slope = 0) {
-    if (h < WATER_LEVEL + 1.2 || h > 24 || slope > 0.7) return false;
+    if (h < WATER_LEVEL + 1.2 || h > 38 || slope > 0.7) return false;
+    // niente erba sulla neve e nella sabbia del deserto (bordo sfumato)
+    const bw = biomeAt(x, z);
+    if (bw[1] > 0.32 + 0.25 * Math.sin(x * 0.37 + z * 0.29) * Math.sin(z * 0.21) || bw[2] > 0.5 + 0.2 * Math.sin(x * 0.3 - z * 0.23)) return false;
     if (inTown(x, z, -5)) return false;
     if (roadDist(x, z) < 2.8) return false;
     return true;
@@ -1387,7 +1867,7 @@ export function buildWorld(scene, opts = {}) {
       const slope = Math.hypot(terrainHeight(x + 1, z) - h, terrainHeight(x, z + 1) - h);
       if (slope > 0.7 || underBox(x, z, h)) continue;
       if (i >= NT) {                                           // fiori
-        if (r3 > 0.25 + fpatch * 0.75) continue;
+        if (r3 > 0.25 + fpatch * 0.75 || biomeAt(x, z)[3] > 0.6) continue;
         q.setFromAxisAngle(up, r1 * 6.28); const s = 0.8 + r2 * 0.6; sc.set(s, s * (0.8 + r3 * 0.6), s); p.set(x, h - 0.02, z);
         mat4.compose(p, q, sc); fm.setMatrixAt(nf, mat4);
         fm.setColorAt(nf, col.set(flowerCols[Math.floor(r2 * 997) % flowerCols.length]));
@@ -1541,8 +2021,8 @@ export function buildWorld(scene, opts = {}) {
     }
     // alberi: abete, quercia, betulla (modelli low-poly con colori per vertice)
     if (ch.trees.length) {
-      const kinds = { pine: [], oak: [], birch: [] };
-      for (const t of ch.trees) kinds[t.pine ? 'pine' : (t.rot > 4.4 ? 'birch' : 'oak')].push(t);
+      const kinds = {};
+      for (const t of ch.trees) (kinds[t.k] || (kinds[t.k] = [])).push(t);
       ch.treeHi = []; ch.treeLo = [];
       for (const [k, list] of Object.entries(kinds)) {
         for (const low of [false, true]) {
@@ -1570,6 +2050,9 @@ export function buildWorld(scene, opts = {}) {
       const v = new THREE.Vector3();
       for (const r of ch.rocks) {
         const g = PROPS.rocks[(r.shape ?? 0) % PROPS.rocks.length];
+        // arenaria rossa nel deserto, roccia fredda e innevata in montagna
+        const bw = biomeAt(r.x, r.z), tR = 1 + bw[2] * 0.35 - bw[1] * 0.04, tG = 1 + bw[2] * 0.02, tB = 1 - bw[2] * 0.3 + bw[1] * 0.06;
+        const snowTop = bw[1] > 0.4 || r.h > 46;
         q.setFromEuler(eul.set(r.e[0] * 0.3, r.e[1], r.e[2] * 0.3));
         sc.set(r.s * r.k[0], r.s * r.k[1], r.s * r.k[2]);
         p.set(r.x, r.h + r.s * 0.15, r.z);
@@ -1579,7 +2062,9 @@ export function buildWorld(scene, opts = {}) {
         for (let i = 0; i < gp.count; i++, o++) {
           v.fromBufferAttribute(gp, i).applyMatrix4(mat4); P[o * 3] = v.x; P[o * 3 + 1] = v.y; P[o * 3 + 2] = v.z;
           v.fromBufferAttribute(gn, i).applyMatrix3(nm).normalize(); Nn[o * 3] = v.x; Nn[o * 3 + 1] = v.y; Nn[o * 3 + 2] = v.z;
-          C[o * 3] = gc.getX(i); C[o * 3 + 1] = gc.getY(i); C[o * 3 + 2] = gc.getZ(i);
+          if (snowTop && gn.getY(i) > 0.45) { C[o * 3] = 0.93; C[o * 3 + 1] = 0.95; C[o * 3 + 2] = 0.98; }
+          else if (bw[2] > 0.3 && gc.getY(i) > gc.getX(i) * 1.05) { C[o * 3] = 0.78; C[o * 3 + 1] = 0.6; C[o * 3 + 2] = 0.4; }   // niente muschio nel deserto
+          else { C[o * 3] = Math.min(1, gc.getX(i) * tR); C[o * 3 + 1] = gc.getY(i) * tG; C[o * 3 + 2] = gc.getZ(i) * tB; }
         }
       }
       const rg = new THREE.BufferGeometry();
@@ -1622,8 +2107,11 @@ export function buildWorld(scene, opts = {}) {
           mat4.compose(p, q, sc);
           im.setMatrixAt(i, mat4);
           groundColor(b.x, b.z, b.h, col, 0.2);
-          const v = 0.85 + (col.g - 0.45) * 0.6;
-          im.setColorAt(i, col.setRGB(v * (col.r > 0.45 ? 1.08 : 1), v, v * 0.95));
+          const v = 0.85 + Math.min(0.3, (col.g - 0.45) * 0.6);
+          // tinta del bioma: foglie rosse in autunno, brinate sulla neve, secche nel deserto
+          const bw = biomeAt(b.x, b.z), wA = bw[3], wS = bw[1], wD = bw[2];
+          const tr = 1 + wA * 0.5 + wS * 0.1 + wD * 0.25, tg = 1 - wA * 0.2 + wS * 0.12, tb = 1 - wA * 0.5 + wS * 0.25 - wD * 0.35;
+          im.setColorAt(i, col.setRGB(v * tr, v * tg, v * 0.95 * tb));
         });
         if (im) { im.castShadow = false; group.add(im); ch.nearOnly.push(im); }
       });
@@ -1683,6 +2171,13 @@ export function buildWorld(scene, opts = {}) {
     }
     // oggetti speciali
     for (const s of ch.specials) {
+      if (SPECIAL_GEO[s.type]) {
+        const mesh = new THREE.Mesh(specialGeo(s.type, s.c), propMaterial);
+        mesh.position.set(s.x, s.h, s.z); mesh.rotation.y = s.rot || 0;
+        mesh.castShadow = mesh.receiveShadow = true;
+        group.add(mesh);
+        continue;
+      }
       if (s.type === 'fountain') {
         const f = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.4, 1, 20), m('stone', '#b8b4a8'));
         f.position.set(s.x, s.h + 0.5, s.z); f.castShadow = f.receiveShadow = true; group.add(f);
@@ -1796,10 +2291,25 @@ export function buildWorld(scene, opts = {}) {
     const x = (px / MM) * HALF * 2 - HALF, z = (py / MM) * HALF * 2 - HALF;
     const h = terrainHeight(x, z);
     let r, gg, b;
-    if (h < WATER_LEVEL) { r = 40; gg = 120; b = 190; }
-    else if (h < WATER_LEVEL + 1) { r = 210; gg = 195; b = 140; }
-    else if (h > 24) { const k = Math.min(1, (h - 24) / 10); r = 130 + 110 * k; gg = 125 + 115 * k; b = 115 + 125 * k; }
-    else { const s = Math.max(0, Math.min(1, (h + 4) / 22)); r = 70 + 40 * s; gg = 130 + 40 * s; b = 55 + 20 * s; }
+    if (h < WATER_LEVEL) { const dp = Math.min(1, (WATER_LEVEL - h) / 9); r = 60 - 30 * dp; gg = 145 - 40 * dp; b = 205 - 20 * dp; }
+    else {
+      const bw = biomeAt(x, z), s = Math.max(0, Math.min(1, (h + 4) / 22));
+      // colore del bioma
+      r = (70 + 40 * s) * bw[0] + 236 * bw[1] + 222 * bw[2] + 196 * bw[3] + 70 * bw[4];
+      gg = (130 + 40 * s) * bw[0] + 241 * bw[1] + 190 * bw[2] + 130 * bw[3] + 175 * bw[4];
+      b = (55 + 20 * s) * bw[0] + 248 * bw[1] + 130 * bw[2] + 60 * bw[3] + 70 * bw[4];
+      if (h < WATER_LEVEL + 1) { r = 220; gg = 205; b = 150; }
+      const hx = terrainHeight(x + 2, z) - terrainHeight(x - 2, z), hz = terrainHeight(x, z + 2) - terrainHeight(x, z - 2);
+      const slope = Math.hypot(hx, hz) / 4;
+      const rk = Math.max(Math.min(1, Math.max(0, (h - 24) / 10)) * (1 - bw[1] * 0.7), Math.min(1, Math.max(0, (slope - 0.55) / 0.5)) * 0.8);
+      const rc = bw[2] > 0.3 ? [190, 110, 65] : [135, 130, 120];
+      r += (rc[0] - r) * rk; gg += (rc[1] - gg) * rk; b += (rc[2] - b) * rk;
+      const sl = 46 - bw[1] * 30;
+      if (h > sl) { const k = Math.min(1, (h - sl) / 8); r += (245 - r) * k; gg += (248 - gg) * k; b += (252 - b) * k; }
+      // ombreggiatura del rilievo (luce da nord-ovest)
+      const sh = Math.max(0.55, Math.min(1.3, 1 + (hx + hz) * 0.09));
+      r *= sh; gg *= sh; b *= sh;
+    }
     const i = (py * MM + px) * 4;
     img.data[i] = r; img.data[i + 1] = gg; img.data[i + 2] = b; img.data[i + 3] = 255;
   }

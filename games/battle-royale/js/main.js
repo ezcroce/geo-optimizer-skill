@@ -5,24 +5,26 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=11';
-import * as PR from './progress.js?v=11';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=11';
-import { initMenu } from './menu.js?v=11';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=11';
-import { initSettingsUI } from './settings-ui.js?v=11';
-import { applyAnisotropy } from './texgen.js?v=11';
-import * as A from './audio.js?v=11';
+} from './config.js?v=12';
+import * as PR from './progress.js?v=12';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=12';
+import { initMenu } from './menu.js?v=12';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=12';
+import { initSettingsUI } from './settings-ui.js?v=12';
+import { applyAnisotropy } from './texgen.js?v=12';
+import * as A from './audio.js?v=12';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=11';
-import { createWeather } from './weather.js?v=11';
-import { createEvents } from './events.js?v=11';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=11';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=11';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=11';
+} from './world.js?v=12';
+import { createWeather } from './weather.js?v=12';
+import { createEvents } from './events.js?v=12';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=12';
+import { weaponIcon } from './weapons.js?v=12';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=12';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=12';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=12';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -57,9 +59,13 @@ const SETTINGS_DEFAULT = () => ({
   name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', players: 100, sens: 1, vol: 0.5, mode: 'br', hat: 'none', back: 'none',
   // controlli, audio e interfaccia
   adsSens: 1, invertY: false, fov: 70, crouchHold: false, shake: true, amb: 1, chColor: '#ffffff', chSize: 1, minimap: 'normal',
+  touch: 'auto', touchSens: 1, touchSize: 1,
   gfx: { ...GFX_DEFAULT },
 });
+const FIRST_RUN = !localStorage.getItem('arenaRoyale');
 const settings = Object.assign(SETTINGS_DEFAULT(), JSON.parse(localStorage.getItem('arenaRoyale') || '{}'));
+// primo avvio su telefono/tablet: grafica leggera (si può cambiare nelle impostazioni)
+if (FIRST_RUN && IS_TOUCH_DEVICE) settings.gfx = { ...GFX_DEFAULT, preset: 'basso', ...PRESETS.basso, fpsCap: 60 };
 settings.gfx = { ...GFX_DEFAULT, ...(settings.gfx || {}) };
 // oggetti equipaggiati ma non (più) posseduti → torna a quelli base
 if (!PR.owns('skin', settings.skin)) settings.skin = 'recluta';
@@ -1039,7 +1045,9 @@ function kill(t, attacker, how) {
   let text;
   if (attacker && attacker !== t) {
     attacker.kills++;
-    text = `<b>${esc(attacker.name)}</b> ha eliminato ${esc(t.name)} <span style="opacity:.7">[${esc(how)}]</span>`;
+    const wk = Object.keys(WEAPONS).find(k => WEAPONS[k].name === how);
+    const wr = wk && attacker.weapon && attacker.weapon.id === wk ? attacker.weapon.rarity : 1;
+    text = `<b>${esc(attacker.name)}</b> ${wk ? weaponIconHTML(wk, wr, 'wi kfi') : `<span style="opacity:.7">[${esc(how)}]</span>`} ${esc(t.name)}`;
   } else if (how === 'storm') text = `${esc(t.name)} è stato consumato dalla tempesta ⛈`;
   else text = `${esc(t.name)} si è eliminato da solo 💥`;
   addFeed(text, attacker === G.player || t === G.player);
@@ -1621,7 +1629,7 @@ function jumpFromBus(ch) {
   ch.m.root.visible = true;
   if (ch.isPlayer) {
     G.state = 'play';
-    showMsg('', 'Premi SPAZIO per aprire il deltaplano prima', 3);
+    showMsg('', tk('Premi SPAZIO per aprire il deltaplano prima', 'Tocca APRI per il deltaplano prima'), 3);
     A.playUI();
   }
 }
@@ -2013,6 +2021,7 @@ addEventListener('wheel', e => {
 let lockFailed = false;
 let lockTime = 0;
 function requestLock() {
+  if (touch.T.on) return;          // sul telefono non c'è il puntatore da bloccare
   try {
     const r = canvas.requestPointerLock();
     if (r && r.catch) r.catch(() => { lockFailed = true; });
@@ -2026,6 +2035,28 @@ document.addEventListener('pointerlockchange', () => {
 });
 document.addEventListener('pointerlockerror', () => { lockFailed = true; });
 
+// ─────────────── Comandi touch (telefono / tablet) ───────────────
+const touch = createTouch({
+  G, keys, pressed, mouse, settings,
+  look(dx, dy) {
+    if (G.paused || G.state === 'end' || G.state === 'menu') return;
+    const zoomK = G.ads ? settings.adsSens / currentZoom() : 1;
+    const s = 0.0045 * (settings.touchSens || 1) * zoomK;
+    G.camYaw -= dx * s;
+    G.camPitch = clamp(G.camPitch - dy * s * (settings.invertY ? -1 : 1), -1.35, 1.35);
+  },
+  togglePause: () => togglePause(true),
+  onSlot(i) {
+    const p = G.player;
+    if (!p || !p.alive || G.state !== 'play') return;
+    p.setActive(i);
+    if (G.build.on) toggleBuild(false);
+  },
+});
+const touchOn = () => settings.touch === 'on' || (settings.touch !== 'off' && IS_TOUCH_DEVICE);
+/** testo dei suggerimenti: tastiera o touch */
+const tk = (kb, tc) => touch.T.on ? tc : kb;
+
 // ─────────────── Schermo intero ───────────────
 const inFrame = (() => { try { return window.top !== window.self; } catch { return true; } })();
 function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
@@ -2038,6 +2069,8 @@ function toggleFullscreen(force) {
       if (!fn) return fsFailed();
       const r = fn.call(el, { navigationUI: 'hide' });
       if (r && r.catch) r.catch(fsFailed);
+      // sul telefono prova anche a bloccare lo schermo in orizzontale
+      if (touch.T.on && r && r.then) r.then(() => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch { /* non supportato */ } }).catch(() => {});
     } else if (!want && isFullscreen()) {
       (document.exitFullscreen || document.webkitExitFullscreen).call(document);
     }
@@ -2103,6 +2136,12 @@ function applySettings(key = '*') {
     mmCanvas.style.width = mmCanvas.style.height = px + 'px';
   }
   if (all || key === 'fpsShow') $('#fps').classList.toggle('hidden', !g.fpsShow);
+  if (all || key === 'touch') {
+    touch.enable(touchOn());
+    $('#pause p').textContent = touch.T.on ? 'Tocca per riprendere' : 'Clicca per riprendere';
+    $('#buildHint').textContent = touch.T.on ? 'MODALITÀ COSTRUZIONE · Spara: muro (10 🪵) · tocca di nuovo il pulsante per uscire' : 'MODALITÀ COSTRUZIONE · Click sx: muro (10 🪵) · Q per uscire';
+  }
+  if (all || key === 'touchSize') document.documentElement.style.setProperty('--tk', settings.touchSize || 1);
 }
 const settingsUI = initSettingsUI({
   settings, presets: PRESETS,
@@ -2168,15 +2207,17 @@ function updatePlayer(dt) {
   if (keys.KeyS || keys.ArrowDown) { mx -= fx; mz -= fz; }
   if (keys.KeyD || keys.ArrowRight) { mx += rx; mz += rz; }
   if (keys.KeyA || keys.ArrowLeft) { mx -= rx; mz -= rz; }
+  const TC = touch.T;
+  if (TC.on && (TC.mx || TC.my)) { mx += fx * TC.my + rx * TC.mx; mz += fz * TC.my + rz * TC.mx; }   // joystick analogico
   const l = Math.hypot(mx, mz);
-  if (l > 0) { mx /= l; mz /= l; }
+  if (l > 1) { mx /= l; mz /= l; }
   if (p.mode === 'fall' || p.mode === 'glide') {
     airMove(p, mx, mz, dt, pressed.has('Space'));
     G.ads = false;
     return;
   }
-  const fwdHeld = keys.KeyW || keys.ArrowUp;
-  const backHeld = keys.KeyS || keys.ArrowDown;
+  const fwdHeld = keys.KeyW || keys.ArrowUp || (TC.on && TC.my > 0.5);
+  const backHeld = keys.KeyS || keys.ArrowDown || (TC.on && TC.my < -0.5);
   if (p.mode === 'climb') {
     G.ads = false; G.interact = null; ghost.visible = false;
     updateClimb(p, dt, fwdHeld, backHeld, pressed.has('Space'));
@@ -2211,7 +2252,7 @@ function updatePlayer(dt) {
   }
   G.interact = inter;
   G.ads = mouse.right && !G.build.on && !!p.weapon && p.reloading <= 0;
-  const sprint = (keys.ShiftLeft || keys.ShiftRight) && !G.ads && !mouse.left && mz * fz + mx * fx > 0.3;
+  const sprint = (keys.ShiftLeft || keys.ShiftRight || TC.sprint) && !G.ads && !mouse.left && mz * fz + mx * fx > 0.3;
   let speed = sprint ? 7.6 : 5.3;
   if (p.crouch) speed = 2.8;
   if (G.ads) speed = Math.min(speed, 3.4);
@@ -2350,6 +2391,11 @@ const hud = {
 const cache = {};
 function setHTML(el, key, html) { if (cache[key] !== html) { cache[key] = html; el.innerHTML = html; } }
 
+/** icona dell'arma: foto del modello 3D (o sagoma SVG se WebGL non riesce a farla) */
+function weaponIconHTML(id, rarity, cls = 'wi') {
+  const url = weaponIcon(id, rarity);
+  return url ? `<img class="${cls}" src="${url}" alt="" draggable="false">` : weaponSVG(id, rarity);
+}
 function weaponSVG(id, rarity) {
   const def = WEAPONS[id];
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -2426,7 +2472,7 @@ function updateHUD(dt) {
     hud.hotbar.innerHTML = p.slots.map((x, i) => {
       let inner = '', rb = '', cnt = '';
       if (!x) inner = i === p.active ? '<span style="font-size:24px">⛏️</span>' : '';
-      else if (x.kind === 'weapon') { inner = weaponSVG(x.id, x.rarity); rb = RARITIES[x.rarity].color; }
+      else if (x.kind === 'weapon') { inner = weaponIconHTML(x.id, x.rarity); rb = RARITIES[x.rarity].color; }
       else { inner = CONSUMABLES[x.id].icon; rb = RARITIES[CONSUMABLES[x.id].rarity].color; cnt = 'x' + x.count; }
       const bg = rb ? `background:linear-gradient(180deg, rgba(0,0,0,.45), ${rb}55)` : '';
       return `<div class="slot ${i === p.active ? 'on' : ''}" style="${bg}"><span class="k">${i + 1}</span>${inner}<span class="c">${cnt}</span>${rb ? `<div class="rbar" style="background:${rb}"></div>` : ''}</div>`;
@@ -2443,15 +2489,15 @@ function updateHUD(dt) {
   // prompt
   let pr = '';
   if (p.mode === 'bus') pr = '';
-  else if (p.mode === 'climb' && p.alive) { pr = '🧗 <kbd>W</kbd> sali · <kbd>S</kbd> scendi · <kbd>Spazio</kbd> salta via'; hud.prompt.style.borderLeftColor = '#ffd23a'; }
+  else if (p.mode === 'climb' && p.alive) { pr = tk('🧗 <kbd>W</kbd> sali · <kbd>S</kbd> scendi · <kbd>Spazio</kbd> salta via', '🧗 Joystick su: sali · giù: scendi · <b>STACCATI</b> per saltare via'); hud.prompt.style.borderLeftColor = '#ffd23a'; }
   else if (G.interact && p.alive) {
     if (G.interact.loot) {
       const it = G.interact.loot.item;
       const col = it.kind === 'weapon' ? RARITIES[it.rarity].color : '#fff';
-      pr = `<span style="border-color:${col}"><kbd>E</kbd> Raccogli ${itemLabel(it)}</span>`;
+      pr = `<span style="border-color:${col}"><kbd class="kbE">E</kbd> Raccogli ${it.kind === 'weapon' ? weaponIconHTML(it.id, it.rarity, 'wi pi') : ''}${itemLabel(it)}</span>`;
       hud.prompt.style.borderLeftColor = col;
-    } else { pr = '<kbd>E</kbd> Apri il forziere ✨'; hud.prompt.style.borderLeftColor = '#ffd24a'; }
-  } else if (G.climbHint && p.alive && p.mode === 'ground') { pr = '🧗 <kbd>W</kbd> + <kbd>Spazio</kbd> per arrampicarti'; hud.prompt.style.borderLeftColor = '#7fe07a'; }
+    } else { pr = tk('<kbd>E</kbd> Apri il forziere ✨', 'Forziere ✨ tocca <b>APRI</b>'); hud.prompt.style.borderLeftColor = '#ffd24a'; }
+  } else if (G.climbHint && p.alive && p.mode === 'ground') { pr = tk('🧗 <kbd>W</kbd> + <kbd>Spazio</kbd> per arrampicarti', '🧗 Spingi avanti + <b>SALTA</b> per arrampicarti'); hud.prompt.style.borderLeftColor = '#7fe07a'; }
   setHTML(hud.prompt, 'prompt', pr);
   hud.prompt.style.display = pr ? 'block' : 'none';
   // progress
@@ -2759,7 +2805,7 @@ function beginMatch(net) {
   $('#end').classList.add('hidden');
   $('#hud').classList.remove('hidden');
   scene.fog.far = 560;
-  showMsg('BENVENUTO NEL BATTLE BUS!', (G.mode === 'random' ? '🎲 Random Map: isola nuova! · ' : '') + 'Premi SPAZIO per lanciarti · muovi il mouse per guardarti intorno', 6);
+  showMsg('BENVENUTO NEL BATTLE BUS!', (G.mode === 'random' ? '🎲 Random Map: isola nuova! · ' : '') + tk('Premi SPAZIO per lanciarti · muovi il mouse per guardarti intorno', 'Tocca LANCIATI quando vuoi · trascina per guardarti intorno'), 6);
   $('#netInfo').classList.toggle('hidden', !G.net);
   if (G.net) $('#netInfo').textContent = `🌐 Online · stanza ${NET.code} · ${NET.players.length} giocatori + bot`;
   cache.hot = null;
@@ -2895,6 +2941,13 @@ function refreshLobbyMates() {
 }
 lobby.mates = [];
 canvas.addEventListener('pointerdown', () => { if (G.state === 'menu') lobby.drag = true; });
+// sul telefono il modello nella lobby si gira trascinando il dito
+{
+  let lx = null;
+  canvas.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') lx = e.clientX; });
+  canvas.addEventListener('pointermove', e => { if (G.state === 'menu' && e.pointerType !== 'mouse' && lx !== null) { lobby.rotV += (e.clientX - lx) * 0.01; lx = e.clientX; } });
+  addEventListener('pointerup', () => { lx = null; });
+}
 addEventListener('pointerup', () => { lobby.drag = false; });
 function renderLobby(dt) {
   const c = lobby.char;
@@ -3251,6 +3304,10 @@ function frame(now) {
   }
   world.update(G.state === 'menu' ? _menuStream : camera.position, G.state === 'menu' ? 8 : 5);
   if (G.player && G.player.alive && G.state === 'play') GRASS_PLAYER.value.copy(G.player.pos); else GRASS_PLAYER.value.set(0, -9999, 0);
+  touch.update();
+  document.body.classList.toggle('playing', G.state === 'play' || G.state === 'bus');
+  // telefono girato in verticale durante la partita: metti in pausa finché non torna orizzontale
+  if (touch.T.on && (G.state === 'play' || G.state === 'bus') && !G.paused && !G.net && innerHeight > innerWidth * 1.1) togglePause(true);
   if (G.state === 'menu') { renderLobby(dt); pressed.clear(); return; }
   if (!G.paused) update(dt);
   gfx.render(scene, camera);
@@ -3267,7 +3324,14 @@ addEventListener('resize', () => {
 applySettings();
 buildMenu();
 $('#loading').classList.add('hidden');
+// icone delle armi: preparate poco per volta, quando il menu è già visibile
+{
+  const q = [];
+  for (const id of Object.keys(WEAPONS)) for (let r = 0; r < RARITIES.length; r++) q.push([id, r]);
+  const tick = () => { if (!q.length) return; const [id, r] = q.shift(); weaponIcon(id, r); setTimeout(tick, 40); };
+  setTimeout(tick, 1200);
+}
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

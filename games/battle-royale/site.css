@@ -227,3 +227,5 @@ footer a { color: var(--mute); }
   *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition-duration: .001s !important; scroll-behavior: auto !important; }
   .reveal { opacity: 1; transform: none; }
 }
+
+.h3touch { margin: 34px 0 14px; font-size: 20px; font-weight: 900; font-style: italic; letter-spacing: .5px; }

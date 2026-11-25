@@ -24,37 +24,37 @@ export const WEAPONS = {
   pistol: {
     name: 'Pistola', speed: 260, drop: 1.15,  dmg: 25, pellets: 1, rate: 0.22, mag: 12, reload: 1.2,
     spread: 0.016, range: 140, ammo: 'light', auto: false, zoom: 1.25,
-    botRange: 35, sound: 'pistol', recoil: 0.012, muzzle: 0.3,
+    botRange: 35, sound: 'pistol', recoil: 0.012, muzzle: 0.28,
     parts: [[0.08, 0.1, 0.34, 0, 0, 0.1, 'm'], [0.07, 0.18, 0.09, 0, -0.11, -0.02, 'b'], [0.086, 0.03, 0.22, 0, 0.055, 0.12, 'r']],
   },
   smg: {
     name: 'Mitraglietta', speed: 280, drop: 1.2,  dmg: 15, pellets: 1, rate: 0.075, mag: 30, reload: 1.9,
     spread: 0.042, range: 90, ammo: 'light', auto: true, zoom: 1.25,
-    botRange: 28, sound: 'smg', recoil: 0.006, muzzle: 0.45,
+    botRange: 28, sound: 'smg', recoil: 0.006, muzzle: 0.57,
     parts: [[0.09, 0.12, 0.5, 0, 0, 0.13, 'm'], [0.06, 0.22, 0.07, 0, -0.15, 0.2, 'b'], [0.07, 0.14, 0.07, 0, -0.1, -0.02, 'b'], [0.05, 0.08, 0.2, 0, 0, -0.2, 'r'], [0.095, 0.025, 0.3, 0, 0.07, 0.15, 'r']],
   },
   ar: {
     name: "Fucile d'assalto", speed: 380, drop: 1.0,  dmg: 30, pellets: 1, rate: 0.13, mag: 30, reload: 2.1,
     spread: 0.02, range: 220, ammo: 'medium', auto: true, zoom: 1.6,
-    botRange: 60, sound: 'ar', recoil: 0.009, muzzle: 0.9,
+    botRange: 60, sound: 'ar', recoil: 0.009, muzzle: 0.96,
     parts: [[0.1, 0.14, 0.72, 0, 0, 0.18, 'b'], [0.05, 0.05, 0.32, 0, 0.02, 0.7, 'm'], [0.07, 0.24, 0.1, 0, -0.17, 0.25, 'm'], [0.07, 0.15, 0.08, 0, -0.12, -0.02, 'm'], [0.09, 0.16, 0.3, 0, -0.02, -0.3, 'b'], [0.06, 0.07, 0.22, 0, 0.11, 0.18, 'r']],
   },
   shotgun: {
     name: 'Fucile a pompa', speed: 230, drop: 1.3,  dmg: 12, pellets: 9, rate: 0.95, mag: 5, reload: 2.5,
     spread: 0.1, range: 45, ammo: 'shells', auto: false, zoom: 1.2,
-    botRange: 14, sound: 'shotgun', recoil: 0.05, muzzle: 0.9,
+    botRange: 14, sound: 'shotgun', recoil: 0.05, muzzle: 0.88,
     parts: [[0.1, 0.12, 0.5, 0, 0, 0.08, 'm'], [0.07, 0.07, 0.55, 0, 0.02, 0.58, 'm'], [0.11, 0.08, 0.26, 0, -0.07, 0.52, 'w'], [0.09, 0.15, 0.35, 0, -0.05, -0.3, 'w'], [0.105, 0.03, 0.3, 0, 0.065, 0.08, 'r']],
   },
   sniper: {
     name: 'Cecchino', speed: 520, drop: 1.0,  dmg: 105, pellets: 1, rate: 1.45, mag: 5, reload: 2.8,
     spread: 0.05, adsSpread: 0.0, range: 600, ammo: 'heavy', auto: false, zoom: 4.5, scope: true,
-    botRange: 120, sound: 'sniper', recoil: 0.06, muzzle: 1.2,
+    botRange: 120, sound: 'sniper', recoil: 0.06, muzzle: 1.18,
     parts: [[0.09, 0.12, 0.7, 0, 0, 0.15, 'b'], [0.04, 0.04, 0.6, 0, 0.02, 0.8, 'm'], [0.08, 0.08, 0.38, 0, 0.13, 0.15, 'm'], [0.085, 0.03, 0.06, 0, 0.13, 0.32, 'r'], [0.085, 0.03, 0.06, 0, 0.13, -0.02, 'r'], [0.09, 0.17, 0.32, 0, -0.04, -0.33, 'b'], [0.07, 0.14, 0.08, 0, -0.12, -0.04, 'm']],
   },
   rocket: {
     name: 'Lanciarazzi', speed: 55, drop: 0.18,  dmg: 100, pellets: 1, rate: 1.3, mag: 1, reload: 2.8,
     spread: 0.01, range: 300, ammo: 'rockets', auto: false, zoom: 1.4, projectile: true, splash: 6,
-    botRange: 45, sound: 'rocket', recoil: 0.06, muzzle: 0.85,
+    botRange: 45, sound: 'rocket', recoil: 0.06, muzzle: 0.92,
     parts: [[0.2, 0.2, 1.2, 0, 0.06, 0.2, 'b'], [0.22, 0.22, 0.08, 0, 0.06, 0.78, 'r'], [0.22, 0.22, 0.08, 0, 0.06, -0.38, 'r'], [0.07, 0.16, 0.08, 0, -0.12, 0.05, 'm'], [0.07, 0.16, 0.08, 0, -0.12, 0.35, 'm']],
   },
 };

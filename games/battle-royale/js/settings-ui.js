@@ -26,6 +26,9 @@ const SCHEMA = [
     { key: 'fov', type: 'range', label: 'Campo visivo (FOV)', min: 60, max: 100, step: 1, fmt: v => v + '°' },
     { key: 'crouchHold', type: 'select', label: 'Abbassarsi (C)', options: [[false, 'Premi per alternare'], [true, 'Tieni premuto']], bool: true },
     { key: 'shake', type: 'toggle', label: 'Scossa della telecamera', hint: 'Rinculo ed esplosioni scuotono la visuale.' },
+    { key: 'touch', type: 'select', label: 'Comandi touch', options: [['auto', 'Automatici (su telefono e tablet)'], ['on', 'Sempre attivi'], ['off', 'Disattivati']], hint: 'Joystick, pulsanti e trascinamento per guardarsi intorno.' },
+    { key: 'touchSens', type: 'range', label: 'Sensibilità touch', min: 0.3, max: 3, step: 0.05, fmt: v => v.toFixed(2) },
+    { key: 'touchSize', type: 'range', label: 'Dimensione pulsanti touch', min: 0.7, max: 1.4, step: 0.05, fmt: pct },
   ] },
   { id: 'audio', label: 'Audio', items: [
     { key: 'vol', type: 'range', label: 'Volume generale', min: 0, max: 1, step: 0.05, fmt: pct },

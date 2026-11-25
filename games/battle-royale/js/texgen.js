@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 
 const saved = (() => { try { return JSON.parse(localStorage.getItem('arenaRoyale') || '{}').gfx || {}; } catch { return {}; } })();
+// primo avvio su telefono/tablet: texture leggere (come il preset "Bassa" scelto in main.js)
+try { if (!localStorage.getItem('arenaRoyale') && matchMedia('(pointer: coarse)').matches && !saved.texq) saved.texq = 'low'; } catch { /* ok */ }
 /** qualità delle texture: 1 = normale, 2 = alta (risoluzione doppia), 0.5 = bassa */
 export const TEXQ = saved.texq === 'low' ? 0.5 : saved.texq === 'normal' ? 1 : 2;
 /** normal map attive (rilievo) */

@@ -1,6 +1,6 @@
 // Pose e animazioni dei personaggi articolati (anche, ginocchia, caviglie, spalle, gomiti).
 // Condivise tra il gioco (main.js) e il sito (site.js), così le animazioni sono identiche.
-import { RIG } from './character.js?v=16';
+import { RIG } from './character.js?v=17';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -146,14 +146,18 @@ export function poseGlide(m, t) {
 }
 
 /** nuoto a stile libero */
-export function poseSwim(m, t) {
-  const sp = t * 4.5;
+/** nuoto: k = 0 → si tiene a galla (braccia che remano ai lati, gambe a bicicletta), k = 1 → stile libero */
+export function poseSwim(m, t, k = 1) {
+  const L = (a, b) => a + (b - a) * k;
   for (let i = 0; i < 2; i++) {
-    const side = i ? 1 : -1, s = Math.sin(sp + i * Math.PI), c = Math.cos(sp + i * Math.PI);
-    setArm(m, i, -Math.PI / 2 + s * 1.35, side * 0.25, -0.2 - Math.max(0, c) * 1.1);
-    setLeg(m, i, Math.sin(sp * 2 + i * Math.PI) * 0.32, 0.25 + Math.max(0, Math.sin(sp * 2 + i * Math.PI)) * 0.4, 0.6);
+    const side = i ? 1 : -1, ph = t + i * Math.PI, s = Math.sin(ph), c = Math.cos(ph);
+    const tread = Math.sin(t * 0.9 + i * Math.PI);
+    setArm(m, i, L(-0.55 + tread * 0.18, -Math.PI / 2 + s * 1.35), L(side * (0.95 + Math.sin(t * 0.9) * 0.35), side * 0.25), L(-0.35 - Math.max(0, tread) * 0.25, -0.2 - Math.max(0, c) * 1.1));
+    const kick = Math.sin(t * 2 + i * Math.PI), cyc = Math.sin(t * 0.7 + i * Math.PI);
+    setLeg(m, i, L(-0.35 + cyc * 0.45, kick * 0.32), L(0.55 + Math.max(0, cyc) * 0.6, 0.25 + Math.max(0, kick) * 0.4), 0.6);
   }
-  m.head.rotation.x = -0.55;
+  m.head.rotation.x = L(-0.08, -0.55 + Math.sin(t) * 0.12);
+  m.head.rotation.y = k > 0.5 ? Math.max(0, Math.sin(t)) * 0.5 * k : 0;   // respira girando la testa
 }
 
 /** morte: caduta all'indietro (k = 0..1) */

@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=16';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=17';
 
 const once = (f) => { let v; return () => v || (v = f()); };
 function mulberry(a) {

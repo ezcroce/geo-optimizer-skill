@@ -24,6 +24,18 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: porte, case arredate, nuoto realistico e partite più lunghe
+
+- **Porte vere**: ogni ingresso ha due ante in legno verniciato con riquadri in rilievo e maniglie d'ottone. Si aprono e chiudono con <kbd>E</kbd> (o *APRI*/*CHIUDI* sul telefono), con cigolio e battuta. Da chiuse bloccano passaggio e proiettili. I bot le aprono quando ci passano e online sono sincronizzate.
+- **Interni arredati** secondo il tema della città: letti con coperte, cuscini e comodino con abat-jour, divani con tavolino, librerie piene di libri (scaffali con scatole nei porti e nelle zone industriali), armadi, cucine con lavello, fornelli e pensili, TV, scrivanie con portatile, camini accesi nelle baite e nei castelli, piante, lampade, quadri e un tavolo da pranzo con sedie su un tappeto. In più ci sono il parquet e i battiscopa. Bottino e forzieri compaiono solo negli spazi liberi.
+- **Nuoto realistico**: in acqua l'inerzia ti fa scivolare. Da fermo resti a galla muovendo braccia e gambe; nuotando passi allo stile libero, con rollio, respiro di lato e corpo in superficie. Con lo sprint nuoti più veloce ma consumi resistenza. In acqua alta non puoi saltare né sparare. Tuffi, schizzi delle bracciate, cerchi che si allargano sull'acqua e suoni dedicati.
+- **Montagne più dure**: sui pendii si rallenta e ci si stanca. Oltre circa 45° non si sale più e sulle pareti più ripide si scivola giù. Arrampicarsi sui muri è più lento, consuma più resistenza e serve più fiato per iniziare, che si ricarica più piano.
+- **Partite più lunghe** (circa 21 minuti): la tempesta ha 7 fasi con attese più lunghe. I bot vedono meno lontano, hanno un campo visivo più stretto e atterrano più sparsi per la mappa, quindi gli scontri sono più rari.
+- **Armi rare davvero rare**: a terra le epiche sono circa il 5% e le leggendarie circa l'1%. Forzieri ed eventi danno solo una *possibilità* di salire di rarità, molto bassa sopra la rara. Lanciarazzi, minigun e cecchino si trovano meno spesso.
+- **Niente più bagliori**: neve meno abbagliante, rocce opache, sole un po' più morbido e bloom che si attiva solo su luci vere (spari, lampade, oggetti luminosi).
+- **Nuovo mirino dello shotgun**: bindella ventilata in prospettiva, mirino in fibra ottica rosso, perla intermedia d'ottone (allineate formano un "8") e un anello leggero che mostra la rosata.
+- **Legno, barili e rocce più tridimensionali**: rocce con rilievo calcolato in 3D, cavità in ombra e strati. Casse con texture a risoluzione doppia, nodi, fessure profonde e chiodi. Cataste di tronchi con corteccia irregolare, anelli sulle sezioni e cinghie di ferro. Barili di legno a doghe con cerchioni rivettati, fusti di metallo con costole, bordi arrotolati e tappi. Su tutti c'è un rilievo procedurale (venature, graffi, sporco alla base).
+
 ### Novità: erba in 3D, accessori, ottiche rifinite e sottobosco
 
 - **Erba davvero tridimensionale**: ogni filo ora ha una sezione a "V" con la nervatura centrale, due metà con luce diversa e una leggera traslucenza, così resta pieno da ogni angolazione invece di sembrare un foglio piatto.
@@ -164,7 +176,7 @@ python3 -m http.server 8080
   - **Più alberi**: circa il 70% in più, raggruppati in veri boschi fitti alternati a prati aperti, con le chiome che ondeggiano al vento. In montagna prevalgono gli abeti.
   - **Cespugli**: circa 4.700, in 4 varianti (due con fiori bianchi e gialli o rosa e viola). Non bloccano il passaggio, quindi ci si può nascondere dentro.
   - **Prestazioni**: l'erba fitta viene generata a celle da 32 m attorno alla telecamera, poco per volta, e scaricata quando ti allontani. Oltre 110 m gli alberi passano a una versione semplificata; cespugli ed erba media spariscono oltre 150 m, e le rocce di ogni chunk sono unite in un'unica geometria.
-- **Tempesta lenta**: si restringe in 6 fasi, con attese da 2 minuti e mezzo all'inizio e danni crescenti. Una partita completa dura circa 15 minuti.
+- **Tempesta lenta**: si restringe in 7 fasi, con attese da 3 minuti e mezzo all'inizio e danni crescenti. Una partita completa dura circa 21 minuti.
 - **Mappa a chunk**: il mondo è diviso in blocchi da 100 m; dentro ogni blocco gli oggetti fissi sono uniti per materiale, così servono poche draw call. Vicino al giocatore vengono costruiti i blocchi dettagliati (alberi, erba, interni delle case, bottino, forzieri), poco per volta per evitare scatti; quelli lontani vengono scaricati. In lontananza resta una versione semplificata dell'isola, così l'orizzonte non è mai vuoto. Le collisioni esistono su tutta la mappa, quindi i bot funzionano anche lontano da te.
 - **99 bot** con IA: raccolgono bottino, aprono forzieri, si curano, scappano dalla tempesta, si combattono anche fra loro e distruggono i tuoi muri.
 - **Abbassarsi**: con `C` ci si accovaccia; la hitbox è più piccola, la dispersione più bassa e la telecamera scende. Anche i bot si abbassano quando sparano da fermi.

@@ -125,21 +125,22 @@ for (const [id, base] of [['revolver', 'pistol'], ['compact', 'smg'], ['burst', 
 // speed = velocità del proiettile (m/s), drop = quanto la gravità lo fa cadere (1 = normale)
 // Rarità tipiche per arma (probabilità per livello)
 export const WEAPON_POOL = [
-  { id: 'pistol', w: 18, rar: [40, 35, 20, 5, 0] },
-  { id: 'smg', w: 18, rar: [30, 35, 25, 8, 2] },
-  { id: 'ar', w: 22, rar: [30, 30, 25, 10, 5] },
-  { id: 'shotgun', w: 20, rar: [25, 35, 25, 10, 5] },
-  { id: 'sniper', w: 8, rar: [0, 0, 50, 35, 15] },
-  { id: 'rocket', w: 5, rar: [0, 0, 0, 60, 40] },
-  { id: 'revolver', w: 9, rar: [20, 35, 30, 12, 3] },
-  { id: 'compact', w: 10, rar: [30, 35, 25, 8, 2] },
-  { id: 'burst', w: 11, rar: [25, 30, 28, 12, 5] },
-  { id: 'heavyar', w: 9, rar: [10, 25, 35, 20, 10] },
-  { id: 'dmr', w: 7, rar: [0, 20, 45, 25, 10] },
-  { id: 'tactical', w: 11, rar: [25, 35, 25, 10, 5] },
-  { id: 'drum', w: 6, rar: [0, 15, 40, 30, 15] },
-  { id: 'hunting', w: 7, rar: [10, 30, 35, 18, 7] },
-  { id: 'minigun', w: 4, rar: [0, 0, 20, 50, 30] },
+  // v21: epiche e leggendarie molto più rare (a terra ~5% epiche, ~1% leggendarie)
+  { id: 'pistol', w: 18, rar: [48, 36, 14, 2, 0] },
+  { id: 'smg', w: 18, rar: [42, 36, 18, 3.5, 0.5] },
+  { id: 'ar', w: 22, rar: [40, 35, 21, 3.5, 0.8] },
+  { id: 'shotgun', w: 20, rar: [40, 35, 21, 3.5, 0.8] },
+  { id: 'sniper', w: 6, rar: [0, 10, 70, 17, 3] },
+  { id: 'rocket', w: 2, rar: [0, 0, 45, 48, 7] },
+  { id: 'revolver', w: 9, rar: [32, 38, 25, 3.5, 0.8] },
+  { id: 'compact', w: 10, rar: [42, 36, 18, 3.5, 0.5] },
+  { id: 'burst', w: 11, rar: [36, 35, 25, 3.5, 0.8] },
+  { id: 'heavyar', w: 9, rar: [20, 38, 36, 5, 1] },
+  { id: 'dmr', w: 7, rar: [0, 38, 53, 7, 1.5] },
+  { id: 'tactical', w: 11, rar: [40, 35, 21, 3.5, 0.8] },
+  { id: 'drum', w: 6, rar: [0, 34, 54, 10, 2] },
+  { id: 'hunting', w: 7, rar: [20, 40, 34, 5, 1] },
+  { id: 'minigun', w: 2, rar: [0, 0, 60, 34, 6] },
 ];
 
 export const CONSUMABLES = {
@@ -238,13 +239,15 @@ export const DIFFICULTY = {
 };
 
 // Fasi della tempesta: attesa, durata restringimento, raggio finale, danno/sec
-// Tempesta: raggi per la mappa grande (1200 m) e tempi più lunghi (partita di circa 15 minuti)
+// Tempesta: raggi per la mappa grande (1200 m) e tempi più lunghi (partita di circa 21 minuti)
 export const STORM_PHASES = [
-  { wait: 150, shrink: 90, radius: 450, dps: 1 },
-  { wait: 100, shrink: 75, radius: 270, dps: 1 },
-  { wait: 80, shrink: 60, radius: 150, dps: 2 },
-  { wait: 65, shrink: 50, radius: 75, dps: 4 },
-  { wait: 50, shrink: 40, radius: 30, dps: 6 },
+  // v21: partite più lunghe (circa 21 minuti), una fase in più
+  { wait: 210, shrink: 120, radius: 460, dps: 1 },
+  { wait: 150, shrink: 100, radius: 300, dps: 1 },
+  { wait: 120, shrink: 85, radius: 180, dps: 2 },
+  { wait: 95, shrink: 70, radius: 95, dps: 3 },
+  { wait: 75, shrink: 55, radius: 40, dps: 5 },
+  { wait: 55, shrink: 50, radius: 12, dps: 8 },
   { wait: 40, shrink: 45, radius: 0, dps: 10 },
 ];
 

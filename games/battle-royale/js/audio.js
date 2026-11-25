@@ -115,6 +115,15 @@ export function playBuild() { noise(0.12, 1200, 1.2, 0.4, 'bandpass'); tone(200,
 export function playHeal() { tone(500, 0.3, 0.15, 'sine', 0, 900); }
 export function playChest() { for (let i = 0; i < 4; i++) tone(700 + i * 220, 0.18, 0.15, 'triangle', i * 0.07); }
 export function playStep() { noise(0.05, 300, 1, 0.08, 'lowpass'); }
+/** bracciata in acqua (sciabordio morbido) */
+export function playSwim() { noise(0.28, 700, 0.9, 0.12, 'lowpass', 0, 0.26); noise(0.18, 1800, 1.2, 0.05, 'bandpass', 0.08, 0.16); }
+/** tuffo / caduta in acqua */
+export function playSplash(k = 1) { noise(0.6, 900, 0.7, 0.35 * k, 'lowpass', 0, 0.55); noise(0.35, 2600, 1, 0.12 * k, 'bandpass', 0.05, 0.3); tone(140, 0.18, 0.12 * k, 'sine', 0, 60); }
+/** porta: cigolio + battuta */
+export function playDoor(open = true, vol = 1) {
+  if (open) { tone(420, 0.32, 0.05 * vol, 'sawtooth', 0, 610); tone(300, 0.25, 0.04 * vol, 'triangle', 0.05, 380); noise(0.06, 900, 1, 0.12 * vol, 'lowpass'); }
+  else { noise(0.12, 380, 1, 0.45 * vol, 'lowpass', 0.18); tone(110, 0.12, 0.25 * vol, 'sine', 0.18, 70); tone(380, 0.2, 0.03 * vol, 'sawtooth', 0, 300); }
+}
 export function playUI() { tone(880, 0.05, 0.12, 'triangle'); }
 export function playVictory() {
   const n = [523, 659, 784, 1046, 784, 1046];

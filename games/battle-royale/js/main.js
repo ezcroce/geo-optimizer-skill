@@ -5,28 +5,28 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=16';
-import * as PR from './progress.js?v=16';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=16';
-import { initMenu } from './menu.js?v=16';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=16';
-import { initSettingsUI } from './settings-ui.js?v=16';
-import { applyAnisotropy } from './texgen.js?v=16';
-import * as A from './audio.js?v=16';
+} from './config.js?v=17';
+import * as PR from './progress.js?v=17';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=17';
+import { initMenu } from './menu.js?v=17';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=17';
+import { initSettingsUI } from './settings-ui.js?v=17';
+import { applyAnisotropy } from './texgen.js?v=17';
+import * as A from './audio.js?v=17';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=16';
-import { createWeather } from './weather.js?v=16';
-import { createEvents } from './events.js?v=16';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=16';
-import { weaponIcon } from './weapons.js?v=16';
-import { consIcon } from './items.js?v=16';
-import { buildChestMesh } from './models3d.js?v=16';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=16';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=16';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=16';
+} from './world.js?v=17';
+import { createWeather } from './weather.js?v=17';
+import { createEvents } from './events.js?v=17';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=17';
+import { weaponIcon } from './weapons.js?v=17';
+import { consIcon } from './items.js?v=17';
+import { buildChestMesh } from './models3d.js?v=17';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=17';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=17';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=17';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -94,7 +94,7 @@ const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 26
 
 const hemi = new THREE.HemisphereLight('#d6ebff', '#5f6a3c', 1.1);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight('#ffeccc', 2.65);
+const sun = new THREE.DirectionalLight('#ffeccc', 2.5);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 400 });
@@ -382,7 +382,7 @@ class Character {
 }
 
 // ─────────────── Arrampicata ───────────────
-const CLIMB_SPEED = 3.4;
+const CLIMB_SPEED = 2.7;   // v21: arrampicata più lenta e faticosa
 const _co = new THREE.Vector3(), _cd = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 /** Cerca una superficie arrampicabile davanti al personaggio */
 function wallAhead(ch, dir, height = 1.0, reach = CHAR_R + 0.45) {
@@ -404,7 +404,7 @@ function wallDir(ch, hit, dir) {
   return _cd.set(0, 0, -1);
 }
 function canStartClimb(ch, dir) {
-  if (ch.stamina < 15 || ch.mode !== 'ground' || ch.using) return null;
+  if (ch.stamina < 28 || ch.mode !== 'ground' || ch.using) return null;
   const hit = wallAhead(ch, dir);
   if (!hit) return null;
   if (hit.collider.maxY - ch.pos.y < 0.5) return null;  // è solo un gradino
@@ -451,7 +451,8 @@ function updateClimb(ch, dt, up, down, jump) {
     _co.set(ch.pos.x, ch.pos.y + CHAR_H, ch.pos.z);
     if (rayColliders(_co, _up, 0.15)) { endClimb(ch); return; }
   }
-  ch.stamina -= dt * (dir ? 11 : 5);
+  ch.stamina -= dt * (dir > 0 ? 17 : dir < 0 ? 9 : 7);
+  ch.tireT = 1.2;
   if (ch.stamina <= 0) { ch.stamina = 0; endClimb(ch); return; }
   ch.pos.y += dir * CLIMB_SPEED * dt;
   ch.climbH += dir * CLIMB_SPEED * dt;
@@ -501,11 +502,59 @@ function showGlider(ch, on) {
 }
 
 // Movimento a terra
+const SLOPE_SLIDE = 1.15;   // tan ≈ 49°: oltre si scivola
+function terrainGrad(x, z, out) {
+  const e = 0.7;
+  out[0] = (terrainHeight(x + e, z) - terrainHeight(x - e, z)) / (2 * e);
+  out[1] = (terrainHeight(x, z + e) - terrainHeight(x, z - e)) / (2 * e);
+  return out;
+}
+const _tg = [0, 0];
 function groundMove(ch, mx, mz, speed, dt, jump) {
   const prevY = ch.pos.y;
-  const acc = ch.onGround ? 14 : 3;
-  ch.vel.x += (mx * speed - ch.vel.x) * Math.min(1, acc * dt);
-  ch.vel.z += (mz * speed - ch.vel.z) * Math.min(1, acc * dt);
+  // ── pendii di montagna: in salita si rallenta e ci si stanca, oltre ~45° non si sale e oltre ~49° si scivola ──
+  let sx = 0, sz = 0;
+  ch.steepT = Math.max(0, (ch.steepT || 0) - dt);
+  if (ch.mode === 'ground' && !ch.inWater && (ch.onGround || ch.steepT > 0)) {
+    const x = ch.pos.x, z = ch.pos.z;
+    if (ch.pos.y - terrainHeight(x, z) < 0.35) {
+      terrainGrad(x, z, _tg);
+      const gx = _tg[0], gz = _tg[1], gl = Math.hypot(gx, gz);
+      ch.slope = gl;
+      const ml = Math.hypot(mx, mz);
+      const human = ch.isPlayer || ch.human;
+      if (ml > 0.01 && gl > 0.28) {
+        const up = (mx * gx + mz * gz) / ml;          // pendenza nella direzione di marcia
+        if (up > 0.28) {
+          speed *= clamp(1.16 - up * 0.62, 0.3, 1);
+          ch.stamina = Math.max(0, ch.stamina - dt * up * (speed > 5.5 ? 13 : 6.5));
+          ch.tireT = 0.9;
+          if (ch.stamina < 6) speed *= 0.5;
+          const lim = human ? 1.0 : 1.4;
+          if (up > lim) {
+            const k = (mx * gx + mz * gz) / (gl * gl);   // toglie la componente in salita
+            mx -= gx * k; mz -= gz * k;
+            ch.steepT = 0.6; jump = false;
+          }
+        }
+      }
+      if (gl > SLOPE_SLIDE && ch.onGround) {
+        const k = Math.min(1, (gl - SLOPE_SLIDE) * 1.6) * 6.5 / gl;
+        sx = -gx * k; sz = -gz * k; jump = false;
+        if (ch.isPlayer && Math.random() < dt * 6) emit(_p.set(ch.pos.x, ch.pos.y + 0.05, ch.pos.z), '#b9b2a2', 1, 1.2, 0.45, 0.12, 0.3);
+      }
+    }
+  }
+  // ── nuoto: inerzia, galleggiamento, bracciate lente, niente salti in acqua alta ──
+  const swimY = WATER_LEVEL - 1.25;
+  let acc = ch.onGround ? 14 : 3;
+  if (ch.inWater) {
+    acc = 2.4;
+    const raw = groundAt(ch.pos.x, ch.pos.z, ch.pos.y + 0.5);
+    if (jump && raw < swimY - 0.35) jump = false;   // non si salta fuori dall'acqua alta
+  }
+  ch.vel.x += (mx * speed + sx - ch.vel.x) * Math.min(1, acc * dt);
+  ch.vel.z += (mz * speed + sz - ch.vel.z) * Math.min(1, acc * dt);
   ch.pos.x += ch.vel.x * dt;
   ch.pos.z += ch.vel.z * dt;
   resolveCollisions(ch.pos, CHAR_R, CHAR_H);
@@ -516,16 +565,70 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   ch.vel.y -= GRAVITY * (G.gravK ?? 1) * dt;
   ch.pos.y += ch.vel.y * dt;
   let g = groundAt(ch.pos.x, ch.pos.z, Math.max(prevY, ch.pos.y));
-  const swimY = WATER_LEVEL - 1.25;
+  const wasWater = ch.inWater;
   ch.inWater = g < swimY + 0.05;
-  if (ch.inWater) g = swimY;
+  if (ch.inWater) {
+    // galleggia: dondola sulle onde e affonda un po' quando nuota veloce
+    ch.swimPh = (ch.swimPh ?? Math.random() * 6) + dt * (1.6 + ch.moveAmt * 0.25);
+    g = swimY + Math.sin(ch.swimPh * 1.3) * 0.06 + (ch.swimK || 0) * 0.32;   // a stile libero il corpo sale in superficie
+    if (!wasWater && ch.vel.y < -3) splashFx(ch, ch.vel.y);
+  }
   if (ch.pos.y <= g) {
-    if (!ch.onGround && ch.vel.y < -7) landFx(ch, ch.vel.y);
+    if (!ch.onGround && ch.vel.y < -7 && !ch.inWater) landFx(ch, ch.vel.y);
     ch.pos.y = g; ch.vel.y = 0; ch.onGround = true;
   }
   else if (ch.onGround && ch.vel.y <= 0 && ch.pos.y - g < 0.7) { ch.pos.y = g; ch.vel.y = 0; }
   else ch.onGround = false;
   ch.moveAmt = Math.hypot(ch.vel.x, ch.vel.z);
+  if (ch.inWater) swimFx(ch, dt);
+}
+
+// ── acqua: anelli che si allargano sulla superficie, schizzi e suoni delle bracciate ──
+const rippleGeo = new THREE.RingGeometry(0.93, 1, 32).rotateX(-Math.PI / 2);
+const ripples = [];
+function addRipple(x, z, size = 1, life = 1.4, op = 0.4) {
+  let r = ripples.find(q => !q.mesh.visible);
+  if (!r) {
+    if (ripples.length >= 40) return;
+    const mat = new THREE.MeshBasicMaterial({ color: '#eaf7ff', transparent: true, opacity: 0, depthWrite: false, fog: true });
+    r = { mesh: new THREE.Mesh(rippleGeo, mat) };
+    r.mesh.renderOrder = 2; scene.add(r.mesh); ripples.push(r);
+  }
+  r.mesh.visible = true; r.mesh.position.set(x, WATER_LEVEL + 0.03, z);
+  r.t = 0; r.life = life; r.size = size; r.op = op;
+}
+function updateRipples(dt) {
+  for (const r of ripples) {
+    if (!r.mesh.visible) continue;
+    r.t += dt;
+    const k = r.t / r.life;
+    if (k >= 1) { r.mesh.visible = false; continue; }
+    const s = r.size * (0.3 + k * 1.5);
+    r.mesh.scale.set(s, 1, s);
+    r.mesh.material.opacity = r.op * (1 - k) * Math.min(1, k * 6);
+  }
+}
+function splashFx(ch, vy) {
+  const near = ch.pos.distanceToSquared(camera.position) < 70 * 70;
+  if (!near) return;
+  const k = Math.min(1.6, -vy / 12);
+  emit(_p.set(ch.pos.x, WATER_LEVEL + 0.1, ch.pos.z), '#e4f6ff', Math.round(10 + k * 10), 4 + k * 2, 0.8, 0.14, 1);
+  addRipple(ch.pos.x, ch.pos.z, 1.2 + k, 1.6, 0.55); addRipple(ch.pos.x, ch.pos.z, 0.7 + k * 0.5, 1.1, 0.5);
+  A.playSplash(ch.isPlayer ? 1 : 0.5 * Math.max(0, 1 - ch.pos.distanceTo(camera.position) / 70));
+}
+function swimFx(ch, dt) {
+  if (ch.pos.distanceToSquared(camera.position) > 60 * 60) return;
+  ch.rippleT = (ch.rippleT ?? 0) - dt;
+  if (ch.rippleT > 0) return;
+  const moving = ch.moveAmt > 0.6;
+  ch.rippleT = moving ? 0.42 : 1.1;
+  // scia: anelli dietro al nuotatore, schizzi delle bracciate
+  addRipple(ch.pos.x - ch.vel.x * 0.12, ch.pos.z - ch.vel.z * 0.12, moving ? 0.8 : 0.55, moving ? 1.3 : 1.8, moving ? 0.18 : 0.12);
+  if (moving) {
+    const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw), side = (ch._swSide = -(ch._swSide || 1));
+    emit(_p.set(ch.pos.x + fx * 0.6 - fz * 0.35 * side, WATER_LEVEL + 0.08, ch.pos.z + fz * 0.6 + fx * 0.35 * side), '#e8f7ff', 4, 1.8, 0.45, 0.08, 1);
+    if (ch.isPlayer) A.playSwim();
+  }
 }
 
 function landFx(ch, vy) {
@@ -821,8 +924,12 @@ function animateChar(ch, dt) {
   // in acqua: bracciate
   if (ch.inWater) {
     m.gunPivot.visible = false;
-    poseSwim(m, t);
-    m.body.rotation.x = 0.5; m.body.position.y = 0.15 + Math.sin(t * 4.5) * 0.04;
+    const swk = clamp((ch.moveAmt - 0.5) / 2.6, 0, 1);   // 0 = a galla, 1 = stile libero
+    ch.swimK = lerp(ch.swimK ?? 0, swk, Math.min(1, dt * 3));
+    ch.swimT = (ch.swimT || 0) + dt * (1.6 + ch.swimK * 3.2 * Math.min(1.4, ch.moveAmt / 3));
+    poseSwim(m, ch.swimT, ch.swimK);
+    m.body.rotation.x = 0.12 + ch.swimK * 0.95; m.body.position.y = 0.15 + Math.sin(ch.swimT * 2) * 0.035 * ch.swimK;
+    m.body.rotation.z = Math.sin(ch.swimT) * 0.12 * ch.swimK;   // rollio delle bracciate
     if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 1.2, dt * 4);
     return;
   }
@@ -970,7 +1077,7 @@ function fireWeapon(ch, aimFn, again = null) {
   const s = ch.weapon;
   if (!s) return false;
   const def = WEAPONS[s.id];
-  if (ch.fireCd > 0 || ch.reloading > 0 || ch.using || ch.mode === 'climb') return false;
+  if (ch.fireCd > 0 || ch.reloading > 0 || ch.using || ch.mode === 'climb' || ch.inWater) return false;   // a nuoto non si spara
   // minigun: le canne devono prima prendere giri
   if (def.spin) { ch.spinReq = G.time; if ((ch.spinK || 0) < 1) return false; }
   if (s.mag <= 0) {
@@ -1392,7 +1499,10 @@ const lootMats = RARITIES.map(r => ({
 
 function randomWeapon(bonus = 0) {
   const w = weighted(WEAPON_POOL);
-  const r = Math.min(4, rollRarity(w.rar) + bonus);
+  // forzieri ed eventi danno solo una *probabilità* di salire di rarità (sopra la rara è molto difficile)
+  let r = rollRarity(w.rar);
+  for (let i = 0; i < bonus; i++) if (Math.random() < (r >= 3 ? 0.12 : r === 2 ? 0.3 : 0.5)) r++;
+  r = Math.min(4, r);
   return { kind: 'weapon', id: w.id, rarity: r, mag: WEAPONS[w.id].mag };
 }
 function randomCons() {
@@ -1730,14 +1840,15 @@ function botThink(b) {
   if (tgt && tgt.pos.distanceTo(b.pos) > 130) tgt = null;
   if (!tgt || Math.random() < 0.15) {
     let best = null, bd = Infinity;
-    const range = b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].role === 'sniper') ? 110 : 75;
+    // v21: vista più corta e campo visivo più stretto → incontri più rari, partite più lunghe
+    const range = b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].role === 'sniper') ? 85 : 55;
     for (const c of G.chars) {
       if (c === b || !c.alive || c.mode === 'bus' || c.mode === 'fall') continue;
       const d = c.pos.distanceTo(b.pos);
-      if (d > (c.human ? range : range * 0.45) || d >= bd) continue;
+      if (d > (c.human ? range : range * 0.38) || d >= bd) continue;
       if (c.hidden && d > hideRange(c)) continue;
       const ang = Math.abs(angDiff(b.yaw, Math.atan2(c.pos.x - b.pos.x, c.pos.z - b.pos.z)));
-      if (ang > 1.9 && d > 12 && ai.alert <= 0) continue;
+      if (ang > 1.35 && d > 9 && ai.alert <= 0) continue;
       if (!hasLOS(b, c)) continue;
       best = c; bd = d;
     }
@@ -1917,7 +2028,7 @@ function updateBot(b, dt) {
   if (gkey !== ai._g) { ai._g = gkey; ai.goalT = 0; }
   ai.goalT = (ai.goalT || 0) + dt;
   if (ai.goal && ai.goalT > 20 && ai.state !== 'zone') { ai.goalT = 0; ai.bad.add(ai.goalLoot); ai.bad.add(ai.goalChest); ai.goal = null; ai.goalLoot = null; ai.goalChest = null; ai.state = 'idle'; }
-  if (ai.think <= 0) { ai.think = 0.25 + Math.random() * 0.15; botThink(b); botTryPickup(b); }
+  if (ai.think <= 0) { ai.think = 0.25 + Math.random() * 0.15; botThink(b); botTryPickup(b); botDoors(b); }
 
   let mx = 0, mz = 0, speed = 5.2, jump = false;
   const tgt = ai.target;
@@ -2000,7 +2111,7 @@ function updateBot(b, dt) {
   }
   if (ai.state !== 'fight') b.crouch = false;
   if (b.crouch) speed = Math.min(speed, 2.8);
-  if (b.inWater) { speed *= 0.6; b.crouch = false; }
+  if (b.inWater) { speed *= 0.55; b.crouch = false; }
   if (ai.wantJump) { jump = true; ai.wantJump = false; }
   groundMove(b, mx, mz, speed, dt, jump);
   ai.stuckT -= dt;
@@ -2200,7 +2311,7 @@ const settingsUI = initSettingsUI({
 $('#setPauseBtn').onclick = e => { e.stopPropagation(); settingsUI.open(); };
 $('#setMenuBtn').onclick = () => { A.playUI(); settingsUI.open(); };
 
-const SIGHT_NAMES = { iron: 'Tacca e mirino', notch: 'Tacca a V', holo: 'Olografico', reddot: 'Red dot', tri: 'Prismatico', bead: 'Perla', rocket: 'Telemetro', scope: 'Cannocchiale', acog: 'Ottica tattica', vintage: "Ottica d'epoca" };
+const SIGHT_NAMES = { iron: 'Tacca e mirino', notch: 'Tacca a V', holo: 'Olografico', reddot: 'Red dot', tri: 'Prismatico', bead: 'Bindella e perla', rocket: 'Telemetro', scope: 'Cannocchiale', acog: 'Ottica tattica', vintage: "Ottica d'epoca" };
 function currentZoom() {
   const w = G.player && G.player.weapon;
   return w ? WEAPONS[w.id].zoom : 1.2;
@@ -2219,6 +2330,27 @@ function currentSpread(p) {
   return s + p.bloom;
 }
 
+// ── porte: si aprono/chiudono con E; i bot le aprono quando ci passano ──
+function updateDoors(dt) {
+  for (const d of world.doors) {
+    const t = d.open ? 1 : 0;
+    if (d.ang === t) continue;
+    d.ang = d.open ? Math.min(1, d.ang + dt / 0.55) : Math.max(0, d.ang - dt / 0.42);
+    world.poseDoor(d);
+  }
+}
+function toggleDoor(d, by, open = !d.open, remote = false) {
+  if (!world.setDoor(d, open)) return;
+  const dd = Math.hypot(d.x - camera.position.x, d.z - camera.position.z);
+  if (dd < 45) A.playDoor(open, by && by.isPlayer ? 1 : Math.max(0.05, 1 - dd / 45) * 0.7);
+  if (G.net && !remote) netSend({ t: 'door', k: d.i, o: open ? 1 : 0 });
+}
+function botDoors(b) {
+  for (const d of world.doors) {
+    if (d.open || Math.abs(d.x - b.pos.x) > 2.3 || Math.abs(d.z - b.pos.z) > 2.3 || Math.abs(d.y - b.pos.y) > 2) continue;
+    toggleDoor(d, b, true);
+  }
+}
 function nearestInteract(p) {
   let best = null, bs = Infinity;
   const fx = Math.sin(G.camYaw), fz = Math.cos(G.camYaw);
@@ -2235,6 +2367,15 @@ function nearestInteract(p) {
     if (c.opened) continue;
     const d = Math.hypot(c.pos.x - p.pos.x, c.pos.z - p.pos.z);
     if (d < 2.6 && Math.abs(c.pos.y - p.pos.y) < 1.8 && d - 1 < bs) { bs = d - 1; best = { chest: c }; }
+  }
+  for (const dr of world.doors) {
+    const dx = dr.x - p.pos.x, dz = dr.z - p.pos.z;
+    if (Math.abs(dx) > 2.6 || Math.abs(dz) > 2.6 || Math.abs(dr.y - p.pos.y) > 1.8) continue;
+    const d = Math.hypot(dx, dz);
+    if (d > 2.4) continue;
+    const facing = d > 0.01 ? (dx * fx + dz * fz) / d : 1;
+    const sc = d - facing * 0.8 + 0.5;
+    if (sc < bs) { bs = sc; best = { door: dr }; }
   }
   return best;
 }
@@ -2297,16 +2438,24 @@ function updatePlayer(dt) {
   if (pressed.has('KeyE') && inter) {
     if (inter.loot) { if (pickupLoot(p, inter.loot, true)) A.playPickup(); }
     else if (inter.chest) openChest(p, inter.chest);
+    else if (inter.door) toggleDoor(inter.door, p);
   }
   G.interact = inter;
-  G.ads = mouse.right && !G.build.on && !!p.weapon && p.reloading <= 0;
+  G.ads = mouse.right && !G.build.on && !!p.weapon && p.reloading <= 0 && !p.inWater;
   const sprint = (keys.ShiftLeft || keys.ShiftRight || TC.sprint) && !G.ads && !mouse.left && mz * fz + mx * fx > 0.3;
   let speed = sprint ? 7.6 : 5.3;
   if (p.crouch) speed = 2.8;
   if (G.ads) speed = Math.min(speed, 3.4);
   if (p.weapon && WEAPONS[p.weapon.id].moveMult) speed *= WEAPONS[p.weapon.id].moveMult;
   if (p.using) speed = Math.min(speed, 2.6);
-  if (p.inWater) { speed *= 0.6; p.crouch = false; }
+  if (p.inWater) {
+    // nuoto: lento, con lo sprint si nuota a stile libero ma si consuma la resistenza
+    p.crouch = false;
+    const fast = sprint && p.stamina > 4;
+    speed = fast ? 4.3 : 2.9;
+    if (fast) { p.stamina = Math.max(0, p.stamina - dt * 11); p.tireT = 0.8; }
+    if (p.stamina < 4) speed = 2.1;
+  }
   if (stoodUp) p._noJumpUntilRelease = true;
   if (!keys.Space) p._noJumpUntilRelease = false;
   groundMove(p, mx, mz, speed, dt, keys.Space && !p._noJumpUntilRelease && !p.crouch);
@@ -2563,6 +2712,9 @@ function updateHUD(dt) {
       const col = it.kind === 'weapon' ? RARITIES[it.rarity].color : '#fff';
       pr = `<span style="border-color:${col}"><kbd class="kbE">E</kbd> Raccogli ${it.kind === 'weapon' ? weaponIconHTML(it.id, it.rarity, 'wi pi') : it.kind === 'cons' ? consIconHTML(it.id, 'ci pi') : ''}${it.kind === 'cons' ? `${CONSUMABLES[it.id].name} x${it.count}` : itemLabel(it)}</span>`;
       hud.prompt.style.borderLeftColor = col;
+    } else if (G.interact.door) {
+      const o = G.interact.door.open;
+      pr = tk(`<kbd>E</kbd> ${o ? 'Chiudi' : 'Apri'} la porta 🚪`, `Porta 🚪 tocca <b>${o ? 'CHIUDI' : 'APRI'}</b>`); hud.prompt.style.borderLeftColor = '#c8a070';
     } else { pr = tk('<kbd>E</kbd> Apri il forziere ✨', 'Forziere ✨ tocca <b>APRI</b>'); hud.prompt.style.borderLeftColor = '#ffd24a'; }
   } else if (G.climbHint && p.alive && p.mode === 'ground') { pr = tk('🧗 <kbd>W</kbd> + <kbd>Spazio</kbd> per arrampicarti', '🧗 Spingi avanti + <b>SALTA</b> per arrampicarti'); hud.prompt.style.borderLeftColor = '#7fe07a'; }
   setHTML(hud.prompt, 'prompt', pr);
@@ -2791,7 +2943,7 @@ function setupBot(b) {
   b.ai = makeAI();
   // punto di atterraggio: città o luogo casuale
   let tx, tz;
-  if (Math.random() < 0.55) { const t = pick(TOWNS); tx = t.x + rand(-t.r * 0.8, t.r * 0.8); tz = t.z + rand(-t.r * 0.8, t.r * 0.8); }
+  if (Math.random() < 0.32) { const t = pick(TOWNS); tx = t.x + rand(-t.r * 0.8, t.r * 0.8); tz = t.z + rand(-t.r * 0.8, t.r * 0.8); }
   else { tx = rand(-HALF + 25, HALF - 25); tz = rand(-HALF + 25, HALF - 25); }
   const hh = houseAt(tx, tz);
   if (hh && hh.doors.length) { const dd = pick(hh.doors); tx = dd.x + dd.nx * 3; tz = dd.z + dd.nz * 3; }
@@ -3254,6 +3406,7 @@ function onNetMessage(from, m) {
       }
       case 'pick': { const L = G.loot.find(x => x.id === m.id); if (L) removeLoot(L, true); break; }
       case 'chest': { const c = G.chests[m.k]; if (c && !c.opened) openChest(null, c); break; }
+      case 'door': { const d = world.doors[m.k]; if (d) toggleDoor(d, null, !!m.o, true); break; }
       case 'evt': if (NET.role === 'client') events.start(m); break;
       case 'wall': {
         const g = m.g;
@@ -3337,7 +3490,8 @@ function update(dt) {
         if (want && c.isPlayer && (c.spinK || 0) < 0.05 && !(c._spinSnd > G.time)) { A.playGun('spin'); c._spinSnd = G.time + 0.5; }
         c.spinK = want ? Math.min(1, (c.spinK || 0) + dt / wdef.spin) : Math.max(0, (c.spinK || 0) - dt * 0.9);
       } else c.spinK = 0;
-      if (c.mode !== 'climb' && c.onGround) c.stamina = Math.min(100, c.stamina + dt * 22);
+      c.tireT = Math.max(0, (c.tireT || 0) - dt);
+      if (c.mode !== 'climb' && c.onGround && c.tireT <= 0) c.stamina = Math.min(100, c.stamina + dt * (c.inWater ? 6 : 15));
       c.swing = Math.max(0, c.swing - dt);
       if (c.reloading > 0) {
         if (c.active !== c.reloadSlot || !c.weapon) c.reloading = 0;
@@ -3363,6 +3517,8 @@ function update(dt) {
   updateStorm(dt);
   events.update(dt);
   updateParticles(dt);
+  updateRipples(dt);
+  updateDoors(dt);
   updateEffects(dt);
   for (const cl of clouds) { cl.position.x += dt * 2; if (cl.position.x > 450) cl.position.x = -450; }
   updateCamera(dt);
@@ -3420,4 +3576,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };

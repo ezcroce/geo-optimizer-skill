@@ -5,7 +5,7 @@
 //  macchie). Tutte ripetibili, con normal map ricavata dal rilievo.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=16';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=17';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };

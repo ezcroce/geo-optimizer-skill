@@ -66,7 +66,7 @@ export function createGfx(renderer, scene, camera, sun) {
     }
     if (opts.bloom) {
       // soglia alta: brillano sole, lampi degli spari, oggetti leggendari, riflessi sull'acqua
-      bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.55, 0.92);
+      bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.26, 0.5, 1.2);   // v21: soglia più alta → niente bagliore su neve e rocce
       composer.addPass(bloomPass);
     }
     outputPass = new OutputPass();

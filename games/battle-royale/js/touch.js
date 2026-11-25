@@ -202,7 +202,7 @@ export function createTouch(api) {
     root.querySelector('.tbusjump').classList.toggle('hidden', !(alive && bus));
     const inter = ground && G.interact;
     root.querySelector('.tuse').classList.toggle('hidden', !inter);
-    if (inter) $('#tUseLbl').textContent = inter.chest ? 'APRI' : 'RACCOGLI';
+    if (inter) $('#tUseLbl').textContent = inter.chest ? 'APRI' : inter.door ? (inter.door.open ? 'CHIUDI' : 'APRI') : 'RACCOGLI';
     $('#tJumpLbl').textContent = p.mode === 'fall' ? 'APRI' : p.mode === 'climb' ? 'STACCATI' : 'SALTA';
     for (const b of btn.aim || []) b.classList.toggle('on', !!mouse.right);
     for (const b of btn.build || []) b.classList.toggle('on', !!G.build.on);

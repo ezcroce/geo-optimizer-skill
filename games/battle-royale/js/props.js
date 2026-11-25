@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=16';
+import { normalFromHeight, NORMALS } from './texgen.js?v=17';
 
 function mulberry32(a) {
   return function () {
@@ -158,7 +158,7 @@ function makeBirchLow() {
 }
 
 // ═════════════ alberi dei biomi ═════════════
-const SNOWC = '#f1f5fa';
+const SNOWC = '#dde5ee';
 function makeSnowPine() {
   const parts = trunkParts(3.0, 0.3, 0.17, '#4e3420');
   const tiers = [[2.3, 2.2, 2.0], [1.85, 2.0, 3.1], [1.4, 1.8, 4.1], [0.95, 1.6, 5.05], [0.55, 1.2, 5.9]];
@@ -427,6 +427,7 @@ function makeStoneTexture() {
 
 // ═════════════ 02 · CATASTA DI LEGNA ═════════════
 function makeLogs() {
+  // v21: tronchi a 12 lati con corteccia irregolare, sezioni con anelli concentrici in rilievo e cinghie
   const parts = [];
   const rnd = mulberry32(77);
   const r = 0.2, len = 2.2;
@@ -435,18 +436,31 @@ function makeLogs() {
     for (let i = 0; i < n; i++) {
       const z = (i - (n - 1) / 2) * (r * 2.05);
       const y = r + row * r * 1.75;
-      const dl = (rnd() - 0.5) * 0.25, rr = r * (0.9 + rnd() * 0.2);
-      const geo = new THREE.CylinderGeometry(rr, rr, len + dl, 8, 1);
-      parts.push(part(geo, '#6e4a2a', {
-        x: (rnd() - 0.5) * 0.15, y, z, rz: Math.PI / 2, rx: rnd() * 3, jit: 0.14,
-        // estremità del tronco più chiare (anelli del legno)
-        colorFn: (nx, ny, nz) => Math.abs(nx) > 0.9 ? (rnd() < 0.5 ? '#c99a5b' : '#d8ac6c') : (rnd() < 0.25 ? '#5a3a20' : '#6e4a2a'),
+      const dl = (rnd() - 0.5) * 0.25, rr = r * (0.9 + rnd() * 0.2), L = len + dl;
+      const x0 = (rnd() - 0.5) * 0.15;
+      let geo = new THREE.CylinderGeometry(rr, rr * 0.96, L, 12, 3, true);
+      geo = wobble(geo, 0.018, 900 + row * 10 + i);
+      parts.push(part(geo, '#5e3d22', {
+        x: x0, y, z, rz: Math.PI / 2, rx: rnd() * 3, jit: 0.18,
+        colorFn: (nx, ny, nz, px, py, pz, r2) => r2() < 0.22 ? '#4a2f1a' : (r2() < 0.15 ? '#6e4c2e' : '#5e3d22'),
       }));
+      // estremità: cerchio chiaro (alburno), anelli scuri e cuore in rilievo
+      for (const sd of [-1, 1]) {
+        const ex = x0 + sd * L / 2, ry = sd > 0 ? Math.PI / 2 : -Math.PI / 2;
+        parts.push(part(new THREE.CircleGeometry(rr * 0.98, 12), '#c99a5b', { x: ex, y, z, ry, jit: 0.04 }));
+        parts.push(part(new THREE.RingGeometry(rr * 0.55, rr * 0.62, 12), '#a8743e', { x: ex + sd * 0.004, y, z, ry, jit: 0.02 }));
+        parts.push(part(new THREE.RingGeometry(rr * 0.25, rr * 0.3, 10), '#a8743e', { x: ex + sd * 0.006, y, z, ry, jit: 0.02 }));
+        parts.push(part(new THREE.CylinderGeometry(rr * 0.12, rr * 0.16, 0.03, 8), '#8a5a2e', { x: ex, y, z, rz: Math.PI / 2, jit: 0.02 }));
+      }
     }
   });
-  // paletti di sostegno
+  // paletti di sostegno e due cinghie di ferro
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    parts.push(part(new THREE.BoxGeometry(0.1, 1.2, 0.1), '#4a3220', { x: sx * 0.85, y: 0.6, z: sz * 0.95, jit: 0.08 }));
+    parts.push(part(new THREE.BoxGeometry(0.12, 1.25, 0.12), '#4a3220', { x: sx * 0.85, y: 0.62, z: sz * 0.95, jit: 0.1 }));
+  }
+  for (const sx of [-0.55, 0.55]) {
+    parts.push(part(new THREE.BoxGeometry(0.05, 0.02, 1.95), '#3a3a3e', { x: sx, y: r * 2 + 2 * r * 1.75 + 0.01, jit: 0.04 }));
+    for (const sz of [-1, 1]) parts.push(part(new THREE.BoxGeometry(0.05, 1.2, 0.02), '#3a3a3e', { x: sx, y: 0.6, z: sz * 0.99, jit: 0.04 }));
   }
   return mergeParts(parts, 78);
 }
@@ -479,30 +493,51 @@ function makeBricks() {
 
 // ═════════════ 06 · BARILI ═════════════
 function makeBarrel(kind) {
+  // v21: più segmenti, doghe alternate, cerchioni in rilievo, bordi arrotondati, coperchio con tappi e ruggine
   const parts = [];
   const H = 1.15, R = 0.4;
   if (kind === 'wood') {
-    // profilo bombato
+    const prof = (t) => R * (0.86 + Math.sin(t * Math.PI) * 0.14);
     const pts = [];
-    for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push(new THREE.Vector2(R * (0.86 + Math.sin(t * Math.PI) * 0.14), t * H)); }
-    const lathe = new THREE.LatheGeometry(pts, 12);
-    parts.push(part(lathe, '#8a5a30', { jit: 0.16, colorFn: (nx, ny, nz, x, y, z, rnd) => rnd() < 0.3 ? '#7a4c26' : '#8f5e33' }));
-    parts.push(part(new THREE.CircleGeometry(R * 0.86, 12), '#a57444', { y: H - 0.02, rx: -Math.PI / 2, jit: 0.1 }));
-    for (const y of [0.16, 0.42, 0.73, 0.99]) {
-      const rr = R * (0.86 + Math.sin((y / H) * Math.PI) * 0.14) + 0.012;
-      parts.push(part(new THREE.CylinderGeometry(rr, rr, 0.05, 12, 1, true), '#3a3a3e', { y, jit: 0.05 }));
+    for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(new THREE.Vector2(prof(t), t * H)); }
+    const lathe = new THREE.LatheGeometry(pts, 18);
+    parts.push(part(lathe, '#8a5a30', { jit: 0.05, colorFn: (nx, ny, nz, x, y, z, rnd) => {
+      const a = Math.atan2(z, x), k = Math.floor((a + Math.PI) / (Math.PI * 2) * 18);
+      return ['#8f5e33', '#7e5029', '#986638', '#84552d'][k % 4];
+    } }));
+    // coperchio incassato con assi e bordo
+    parts.push(part(new THREE.CircleGeometry(prof(1) - 0.03, 18), '#a57444', { y: H - 0.035, rx: -Math.PI / 2, jit: 0.06, colorFn: (nx, ny, nz, x) => Math.abs(Math.round(x / 0.11) - x / 0.11) < 0.08 ? '#6e4a26' : null }));
+    parts.push(part(new THREE.TorusGeometry(prof(1) - 0.012, 0.022, 6, 18), '#7a4c26', { y: H - 0.01, rx: Math.PI / 2, jit: 0.05 }));
+    for (const y of [0.1, 0.36, 0.79, 1.05]) {
+      const rr = prof(y / H) + 0.008;
+      parts.push(part(new THREE.TorusGeometry(rr, 0.018, 4, 18), '#3a3a3e', { y, rx: Math.PI / 2, sy: 1, sz: 1.8, jit: 0.04 }));
+      // rivetti
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + y; parts.push(part(new THREE.SphereGeometry(0.014, 5, 4), '#8a8a90', { x: Math.cos(a) * (rr + 0.012), y, z: Math.sin(a) * (rr + 0.012), jit: 0 })); }
     }
+    parts.push(part(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 8), '#5a3a1e', { x: 0, y: H * 0.55, z: prof(0.55) + 0.005, rx: Math.PI / 2, jit: 0 }));
   } else {
-    const body = kind === 'red' ? '#c62e24' : '#2f5f9e';
-    parts.push(part(new THREE.CylinderGeometry(R, R, H, 14, 1), body, { y: H / 2, jit: 0.07, colorFn: (nx, ny) => ny > 0.9 ? (kind === 'red' ? '#9a241c' : '#264d80') : null }));
-    for (const y of [0.05, H / 3, (2 * H) / 3, H - 0.05]) parts.push(part(new THREE.CylinderGeometry(R + 0.018, R + 0.018, 0.045, 14, 1, true), kind === 'red' ? '#8a1e17' : '#1f4170', { y, jit: 0.04 }));
-    // tappo
-    parts.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 8), '#cfcfcf', { x: 0.2, y: H + 0.02, jit: 0.04 }));
+    const body = kind === 'red' ? '#c62e24' : '#2f5f9e', dark = kind === 'red' ? '#8a1e17' : '#1f4170';
+    const bodyGeo = wobble(new THREE.CylinderGeometry(R, R, H - 0.06, 20, 6, true), 0.006, kind === 'red' ? 11 : 12);
+    parts.push(part(bodyGeo, body, { y: H / 2, jit: 0.05 }));
+    // fondo e coperchio con bordo arrotolato
+    for (const y of [0.03, H - 0.03]) {
+      parts.push(part(new THREE.TorusGeometry(R - 0.004, 0.026, 6, 20), dark, { y, rx: Math.PI / 2, jit: 0.04 }));
+    }
+    parts.push(part(new THREE.CircleGeometry(R - 0.01, 20), dark, { y: H - 0.045, rx: -Math.PI / 2, jit: 0.04 }));
+    parts.push(part(new THREE.CircleGeometry(R - 0.01, 20), dark, { y: 0.01, rx: Math.PI / 2, jit: 0.04 }));
+    // costole di rotolamento in rilievo
+    for (const y of [H / 3, (2 * H) / 3]) parts.push(part(new THREE.TorusGeometry(R + 0.004, 0.02, 5, 20), body, { y, rx: Math.PI / 2, jit: 0.04 }));
+    // tappi (uno grande e uno piccolo)
+    parts.push(part(new THREE.CylinderGeometry(0.065, 0.07, 0.035, 10), '#cfcfcf', { x: 0.2, y: H - 0.03, jit: 0.04 }));
+    parts.push(part(new THREE.CylinderGeometry(0.035, 0.04, 0.03, 8), '#bdbdbd', { x: -0.22, y: H - 0.035, z: 0.08, jit: 0.04 }));
     if (kind === 'red') {
-      // fascia gialla di pericolo con triangolo
-      parts.push(part(new THREE.CylinderGeometry(R + 0.006, R + 0.006, 0.22, 14, 1, true), '#f2c230', { y: H / 2, jit: 0.05 }));
+      // fascia gialla di pericolo con triangolo e fiamma stilizzata
+      parts.push(part(new THREE.CylinderGeometry(R + 0.006, R + 0.006, 0.22, 20, 1, true), '#f2c230', { y: H / 2, jit: 0.04 }));
       const tri = new THREE.CylinderGeometry(0.11, 0.11, 0.02, 3);
       parts.push(part(tri, '#151515', { y: H / 2, z: R + 0.012, rx: Math.PI / 2, rz: Math.PI / 6, jit: 0 }));
+      parts.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.022, 3), '#f2c230', { y: H / 2 - 0.005, z: R + 0.016, rx: Math.PI / 2, rz: Math.PI / 6, jit: 0 }));
+    } else {
+      parts.push(part(new THREE.CylinderGeometry(R + 0.005, R + 0.005, 0.14, 20, 1, true), '#e8e8e8', { y: H * 0.52, jit: 0.04, colorFn: (nx, ny, nz, x, y, z) => Math.abs(Math.atan2(z, x) - 1.2) < 0.5 ? null : body }));
     }
   }
   return mergeParts(parts, kind.length * 13);
@@ -643,25 +678,96 @@ export const bushMaterial = addWind(new THREE.MeshStandardMaterial({ vertexColor
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
 const stoneTex = makeStoneTexture();
-export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.0, flatShading: true, map: stoneTex, normalMap: NORMALS ? normalFromHeight(stoneTex.image, 3) : null, normalScale: new THREE.Vector2(0.8, 0.8) });
+// v21: niente normal map in UV (dava riflessi a scatti); rilievo calcolato in triplanare (bump con le derivate),
+// cavità più scure, venature a strati e luminosità limitata (niente bagliori sulle facce al sole)
+export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0.0, flatShading: true, map: stoneTex });
 rockMaterial.onBeforeCompile = (sh) => {
   sh.vertexShader = sh.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position; vON = normal;');
   sh.fragmentShader = sh.fragmentShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;')
+    .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;\nfloat rockH;')
     .replace('#include <map_fragment>', `
       {
         vec3 w = abs(normalize(vON)); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z);
         vec3 p = vOP * 0.9;
-        float t = texture2D(map, p.yz).r * w.x + texture2D(map, p.xz).r * w.y + texture2D(map, p.xy).r * w.z;
+        float t = texture2D(map, p.yz, 0.8).r * w.x + texture2D(map, p.xz, 0.8).r * w.y + texture2D(map, p.xy, 0.8).r * w.z;
+        vec3 p2 = vOP * 0.32;
+        float f = texture2D(map, p2.yz, 3.0).r * w.x + texture2D(map, p2.xz, 3.0).r * w.y + texture2D(map, p2.xy, 3.0).r * w.z;   // mip sfocato: forme, non grana
         float t2 = texture2D(map, p.zx * 0.31 + 0.5).r;
-        diffuseColor.rgb *= (0.35 + 1.3 * t) * (0.8 + 0.4 * t2);
-      }`);
+        float strata = 0.5 + 0.5 * sin(vOP.y * 3.0 + t2 * 5.0);
+        rockH = f;   // rilievo a grana grossa (niente sfarfallio da vicino)
+        float cav = smoothstep(0.18, 0.55, rockH);                       // crepe e cavità in ombra
+        diffuseColor.rgb *= clamp((0.5 + 0.6 * t) * (0.86 + 0.24 * t2) * (0.92 + 0.12 * strata), 0.3, 1.04) * mix(0.7, 1.0, cav);
+        diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8));             // le rocce non diventano mai bianche abbaglianti
+      }`)
+    .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
+        float dhx = dFdx(rockH), dhy = dFdy(rockH);
+        vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
+        float det = dot(dpx, r1);
+        vec3 grad = sign(det) * (dhx * r1 + dhy * r2);
+        normal = normalize(abs(det) * normal - grad * 2.2);
+      }`)
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = 1.0;');
 };
-rockMaterial.customProgramCacheKey = () => 'rock-triplanar';
+rockMaterial.customProgramCacheKey = () => 'rock-triplanar-v21';
 
-export const metalPropMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.35, flatShading: true });
+/** rilievo procedurale (bump con rumore 3D) per legno e metallo degli oggetti di scena: più tridimensionali */
+function addSurfaceDetail(mat, key, opts) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSP;\nvarying vec3 vSN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSP = position; vSN = normal;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vSP;
+        varying vec3 vSN;
+        float surfH;
+        float h31(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+        float vnoise(vec3 x) {
+          vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(mix(h31(i), h31(i + vec3(1, 0, 0)), f.x), mix(h31(i + vec3(0, 1, 0)), h31(i + vec3(1, 1, 0)), f.x), f.y),
+                     mix(mix(h31(i + vec3(0, 0, 1)), h31(i + vec3(1, 0, 1)), f.x), mix(h31(i + vec3(0, 1, 1)), h31(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 c = vColor.rgb;
+          float gr = c.g / max(c.r, 0.001);
+          float woody = ${opts.wood === false ? '0.0' : '1.0'} * smoothstep(0.25, 0.33, gr) * (1.0 - smoothstep(0.68, 0.75, gr)) * (1.0 - smoothstep(0.62, 0.7, c.r)) * step(c.b, c.g);   // marroni (spazio lineare) → legno
+          vec3 n = abs(normalize(vSN));
+          // legno: venature allungate lungo l'asse principale della faccia
+          vec3 q = vSP * vec3(${opts.grain});
+          float g1 = vnoise(q + vec3(0.0, vnoise(vSP * 1.5) * 0.6, 0.0));
+          float rings = 0.5 + 0.5 * sin(g1 * 22.0);
+          float fine = vnoise(vSP * 13.0);
+          float wood = mix(0.9, 1.05, rings) * mix(0.94, 1.03, fine);
+          // metallo / vernice: graffi fini e macchie
+          float blot = vnoise(vSP * 4.0), scr = vnoise(vSP * vec3(22.0, 2.5, 22.0));
+          float metal = mix(0.9, 1.04, blot) * (1.0 - smoothstep(0.86, 0.95, scr) * 0.15);
+          diffuseColor.rgb *= mix(metal, wood, woody);
+          // sporco e ombra di contatto verso il basso
+          diffuseColor.rgb *= mix(0.78, 1.0, smoothstep(0.0, 0.25, vSP.y));
+          surfH = mix(blot * 0.3, rings * 0.2 + fine * 0.06, woody) * ${opts.bump.toFixed(2)};
+        }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        {
+          vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
+          float dhx = dFdx(surfH), dhy = dFdy(surfH);
+          vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
+          float det = dot(dpx, r1);
+          normal = normalize(abs(det) * normal - sign(det) * (dhx * r1 + dhy * r2));
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'surf-' + key;
+  return mat;
+}
+addSurfaceDetail(propMaterial, 'prop', { grain: '7.0, 1.0, 7.0', bump: 1.0 });
+
+export const metalPropMaterial = addSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.3, flatShading: true }), 'metal', { grain: '7.0, 1.0, 7.0', bump: 0.7, wood: false });
+/** legno dei tronchi accatastati: venature lungo x (l'asse dei tronchi) */
+export const logMaterial = addSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, flatShading: true }), 'log', { grain: '0.8, 7.0, 7.0', bump: 1.0 });
 export const MODEL_SOURCE = { tree: 'procedurale', logs: 'procedurale', bricks: 'procedurale', shed: 'procedurale', barrel: 'procedurale' };
 
 // ═════════════ caricamento dei modelli GLB originali (facoltativo) ═════════════

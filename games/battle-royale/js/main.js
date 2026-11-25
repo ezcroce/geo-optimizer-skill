@@ -8,7 +8,7 @@ import {
 } from './config.js?v=19';
 import * as PR from './progress.js?v=19';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=24';
+import { initMenu } from './menu.js?v=25';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';
@@ -17,17 +17,18 @@ import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP,
-} from './world.js?v=24';
+} from './world.js?v=25';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=19';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=25';
 import { weaponIcon } from './weapons.js?v=19';
 import { consIcon } from './items.js?v=19';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=19';
 import { createInventory } from './inventory.js?v=19';
 import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=19';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=19';
+import { loadRealChars, syncAllReal } from './realchar.js?v=25';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=25';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -92,6 +93,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
 const scene = new THREE.Scene();
+scene.onBeforeRender = syncAllReal;   // v25: posa dei personaggi realistici prima di ogni render
 scene.fog = new THREE.Fog('#c9e3f8', 190, 720);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2600);
 
@@ -176,7 +178,7 @@ const clouds = [];
 
 // Mondo
 // se in models/ ci sono i file .glb originali vengono caricati prima di costruire il mondo
-const loadedModels = await loadModelOverrides('models/');
+const [loadedModels] = await Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/')]);   // v25: personaggi realistici
 if (loadedModels.length) console.info('Modelli GLB caricati:', loadedModels.join(', '));
 let world = buildWorld(scene, { seed: 1337, random: false });
 /** ricostruisce l'isola (Random Map: un seme nuovo a ogni partita) */
@@ -2735,20 +2737,9 @@ function updateCamera(dt) {
     scene.fog.far = lerp(620, 1500, alt) * fogK * lerp(weather.fogMul, 1, 0.15);
     scene.fog.color.copy(weather.fogTint);
   }
-  // tetti trasparenti se sei dentro una casa; nei palazzi si tagliano i piani sopra il tuo (v24)
-  let clipH = null;
-  for (const h of world.houses) {
-    const inside = p.alive && Math.abs(p.pos.x - h.cx) < h.w / 2 && Math.abs(p.pos.z - h.cz) < h.d / 2 && p.pos.y < h.roofTop - 0.5 && p.pos.y > h.baseY - 1;
-    if (h.roofMesh) h.roofMesh.visible = !inside;
-    if (inside && h.clip) clipH = h;
-  }
-  if (clipH) {
-    const h = clipH, c = h.clip;
-    let cy;
-    if (h.city === 'palazzo') { const f = Math.max(0, Math.floor((p.pos.y - h.baseY + 0.4) / 3)); cy = h.baseY + 3 * (f + 1) - 0.12; }
-    else cy = h.roofTop - 0.6;
-    CLIP.box.value.set(c[0], c[1], c[2], c[3]); CLIP.y.value = cy;
-  } else CLIP.y.value = 1e9;
+  // v25: dentro le case il soffitto resta al suo posto (prima tetti e piani superiori sparivano per mostrare il
+  // personaggio dall'alto): la telecamera si accorcia contro soffitti e pareti grazie alle collisioni qui sopra
+  CLIP.y.value = 1e9;
 }
 
 // ─────────────── HUD ───────────────
@@ -3357,6 +3348,7 @@ function toMenu() {
 
 // ─────────────── Lobby (armadietto) ───────────────
 const lobby = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100), char: null, rot: 0.4, rotV: 0, drag: false, ring: null };
+lobby.scene.onBeforeRender = syncAllReal;
 {
   const L = lobby.scene;
   L.add(new THREE.Mesh(new THREE.SphereGeometry(50, 24, 16), gradientMaterial('#1d2f8a', '#0a0f2e')));

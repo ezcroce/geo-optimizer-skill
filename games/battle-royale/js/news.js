@@ -1,9 +1,18 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v24';
+export const NEWS_VERSION = 'v25';
 
 export const NEWS = [
+  {
+    v: 'v25', title: 'Grafica realistica', color: '#7fd0ff', icon: '🎮',
+    items: [
+      'Personaggi veri al posto dei pupazzi a cubi e sfere: soldato in armatura e ragazza con modelli umani scolpiti e texturizzati',
+      'Le skin ricolorano armatura, tessuti e dettagli · dita che stringono l’arma, braccia che seguono l’impugnatura',
+      'Auto realistiche: berline, utilitarie e SUV con vernice metallizzata lucida, vetri a specchio, cerchi in lega, fari e targhe',
+      'Entrando in una casa il soffitto resta al suo posto: intonaco bianco e plafoniera accesa',
+    ],
+  },
   {
     v: 'v24', title: 'Città vere', color: '#ff9f2e', icon: '🏙',
     items: [

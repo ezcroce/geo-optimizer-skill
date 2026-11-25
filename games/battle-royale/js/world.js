@@ -4,7 +4,8 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=24';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=25';
+import { carInstances } from './cars.js?v=25';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
 import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=19';
 
@@ -1288,6 +1289,9 @@ export function buildWorld(scene, opts = {}) {
   const shutterColors = ['#3f6e4a', '#3c5f8a', '#7a4a2a', '#8a3a3a', '#5f6a3a'];
   const shutterMats = shutterColors.map(c => m('shut' + c, c));
   const matMat = m('doormat', '#7a3b2a');
+  // v25: soffitti (luce di rimbalzo simulata: altrimenti la luce emisferica dal basso li tinge di verde scuro)
+  const ceilMat = new THREE.MeshStandardMaterial({ color: '#f3efe6', roughness: 0.95, emissive: '#b8b2a6', emissiveIntensity: 0.32 });
+  const ceilLampMat = new THREE.MeshStandardMaterial({ color: '#fffaf0', roughness: 0.4, emissive: '#fff4dc', emissiveIntensity: 0.9 });
   const floorMat = texMat(makeParquetTexture(), { roughness: 0.62 });
   // ── arredi degli interni (v21) ──
   const fabricTex = makeFabricTexture();
@@ -1787,6 +1791,9 @@ export function buildWorld(scene, opts = {}) {
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) addBox(T + 0.16, H - 0.5, T + 0.16, cx + sx * (w / 2 - T / 2), baseY + 0.5 + (H - 0.5) / 2, cz + sz * (d / 2 - T / 2), TH.walls[wi] === 'stone' ? trimMat : stoneMat, { ...deco, cast: false });
     const ri = Math.floor(srand() * TH.roofs.length);
     addBox(w + 0.6, 0.3, d + 0.6, cx, baseY + H + 0.15, cz, roofMatFor(TH.roofs[ri]), { ...ho, roof: true });
+    // v25: soffitto intonacato sotto il tetto e sotto il cornicione (resta visibile quando si entra)
+    addBox(w - 2 * T, 0.03, d - 2 * T, cx, baseY + H - 0.21, cz, ceilMat, { house, collide: false, cast: false });
+    addBox(0.55, 0.05, 0.55, cx, baseY + H - 0.25, cz, ceilLampMat, { house, collide: false, cast: false });
     // tetto a due falde (non per le facciate western né per i castelli): colmo sul lato lungo
     const pitched = !TH.facade && !TH.merlons;
     const alongX = w >= d, span = alongX ? d : w, rlen = alongX ? w : d;
@@ -2922,6 +2929,11 @@ export function buildWorld(scene, opts = {}) {
       }
     }
     for (const list of spec.values()) {
+      if (list[0].type === 'car') {
+        // v25: auto realistiche, carrozzeria a colori per istanza + dettagli (vetri, gomme, cerchi, fari)
+        for (const im of carInstances(list[0].c || 0, list, (s) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); return mat4.compose(p, q, sc); }, scene.environment, (mt) => { clipMat(mt); return mt; })) group.add(im);
+        continue;
+      }
       clipMat(propMaterial);
       const im = new THREE.InstancedMesh(specialGeo(list[0].type, list[0].c), propMaterial, list.length);
       list.forEach((s, i) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); mat4.compose(p, q, sc); im.setMatrixAt(i, mat4); });

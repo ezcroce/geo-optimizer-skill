@@ -5,6 +5,7 @@
 //  Tutto è fatto di box (uniti per materiale quando il chunk viene costruito) + oggetti "speciali" instanziati.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
+import { CAR_VARIANTS, CAR_DIMS, CAR_PAINTS } from './cars.js?v=25';
 import { mergeParts } from './props.js?v=19';
 import {
   facadeTexture, plainTexture, asphaltTexture, sidewalkTexture, cobbleTexture, roofFlatTexture, tileTexture,
@@ -227,6 +228,8 @@ const MAT = {
   get board() { return solid('signBoard', '#26282c', { roughness: 0.6 }); },
   get sign() { return mc('signAtlas', () => { const t = signAtlas(); return new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: '#ffffff', emissiveIntensity: 0.22, roughness: 0.5 }); }); },
   get inner() { return solid('innerWall', '#efe9dc', { roughness: 0.95 }); },
+  get ceil() { return mc('ceil', () => texMat(concreteTexture(), { color: '#fbf8f2', roughness: 0.95, emissive: '#b8b2a6', emissiveIntensity: 0.3, normalScale: new THREE.Vector2(0.25, 0.25) })); },
+  get lamp() { return solid('ceilLamp', '#fffaf0', { roughness: 0.4, emissive: '#fff4dc', emissiveIntensity: 0.9 }); },
   get stair() { return mc('stair', () => texMat(concreteTexture(), { color: '#d8d2c6', roughness: 0.8 })); },
   get products() { return mc('products', () => texMat(productsTexture(), { roughness: 0.7 })); },
   get books() { return mc('booksT', () => texMat(booksTexture(), { roughness: 0.85 })); },
@@ -351,7 +354,7 @@ export function buildCity(C) {
       const piece = (s0, s1, v0, v1) => {
         if (s1 - s0 < 0.02 || v1 - v0 < 0.02) return;
         const u0 = Math.min(U(s0), U(s1)), u1 = Math.max(U(s0), U(s1)), uc = (u0 + u1) / 2, vc = (v0 + v1) / 2;
-        F.box(uc, vc, yb + 0.1, u1 - u0, 0.2, v1 - v0, MAT.inner, { house, cast: roof });
+        F.box(uc, vc, yb + 0.1, u1 - u0, 0.2, v1 - v0, MAT.ceil, { house, cast: roof });   // v25: intradosso intonacato
         F.box(uc, vc, yb + 0.21, u1 - u0, 0.02, v1 - v0, roof ? MAT.roof : M.floorMat, nc);
       };
       piece(sMin, sMax, vMin, vA); piece(sMin, sMax, vB, vMax);
@@ -367,6 +370,8 @@ export function buildCity(C) {
       }
     };
     for (let k = 1; k <= n; k++) slabs(k);
+    // v25: plafoniere al centro di ogni piano (lontane dal vano scala)
+    for (let k = 1; k <= n; k++) F.box(0, (d + vB) / 2 > d - T - 0.6 ? d / 2 : (vB + d - T) / 2, y + 3 * k - 0.03, 0.6, 0.05, 0.6, MAT.lamp, { house, cast: false, collide: false });
     // ── scale: rampe di 10 gradini (alzata 30 cm), corsie alternate ──
     const flights = [];
     for (let j = 0; j < nf; j++) {
@@ -789,9 +794,11 @@ export function buildCity(C) {
         if (rnd() > 0.32) continue;
         const [x, z] = pos(s + sr(-0.6, 0.6), it.sd * (RW - 1.15));
         const flip = rnd() < 0.5 ? 0 : Math.PI;
-        special('car', x, z, y + 0.04, null, { rot: (it.vert ? 0 : Math.PI / 2) + flip, c: Math.floor(rnd() * CAR_COLORS.length) });
-        const hx = it.vert ? 0.95 : 2.15, hz = it.vert ? 2.15 : 0.95;
-        addCollider({ type: 'box', minX: x - hx, maxX: x + hx, minY: y, maxY: y + 1.42, minZ: z - hz, maxZ: z + hz });
+        // v25: auto realistiche (berlina, utilitaria, SUV) con vernice metallizzata
+        const cv = Math.floor(rnd() * CAR_VARIANTS), D = CAR_DIMS[cv];
+        special('car', x, z, y + 0.02, null, { rot: (it.vert ? 0 : Math.PI / 2) + flip, c: cv, paint: Math.floor(rnd() * CAR_PAINTS.length) });
+        const hx = it.vert ? D.hx : D.hz, hz = it.vert ? D.hz : D.hx;
+        addCollider({ type: 'box', minX: x - hx, maxX: x + hx, minY: y, maxY: y + D.h, minZ: z - hz, maxZ: z + hz });
         stats.auto++;
       }
     }

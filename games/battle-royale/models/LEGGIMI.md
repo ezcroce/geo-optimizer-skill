@@ -17,6 +17,17 @@ e li usa al posto di quelli procedurali:
 Note:
 - il modello viene raddrizzato se è in asse Z, centrato, appoggiato a terra e scalato alla misura giusta;
 - vengono usati i colori dei materiali (le texture diventano il loro colore medio);
-- `04_personaggi_3_varianti.glb` non viene caricato: i personaggi del gioco sono fatti a pezzi
-  separati (braccia, gambe, testa) per poter essere animati. Le tre varianti sono state ricreate
-  come skin: **Soldato Tattico**, **Esploratrice** e **Meccanico**.
+- `04_personaggi_3_varianti.glb` non viene caricato direttamente: le tre varianti sono state ricreate
+  come skin (**Soldato Tattico**, **Esploratrice**, **Meccanico**).
+
+## Personaggi realistici (v25) — cartella `chars/`
+
+| File | Uso |
+|---|---|
+| `chars/soldato.glb` | corpo di quasi tutte le skin (armatura ricolorata secondo la skin) |
+| `chars/donna.glb` | Esploratrice, Tamsin, Scienziata, Giardiniera |
+
+Sono modelli con scheletro standard Mixamo (`mixamorig:Hips`, `Spine`, `LeftArm`…): si possono sostituire
+con qualunque personaggio esportato da Mixamo/Blender in .glb con lo stesso scheletro e lo stesso nome file.
+Lo scheletro procedurale del gioco fa le animazioni e la posa viene trasferita alle ossa (`js/realchar.js`).
+Se i file mancano si torna ai personaggi procedurali.

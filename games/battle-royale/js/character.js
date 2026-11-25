@@ -1,5 +1,6 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
+import { REAL, attachReal, realKind } from './realchar.js?v=25';
 import { normalFromHeight, NORMALS } from './texgen.js?v=19';
 import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=19';
 /** normal map ricavata dalla trama (cache per texture) */
@@ -531,7 +532,9 @@ export function buildCharacter(skin, cos = {}) {
 
   // ── zaino (della skin o scelto nell'armadietto) ──
   const backId = cos.back && cos.back !== 'none' ? cos.back : (skin.backpack ? 'skinpack' : null);
+  const backStart = torso.children.length;
   if (backId) buildBack(backId, skin, torso, cos);
+  const backParts = torso.children.slice(backStart);
 
   // ── mantello ──
   let cape = null;
@@ -692,7 +695,9 @@ export function buildCharacter(skin, cos = {}) {
   }
   // ── corpo unico senza giunture: busto, collo, braccia e gambe in una sola mesh deformabile ──
   body.add(buildBodySkin(skin, { torso, head, legs, knees, feet, arms, elbows, hands, shirtM, pantsM, skinM, neckM }));
+  const hatStart = head.children.length;
   if (hasHat) buildHat(hasHat, skin, head);
+  const hatParts = head.children.slice(hatStart);
   if (skin.hero) buildHero(skin, { legs, knees, feet, arms, elbows, hands, torso, head, skinM, shirtM, pantsM, hasHat });
 
   // Punto in cui l'arma viene impugnata
@@ -708,7 +713,11 @@ export function buildCharacter(skin, cos = {}) {
   lod.visible = false;
   root.add(lod);
 
-  return { root, body, legs, knees, feet, arms, elbows, hands, torso, head, gunPivot, cape, lod, lids };
+  const m = { root, body, legs, knees, feet, arms, elbows, hands, torso, head, gunPivot, cape, lod, lids };
+  // v25: modello umano realistico (se caricato) al posto delle mesh procedurali; lo scheletro resta per le animazioni.
+  // Il soldato ha già l'elmetto: i cappelli si vedono solo sul modello femminile
+  if (REAL.ready && !cos.procedural) attachReal(m, skin, { hat: realKind(skin) === 'woman' ? hatParts : [], back: backParts, cape });
+  return m;
 }
 function mask(skin) { return skin.acc === 'ninja'; }
 

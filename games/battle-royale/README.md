@@ -24,6 +24,24 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: grafica realistica (v25)
+
+- **Personaggi veri** (`js/realchar.js`): al posto dei pupazzi fatti di cubi, sfere e cilindri ci sono modelli
+  umani scolpiti e texturizzati con scheletro Mixamo (`models/chars/soldato.glb`, `models/chars/donna.glb`).
+  Lo scheletro procedurale continua a fare tutte le animazioni (corsa, mira, arrampicata, nuoto, deltaplano,
+  emote, morte) e ogni fotogramma la posa viene **trasferita alle ossa** del modello; con l'arma in mano le
+  braccia usano la **cinematica inversa** così le mani restano sull'impugnatura e le dita si chiudono sull'arma.
+  Le skin **ricolorano** armatura, tessuti e dettagli direttamente nello shader (la texture originale con pieghe,
+  graffi e cuciture resta). Cappelli, zaini e mantelli si agganciano alla testa e alla schiena vere.
+  Se i modelli non si caricano si torna ai personaggi procedurali.
+- **Auto realistiche** (`js/cars.js`): carrozzeria a superficie continua (cofano, parabrezza, tetto, lunotto,
+  passaruota, fiancate bombate) in tre modelli — berlina, utilitaria, SUV — con **vernice metallizzata e
+  trasparente lucido** che riflette il cielo, vetri a specchio, gomme con spalla, cerchi in lega a 5 razze,
+  fari, fendinebbia, fanali, griglia, specchietti, maniglie cromate e **targhe italiane**.
+- **Soffitti**: entrando in una casa o in un palazzo tetto e piani superiori non spariscono più. Soffitti
+  intonacati con plafoniera; la telecamera si accorcia contro soffitti e pareti.
+- Crediti modelli: `soldato.glb` e `donna.glb` provengono dagli esempi di three.js (personaggi Mixamo, Adobe).
+
 ### Novità: città vere (v24)
 
 - **Città molto più grandi e complete** (`js/city.js`). Ogni città ha un **reticolo di strade** con piazza centrale.
@@ -279,6 +297,8 @@ js/noise.js     rumore simplex / frattale per il terreno
 js/world.js     terreno, biomi, città tematiche, chunk (dettaglio + LOD), collisioni, raycast
 js/city.js      generatore delle città: strade, piazze, palazzi a più piani, negozi, capannoni, arredo urbano
 js/citytex.js   texture procedurali delle città: facciate, asfalto, marciapiedi, insegne, prodotti
+js/realchar.js  personaggi realistici: caricamento dei modelli .glb, ricolori delle skin, retargeting della posa e IK delle braccia
+js/cars.js      auto realistiche: carrozzeria, vernice metallizzata, vetri, ruote, fari e targhe
 js/weather.js   nebbia d'altezza, montagne all'orizzonte, neve / foglie / polvere locali
 js/events.js    eventi della partita (rifornimento, meteoriti, nebbia, bufera, ora d'oro, bassa gravità)
 js/props.js     modelli low-poly (alberi, rocce, legna, mattoni, barili, casetta) e caricamento dei .glb

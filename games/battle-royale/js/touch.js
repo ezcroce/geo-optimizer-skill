@@ -23,6 +23,7 @@ const ICON = {
   pause: '<svg viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>',
   map: '<svg viewBox="0 0 24 24"><path d="M9 4l6 2 5-2v16l-5 2-6-2-5 2V6zm0 2.2v11.6l6 2V8.2z" fill="currentColor"/></svg>',
   emote: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="1.3" fill="currentColor"/><circle cx="15" cy="10" r="1.3" fill="currentColor"/><path d="M8 14.2c2.2 2.6 5.8 2.6 8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  inv: '<svg viewBox="0 0 24 24"><path d="M9 4h6a2 2 0 0 1 2 2v1h1.5A2.5 2.5 0 0 1 21 9.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5A2.5 2.5 0 0 1 5.5 7H7V6a2 2 0 0 1 2-2zm0 2v1h6V6zm-2 6v2h10v-2z" fill="currentColor"/></svg>',
   drop: '<svg viewBox="0 0 24 24"><path d="M12 15l-5-5h3V4h4v6h3zM5 18h14v2H5z" fill="currentColor"/></svg>',
 };
 
@@ -52,6 +53,7 @@ export function createTouch(api) {
       <button class="tbtn tsmall" data-b="map" aria-label="Mappa">${ICON.map}</button>
       <button class="tbtn tsmall" data-b="emote" aria-label="Balletto">${ICON.emote}</button>
       <button class="tbtn tsmall" data-b="drop" aria-label="Lascia oggetto">${ICON.drop}</button>
+      <button class="tbtn tsmall" data-b="inv" aria-label="Inventario">${ICON.inv}</button>
     </div>`;
   document.body.appendChild(root);
   const $ = s => root.querySelector(s);
@@ -74,6 +76,7 @@ export function createTouch(api) {
     map: () => press('KeyM'),
     drop: () => press('KeyG'),
     pause: () => api.togglePause(),
+    inv: () => api.toggleInv && api.toggleInv(),
   };
   const UP = {
     fire: () => { mouse.left = false; },

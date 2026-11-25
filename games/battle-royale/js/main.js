@@ -5,28 +5,29 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=17';
-import * as PR from './progress.js?v=17';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=17';
-import { initMenu } from './menu.js?v=17';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=17';
-import { initSettingsUI } from './settings-ui.js?v=17';
-import { applyAnisotropy } from './texgen.js?v=17';
-import * as A from './audio.js?v=17';
+} from './config.js?v=18';
+import * as PR from './progress.js?v=18';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=18';
+import { initMenu } from './menu.js?v=18';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=18';
+import { initSettingsUI } from './settings-ui.js?v=18';
+import { applyAnisotropy } from './texgen.js?v=18';
+import * as A from './audio.js?v=18';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=17';
-import { createWeather } from './weather.js?v=17';
-import { createEvents } from './events.js?v=17';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=17';
-import { weaponIcon } from './weapons.js?v=17';
-import { consIcon } from './items.js?v=17';
-import { buildChestMesh } from './models3d.js?v=17';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=17';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=17';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=17';
+} from './world.js?v=18';
+import { createWeather } from './weather.js?v=18';
+import { createEvents } from './events.js?v=18';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=18';
+import { weaponIcon } from './weapons.js?v=18';
+import { consIcon } from './items.js?v=18';
+import { buildChestMesh } from './models3d.js?v=18';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=18';
+import { createInventory } from './inventory.js?v=18';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=18';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=18';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -2142,6 +2143,14 @@ const mouse = { left: false, right: false, leftPressed: false };
 let pointerLocked = false;
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  // v22: inventario con TAB (Esc lo chiude); mentre è aperto i tasti servono solo all'inventario
+  if (e.code === 'Tab' && G.state === 'play') { e.preventDefault(); if (!e.repeat) toggleInventory(); return; }
+  if (G.invOpen) {
+    e.preventDefault();
+    if (e.code === 'Escape') toggleInventory(false);
+    else if (!e.repeat) inventory.key(e.code);
+    return;
+  }
   if (!keys[e.code]) pressed.add(e.code);
   keys[e.code] = true;
   if (['Space', 'Tab'].includes(e.code) && G.state !== 'menu') e.preventDefault();
@@ -2151,7 +2160,7 @@ addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.left = mouse.right = false; });
 canvas.addEventListener('mousedown', e => {
   A.initAudio();
-  if (G.state === 'play' || G.state === 'bus') {
+  if ((G.state === 'play' || G.state === 'bus') && !G.invOpen) {
     if (!pointerLocked && !G.paused) requestLock();
     if (e.button === 0) { mouse.left = true; mouse.leftPressed = true; }
     if (e.button === 2) mouse.right = true;
@@ -2161,7 +2170,7 @@ addEventListener('mouseup', e => { if (e.button === 0) mouse.left = false; if (e
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('mousemove', e => {
   if (G.state === 'menu') { if (lobby.drag) lobby.rotV += e.movementX * 0.01; return; }
-  if (G.paused || G.state === 'end') return;
+  if (G.paused || G.state === 'end' || G.invOpen) return;
   if (!pointerLocked && !(e.buttons & 1) && !(e.buttons & 2)) { if (!lockFailed) return; }
   // Chrome a volte invia salti enormi subito dopo il pointer lock: ignorali
   if (performance.now() - lockTime < 120 || Math.abs(e.movementX) > 300 || Math.abs(e.movementY) > 300) return;
@@ -2189,7 +2198,7 @@ document.addEventListener('pointerlockchange', () => {
   const was = pointerLocked;
   pointerLocked = document.pointerLockElement === canvas;
   if (pointerLocked) lockTime = performance.now();
-  if (was && !pointerLocked && (G.state === 'play' || G.state === 'bus') && !G.paused) togglePause(true);
+  if (was && !pointerLocked && (G.state === 'play' || G.state === 'bus') && !G.paused && !G.invOpen) togglePause(true);
 });
 document.addEventListener('pointerlockerror', () => { lockFailed = true; });
 
@@ -2204,6 +2213,7 @@ const touch = createTouch({
     G.camPitch = clamp(G.camPitch - dy * s * (settings.invertY ? -1 : 1), -1.35, 1.35);
   },
   togglePause: () => togglePause(true),
+  toggleInv: () => toggleInventory(),
   onSlot(i) {
     const p = G.player;
     if (!p || !p.alive || G.state !== 'play') return;
@@ -2214,6 +2224,53 @@ const touch = createTouch({
 const touchOn = () => settings.touch === 'on' || (settings.touch !== 'off' && IS_TOUCH_DEVICE);
 /** testo dei suggerimenti: tastiera o touch */
 const tk = (kb, tc) => touch.T.on ? tc : kb;
+
+// ─────────────── Inventario (TAB) ───────────────
+const inventory = createInventory({
+  G, weaponIconHTML, consIconHTML,
+  swap(i, j) {
+    // l'oggetto in mano resta in mano: l'indice attivo segue l'oggetto spostato
+    const p = G.player, held = p.active;
+    [p.slots[i], p.slots[j]] = [p.slots[j], p.slots[i]];
+    if (held === i) p.active = j; else if (held === j) p.active = i;
+    if (p.reloading > 0) { p.reloading = 0; p.reloadSlot = -1; }
+    p.using = null;
+    p.updateHeld();
+  },
+  drop(i) {
+    const p = G.player, sl = p.slots[i];
+    if (!sl) return;
+    dropAt(p, itemFromSlot(sl));
+    p.slots[i] = null;
+    if (i === p.active) { p.using = null; p.reloading = 0; }
+    p.updateHeld();
+  },
+  dropAmmo(id) {
+    const p = G.player, n = Math.min(p.ammo[id], AMMO_TYPES[id].pickup);
+    if (n <= 0) return;
+    p.ammo[id] -= n;
+    dropAt(p, { kind: 'ammo', id, count: n });
+  },
+  equip(i) { const p = G.player; p.setActive(i); if (G.build.on) toggleBuild(false); },
+  onOpen() {
+    for (const k in keys) keys[k] = false;
+    pressed.clear();
+    mouse.left = mouse.right = false;
+    touch.T.mx = touch.T.my = 0; touch.T.sprint = false;
+    G.ads = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    document.body.classList.add('inv-open');
+  },
+  onClose() {
+    document.body.classList.remove('inv-open');
+    if (G.state === 'play' && !G.paused && G.player && G.player.alive) requestLock();
+  },
+  sound: k => A.playInv(k),
+});
+function toggleInventory(force) {
+  if (force === undefined && !G.invOpen && G.paused) return;
+  inventory.toggle(force);
+}
 
 // ─────────────── Schermo intero ───────────────
 const inFrame = (() => { try { return window.top !== window.self; } catch { return true; } })();
@@ -2256,6 +2313,7 @@ addEventListener('keydown', e => {
 
 function togglePause(force) {
   G.paused = force !== undefined ? force : !G.paused;
+  if (G.paused && G.invOpen) inventory.close();
   $('#pause').classList.toggle('hidden', !G.paused);
   mouse.left = mouse.right = false;
 }
@@ -2661,6 +2719,7 @@ function updateDmgNums(dt) {
 function fmtTime(t) { t = Math.max(0, Math.ceil(t)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; }
 
 function updateHUD(dt) {
+  inventory.update();
   const p = G.player;
   setHTML(hud.alive, 'alive', String(aliveCount()));
   setHTML(hud.kills, 'kills', String(p.kills));
@@ -2871,6 +2930,7 @@ function makeBotNames(n) {
 }
 
 function clearMatch() {
+  inventory.close();
   events.reset();
   weather.hide();
   world.resetProps();
@@ -3043,6 +3103,7 @@ function endMatch(win) {
   if (win && G.player && G.player.alive && G.player.mode === 'ground') startEmote(G.player, 'tifo');
   if (G.endShown) return;
   G.endShown = true;
+  inventory.close();
   G.state = 'end';
   G.ads = false;
   if (document.pointerLockElement) document.exitPointerLock();

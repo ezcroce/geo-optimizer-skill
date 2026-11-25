@@ -125,6 +125,14 @@ export function playDoor(open = true, vol = 1) {
   else { noise(0.12, 380, 1, 0.45 * vol, 'lowpass', 0.18); tone(110, 0.12, 0.25 * vol, 'sine', 0.18, 70); tone(380, 0.2, 0.03 * vol, 'sawtooth', 0, 300); }
 }
 export function playUI() { tone(880, 0.05, 0.12, 'triangle'); }
+/** v22: suoni dell'inventario (zaino che si apre/chiude, oggetto spostato, gettato, selezione) */
+export function playInv(kind) {
+  if (kind === 'open') { noise(0.16, 900, 0.8, 0.14, 'bandpass', 0, 0.14); tone(420, 0.07, 0.07, 'triangle', 0.04, 620); }
+  else if (kind === 'close') { noise(0.12, 700, 0.8, 0.12, 'bandpass', 0, 0.1); tone(560, 0.06, 0.06, 'triangle', 0.02, 380); }
+  else if (kind === 'move') { noise(0.06, 2400, 2, 0.12, 'bandpass'); tone(760, 0.05, 0.08, 'triangle', 0.03); }
+  else if (kind === 'drop') { noise(0.14, 500, 1, 0.2, 'lowpass', 0, 0.12); tone(220, 0.1, 0.1, 'sine', 0, 120); }
+  else tone(1100, 0.03, 0.06, 'triangle');
+}
 export function playVictory() {
   const n = [523, 659, 784, 1046, 784, 1046];
   n.forEach((f, i) => tone(f, 0.35, 0.22, 'triangle', i * 0.16));

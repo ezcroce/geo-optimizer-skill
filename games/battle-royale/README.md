@@ -24,6 +24,17 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: inventario (TAB), legno e rocce rifatti
+
+- **Inventario con <kbd>TAB</kbd>** (sul telefono c'è il pulsante 🎒 in alto). Si apre un pannello con i 5 slot, che mostrano l'icona 3D, il colore della rarità, il caricatore, le munizioni di riserva e le quantità.
+  - Gli oggetti si **riordinano trascinandoli** con il mouse o con il dito. In alternativa si seleziona uno slot e si preme <kbd>1</kbd>–<kbd>5</kbd>, oppure si usano i pulsanti ◀ ▶. L'arma che hai in mano resta in mano.
+  - Si **gettano a terra** trascinandoli sulla zona rossa, con *Getta* o con <kbd>G</kbd>. Si impugnano con *Impugna*, con <kbd>E</kbd> o con un doppio clic.
+  - Il pannello dei dettagli mostra le **statistiche** dell'arma in barre: danno (con la rarità), danni al secondo, cadenza, precisione, portata, caricatore e ricarica. Mostra anche il tipo di munizione, con un avviso se è finita. Per le cure indica l'effetto e il tempo d'uso.
+  - Sulla destra trovi **munizioni** per tipo, con quali slot le usano. Si possono gettare a pacchetti con ⤓. Ci sono anche i materiali e il riepilogo delle cure, mentre salute e scudo sono in alto.
+  - Mentre l'inventario è aperto il cursore è libero e il personaggio si ferma. La partita però continua, quindi occhio. Si chiude con <kbd>TAB</kbd> o <kbd>Esc</kbd>.
+- **Legno sistemato**: le venature ora sono lunghe, lisce e continue, e da lontano si sfumano. Prima il rumore procedurale creava blocchi a "pixel" e anelli a macchie su capanni, torri dell'acqua, barili e cataste. Le casse hanno assi pulite, senza la grana a puntini. Le facce piatte non si dividono più in triangoli chiari e scuri.
+- **Rocce più belle**: niente più quadretti né puntini da vicino. Il rilievo viene da rumore 3D liscio invece che dalla texture. Le rocce hanno macchie morbide, strati ondulati e una leggera marezzatura. Il **muschio** cresce sulle facce in alto nei prati e nei boschi, mentre in montagna e nella zona innevata c'è una **calotta di neve** con bordo irregolare (prima erano triangoli bianchi e verdi a caso). Nel deserto le rocce sono in arenaria senza muschio.
+
 ### Novità: porte, case arredate, nuoto realistico e partite più lunghe
 
 - **Porte vere**: ogni ingresso ha due ante in legno verniciato con riquadri in rilievo e maniglie d'ottone. Si aprono e chiudono con <kbd>E</kbd> (o *APRI*/*CHIUDI* sul telefono), con cigolio e battuta. Da chiuse bloccano passaggio e proiettili. I bot le aprono quando ci passano e online sono sincronizzate.

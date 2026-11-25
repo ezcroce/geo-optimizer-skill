@@ -12,9 +12,9 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=17" />
+<link rel="stylesheet" href="style.css?v=18" />
 <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=17", "three/addons/": "./vendor/addons/" } }
+  { "imports": { "three": "./vendor/three.module.js?v=18", "three/addons/": "./vendor/addons/" } }
 </script>
 </head>
 <body>
@@ -89,7 +89,7 @@
         <div>🕹️ <b>Pollice sinistro</b>: joystick per muoverti (spingi fino in fondo per correre)</div>
         <div>👆 <b>Trascina a destra</b> per guardarti intorno · il pulsante di fuoco si può trascinare per mirare mentre spari</div>
         <div>🎯 Spara · Mira · Salta · Abbassati · Ricarica · Costruisci · tocca gli slot per cambiare arma</div>
-        <div>⏸ Pausa · 🗺 Mappa (o tocca la minimappa) · 😀 Balletti · ⬇ Lascia oggetto</div>
+        <div>⏸ Pausa · 🗺 Mappa (o tocca la minimappa) · 😀 Balletti · ⬇ Lascia oggetto · 🎒 Inventario</div>
       </div>
       <div class="controls keyhelp">
         <b>Comandi</b>
@@ -97,7 +97,7 @@
         <div><kbd>C</kbd> abbassati (nell'erba alta sei nascosto) · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
         <div><kbd>Mouse</kbd> mira · <kbd>Click sx</kbd> spara/usa · <kbd>Click dx</kbd> mira di precisione</div>
         <div><kbd>1-5</kbd> / <kbd>Rotella</kbd> cambia slot · <kbd>R</kbd> ricarica · <kbd>E</kbd> raccogli / apri forziere</div>
-        <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>G</kbd> lascia oggetto · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>9</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
+        <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>TAB</kbd> inventario · <kbd>G</kbd> lascia oggetto · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>9</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
       </div>
     </div>
     <div class="menu-right">
@@ -195,6 +195,26 @@
   <div class="bigmap-box"><canvas id="bigmapCanvas" width="640" height="640"></canvas><div class="hint">M per chiudere</div></div>
 </div>
 
+<div id="inventory" class="screen hidden">
+  <div class="invbox">
+    <div class="invhead">
+      <h2>INVENTARIO</h2>
+      <div id="invBars"></div>
+      <span class="invhint"><kbd>TAB</kbd> / <kbd>Esc</kbd> chiudi</span>
+      <button class="ghost tiny" data-a="close" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="invmain">
+      <div class="invleft">
+        <div id="invSlots"></div>
+        <div id="invDrop">⤓ Trascina qui per gettare a terra</div>
+        <div id="invDetail"></div>
+      </div>
+      <div id="invAmmo"></div>
+    </div>
+    <div class="invtips">Trascina gli oggetti per riordinarli · seleziona e premi <kbd>1</kbd>–<kbd>5</kbd> per spostarli · <kbd>E</kbd> o doppio clic impugna · <kbd>G</kbd> getta</div>
+  </div>
+</div>
+
 <div id="pause" class="screen hidden">
   <div class="box">
     <h2>PAUSA</h2>
@@ -232,7 +252,7 @@
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
 
-<script type="module" src="js/main.js?v=17"></script>
-<script src="js/transition.js?v=17"></script>
+<script type="module" src="js/main.js?v=18"></script>
+<script src="js/transition.js?v=18"></script>
 </body>
 </html>

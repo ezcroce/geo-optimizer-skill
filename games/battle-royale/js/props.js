@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=17';
+import { normalFromHeight, NORMALS } from './texgen.js?v=18';
 
 function mulberry32(a) {
   return function () {
@@ -42,13 +42,17 @@ export function mergeParts(parts, seed = 1) {
     if (o.post) g.applyMatrix4(o.post);
     const P = g.attributes.position;
     const base = new THREE.Color(color);
+    const faceK = new Map();
     for (let i = 0; i < P.count; i += 3) {
       a.fromBufferAttribute(P, i); b.fromBufferAttribute(P, i + 1); cc.fromBufferAttribute(P, i + 2);
       n.subVectors(cc, b).cross(_p.subVectors(a, b)).normalize();
       if (o.colorFn) _c.set(o.colorFn(n.x, n.y, n.z, (a.x + b.x + cc.x) / 3, (a.y + b.y + cc.y) / 3, (a.z + b.z + cc.z) / 3, rnd) || color);
       else _c.copy(base);
       const j = o.jit ?? 0.08;
-      const k = 1 + (rnd() * 2 - 1) * j;
+      // v22: stessa variazione per i triangoli complanari (niente diagonali chiare/scure sulle facce piatte di assi e casse)
+      const nk = `${n.x.toFixed(2)},${n.y.toFixed(2)},${n.z.toFixed(2)}`;
+      let k = faceK.get(nk);
+      if (k === undefined) { k = 1 + (rnd() * 2 - 1) * j; faceK.set(nk, k); }
       // le facce rivolte verso l'alto sono un po' più chiare (luce dal cielo)
       const sky = o.noSky ? 1 : 1 + Math.max(0, n.y) * 0.06;
       const r = Math.min(1, _c.r * k * sky), gg = Math.min(1, _c.g * k * sky), bb = Math.min(1, _c.b * k * sky);
@@ -279,10 +283,11 @@ function makeRock(seed, kind = 0) {
   if (kind === 1) g.scale(1.35, 0.5, 1.1);
   if (kind === 2) g.scale(0.75, 1.45, 0.8);
   if (kind === 3) { g.scale(1.15, 0.85, 1); }
-  const moss = rnd() < 0.5 ? '#6f8a4a' : '#7b9450';
-  return withUV(mergeParts([part(g, '#8f8b82', {
-    jit: 0.1,
-    colorFn: (nx, ny, nz, x, y, z, r) => ny > 0.55 && r() < 0.65 ? moss : (ny < -0.2 ? '#6e6a62' : (r() < 0.25 ? '#7d7970' : (r() < 0.3 ? '#9d988c' : '#928e85'))),
+  // v22: colore di base uniforme con leggere variazioni per faccia (stile low-poly); muschio e neve li dipinge lo shader
+  const warm = rnd() < 0.5;
+  return withUV(mergeParts([part(g, warm ? '#948e84' : '#8c8b86', {
+    jit: 0.06,
+    colorFn: (nx, ny) => (ny < -0.25 ? (warm ? '#76716a' : '#706f6b') : null),
   })], seed));
 }
 function makePebbles() {
@@ -381,47 +386,40 @@ function makeBush(seed, flowers = null) {
 
 // ═════════════ texture della pietra (dati lineari, media ~0,5) ═════════════
 function makeStoneTexture() {
+  // v22: niente grana per pixel (dava il "rumore" a quadretti da vicino): solo macchie morbide e venature sfumate
   const S = 256, c = document.createElement('canvas');
   c.width = c.height = S;
   const g = c.getContext('2d');
   g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, S, S);
   const wrap = (fn) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) fn(ox, oy); };
   const rnd = mulberry32(999);
-  // macchie morbide chiare/scure
-  for (let i = 0; i < 90; i++) {
-    const x = rnd() * S, y = rnd() * S, r = 8 + rnd() * 30, v = rnd() < 0.5 ? 0 : 255;
-    wrap((ox, oy) => {
-      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
-      gr.addColorStop(0, `rgba(${v},${v},${v},0.16)`); gr.addColorStop(1, `rgba(${v},${v},${v},0)`);
-      g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
-    });
+  for (const [n, r0, r1, a] of [[40, 30, 70, 0.10], [120, 10, 28, 0.09], [260, 4, 10, 0.06]]) {
+    for (let i = 0; i < n; i++) {
+      const x = rnd() * S, y = rnd() * S, r = r0 + rnd() * (r1 - r0), v = rnd() < 0.5 ? 0 : 255;
+      wrap((ox, oy) => {
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+        gr.addColorStop(0, `rgba(${v},${v},${v},${a})`); gr.addColorStop(1, `rgba(${v},${v},${v},0)`);
+        g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+      });
+    }
   }
-  // crepe
-  g.lineCap = 'round';
-  for (let i = 0; i < 26; i++) {
+  // venature sottili e sfumate
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.filter = 'blur(1px)';
+  for (let i = 0; i < 14; i++) {
     let x = rnd() * S, y = rnd() * S, a = rnd() * 6.28;
     const pts = [[x, y]];
-    for (let k = 0; k < 6 + rnd() * 8; k++) { a += (rnd() - 0.5) * 1.2; x += Math.cos(a) * 7; y += Math.sin(a) * 7; pts.push([x, y]); }
+    for (let k = 0; k < 8 + rnd() * 8; k++) { a += (rnd() - 0.5) * 0.7; x += Math.cos(a) * 9; y += Math.sin(a) * 9; pts.push([x, y]); }
     wrap((ox, oy) => {
-      g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.4;
+      g.strokeStyle = 'rgba(30,30,30,0.22)'; g.lineWidth = 2.2;
       g.beginPath(); pts.forEach(([px, py], k) => k ? g.lineTo(px + ox, py + oy) : g.moveTo(px + ox, py + oy)); g.stroke();
-      g.strokeStyle = 'rgba(255,255,255,0.18)'; g.lineWidth = 1;
-      g.beginPath(); pts.forEach(([px, py], k) => k ? g.lineTo(px + ox + 1, py + oy + 1) : g.moveTo(px + ox + 1, py + oy + 1)); g.stroke();
     });
   }
-  // grana e puntini (granito)
-  const img = g.getImageData(0, 0, S, S), d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    let v = (rnd() - 0.5) * 34;
-    const q = rnd();
-    if (q < 0.025) v -= 50; else if (q > 0.985) v += 45;
-    d[i] += v; d[i + 1] += v; d[i + 2] += v;
-  }
-  g.putImageData(img, 0, 0);
+  g.filter = 'none';
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.NoColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
@@ -501,7 +499,7 @@ function makeBarrel(kind) {
     const pts = [];
     for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(new THREE.Vector2(prof(t), t * H)); }
     const lathe = new THREE.LatheGeometry(pts, 18);
-    parts.push(part(lathe, '#8a5a30', { jit: 0.05, colorFn: (nx, ny, nz, x, y, z, rnd) => {
+    parts.push(part(lathe, '#8a5a30', { jit: 0, colorFn: (nx, ny, nz, x, y, z, rnd) => {
       const a = Math.atan2(z, x), k = Math.floor((a + Math.PI) / (Math.PI * 2) * 18);
       return ['#8f5e33', '#7e5029', '#986638', '#84552d'][k % 4];
     } }));
@@ -678,28 +676,61 @@ export const bushMaterial = addWind(new THREE.MeshStandardMaterial({ vertexColor
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
 const stoneTex = makeStoneTexture();
-// v21: niente normal map in UV (dava riflessi a scatti); rilievo calcolato in triplanare (bump con le derivate),
-// cavità più scure, venature a strati e luminosità limitata (niente bagliori sulle facce al sole)
+// rumore 3D liscio per gli shader (hash senza seno: stabile anche con coordinate grandi)
+const GLSL_NOISE = `
+  float rHash(vec3 p3) { p3 = fract(p3 * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
+  float rNoise(vec3 x) {
+    vec3 i = floor(x), f = fract(x); vec3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    return mix(mix(mix(rHash(i), rHash(i + vec3(1, 0, 0)), u.x), mix(rHash(i + vec3(0, 1, 0)), rHash(i + vec3(1, 1, 0)), u.x), u.y),
+               mix(mix(rHash(i + vec3(0, 0, 1)), rHash(i + vec3(1, 0, 1)), u.x), mix(rHash(i + vec3(0, 1, 1)), rHash(i + vec3(1, 1, 1)), u.x), u.y), u.z);
+  }
+  // fbm che si spegne quando le ottave diventano più piccole di un pixel (niente sfarfallio né puntini)
+  float rFbm(vec3 p, float fw) {
+    float s = 0.0, a = 0.5;
+    for (int i = 0; i < 4; i++) { s += a * (rNoise(p) - 0.5) * (1.0 - smoothstep(0.25, 0.7, fw)); p = p * 2.03 + vec3(7.1, 3.7, 1.3); fw *= 2.03; a *= 0.5; }
+    return s;
+  }
+`;
+// v22: roccia ridisegnata. Niente rilievo preso dalla texture (i texel filtrati davano i "quadretti"): forme e rilievo
+// vengono da rumore 3D liscio che si attenua con la distanza; venature a strati morbide, muschio e neve sulle facce in alto
 export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0.0, flatShading: true, map: stoneTex });
 rockMaterial.onBeforeCompile = (sh) => {
   sh.vertexShader = sh.vertexShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position; vON = normal;');
+    .replace('#include <common>', '#include <common>\nattribute vec2 aSurf;\nvarying vec3 vOP;\nvarying vec3 vON;\nvarying vec2 vSurf;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position; vON = normal; vSurf = aSurf;');
   sh.fragmentShader = sh.fragmentShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vOP;\nvarying vec3 vON;\nfloat rockH;')
-    .replace('#include <map_fragment>', `
+    .replace('#include <common>', `#include <common>
+        varying vec3 vOP;
+        varying vec3 vON;
+        varying vec2 vSurf;
+        float rockH;
+        ${GLSL_NOISE}`)
+    .replace('#include <map_fragment>', '')   // la texture si campiona in triplanare qui sotto (le UV delle rocce sono vuote)
+    .replace('#include <color_fragment>', `#include <color_fragment>
       {
-        vec3 w = abs(normalize(vON)); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z);
-        vec3 p = vOP * 0.9;
-        float t = texture2D(map, p.yz, 0.8).r * w.x + texture2D(map, p.xz, 0.8).r * w.y + texture2D(map, p.xy, 0.8).r * w.z;
-        vec3 p2 = vOP * 0.32;
-        float f = texture2D(map, p2.yz, 3.0).r * w.x + texture2D(map, p2.xz, 3.0).r * w.y + texture2D(map, p2.xy, 3.0).r * w.z;   // mip sfocato: forme, non grana
-        float t2 = texture2D(map, p.zx * 0.31 + 0.5).r;
-        float strata = 0.5 + 0.5 * sin(vOP.y * 3.0 + t2 * 5.0);
-        rockH = f;   // rilievo a grana grossa (niente sfarfallio da vicino)
-        float cav = smoothstep(0.18, 0.55, rockH);                       // crepe e cavità in ombra
-        diffuseColor.rgb *= clamp((0.5 + 0.6 * t) * (0.86 + 0.24 * t2) * (0.92 + 0.12 * strata), 0.3, 1.04) * mix(0.7, 1.0, cav);
-        diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8));             // le rocce non diventano mai bianche abbaglianti
+        vec3 P = vOP;
+        vec3 nn = normalize(vON);
+        float fw = length(fwidth(P));
+        float n1 = rFbm(P * 0.45, fw * 0.45);                         // grandi macchie
+        float n2 = rFbm(P * 1.9 + 11.0, fw * 1.9);                    // dettaglio medio
+        // texture di pietra solo come leggera marezzatura (mip normali, niente grana)
+        vec3 w = abs(nn); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z);
+        vec3 tp = P * 0.35;
+        float t = texture2D(map, tp.yz).r * w.x + texture2D(map, tp.xz).r * w.y + texture2D(map, tp.xy).r * w.z;
+        // strati della roccia: bande morbide e ondulate, sfumate se troppo fitte per lo schermo
+        float sp = P.y * 2.2 + n1 * 5.0;
+        float bandAA = 1.0 - smoothstep(0.4, 1.2, fwidth(sp));
+        float strata = (0.5 + 0.5 * sin(sp)) * bandAA + 0.5 * (1.0 - bandAA);
+        float tone = (1.0 + n1 * 0.36 + n2 * 0.14) * (0.94 + 0.1 * t) * (0.94 + 0.1 * strata);
+        diffuseColor.rgb *= clamp(tone, 0.55, 1.2);
+        // muschio (prati, boschi) e neve (montagna) sulle facce rivolte verso l'alto, con bordo irregolare
+        float up = nn.y + n1 * 0.9 + n2 * 0.4;
+        float moss = vSurf.y * smoothstep(0.42, 0.72, up);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.20, 0.30, 0.09) * (0.85 + n2 * 0.8 + t * 0.3), moss);
+        float snow = clamp(vSurf.x, 0.0, 1.0) * smoothstep(0.5, 0.78, up);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82) * (0.97 + n2 * 0.1), snow);
+        diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8));            // mai bianco abbagliante
+        rockH = (n1 * 0.6 + n2 * 0.4) * (1.0 - snow * 0.7);
       }`)
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
@@ -708,13 +739,14 @@ rockMaterial.onBeforeCompile = (sh) => {
         vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
         float det = dot(dpx, r1);
         vec3 grad = sign(det) * (dhx * r1 + dhy * r2);
-        normal = normalize(abs(det) * normal - grad * 2.2);
+        normal = normalize(abs(det) * normal - grad * 0.9);
       }`)
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = 1.0;');
 };
-rockMaterial.customProgramCacheKey = () => 'rock-triplanar-v21';
+rockMaterial.customProgramCacheKey = () => 'rock-v22';
 
-/** rilievo procedurale (bump con rumore 3D) per legno e metallo degli oggetti di scena: più tridimensionali */
+/** rilievo procedurale (bump con rumore 3D) per legno e metallo degli oggetti di scena: più tridimensionali
+ *  v22: venature lisce e continue (prima l'hash dava blocchi e anelli a macchie), che si sfumano da lontano */
 function addSurfaceDetail(mat, key, opts) {
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
@@ -725,31 +757,34 @@ function addSurfaceDetail(mat, key, opts) {
         varying vec3 vSP;
         varying vec3 vSN;
         float surfH;
-        float h31(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-        float vnoise(vec3 x) {
-          vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-          return mix(mix(mix(h31(i), h31(i + vec3(1, 0, 0)), f.x), mix(h31(i + vec3(0, 1, 0)), h31(i + vec3(1, 1, 0)), f.x), f.y),
-                     mix(mix(h31(i + vec3(0, 0, 1)), h31(i + vec3(1, 0, 1)), f.x), mix(h31(i + vec3(0, 1, 1)), h31(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-        }`)
+        ${GLSL_NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         {
           vec3 c = vColor.rgb;
           float gr = c.g / max(c.r, 0.001);
           float woody = ${opts.wood === false ? '0.0' : '1.0'} * smoothstep(0.25, 0.33, gr) * (1.0 - smoothstep(0.68, 0.75, gr)) * (1.0 - smoothstep(0.62, 0.7, c.r)) * step(c.b, c.g);   // marroni (spazio lineare) → legno
-          vec3 n = abs(normalize(vSN));
-          // legno: venature allungate lungo l'asse principale della faccia
+          // legno: coordinate "stirate" lungo la fibra, deformate piano → venature lunghe e ondulate
           vec3 q = vSP * vec3(${opts.grain});
-          float g1 = vnoise(q + vec3(0.0, vnoise(vSP * 1.5) * 0.6, 0.0));
-          float rings = 0.5 + 0.5 * sin(g1 * 22.0);
-          float fine = vnoise(vSP * 13.0);
-          float wood = mix(0.9, 1.05, rings) * mix(0.94, 1.03, fine);
-          // metallo / vernice: graffi fini e macchie
-          float blot = vnoise(vSP * 4.0), scr = vnoise(vSP * vec3(22.0, 2.5, 22.0));
-          float metal = mix(0.9, 1.04, blot) * (1.0 - smoothstep(0.86, 0.95, scr) * 0.15);
+          float fw = length(fwidth(q));
+          float warp = rNoise(vSP * vec3(${opts.warp || '0.9, 0.18, 0.9'}) * 1.0) * 2.0;
+          float gx = rNoise(q) * 6.0 + rNoise(q * 1.9 + 5.0) * 2.0 + warp;
+          float aa = 1.0 - smoothstep(0.35, 1.1, fwidth(gx));            // da lontano le righe si fondono in un tono medio
+          float stripe = 0.5 + 0.5 * sin(gx * 3.14159);
+          stripe = mix(0.55, smoothstep(0.15, 0.95, stripe), aa);
+          float fiber = rNoise(q * vec3(3.0, 0.6, 3.0)) - 0.5;
+          float fiberAA = 1.0 - smoothstep(0.3, 0.9, fw * 3.0);
+          float tone = rFbm(vSP * 0.8, length(fwidth(vSP)) * 0.8);
+          float wood = mix(0.86, 1.04, stripe) * (1.0 + fiber * 0.10 * fiberAA) * (1.0 + tone * 0.35);
+          // metallo / vernice: macchie morbide e graffi fini (sfumati da lontano)
+          float blot = rNoise(vSP * 3.0);
+          vec3 sq = vSP * vec3(18.0, 2.0, 18.0);
+          float scrAA = 1.0 - smoothstep(0.3, 0.9, length(fwidth(sq)));
+          float scr = smoothstep(0.82, 0.95, rNoise(sq)) * scrAA;
+          float metal = mix(0.93, 1.03, blot) * (1.0 - scr * 0.12);
           diffuseColor.rgb *= mix(metal, wood, woody);
           // sporco e ombra di contatto verso il basso
-          diffuseColor.rgb *= mix(0.78, 1.0, smoothstep(0.0, 0.25, vSP.y));
-          surfH = mix(blot * 0.3, rings * 0.2 + fine * 0.06, woody) * ${opts.bump.toFixed(2)};
+          diffuseColor.rgb *= mix(0.8, 1.0, smoothstep(0.0, 0.25, vSP.y));
+          surfH = mix(blot * 0.15, stripe * 0.10 * aa + fiber * 0.04 * fiberAA, woody) * ${opts.bump.toFixed(2)};
         }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
@@ -760,14 +795,14 @@ function addSurfaceDetail(mat, key, opts) {
           normal = normalize(abs(det) * normal - sign(det) * (dhx * r1 + dhy * r2));
         }`);
   };
-  mat.customProgramCacheKey = () => 'surf-' + key;
+  mat.customProgramCacheKey = () => 'surf22-' + key;
   return mat;
 }
-addSurfaceDetail(propMaterial, 'prop', { grain: '7.0, 1.0, 7.0', bump: 1.0 });
+addSurfaceDetail(propMaterial, 'prop', { grain: '2.2, 0.25, 2.2', bump: 1.0 });
 
-export const metalPropMaterial = addSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.3, flatShading: true }), 'metal', { grain: '7.0, 1.0, 7.0', bump: 0.7, wood: false });
+export const metalPropMaterial = addSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.3, flatShading: true }), 'metal', { grain: '2.2, 0.25, 2.2', bump: 0.7, wood: false });
 /** legno dei tronchi accatastati: venature lungo x (l'asse dei tronchi) */
-export const logMaterial = addSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, flatShading: true }), 'log', { grain: '0.8, 7.0, 7.0', bump: 1.0 });
+export const logMaterial = addSurfaceDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, flatShading: true }), 'log', { grain: '0.25, 2.6, 2.6', warp: '0.18, 0.9, 0.9', bump: 1.0 });
 export const MODEL_SOURCE = { tree: 'procedurale', logs: 'procedurale', bricks: 'procedurale', shed: 'procedurale', barrel: 'procedurale' };
 
 // ═════════════ caricamento dei modelli GLB originali (facoltativo) ═════════════

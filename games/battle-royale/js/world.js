@@ -3,9 +3,9 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=17';
-import { makeNoise, fbm, ridged } from './noise.js?v=17';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=17';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=18';
+import { makeNoise, fbm, ridged } from './noise.js?v=18';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=18';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -772,7 +772,7 @@ function makeWoodTexture() {
     for (let i = 0; i < 16; i++) {
       const vx = x + 1 + Math.random() * (PW - 2), a = 0.06 + Math.random() * 0.16;
       g.strokeStyle = `rgba(70,35,10,${a})`; g.lineWidth = 0.5 + Math.random() * 0.6;
-      h.strokeStyle = `rgba(0,0,0,${0.12 + a})`; h.lineWidth = 0.7;
+      h.strokeStyle = `rgba(0,0,0,${0.04 + a * 0.4})`; h.lineWidth = 1.1;
       for (const ctx of [g, h]) {
         ctx.beginPath(); ctx.moveTo(vx, 0);
         for (let y = 4; y <= B; y += 4) {
@@ -808,8 +808,10 @@ function makeWoodTexture() {
     g.fillStyle = '#9a9aa0'; g.beginPath(); g.arc(x - 0.4, y - 0.4, 0.6, 0, 7); g.fill();
     h.fillStyle = '#fff'; h.beginPath(); h.arc(x, y, 1.7, 0, 7); h.fill();
   }
-  addGrain(g, S, 12); addGrain(h, H.S, 22);
-  const t = withNormal(c, H.c, 3.2);
+  // v22: niente grana per pixel sul rilievo (dava puntini e righe "rumorose" da vicino); rilievo leggermente sfocato
+  addGrain(g, S, 4);
+  { const tmp = document.createElement('canvas'); tmp.width = tmp.height = H.S; const tg = tmp.getContext('2d'); tg.filter = 'blur(0.8px)'; tg.drawImage(H.c, 0, 0); h.save(); h.setTransform(1, 0, 0, 1, 0, 0); h.drawImage(tmp, 0, 0); h.restore(); }
+  const t = withNormal(c, H.c, 2.2);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   if (t.userData.normal) t.userData.normal.wrapS = t.userData.normal.wrapT = THREE.ClampToEdgeWrapping;
   return t;
@@ -1279,7 +1281,7 @@ export function buildWorld(scene, opts = {}) {
   const knobMat = m('knob', '#d8b04a', { metalness: 0.85, roughness: 0.3 });
   const doors = [];
   const woodTex = makeWoodTexture();
-  const crateMat = texMat(woodTex, { roughness: 0.88, normalScale: new THREE.Vector2(1.5, 1.5) });
+  const crateMat = texMat(woodTex, { roughness: 0.88, normalScale: new THREE.Vector2(1.0, 1.0) });
   const metalMat = m('metal', '#6a6f78', { metalness: 0.6, roughness: 0.4 });
   const contColors = ['#c0392b', '#2471a3', '#d68910', '#1e8449'];
   const containerMats = contColors.map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
@@ -2713,7 +2715,7 @@ export function buildWorld(scene, opts = {}) {
       const nm = new THREE.Matrix3();
       let total = 0;
       for (const r of ch.rocks) total += PROPS.rocks[(r.shape ?? 0) % PROPS.rocks.length].attributes.position.count;
-      const P = new Float32Array(total * 3), Nn = new Float32Array(total * 3), C = new Float32Array(total * 3);
+      const P = new Float32Array(total * 3), Nn = new Float32Array(total * 3), C = new Float32Array(total * 3), SF = new Float32Array(total * 2);
       let o = 0;
       const v = new THREE.Vector3();
       for (const r of ch.rocks) {
@@ -2721,6 +2723,8 @@ export function buildWorld(scene, opts = {}) {
         // arenaria rossa nel deserto, roccia fredda e innevata in montagna
         const bw = biomeAt(r.x, r.z), tR = 1 + bw[2] * 0.35 - bw[1] * 0.04, tG = 1 + bw[2] * 0.02, tB = 1 - bw[2] * 0.3 + bw[1] * 0.06;
         const snowTop = bw[1] > 0.4 || r.h > 46;
+        // v22: neve e muschio sfumati dallo shader (prima erano triangoli bianchi/verdi a caso)
+        const sSnow = snowTop ? 1 : Math.max(0, (bw[1] - 0.15) * 2), sMoss = snowTop ? 0 : Math.max(0, 1 - bw[2] * 2.5 - bw[1] * 2) * (0.35 + (Math.abs(Math.sin(r.x * 12.9 + r.z * 78.2)) * 0.65));
         q.setFromEuler(eul.set(r.e[0] * 0.3, r.e[1], r.e[2] * 0.3));
         sc.set(r.s * r.k[0], r.s * r.k[1], r.s * r.k[2]);
         p.set(r.x, r.h + r.s * 0.15, r.z);
@@ -2730,15 +2734,15 @@ export function buildWorld(scene, opts = {}) {
         for (let i = 0; i < gp.count; i++, o++) {
           v.fromBufferAttribute(gp, i).applyMatrix4(mat4); P[o * 3] = v.x; P[o * 3 + 1] = v.y; P[o * 3 + 2] = v.z;
           v.fromBufferAttribute(gn, i).applyMatrix3(nm).normalize(); Nn[o * 3] = v.x; Nn[o * 3 + 1] = v.y; Nn[o * 3 + 2] = v.z;
-          if (snowTop && gn.getY(i) > 0.45) { C[o * 3] = 0.86; C[o * 3 + 1] = 0.89; C[o * 3 + 2] = 0.93; }
-          else if (bw[2] > 0.3 && gc.getY(i) > gc.getX(i) * 1.05) { C[o * 3] = 0.78; C[o * 3 + 1] = 0.6; C[o * 3 + 2] = 0.4; }   // niente muschio nel deserto
-          else { C[o * 3] = Math.min(1, gc.getX(i) * tR); C[o * 3 + 1] = gc.getY(i) * tG; C[o * 3 + 2] = gc.getZ(i) * tB; }
+          C[o * 3] = Math.min(1, gc.getX(i) * tR); C[o * 3 + 1] = gc.getY(i) * tG; C[o * 3 + 2] = gc.getZ(i) * tB;
+          SF[o * 2] = sSnow; SF[o * 2 + 1] = sMoss;
         }
       }
       const rg = new THREE.BufferGeometry();
       rg.setAttribute('position', new THREE.BufferAttribute(P, 3));
       rg.setAttribute('normal', new THREE.BufferAttribute(Nn, 3));
       rg.setAttribute('color', new THREE.BufferAttribute(C, 3));
+      rg.setAttribute('aSurf', new THREE.BufferAttribute(SF, 2));
       rg.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(total * 2), 2));
       rg.computeBoundingSphere();
       const rm = new THREE.Mesh(rg, rockMaterial);

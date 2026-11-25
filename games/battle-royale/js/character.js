@@ -1,11 +1,11 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=13';
-import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=13';
+import { normalFromHeight, NORMALS } from './texgen.js?v=14';
+import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=14';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=13';
-import { mergeParts } from './props.js?v=13';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=14';
+import { mergeParts } from './props.js?v=14';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -1195,8 +1195,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=13';
-import { buildConsumableMesh } from './items.js?v=13';
+export { buildWeaponMesh } from './weapons.js?v=14';
+import { buildConsumableMesh } from './items.js?v=14';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
@@ -1245,29 +1245,5 @@ export function buildGlider(glider) {
   return g;
 }
 
-/** Il "Battle Bus" volante */
-export function buildBus() {
-  const g = new THREE.Group();
-  box(3.2, 3, 9, mat('#2f6fd6'), 0, 0, 0, g);
-  box(3.25, 1, 7.6, mat('#bfe6ff', { metalness: 0.6, roughness: 0.1 }), 0, 0.6, -0.4, g);
-  box(3.25, 0.25, 9.05, mat('#ffffff'), 0, -0.6, 0, g);
-  box(2.8, 1.1, 0.1, mat('#bfe6ff', { metalness: 0.6, roughness: 0.1 }), 0, 0.5, 4.52, g);
-  const wheelGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.4, 12);
-  const wm = mat('#1a1a1a');
-  for (const x of [-1.6, 1.6]) for (const z of [-3, 3]) {
-    const w = new THREE.Mesh(wheelGeo, wm);
-    w.rotation.z = Math.PI / 2;
-    w.position.set(x, -1.6, z);
-    g.add(w);
-  }
-  const balloon = new THREE.Mesh(new THREE.SphereGeometry(4.5, 18, 14), mat('#e83a3a'));
-  balloon.scale.set(1, 0.85, 1.4);
-  balloon.position.y = 7.5;
-  g.add(balloon);
-  const stripe = new THREE.Mesh(new THREE.SphereGeometry(4.55, 18, 4, 0, Math.PI * 2, Math.PI * 0.45, Math.PI * 0.1), mat('#ffffff'));
-  stripe.scale.copy(balloon.scale); stripe.position.copy(balloon.position);
-  g.add(stripe);
-  const ropeM = mat('#444444');
-  for (const x of [-1.4, 1.4]) for (const z of [-4, 4]) box(0.06, 4, 0.06, ropeM, x, 3.2, z * 0.8, g);
-  return g;
-}
+/** Il "Battle Bus" volante: modello in models3d.js */
+export { buildBus } from './models3d.js?v=14';

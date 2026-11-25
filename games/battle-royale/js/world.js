@@ -3,9 +3,9 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=13';
-import { makeNoise, fbm, ridged } from './noise.js?v=13';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=13';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=14';
+import { makeNoise, fbm, ridged } from './noise.js?v=14';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=14';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -16,7 +16,7 @@ export const WATER_LEVEL = -2.6;
 export const CHUNK = 100;             // lato di un chunk (m)
 /** qualità grafica regolabile dalle impostazioni (distanze di dettaglio, erba) */
 export const GRASS_FADE = { value: 1 };
-export const QUALITY = { detailIn: 240, detailOut: 310, grassR: 64, grassDens: 0.55, treeHi: 110, nearOnly: 150, grassOn: true, version: 0 };
+export const QUALITY = { detailIn: 240, detailOut: 310, grassR: 64, grassDens: 0.8, treeHi: 110, nearOnly: 150, grassOn: true, version: 0 };
 const EDGE = HALF + 60;               // il terreno continua un po' nel mare
 
 const DEFAULT_TOWNS = [
@@ -1050,6 +1050,59 @@ const SPECIAL_GEO = {
   },
 };
 const _specialCache = new Map();
+/**
+ * Tetto a due falde: lastra spessa con colmo lungo x. half = mezza luce orizzontale (sporto compreso),
+ * rise = altezza del colmo sopra la gronda, thick = spessore. y = 0 alla gronda (sotto).
+ * Le uv sono in metri/2 come i box texturizzati.
+ */
+function gableRoofGeo(len, half, rise, thick) {
+  const P = [], U = [], idx = [];
+  const quad = (a, b, c, d, ua, ub, uc, ud) => {
+    const o = P.length / 3;
+    P.push(...a, ...b, ...c, ...d); U.push(...ua, ...ub, ...uc, ...ud);
+    idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+  };
+  const L = len / 2, sl = Math.hypot(half, rise) / 2;
+  for (const s of [-1, 1]) {
+    const top = (x, zz) => [x, rise * (1 - zz / half) + thick, s * zz];
+    const bot = (x, zz) => [x, rise * (1 - zz / half), s * zz];
+    // facce ordinate in modo che la normale punti fuori (si corregge con s)
+    const T = [top(-L, 0), top(L, 0), top(L, half), top(-L, half)];
+    const Bt = [bot(-L, 0), bot(L, 0), bot(L, half), bot(-L, half)];
+    const uT = [[-L / 2, sl], [L / 2, sl], [L / 2, 0], [-L / 2, 0]];
+    if (s > 0) { quad(T[0], T[3], T[2], T[1], uT[0], uT[3], uT[2], uT[1]); quad(Bt[0], Bt[1], Bt[2], Bt[3], uT[0], uT[1], uT[2], uT[3]); }
+    else { quad(T[0], T[1], T[2], T[3], uT[0], uT[1], uT[2], uT[3]); quad(Bt[0], Bt[3], Bt[2], Bt[1], uT[0], uT[3], uT[2], uT[1]); }
+    // gronda (fascia)
+    const e = [bot(-L, half), bot(L, half), top(L, half), top(-L, half)], ue = [[-L / 2, 0], [L / 2, 0], [L / 2, thick / 2], [-L / 2, thick / 2]];
+    if (s > 0) quad(e[0], e[1], e[2], e[3], ue[0], ue[1], ue[2], ue[3]); else quad(e[0], e[3], e[2], e[1], ue[0], ue[3], ue[2], ue[1]);
+    // bordi sulle testate (lungo la pendenza)
+    for (const xe of [-1, 1]) {
+      const q = [bot(xe * L, 0), bot(xe * L, half), top(xe * L, half), top(xe * L, 0)], uq = [[0, sl], [0, 0], [thick / 2, 0], [thick / 2, sl]];
+      if (xe * s < 0) quad(q[0], q[1], q[2], q[3], uq[0], uq[1], uq[2], uq[3]); else quad(q[0], q[3], q[2], q[1], uq[0], uq[3], uq[2], uq[1]);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setIndex(idx);
+  const ng = g.toNonIndexed(); ng.computeVertexNormals();
+  ng.computeBoundingSphere();
+  return ng;
+}
+/** timpano (muro triangolare sotto le falde), spessore t, nel piano zy, base a y = 0 */
+function gableEndGeo(wallHalf, half, rise, t) {
+  const top = (zz) => rise * (1 - zz / half);
+  const sh = new THREE.Shape();
+  sh.moveTo(-wallHalf, 0); sh.lineTo(wallHalf, 0); sh.lineTo(wallHalf, top(wallHalf)); sh.lineTo(0, rise); sh.lineTo(-wallHalf, top(wallHalf)); sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, { depth: t, bevelEnabled: false });
+  g.translate(0, 0, -t / 2);
+  const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2, uv.getY(i) / 2);
+  g.rotateY(Math.PI / 2);
+  return g;
+}
+/** colmo: trave arrotondata lungo x */
+function ridgeGeo(len) { const g = new THREE.CylinderGeometry(0.13, 0.13, len, 8); g.rotateZ(Math.PI / 2); return g; }
+
 function specialGeo(type, c = 0) {
   const key = type + ':' + (c || 0);
   if (!_specialCache.has(key)) _specialCache.set(key, SPECIAL_GEO[type](c || 0));
@@ -1091,6 +1144,7 @@ export function buildWorld(scene, opts = {}) {
   const metalMat = m('metal', '#6a6f78', { metalness: 0.6, roughness: 0.4 });
   const contColors = ['#c0392b', '#2471a3', '#d68910', '#1e8449'];
   const containerMats = contColors.map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
+  const contFrameMats = contColors.map(c => m('contF' + c, '#' + new THREE.Color(c).multiplyScalar(0.62).getHexString(), { metalness: 0.5, roughness: 0.55 }));
   // ── città tematiche: tavolozze di muri e tetti (materiali creati solo per i temi presenti) ──
   const THEMES = {
     classic: { walls: wallColors, roofs: roofColors },
@@ -1119,6 +1173,24 @@ export function buildWorld(scene, opts = {}) {
   const blockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
 
   /** Registra un box: il collisore subito, la mesh quando il chunk viene generato */
+  /** cassa di legno con i 12 spigoli rinforzati in rilievo */
+  const crateEdgeMat = m('crateEdge', '#6a4220', { roughness: 0.9 });
+  function addCrate(w, h, d, x, y, z, opts = {}) {
+    const b = addBox(w, h, d, x, y, z, crateMat, opts);
+    const e = Math.min(w, h, d) * 0.11, o = { house: opts.house, collide: false, cast: false };
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) addBox(e, h + 0.02, e, x + sx * (w / 2 - e / 2 + 0.01), y, z + sz * (d / 2 - e / 2 + 0.01), crateEdgeMat, o);
+    for (const sy of [-1, 1]) {
+      for (const sz of [-1, 1]) addBox(w + 0.02, e, e, x, y + sy * (h / 2 - e / 2 + 0.01), z + sz * (d / 2 - e / 2 + 0.01), crateEdgeMat, o);
+      for (const sx of [-1, 1]) addBox(e, e, d - e * 2, x + sx * (w / 2 - e / 2 + 0.01), y + sy * (h / 2 - e / 2 + 0.01), z, crateEdgeMat, o);
+    }
+    return b;
+  }
+  /** geometria su misura (tetti a falde, timpani): solo grafica, sparisce col tetto se roof */
+  function addGeo(geo, x, y, z, material, opts = {}) {
+    const spec = { geo, w: 0, h: 0, d: 0, x, y, z, material, cast: opts.cast !== false, house: opts.house, roof: opts.roof, mesh: null, rotY: opts.rotY || 0 };
+    chunkAt(x, z).boxes.push(spec);
+    return spec;
+  }
   function addBox(w, h, d, x, y, z, material, opts = {}) {
     const spec = { w, h, d, x, y, z, material, cast: opts.cast !== false, lodColor: opts.lodColor, house: opts.house, roof: opts.roof, mesh: null };
     chunkAt(x, z).boxes.push(spec);
@@ -1175,7 +1247,8 @@ export function buildWorld(scene, opts = {}) {
           // cornice della porta e zerbino
           for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.07), baseY + 1.3, 0.14, 2.6, 0.1, trimMat);
           outer(s, n, 0, baseY + 2.67, gap + 0.28, 0.14, 0.1, trimMat);
-          outer(s, n, 0, baseY + 0.02, 1.3, 0.04, 0.9, matMat);
+          outer(s, n, 0, baseY - 0.02, gap + 0.7, 0.16, 0.75, stoneMat);   // gradino
+          outer(s, n, 0, baseY + 0.075, 1.3, 0.03, 0.6, matMat);
         } else {
           // finestra: cornice, davanzale e persiane aperte
           const wy = baseY + H / 2;
@@ -1183,6 +1256,9 @@ export function buildWorld(scene, opts = {}) {
           outer(s, n, 0, baseY + H - 1.1 + 0.06, gap + 0.24, 0.12, 0.08, trimMat);
           outer(s, n, 0, baseY + 1.1 - 0.04, gap + 0.4, 0.08, 0.26, trimMat);
           if (seg > 1.0) for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.12 + 0.4), wy, 0.78, 1.6, 0.05, shutM);
+          // infisso a croce dentro il vano (dà profondità alla finestra)
+          if (s.horiz) { addBox(0.07, 1.6, 0.08, s.x, wy, s.z, trimMat, deco); addBox(gap, 0.07, 0.08, s.x, wy + 0.1, s.z, trimMat, deco); }
+          else { addBox(0.08, 1.6, 0.07, s.x, wy, s.z, trimMat, deco); addBox(0.08, 0.07, gap, s.x, wy + 0.1, s.z, trimMat, deco); }
         }
         if (hasDoor) {
           const lh = H - 2.6;
@@ -1204,11 +1280,41 @@ export function buildWorld(scene, opts = {}) {
         plinth(s, s.len, s.x, s.z);
       }
     });
+    // lesene in rilievo agli angoli
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) addBox(T + 0.16, H - 0.5, T + 0.16, cx + sx * (w / 2 - T / 2), baseY + 0.5 + (H - 0.5) / 2, cz + sz * (d / 2 - T / 2), TH.walls[wi] === 'stone' ? trimMat : stoneMat, { ...deco, cast: false });
     const ri = Math.floor(srand() * TH.roofs.length);
     addBox(w + 0.6, 0.3, d + 0.6, cx, baseY + H + 0.15, cz, roofMatFor(TH.roofs[ri]), { ...ho, roof: true });
+    // tetto a due falde (non per le facciate western né per i castelli): colmo sul lato lungo
+    const pitched = !TH.facade && !TH.merlons;
+    const alongX = w >= d, span = alongX ? d : w, rlen = alongX ? w : d;
+    const half = span / 2 + 0.75, rise = (TH.bigChimney ? 0.3 : TH.snowRoof ? 0.68 : 0.55) * half, thick = 0.18;
+    const yb = baseY + H + 0.3;
+    const roofAt = (x, z) => pitched ? Math.max(0, rise * (1 - Math.abs(alongX ? z - cz : x - cx) / half)) : 0;
+    if (pitched) {
+      const rot = alongX ? 0 : Math.PI / 2;
+      const rm = roofMatFor(TH.roofs[ri]);
+      addGeo(gableRoofGeo(rlen + 1.1, half, rise, thick), cx, yb - 0.02, cz, rm, { ...ho, roof: true, rotY: rot });
+      addGeo(ridgeGeo(rlen + 1.2), cx, yb - 0.02 + rise + thick, cz, capMat, { ...ho, roof: true, rotY: rot });
+      if (TH.snowRoof) addGeo(gableRoofGeo(rlen + 0.9, half - 0.12, rise * (half - 0.12) / half, 0.14), cx, yb + 0.16, cz, snowMat, { ...ho, roof: true, rotY: rot, cast: false });
+      // timpani alle due testate (stesso muro della casa)
+      const eg = gableEndGeo(span / 2, half, rise, T);
+      for (const e of [-1, 1]) {
+        if (alongX) addGeo(eg, cx + e * (w / 2 - T / 2), yb - 0.02, cz, wm, { ...ho, roof: true });
+        else addGeo(eg, cx, yb - 0.02, cz + e * (d / 2 - T / 2), wm, { ...ho, roof: true, rotY: Math.PI / 2 });
+      }
+      // falde calpestabili: gradini invisibili che seguono la pendenza
+      const NS = 5;
+      for (const sd of [-1, 1]) for (let k = 0; k < NS; k++) {
+        const a = half * k / NS, b2 = half * (k + 1) / NS, ym = rise * (1 - (a + b2) / 2 / half) + thick;
+        const lo = sd > 0 ? a : -b2, hi = sd > 0 ? b2 : -a;
+        if (alongX) addCollider({ type: 'box', minX: cx - rlen / 2 - 0.5, maxX: cx + rlen / 2 + 0.5, minY: yb, maxY: yb + ym, minZ: cz + lo, maxZ: cz + hi });
+        else addCollider({ type: 'box', minX: cx + lo, maxX: cx + hi, minY: yb, maxY: yb + ym, minZ: cz - rlen / 2 - 0.5, maxZ: cz + rlen / 2 + 0.5 });
+      }
+      house.pitch = { alongX, rise };
+    }
     // dettagli del tema
     const ds = sides[doorSide], dn = normals[doorSide];
-    if (TH.snowRoof) {
+    if (TH.snowRoof && !pitched) {
       addBox(w + 0.75, 0.28, d + 0.75, cx, baseY + H + 0.44, cz, snowMat, { ...ho, roof: true, collide: false, cast: false });
       addBox(w * 0.6, 0.18, d * 0.6, cx, baseY + H + 0.64, cz, snowMat, { ...ho, roof: true, collide: false, cast: false });
     }
@@ -1230,7 +1336,7 @@ export function buildWorld(scene, opts = {}) {
     {
       const sx = srand() < 0.5 ? -1 : 1, sz = srand() < 0.5 ? -1 : 1;
       const chx = cx + sx * (w / 2 - 1.1), chz = cz + sz * (d / 2 - 1.1);
-      const chH = TH.bigChimney ? 4.5 : 1.4;
+      const chH = Math.max(TH.bigChimney ? 4.5 : 1.4, roofAt(chx, chz) + 1.1);
       if (!TH.merlons) {
         addBox(0.8, chH, 0.8, chx, baseY + H + 0.3 + chH / 2, chz, brickMat, { ...ho, roof: true });
         addBox(0.95, 0.14, 0.95, chx, baseY + H + 0.3 + chH + 0.05, chz, capMat, { ...ho, roof: true, collide: false });
@@ -1247,7 +1353,7 @@ export function buildWorld(scene, opts = {}) {
     if (srand() < 0.7) chestSpots.push({ pos: new THREE.Vector3(cx + sr(-w / 2 + 1.3, w / 2 - 1.3), baseY + 0.2, cz + sr(-d / 2 + 1.3, d / 2 - 1.3)), rot: srand() * Math.PI });
     if (srand() < 0.6) {
       const tx = cx + sr(-w / 4, w / 4), tz = cz + sr(-d / 4, d / 4);
-      addBox(1.6, 0.9, 0.9, tx, baseY + 0.55, tz, crateMat, ho);
+      addCrate(1.6, 0.9, 0.9, tx, baseY + 0.55, tz, ho);
     }
     return house;
   }
@@ -1347,7 +1453,16 @@ export function buildWorld(scene, opts = {}) {
         const stack = srand() < 0.35 ? 2 : 1;
         for (let s = 0; s < stack; s++) {
           const ci = Math.floor(srand() * 4);
-          addBox(rot ? 2.5 : 6.5, 2.6, rot ? 6.5 : 2.5, x, t.h + 1.3 + s * 2.6, z, containerMats[ci], { lodColor: contColors[ci] });
+          const cy = t.h + 1.3 + s * 2.6;
+          addBox(rot ? 2.5 : 6.5, 2.6, rot ? 6.5 : 2.5, x, cy, z, containerMats[ci], { lodColor: contColors[ci] });
+          // lamiera ondulata (nervature), montanti d'angolo, longheroni e barre di chiusura delle porte
+          const o = { collide: false, cast: false }, L = 6.5, Wd = 2.5, cm = containerMats[ci], fm = contFrameMats[ci];
+          const P = (u, v, lu, lv, h, y) => rot ? addBox(lv, h, lu, x + v, y, z + u, fm, o) : addBox(lu, h, lv, x + u, y, z + v, fm, o);
+          const R = (u, v, lu, lv, h, y) => rot ? addBox(lv, h, lu, x + v, y, z + u, cm, o) : addBox(lu, h, lv, x + u, y, z + v, cm, o);
+          for (let u = -L / 2 + 0.45; u < L / 2 - 0.3; u += 0.42) for (const sv of [-1, 1]) R(u, sv * (Wd / 2 + 0.03), 0.18, 0.06, 2.3, cy);
+          for (const su of [-1, 1]) for (const sv of [-1, 1]) P(su * (L / 2 - 0.08), sv * (Wd / 2 - 0.08), 0.2, 0.2, 2.62, cy);
+          for (const sy of [-1, 1]) for (const sv of [-1, 1]) P(0, sv * (Wd / 2 - 0.05), L + 0.01, 0.14, 0.16, cy + sy * 1.22);
+          for (const vv of [-0.75, -0.3, 0.3, 0.75]) P(L / 2 + 0.03, vv, 0.05, 0.05, 2.3, cy);
         }
         lootSpots.push(new THREE.Vector3(x + (rot ? 2 : 0), t.h + 0.2, z + (rot ? 0 : 2)));
       }
@@ -1359,8 +1474,8 @@ export function buildWorld(scene, opts = {}) {
       if (overlapsHouse(x, z, 1.5, 1.5)) continue;
       const s = sr(1.1, 1.4);
       const gy = terrainHeight(x, z);
-      addBox(s, s, s, x, gy + s / 2, z, crateMat);
-      if (srand() < 0.3) addBox(s * 0.9, s * 0.9, s * 0.9, x + 0.1, gy + s + s * 0.45, z, crateMat);
+      addCrate(s, s, s, x, gy + s / 2, z);
+      if (srand() < 0.3) addCrate(s * 0.9, s * 0.9, s * 0.9, x + 0.1, gy + s + s * 0.45, z);
       if (srand() < 0.5) lootSpots.push(new THREE.Vector3(x + s, gy, z));
     }
   }
@@ -1710,7 +1825,13 @@ export function buildWorld(scene, opts = {}) {
     t.receiveShadow = false;
     group.add(t);
     const blocks = [];
-    for (const h of ch.houses) blocks.push({ w: h.w, h: 4.1, d: h.d, x: h.cx, y: h.baseY + 2.05, z: h.cz, color: h.wallColor, top: h.roofColor });
+    for (const h of ch.houses) {
+      blocks.push({ w: h.w, h: 4.1, d: h.d, x: h.cx, y: h.baseY + 2.05, z: h.cz, color: h.wallColor, top: h.roofColor });
+      if (h.pitch) for (let k = 1; k <= 2; k++) {                       // tetto a falde: due gradoni
+        const f = 1 - k / 3, ax = h.pitch.alongX;
+        blocks.push({ w: ax ? h.w + 0.6 : (h.w + 1.5) * f, h: h.pitch.rise / 3, d: ax ? (h.d + 1.5) * f : h.d + 0.6, x: h.cx, y: h.baseY + 4.1 + h.pitch.rise * (k - 0.5) / 3, z: h.cz, color: h.roofColor, top: h.roofColor });
+      }
+    }
     for (const b of ch.boxes) if (b.lodColor) blocks.push({ w: b.w, h: b.h, d: b.d, x: b.x, y: b.y, z: b.z, color: b.lodColor });
     for (const pr of ch.props) if (pr.type === 'shed') {
       const D = PROP_DIMS.shed, q90 = Math.round(pr.rot / (Math.PI / 2)) % 2 !== 0;
@@ -1730,26 +1851,45 @@ export function buildWorld(scene, opts = {}) {
 
   // geometrie condivise per alberi/rocce/erba
   // ── erba: ciuffi di fili sottili (colori per vertice: scuri alla base, chiari in punta) ──
+  /**
+   * Ciuffo d'erba: fili curvi a 3 segmenti che si assottigliano fino alla punta.
+   * Le normali sono a metà tra "verso l'alto" e la faccia del filo, così ogni filo prende la luce
+   * in modo diverso secondo l'orientamento (volume invece di un tappeto piatto).
+   */
   function makeTuft(blades, seed, h0 = 0.32, hr = 0.42, rad = 0.16, wMul = 1, dryK = 0.18) {
     const rnd = mulberry32(seed);
     const P = [], C = [], N = [];
     for (let b = 0; b < blades; b++) {
-      const a = rnd() * 6.283, r0 = rnd() * rad, h = h0 + rnd() * hr, w = (0.035 + rnd() * 0.025) * wMul;
-      const lean = 0.08 + rnd() * 0.28, la = a + (rnd() - 0.5) * 0.8;
+      const a = rnd() * 6.283, r0 = Math.sqrt(rnd()) * rad, h = h0 + rnd() * hr, w = (0.032 + rnd() * 0.024) * wMul;
+      const lean = 0.1 + rnd() * 0.32, la = a + (rnd() - 0.5) * 0.9;
       const bx = Math.cos(a) * r0, bz = Math.sin(a) * r0;
-      const px = -Math.sin(a) * w, pz = Math.cos(a) * w;          // larghezza perpendicolare
-      const lx = Math.cos(la) * lean, lz = Math.sin(la) * lean;  // inclinazione
-      const tone = 0.92 + rnd() * 0.22, dry = rnd() < dryK ? 1 : 0;
-      const v = [
-        [bx - px, 0, bz - pz, 0.42], [bx + px, 0, bz + pz, 0.42],
-        [bx + lx * 0.35 + px * 0.6, h * 0.5, bz + lz * 0.35 + pz * 0.6, 0.78], [bx + lx * 0.35 - px * 0.6, h * 0.5, bz + lz * 0.35 - pz * 0.6, 0.78],
-        [bx + lx, h, bz + lz, 1.12],
-      ];
-      for (const tri of [[0, 1, 2], [0, 2, 3], [3, 2, 4]]) for (const k of tri) {
-        const [x, y, z, c] = v[k];
-        P.push(x, y, z); N.push(0, 1, 0);
+      const fa = rnd() * 6.283;                                   // orientamento della lama
+      const px = Math.cos(fa) * w, pz = Math.sin(fa) * w;         // larghezza
+      const fnx = -Math.sin(fa), fnz = Math.cos(fa);              // normale della faccia
+      const lx = Math.cos(la) * lean, lz = Math.sin(la) * lean;   // curvatura
+      const tone = 0.9 + rnd() * 0.24, dry = rnd() < dryK ? 1 : 0;
+      // punti lungo il filo: t, larghezza relativa, colore
+      const st = [[0, 1, 0.4], [0.38, 0.82, 0.68], [0.72, 0.5, 0.92], [1, 0, 1.15]];
+      const ring = st.map(([t, k, c]) => {
+        const cx = bx + lx * t * t, cz = bz + lz * t * t, y = h * t * (1 - lean * 0.25 * t);
+        return [[cx - px * k, y, cz - pz * k], [cx + px * k, y, cz + pz * k], c];
+      });
+      const nUp = 0.62, nS = 0.5;
+      const push = (v, c, ti) => {
+        P.push(v[0], v[1], v[2]);
+        const nx = fnx * nS + lx * 0.3 * ti, nz = fnz * nS + lz * 0.3 * ti, ny = nUp, l = Math.hypot(nx, ny, nz);
+        N.push(nx / l, ny / l, nz / l);
         const cc = c * tone;
         C.push(cc * (dry ? 1.18 : 1), cc * (dry ? 1.05 : 1), cc * (dry ? 0.7 : 1));
+      };
+      for (let i = 0; i < 3; i++) {
+        const A = ring[i], B = ring[i + 1], ta = st[i][0], tb = st[i + 1][0];
+        if (i < 2) {
+          push(A[0], A[2], ta); push(A[1], A[2], ta); push(B[1], B[2], tb);
+          push(A[0], A[2], ta); push(B[1], B[2], tb); push(B[0], B[2], tb);
+        } else {
+          push(A[0], A[2], ta); push(A[1], A[2], ta); push(B[0], B[2], tb);
+        }
       }
     }
     const g = new THREE.BufferGeometry();
@@ -1779,7 +1919,8 @@ export function buildWorld(scene, opts = {}) {
     g.computeBoundingSphere(); g.userData.shared = true;
     return g;
   }
-  const tuftGeo = makeTuft(5, 9001);
+  const tuftGeo = makeTuft(9, 9001, 0.3, 0.42, 0.22);
+  const tuftFarGeo = makeTuft(6, 9002, 0.34, 0.4, 0.26, 1.25);
   const tallGeo = makeTuft(7, 4242, 0.85, 0.6, 0.3, 1.5, 0.3);   // erba alta: fili fino a 1,45 m
   const flowerGeo = makeFlower();
   /** materiale dell'erba: vento a raffiche, si piega attorno al giocatore e sfuma con la distanza */
@@ -1845,7 +1986,7 @@ export function buildWorld(scene, opts = {}) {
   function buildGrassCell(gx, gz) {
     const rnd = mulberry32((gx * 92837111) ^ (gz * 689287499) ^ 0x5bd1e995);
     const x0 = gx * GCELL, z0 = gz * GCELL;
-    const NT = Math.max(1, Math.round(GCELL * GCELL * QUALITY.grassDens)), NF = Math.round(70 * Math.min(1, QUALITY.grassDens / 0.55)), NP = 16;
+    const NT = Math.max(1, Math.round(GCELL * GCELL * QUALITY.grassDens)), NF = Math.round(70 * Math.min(1, QUALITY.grassDens / 0.8)), NP = 16;
     const grp = new THREE.Group();
     const gm = new THREE.InstancedMesh(tuftGeo, grassNearMat, NT);
     const fm = new THREE.InstancedMesh(flowerGeo, flowerMat, NF);
@@ -2003,10 +2144,18 @@ export function buildWorld(scene, opts = {}) {
       if (b.roof && b.house) {
         let rg = roofGroups.get(b.house);
         if (!rg) { rg = new THREE.Group(); roofGroups.set(b.house, rg); group.add(rg); b.house.roofMesh = rg; }
-        const mesh = new THREE.Mesh(boxGeometry(b), b.material);
+        const mesh = new THREE.Mesh(b.geo || boxGeometry(b), b.material);
         mesh.position.set(b.x, b.y, b.z);
+        if (b.rotY) mesh.rotation.y = b.rotY;
         mesh.castShadow = b.cast; mesh.receiveShadow = true;
         rg.add(mesh);
+        continue;
+      }
+      if (b.geo) {
+        const mesh = new THREE.Mesh(b.geo, b.material);
+        mesh.position.set(b.x, b.y, b.z); if (b.rotY) mesh.rotation.y = b.rotY;
+        mesh.castShadow = b.cast; mesh.receiveShadow = true;
+        group.add(mesh);
         continue;
       }
       const key = b.material.uuid + (b.cast ? 1 : 0);
@@ -2119,7 +2268,7 @@ export function buildWorld(scene, opts = {}) {
     // ciuffi d'erba radi per la media distanza (quelli fitti li gestisce grassField)
     {
       const rnd = mulberry32((ch.cx * 73856093) ^ (ch.cz * 19349663));
-      const N = 150, gm = new THREE.InstancedMesh(tuftGeo, grassFarMat, N);
+      const N = 280, gm = new THREE.InstancedMesh(tuftFarGeo, grassFarMat, N);
       let n = 0;
       for (let i = 0; i < N; i++) {
         const x = ch.x0 + rnd() * CHUNK, z = ch.z0 + rnd() * CHUNK;

@@ -5,27 +5,28 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=13';
-import * as PR from './progress.js?v=13';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=13';
-import { initMenu } from './menu.js?v=13';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=13';
-import { initSettingsUI } from './settings-ui.js?v=13';
-import { applyAnisotropy } from './texgen.js?v=13';
-import * as A from './audio.js?v=13';
+} from './config.js?v=14';
+import * as PR from './progress.js?v=14';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=14';
+import { initMenu } from './menu.js?v=14';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=14';
+import { initSettingsUI } from './settings-ui.js?v=14';
+import { applyAnisotropy } from './texgen.js?v=14';
+import * as A from './audio.js?v=14';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=13';
-import { createWeather } from './weather.js?v=13';
-import { createEvents } from './events.js?v=13';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=13';
-import { weaponIcon } from './weapons.js?v=13';
-import { consIcon } from './items.js?v=13';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=13';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=13';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=13';
+} from './world.js?v=14';
+import { createWeather } from './weather.js?v=14';
+import { createEvents } from './events.js?v=14';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=14';
+import { weaponIcon } from './weapons.js?v=14';
+import { consIcon } from './items.js?v=14';
+import { buildChestMesh } from './models3d.js?v=14';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=14';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=14';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=14';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -1463,28 +1464,7 @@ function updateLoot(dt) {
   }
 }
 
-// Forzieri
-const chestMats = {
-  base: new THREE.MeshStandardMaterial({ color: '#8a5a1a', roughness: 0.7 }),
-  gold: new THREE.MeshStandardMaterial({ color: '#ffd24a', emissive: '#ffae00', emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.3 }),
-};
-function buildChestMesh() {
-  const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1, 0.55, 0.65), chestMats.base);
-  base.position.y = 0.28; base.castShadow = true; g.add(base);
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.08, 0.67), chestMats.gold);
-  trim.position.y = 0.5; g.add(trim);
-  const lid = new THREE.Group();
-  lid.position.set(0, 0.55, -0.32);
-  const lm = new THREE.Mesh(new THREE.BoxGeometry(1, 0.22, 0.65), chestMats.base);
-  lm.position.set(0, 0.11, 0.32); lm.castShadow = true; lid.add(lm);
-  const lt = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.06, 0.67), chestMats.gold);
-  lt.position.set(0, 0.22, 0.32); lid.add(lt);
-  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.18, 0.04), chestMats.gold);
-  lock.position.set(0, 0.0, 0.66); lid.add(lock);
-  g.add(lid);
-  return { g, lid };
-}
+// Forzieri: modello 3D in models3d.js
 for (const cs of world.chestSpots) G.chests.push({ pos: cs.pos.clone(), rot: cs.rot, mesh: null, lid: null, opened: false, t: 0 });
 function ensureChestMesh(c) {
   if (c.mesh) return;
@@ -2116,7 +2096,7 @@ function applySettings(key = '*') {
     fogK = v;
     QUALITY.detailIn = 240 * v; QUALITY.detailOut = 310 * v; QUALITY.treeHi = 110 * v; QUALITY.nearOnly = 150 * v;
     QUALITY.grassOn = g.grass > 0.01;
-    QUALITY.grassDens = 0.55 * Math.max(0.1, g.grass);
+    QUALITY.grassDens = 0.8 * Math.max(0.1, g.grass);
     QUALITY.grassR = 64 * clamp(0.6 + g.grass * 0.4, 0.6, 1.25);
     GRASS_FADE.value = QUALITY.grassR / 64;
     QUALITY.version++;

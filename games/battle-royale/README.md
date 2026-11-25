@@ -24,6 +24,16 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: erba fitta e mondo più tridimensionale
+
+- **Erba nuova**: ciuffi con più fili, curvi e a tre segmenti che si assottigliano fino alla punta; ogni filo prende la luce in modo diverso secondo l'orientamento (volume invece di un tappeto piatto). Densità aumentata vicino al giocatore e più ciuffi a media distanza. La densità resta regolabile nelle impostazioni (preset "basso" più leggero).
+- **Case con tetto a due falde**: falde spesse con gronda, colmo, timpani in muratura e camini alti che escono dal tetto (il tetto si può calpestare). Restano piatti solo le facciate western e i castelli merlati. Da lontano la sagoma del tetto si vede anche nella versione semplificata.
+- Lesene in rilievo agli angoli delle case, infissi a croce nelle finestre, gradino in pietra davanti alle porte.
+- **Container** in lamiera ondulata con nervature, montanti d'angolo, longheroni e barre di chiusura.
+- **Casse** di legno con i 12 spigoli rinforzati in rilievo.
+- **Forzieri** rifatti: assi di legno con rilievo, coperchio a botte, fasce dorate, borchie agli angoli, serratura con anello e maniglie laterali.
+- **Battle Bus** rifatto: carrozzeria arrotondata con pannelli rivettati e vernice lucida, finestrini incassati con cornici, parabrezza inclinato con tergicristalli, fari tondi luminosi, griglia cromata, paraurti, specchietti, porta, fascia "BATTLE BUS", portapacchi con bagagli, scaletta, ruote con pneumatici e cerchioni a razze. La mongolfiera ha spicchi cuciti in rilievo, una bocca e funi che scendono fino al tetto del bus.
+
 ### Novità: corpo unico senza giunture e cure rifatte
 
 - **Personaggi senza giunture**: busto, collo, braccia e gambe sono ora un'unica mesh deformabile (skinning). Gomiti e ginocchia si piegano in modo morbido, le spalle sfumano nel busto e il collo nella testa: niente più sfere o pezzi staccati alle articolazioni. Le animazioni sono le stesse di prima e il corpo costa meno draw call.
@@ -179,6 +189,7 @@ models/         cartella facoltativa per i file .glb originali
 js/character.js modelli 3D di personaggi, armi, deltaplano e bus
 js/chartex.js   texture dei personaggi: tessuti, fantasie, pelle, capelli
 js/items.js     consumabili 3D (bende, medikit, scudi) e loro icone
+js/models3d.js  Battle Bus e forziere in 3D
 js/audio.js     effetti sonori sintetizzati
 js/main.js      ciclo di gioco, giocatore, arrampicata, IA dei bot, combattimento, HUD
 js/site.js      scene 3D e animazioni del sito

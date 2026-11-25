@@ -52,18 +52,20 @@ function mountainRing(radius, segs, hMin, hMax, colBase, colTop, seed, snow) {
     H.push(hMin + (hMax - hMin) * Math.max(0.03, Math.min(1.15, h)));
   }
   const push = (x, y, z, cc) => { pos.push(x, y, z); col.push(cc.r, cc.g, cc.b); };
+  // v24: un raggio per vertice condiviso tra segmenti vicini (prima ogni segmento aveva il suo → fessure verticali)
+  const RV = []; for (let i = 0; i < segs; i++) RV.push(radius * (1 + (rnd() - 0.5) * 0.06));
   for (let i = 0; i < segs; i++) {
     const a0 = i / segs * Math.PI * 2, a1 = (i + 1) / segs * Math.PI * 2, am = (a0 + a1) / 2;
-    const r0 = radius * (1 + (rnd() - 0.5) * 0.06), rm = radius * (1 + (rnd() - 0.5) * 0.08);
-    const x0 = Math.cos(a0) * r0, z0 = Math.sin(a0) * r0, x1 = Math.cos(a1) * r0, z1 = Math.sin(a1) * r0;
+    const r0 = RV[i], r1 = RV[(i + 1) % segs], rm = radius * (1 + (rnd() - 0.5) * 0.08);
+    const x0 = Math.cos(a0) * r0, z0 = Math.sin(a0) * r0, x1 = Math.cos(a1) * r1, z1 = Math.sin(a1) * r1;
     const xm = Math.cos(am) * rm, zm = Math.sin(am) * rm;
     const h0 = H[i], h1 = H[(i + 1) % segs], hm = (h0 + h1) / 2 * (1 + rnd() * 0.16);
     // due triangoli: base → picco intermedio → creste ai lati
     const top = c.copy(cB).lerp(cT, 0.85);
-    const tm = snow && hm > hMax * 0.72 ? cS : top;
-    push(x0, -20, z0, cB); push(xm, hm, zm, tm); push(x0, h0, z0, top);
-    push(x0, -20, z0, cB); push(x1, -20, z1, cB); push(xm, hm, zm, tm);
-    push(x1, -20, z1, cB); push(x1, h1, z1, top); push(xm, hm, zm, tm);
+    // v24: niente vertice bianco sul picco: sfumava fino alla base e all'orizzonte comparivano lunghe "colonne" chiare
+    push(x0, -20, z0, cB); push(xm, hm, zm, top); push(x0, h0, z0, top);
+    push(x0, -20, z0, cB); push(x1, -20, z1, cB); push(xm, hm, zm, top);
+    push(x1, -20, z1, cB); push(x1, h1, z1, top); push(xm, hm, zm, top);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));

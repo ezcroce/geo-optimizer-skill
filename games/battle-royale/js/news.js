@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v23';
+export const NEWS_VERSION = 'v24';
 
 export const NEWS = [
+  {
+    v: 'v24', title: 'Città vere', color: '#ff9f2e', icon: '🏙',
+    items: [
+      'Città 10 volte più ricche: strade asfaltate con strisce, marciapiedi, semafori e piazze',
+      'Palazzi fino a 7 piani con scale, balconi e tetti calpestabili · capannoni con soppalco',
+      'Negozi veri con insegna e interni: bar, pizzeria, farmacia, armeria, supermercato e altri',
+      'Lampioni, panchine, auto parcheggiate, fermate del bus, chioschi e monumenti',
+      'Niente più sagome strane all’orizzonte · i nemici lontani svaniscono nella nebbia',
+    ],
+  },
   {
     v: 'v23', title: 'Squadre, Versus e lobby nuova', color: '#ffcf2e', icon: '👥',
     items: [

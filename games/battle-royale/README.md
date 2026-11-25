@@ -24,6 +24,27 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: città vere (v24)
+
+- **Città molto più grandi e complete** (`js/city.js`). Ogni città ha un **reticolo di strade** con piazza centrale.
+  - **Strade**: asfalto con linea tratteggiata, strisce pedonali agli incroci, marciapiedi con cordolo e semafori nelle città grandi.
+  - **Piazza** in porfido con un monumento a tema (fontana, statua, pozzo, albero di Natale…), aiuole, alberi, panchine, chiosco e tavolini dei bar.
+  - **Arredo urbano**: lampioni ogni 22 m, cestini, idranti, fermata del bus e centinaia di auto parcheggiate (non nel far west).
+- **Palazzi** da 1 a 7 piani, con piani da 3 m.
+  - Ogni piano ha solai veri con le **scale** (rampe da 10 gradini). Il tetto piano è calpestabile, con parapetto, condizionatori, cisterne e antenne. In alternativa c'è il tetto a falde.
+  - Facciate a tema: intonaco, mattoni, pastello, vetro (grattacieli in centro), legno con falsa facciata e portico nel far west, pietra con merli nei castelli. Hanno balconi e tende da sole.
+  - Quando entri **si nascondono i piani sopra di te**, così vedi sempre dove sei.
+- **Negozi** al piano terra (32 tipi). Hanno insegna, vetrina e **interni arredati**: bar, pizzeria, farmacia con croce verde, armeria, supermercato con scaffali, libreria e altri.
+- **Capannoni** nelle zone industriali e nei porti: portone aperto, soppalco con scala e scaffalature con casse.
+- **Case con giardino** e siepe ai bordi della città.
+- I bot sanno usare le scale per salire e scendere dai piani.
+- Minimappa con le strade e i palazzi delle città.
+- **Orizzonte pulito**:
+  - Niente più "colonne" chiare o scure. Le montagne lontane avevano picchi bianchi che sfumavano fino alla base e fessure tra i segmenti.
+  - Il muro della tempesta non ha più strisce seghettate quando è lontano.
+  - Gli alberi lontani (LOD) non sono più blocchi scuri.
+- **Nemici lontani**: non spuntano più di colpo a 480 m. Svaniscono gradualmente nella nebbia.
+
 ### Novità: squadre (Duo, Trio, Squad), Versus e lobby nuova
 
 - **Modalità a squadre** nella scheda GIOCA: *Singolo*, *Duo*, *Trio* e *Squad* (squadre da 1, 2, 3 o 4 su 100 giocatori). Vince l'ultima squadra in piedi.
@@ -256,6 +277,8 @@ js/settings-ui.js pannello impostazioni a schede
 js/texgen.js    texture procedurali: qualità, normal map dal rilievo
 js/noise.js     rumore simplex / frattale per il terreno
 js/world.js     terreno, biomi, città tematiche, chunk (dettaglio + LOD), collisioni, raycast
+js/city.js      generatore delle città: strade, piazze, palazzi a più piani, negozi, capannoni, arredo urbano
+js/citytex.js   texture procedurali delle città: facciate, asfalto, marciapiedi, insegne, prodotti
 js/weather.js   nebbia d'altezza, montagne all'orizzonte, neve / foglie / polvere locali
 js/events.js    eventi della partita (rifornimento, meteoriti, nebbia, bufera, ora d'oro, bassa gravità)
 js/props.js     modelli low-poly (alberi, rocce, legna, mattoni, barili, casetta) e caricamento dei .glb

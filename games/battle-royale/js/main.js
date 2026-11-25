@@ -8,7 +8,7 @@ import {
 } from './config.js?v=19';
 import * as PR from './progress.js?v=19';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=19';
+import { initMenu } from './menu.js?v=24';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';
@@ -16,9 +16,9 @@ import * as A from './audio.js?v=19';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
-  biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=19';
-import { createWeather } from './weather.js?v=19';
+  biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP,
+} from './world.js?v=24';
+import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
 import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=19';
 import { weaponIcon } from './weapons.js?v=19';
@@ -759,10 +759,12 @@ function updateCharVisual(c, dt) {
   blink(c, dt);
   if (c.isPlayer || !c.alive) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
   const d2 = c.pos.distanceToSquared(camera.position);
-  if (d2 < 85 * 85) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
+  if (d2 < 120 * 120) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
   m.body.visible = false;
   m.root.position.copy(c.pos); m.root.rotation.set(0, c.yaw, 0);
-  if (d2 > 480 * 480) { m.lod.visible = false; return; }
+  // v24: i nemici lontani restano visibili fin dentro la nebbia (prima sparivano di colpo a 480 m)
+  const far = Math.min(1400, scene.fog.far * 1.05);
+  if (d2 > far * far) { m.lod.visible = false; return; }
   m.lod.visible = true;
   const falling = c.mode === 'fall';
   m.lod.rotation.x = falling ? 1.15 : 0;
@@ -1724,13 +1726,20 @@ function updateChests(dt) {
 const stormMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
   uniforms: { time: { value: 0 } },
-  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-  fragmentShader: `uniform float time; varying vec2 vUv;
+  vertexShader: 'varying vec2 vUv; varying vec3 vW; void main(){ vUv = uv; vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+  // v24: strisce senza aliasing (si sfumano quando diventano più fitte dei pixel) e muro che svanisce da lontano:
+  // prima all'orizzonte comparivano grossi "denti" chiari o scuri
+  fragmentShader: `uniform float time; varying vec2 vUv; varying vec3 vW;
+    float band(float x) { float w = fwidth(x); return mix(sin(x) * 0.5 + 0.5, 0.5, smoothstep(0.6, 2.2, w)); }
     void main(){
-      float s = sin(vUv.x * 600.0 + time * 1.5 + sin(vUv.y * 30.0 + time) * 3.0) * 0.5 + 0.5;
-      float s2 = sin(vUv.x * 230.0 - time * 0.8 + vUv.y * 50.0) * 0.5 + 0.5;
+      float s = band(vUv.x * 600.0 + time * 1.5 + sin(vUv.y * 30.0 + time) * 3.0);
+      float s2 = band(vUv.x * 230.0 - time * 0.8 + vUv.y * 50.0);
       float a = 0.2 + 0.16 * s * s2;
+      // alto e sfumato in cima; più basso visto da lontano
       a *= smoothstep(0.85, 0.2, vUv.y);
+      float dist = distance(vW.xz, cameraPosition.xz);
+      a *= 1.0 - smoothstep(220.0, 520.0, dist) * 0.92;
+      a *= 1.0 - smoothstep(cameraPosition.y + 40.0, cameraPosition.y + 160.0, vW.y) * step(260.0, dist);
       gl_FragColor = vec4(mix(vec3(0.45,0.15,0.85), vec3(0.85,0.5,1.0), s * 0.5), a);
     }`,
 });
@@ -2056,6 +2065,22 @@ function navPoint(b, goal) {
     }
   }
   const hb = houseAt(b.pos.x, b.pos.z, b.pos.y), hg = houseAt(goal.x, goal.z);
+  // v24: palazzi a più piani → usa le rampe di scale
+  const fl = hb && hb.stair && hb.stair.flights;
+  if (fl && fl.length) {
+    const fNow = Math.max(0, Math.floor((b.pos.y - hb.baseY + 0.4) / 3));
+    const gy = hb === hg && goal.y !== undefined && goal.y > hb.baseY - 1 ? goal.y : hb.baseY;
+    const fGoal = Math.max(0, Math.floor((gy - hb.baseY + 0.4) / 3));
+    if (fNow !== fGoal) {
+      const onF = fl.find(f => b.pos.x > f.box[0] - 0.1 && b.pos.x < f.box[1] + 0.1 && b.pos.z > f.box[2] - 0.1 && b.pos.z < f.box[3] + 0.1);
+      if (fGoal > fNow) {
+        const f = fl[Math.min(fNow, fl.length - 1)];
+        return onF ? _nav.set(f.ex, 0, f.ez) : _nav.set(f.sx, 0, f.sz);
+      }
+      const f = fl[Math.min(fNow - 1, fl.length - 1)];
+      if (f) return onF ? _nav.set(f.sx, 0, f.sz) : _nav.set(f.ex, 0, f.ez);
+    }
+  }
   if (hb === hg) return goal;
   const h = hb || hg;
   if (!h.doors.length) return goal;
@@ -2710,11 +2735,20 @@ function updateCamera(dt) {
     scene.fog.far = lerp(620, 1500, alt) * fogK * lerp(weather.fogMul, 1, 0.15);
     scene.fog.color.copy(weather.fogTint);
   }
-  // tetti trasparenti se sei dentro una casa
+  // tetti trasparenti se sei dentro una casa; nei palazzi si tagliano i piani sopra il tuo (v24)
+  let clipH = null;
   for (const h of world.houses) {
-    const inside = p.alive && Math.abs(p.pos.x - h.cx) < h.w / 2 && Math.abs(p.pos.z - h.cz) < h.d / 2 && p.pos.y < h.roofTop - 0.5;
+    const inside = p.alive && Math.abs(p.pos.x - h.cx) < h.w / 2 && Math.abs(p.pos.z - h.cz) < h.d / 2 && p.pos.y < h.roofTop - 0.5 && p.pos.y > h.baseY - 1;
     if (h.roofMesh) h.roofMesh.visible = !inside;
+    if (inside && h.clip) clipH = h;
   }
+  if (clipH) {
+    const h = clipH, c = h.clip;
+    let cy;
+    if (h.city === 'palazzo') { const f = Math.max(0, Math.floor((p.pos.y - h.baseY + 0.4) / 3)); cy = h.baseY + 3 * (f + 1) - 0.12; }
+    else cy = h.roofTop - 0.6;
+    CLIP.box.value.set(c[0], c[1], c[2], c[3]); CLIP.y.value = cy;
+  } else CLIP.y.value = 1e9;
 }
 
 // ─────────────── HUD ───────────────
@@ -3616,7 +3650,7 @@ function netTick(dt) {
     for (const rc of G.chars) {
       if (!rc.remote || !rc.human || !rc.netId) continue;
       const list = [];
-      const far = rc.mode === 'bus' || rc.mode === 'fall' ? 900 : 480;
+      const far = rc.mode === 'bus' || rc.mode === 'fall' ? 1200 : 800;
       for (const c of G.chars) {
         if (c === rc || !c.alive || c.mode === 'bus') continue;
         if (c.human || c.pos.distanceToSquared(rc.pos) < far * far) list.push(encodeChar(c));

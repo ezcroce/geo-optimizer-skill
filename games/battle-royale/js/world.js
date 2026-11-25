@@ -4,6 +4,7 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=24';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
 import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=19';
 
@@ -20,24 +21,25 @@ export const QUALITY = { detailIn: 240, detailOut: 310, grassR: 64, grassDens: 0
 const EDGE = HALF + 60;               // il terreno continua un po' nel mare
 
 const DEFAULT_TOWNS = [
-  { name: 'Centro Caos', x: 15, z: 0, r: 52, houses: 12 },
-  { name: 'Piazza Pulita', x: -315, z: -285, r: 34, houses: 7 },
-  { name: 'Torri Tremanti', x: 300, z: -315, r: 32, houses: 4, towers: true },
-  { name: 'Borgo Bottino', x: -330, z: 285, r: 34, houses: 7 },
-  { name: 'Villa Vertigine', x: 336, z: 276, r: 30, houses: 5 },
-  { name: 'Porto Pigro', x: -430, z: 0, r: 26, houses: 3, containers: true },
-  { name: 'Fattoria Felice', x: 120, z: 390, r: 26, houses: 3 },
-  { name: 'Deposito Dannato', x: 90, z: -430, r: 28, houses: 2, containers: true },
-  { name: 'Lido Lampo', x: 470, z: -20, r: 30, houses: 5 },
-  { name: 'Castello Cosmico', x: -130, z: -175, r: 34, houses: 6, towers: true },
-  { name: 'Miniera Matta', x: -440, z: -420, r: 26, houses: 3, containers: true },
-  { name: 'Bosco Brivido', x: -200, z: 430, r: 28, houses: 4 },
-  { name: 'Faro Folle', x: 460, z: 460, r: 24, houses: 3, towers: true },
-  { name: 'Campeggio Caos', x: 190, z: 170, r: 28, houses: 4 },
-  { name: 'Valle Vortice', x: -470, z: 190, r: 26, houses: 3 },
-  { name: 'Stazione Strana', x: 230, z: -170, r: 32, houses: 5, containers: true },
-  { name: 'Paese Pazzo', x: -10, z: 250, r: 32, houses: 6 },
-  { name: 'Rocca Ribelle', x: -20, z: -290, r: 28, houses: 4 },
+  // v24: città più grandi (reticolo di strade, palazzi, negozi)
+  { name: 'Centro Caos', x: 15, z: 0, r: 84, houses: 12 },
+  { name: 'Piazza Pulita', x: -315, z: -285, r: 54, houses: 7 },
+  { name: 'Torri Tremanti', x: 300, z: -315, r: 50, houses: 4, towers: true },
+  { name: 'Borgo Bottino', x: -330, z: 285, r: 54, houses: 7 },
+  { name: 'Villa Vertigine', x: 336, z: 276, r: 50, houses: 5 },
+  { name: 'Porto Pigro', x: -430, z: 0, r: 50, houses: 3, containers: true },
+  { name: 'Fattoria Felice', x: 120, z: 390, r: 46, houses: 3 },
+  { name: 'Deposito Dannato', x: 90, z: -430, r: 50, houses: 2, containers: true },
+  { name: 'Lido Lampo', x: 466, z: -20, r: 48, houses: 5 },
+  { name: 'Castello Cosmico', x: -130, z: -175, r: 52, houses: 6, towers: true },
+  { name: 'Miniera Matta', x: -440, z: -420, r: 48, houses: 3, containers: true },
+  { name: 'Bosco Brivido', x: -200, z: 430, r: 46, houses: 4 },
+  { name: 'Faro Folle', x: 456, z: 456, r: 46, houses: 3, towers: true },
+  { name: 'Campeggio Caos', x: 190, z: 170, r: 50, houses: 4 },
+  { name: 'Valle Vortice', x: -470, z: 190, r: 48, houses: 3 },
+  { name: 'Stazione Strana', x: 230, z: -170, r: 50, houses: 5, containers: true },
+  { name: 'Paese Pazzo', x: -10, z: 250, r: 54, houses: 6 },
+  { name: 'Rocca Ribelle', x: -20, z: -290, r: 50, houses: 4 },
 ];
 /** città della mappa corrente (l'array resta lo stesso: viene riempito di nuovo a ogni mappa) */
 export const TOWNS = DEFAULT_TOWNS.map(t => ({ ...t }));
@@ -250,14 +252,16 @@ function buildHeightGrid() {
       const x = i * HSTEP - HOFF;
       let h = rawHeight(x, z, biomeAt(x, z, _bw));
       h = roadCarve(x, z, h);
+      let inT = false;
       for (const t of TOWNS) {
-        const dx = x - t.x, dz = z - t.z, R = t.r + 18;
+        const dx = x - t.x, dz = z - t.z, R = t.r + 24;
         if (dx > R || dx < -R || dz > R || dz < -R) continue;
         const d = Math.hypot(dx, dz);
-        if (d < R) h = h + (t.h - h) * (1 - smoothstep(t.r, R, d));
+        if (d < R) h = h + (t.h - h) * (1 - smoothstep(t.r + 5, R, d));   // v24: piano fino a r+5 (lotti esterni)
+        if (d < t.r + 6) inT = true;
       }
       const e = coastMask(x, z);
-      if (e > 0.82) {
+      if (e > 0.82 && !inT) {
         h = h + (-12 - h) * smoothstep(0.82, 0.97, e);
         const isl = fbm(NZ.isl, x * 0.009, z * 0.009, 3);
         if (isl > 0.3 && e < 1.2) h = Math.max(h, WATER_LEVEL - 2 + Math.min(8, (isl - 0.3) * 60) * smoothstep(1.2, 1.05, e));
@@ -278,6 +282,7 @@ function ensureFields() {
   makeRivers(mulberry32(MAP.seed ^ 0x5eed), MAP.random ? 1 + (MAP.seed % 3) : 2);
   buildHeightGrid();
   assignThemes(mulberry32(MAP.seed ^ 0x7e3a), MAP.random);
+  for (const t of TOWNS) planTown(t);
 }
 
 /** altezza del terreno (griglia precalcolata da 2,5 m, interpolazione bilineare) */
@@ -379,11 +384,11 @@ function configureMap(seed, random) {
     // città: una grande vicino al centro, le altre sparse con distanza minima
     const n = 14 + Math.floor(r() * 5), used = new Set();
     const name = () => { for (let k = 0; k < 50; k++) { const s = P1[Math.floor(r() * P1.length)] + ' ' + P2[Math.floor(r() * P2.length)]; if (!used.has(s)) { used.add(s); return s; } } return 'Paese ' + used.size; };
-    TOWNS.push({ name: name(), x: R(-120, 120), z: R(-120, 120), r: 50, houses: 12 });
+    TOWNS.push({ name: name(), x: R(-120, 120), z: R(-120, 120), r: 80, houses: 12 });
     for (let k = 0; TOWNS.length < n && k < 3000; k++) {
-      const x = R(-HALF + 90, HALF - 90), z = R(-HALF + 90, HALF - 90);
-      if (TOWNS.some(t => Math.hypot(t.x - x, t.z - z) < 150)) continue;
-      const tr = Math.round(R(24, 36)), kind = r();
+      const x = R(-HALF + 100, HALF - 100), z = R(-HALF + 100, HALF - 100);
+      if (TOWNS.some(t => Math.hypot(t.x - x, t.z - z) < (t.r > 60 ? 200 : 172))) continue;
+      const tr = Math.round(R(46, 54)), kind = r();
       TOWNS.push({ name: name(), x, z, r: tr, houses: Math.max(2, Math.round(tr / 5.5 + R(-1, 1.5))), towers: kind < 0.2, containers: kind > 0.78 });
     }
     // biomi: uno per quadrante, in ordine e posizione casuali
@@ -653,6 +658,27 @@ export function rayWorld(o, d, maxDist, ignore = null) {
 
 // ─────────────── Materiali e texture condivisi ───────────────
 const M = {};
+// v24: taglio dei piani superiori del palazzo in cui si trova il giocatore (scarta i frammenti sopra uClipY
+// dentro il rettangolo uClipBox = minX, minZ, maxX, maxZ). Aggiornato da main.js ogni frame.
+export const CLIP = { box: { value: new THREE.Vector4(0, 0, 0, 0) }, y: { value: 1e9 } };
+const _clipDone = new WeakSet();
+function clipCompile(sh) {
+  sh.uniforms.uClipBox = CLIP.box; sh.uniforms.uClipY = CLIP.y;
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vClipW;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\n{ vec4 cw = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\ncw = instanceMatrix * cw;\n#endif\nvClipW = (modelMatrix * cw).xyz; }');
+  sh.fragmentShader = sh.fragmentShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vClipW;\nuniform vec4 uClipBox;\nuniform float uClipY;')
+    .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vClipW.y > uClipY && vClipW.x > uClipBox.x && vClipW.x < uClipBox.z && vClipW.z > uClipBox.y && vClipW.z < uClipBox.w) discard;');
+}
+function clipMat(mt) {
+  if (_clipDone.has(mt)) return;
+  _clipDone.add(mt);
+  if (mt.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile) return;
+  mt.onBeforeCompile = clipCompile;
+  mt.needsUpdate = true;
+}
+
 function m(name, color, opts = {}) {
   if (!M[name]) M[name] = new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts });
   return M[name];
@@ -952,6 +978,7 @@ const _gc = {
   sandA: new THREE.Color('#e2c387'), sandB: new THREE.Color('#d1a866'), redRock: new THREE.Color('#b8693a'), redRock2: new THREE.Color('#d39a5c'), dryBush: new THREE.Color('#a39a58'),
   autA: new THREE.Color('#b48a3a'), autB: new THREE.Color('#9a6a2c'), leaves: new THREE.Color('#c25a26'), autGreen: new THREE.Color('#7f8c3a'),
   tropA: new THREE.Color('#3fb04a'), tropB: new THREE.Color('#5cc44e'), whiteSand: new THREE.Color('#f3e7c4'),
+  asphalt: new THREE.Color('#505256'), road: new THREE.Color('#66676a'), walk: new THREE.Color('#b3aea4'), cobble: new THREE.Color('#8a8276'),
   townSnow: new THREE.Color('#e4e9ef'), townSand: new THREE.Color('#d8b98a'), townStone: new THREE.Color('#b9b1a0'), townDirt: new THREE.Color('#a8865a'),
 };
 const _bc = new THREE.Color();
@@ -987,10 +1014,15 @@ function groundColor(x, z, h, out, slope = null) {
   }
   const tw = inTown(x, z, 4);
   if (tw) out.lerp(TOWN_GROUND[tw.theme] ? _gc[TOWN_GROUND[tw.theme]] : _gc.town, 0.45);
-  // strade sterrate con bordo erboso più scuro
-  const rd = roadDist(x, z);
-  if (rd < 5) out.lerp(_gc.dirtEdge, smoothstep(5, 3.5, rd) * 0.5);
-  if (rd < 3.5) out.lerp(_gc.dirt, 1 - rd / 3.5);
+  // v24: dentro le città il reticolo di strade (si vede anche da lontano sul terreno semplificato)
+  const st = tw ? streetAt(tw, x, z) : 0;
+  if (st) out.copy(st === 2 ? _gc.asphalt : st === 3 ? _gc.cobble : _gc.walk);
+  else if (!tw || Math.hypot(x - tw.x, z - tw.z) > tw.r - 3) {
+    // strade tra le città: asfalto (sterrato nel deserto) con bordo erboso più scuro
+    const rd = roadDist(x, z);
+    if (rd < 5) out.lerp(_gc.dirtEdge, smoothstep(5, 3.5, rd) * 0.5);
+    if (rd < 3.6) out.lerp(wD > 0.5 ? _gc.dirt : _gc.road, smoothstep(3.6, 2.6, rd));
+  }
   // spiagge, con sabbia bagnata vicino all'acqua
   if (h < WATER_LEVEL + 1.4 + wT * 1.6) out.lerp(wT > 0.4 ? _gc.whiteSand : _gc.sand, Math.min(1, (WATER_LEVEL + 1.4 + wT * 1.6 - h) / 1.2));
   if (h < WATER_LEVEL + 0.35) out.lerp(_gc.wetSand, Math.min(1, (WATER_LEVEL + 0.35 - h) / 0.6));
@@ -1166,6 +1198,7 @@ const SPECIAL_GEO = {
     ], 907 + c);
   },
 };
+Object.assign(SPECIAL_GEO, CITY_SPECIALS);
 const _specialCache = new Map();
 /**
  * Tetto a due falde: lastra spessa con colmo lungo x. half = mezza luce orizzontale (sporto compreso),
@@ -1401,8 +1434,8 @@ export function buildWorld(scene, opts = {}) {
   }
   const geoCache = new Map();
   const cgeo = (k, f) => { if (!geoCache.has(k)) { const g = f(); g.userData.shared = true; geoCache.set(k, g); } return geoCache.get(k); };
-  function furnish(house, sides, baseY, H, T, theme) {
-    const F = house.furn = [];
+  function furnish(house, sides, baseY, H, T, theme, fo = {}) {
+    const F = fo.F || (house.furn = []);
     const fy = baseY + 0.2;
     const at = (s, u, dist) => s.horiz ? [s.x + u, s.z - s.n[1] * (T / 2 + dist)] : [s.x - s.n[0] * (T / 2 + dist), s.z + u];
     const reg = (s, u, lu, ld, dist = 0) => { const [x, z] = at(s, u, dist + ld / 2); F.push(s.horiz ? { x, z, hw: lu / 2, hd: ld / 2 } : { x, z, hw: ld / 2, hd: lu / 2 }); };
@@ -1585,7 +1618,7 @@ export function buildWorld(scene, opts = {}) {
     const walls = sides.filter(s => !s.door);
     for (let i = walls.length - 1; i > 0; i--) { const j = Math.floor(srand() * (i + 1)); [walls[i], walls[j]] = [walls[j], walls[i]]; }
     let placed = 0;
-    const maxItems = 3 + Math.floor(srand() * 3);
+    const maxItems = fo.max ?? 3 + Math.floor(srand() * 3);
     const winHit = (s, a, b) => s.win && a < 0.98 && b > -0.98;
     const pics = [];
     for (const s of walls) {
@@ -1655,7 +1688,7 @@ export function buildWorld(scene, opts = {}) {
     }
   }
 
-  function placeHouse(cx, cz, w, d, baseY, rot90, theme = 'classic') {
+  function placeHouse(cx, cz, w, d, baseY, rot90, theme = 'classic', doorFace = -1) {
     if (rot90) { const t = w; w = d; d = t; }
     const H = 3.8, T = 0.35, door = 2.2;
     const TH = THEMES[theme] || THEMES.classic;
@@ -1677,7 +1710,7 @@ export function buildWorld(scene, opts = {}) {
       if (s.horiz) addBox(lu, lh, depth, s.x + u, y, s.z + n[1] * o, mat, deco);
       else addBox(depth, lh, lu, s.x + n[0] * o, y, s.z + u, mat, deco);
     };
-    const doorSide = Math.floor(srand() * 4);
+    const doorSide = doorFace >= 0 ? doorFace : Math.floor(srand() * 4);
     const normals = [[0, -1], [0, 1], [-1, 0], [1, 0]];
     const sides = [
       { x: cx, z: cz - d / 2 + T / 2, len: w, horiz: true },
@@ -1845,7 +1878,7 @@ export function buildWorld(scene, opts = {}) {
     for (let k = 0; k < 40; k++) {
       const a = srand() * Math.PI * 2, rr = sr(rMin, rMax);
       const x = t.x + Math.cos(a) * rr, z = t.z + Math.sin(a) * rr;
-      if (overlapsHouse(x, z, r * 2, r * 2) || roadDist(x, z) < r + 2.5) continue;
+      if (overlapsHouse(x, z, r * 2, r * 2) || onStreet(t, x, z, r + 0.5) || (rr > t.r - 3 && roadDist(x, z) < r + 2.5)) continue;
       if (queryColliders(x, z, r).some(c => c.type === 'cyl' ? Math.hypot(c.x - x, c.z - z) < c.r + r : (x + r > c.minX && x - r < c.maxX && z + r > c.minZ && z - r < c.maxZ))) continue;
       return [x, z];
     }
@@ -1884,25 +1917,32 @@ export function buildWorld(scene, opts = {}) {
     if (/^Faro/.test(t.name) && th !== 'port') { const s = townSpot(t, 1.5); if (s) special('lighthouse', s[0], s[1], t.h, [1.7, 14, false]); }
   }
 
-  // ── città ──
+  // ── città (v24): strade, piazze, palazzi, negozi, capannoni e case (city.js) ──
+  function makeDoor(x, z, y, horiz, nx, nz, house, gap = 2.2) {
+    const dr = { i: doors.length, x, z, y: y + 0.2, horiz, nx, nz, gap, open0: srand() < 0.3, open: false, ang: 0, mat: doorMats[Math.floor(srand() * doorMats.length)], c: null, leaves: null, house };
+    dr.c = { type: 'box', minX: horiz ? x - gap / 2 : x - 0.08, maxX: horiz ? x + gap / 2 : x + 0.08, minY: y + 0.2, maxY: y + 2.6, minZ: horiz ? z - 0.08 : z - gap / 2, maxZ: horiz ? z + gap / 2 : z + 0.08, door: dr };
+    setDoor(dr, dr.open0, true);
+    doors.push(dr); chunkAt(x, z).doors.push(dr);
+    house.doors.push({ x, z, nx, nz, door: dr });
+    return dr;
+  }
+  const cityStats = buildCity({
+    TOWNS, addBox, addGeo, addCollider, special, houses, lootSpots, chestSpots, extraTrees, makeDoor, furnish, placeHouse, cgeo, chunkAt, addCrate,
+    rnd: () => srand(), gableRoofGeo, gableEndGeo, ridgeGeo, roofMatFor,
+    M: { floorMat, trimMat, stoneMat, capMat, brickMat, crateMat, counterTopMat, blackMat, darkWoodMat, steelMat, potMat, leafMat, cabinetMats, sofaMats, blanketMats, furnWoodMats, screenMat, bookMats, snowMat },
+  });
+  const freeOfCity = (t, x, z, w, d) => !overlapsHouse(x, z, w, d) && !onStreet(t, x, z, Math.max(w, d) / 2 + 0.5);
   for (const t of TOWNS) {
-    let placed = 0, tries = 0;
-    while (placed < t.houses && tries < 300) {
-      tries++;
-      const w = Math.round(sr(8, 13)), d = Math.round(sr(8, 12));
-      const a = srand() * Math.PI * 2, rr = placed === 0 && t.houses > 6 ? sr(14, 20) : sr(4, t.r - 8);
-      const x = t.x + Math.cos(a) * rr, z = t.z + Math.sin(a) * rr;
-      const rot = srand() < 0.5;
-      const ww = rot ? d : w, dd = rot ? w : d;
-      if (overlapsHouse(x, z, ww, dd)) continue;
-      placeHouse(x, z, w, d, t.h, rot, t.theme);
-      placed++;
-    }
     townExtras(t);
     if (t.towers) {
       for (let i = 0; i < 4; i++) {
-        const a = i * Math.PI / 2 + 0.4;
-        const x = t.x + Math.cos(a) * (t.r - 6), z = t.z + Math.sin(a) * (t.r - 6);
+        let a = i * Math.PI / 2 + 0.4, rr = t.r - 6, ok = false;
+        for (let k = 0; k < 30 && !ok; k++) {
+          a = i * Math.PI / 2 + 0.4 + (k ? sr(-0.7, 0.7) : 0); rr = k ? sr(t.r * 0.45, t.r - 5) : t.r - 6;
+          ok = freeOfCity(t, t.x + Math.cos(a) * rr, t.z + Math.sin(a) * rr, 7, 7);
+        }
+        if (!ok) continue;
+        const x = t.x + Math.cos(a) * rr, z = t.z + Math.sin(a) * rr;
         if (t.theme === 'castle') {
           // torre di pietra con merli e bandiera
           addBox(5, 18, 5, x, t.h + 9, z, stoneMat, { lodColor: '#a39d92' });
@@ -1922,7 +1962,7 @@ export function buildWorld(scene, opts = {}) {
     if (t.containers) {
       for (let i = 0; i < 8; i++) {
         const x = t.x + sr(-t.r + 4, t.r - 4), z = t.z + sr(-t.r + 4, t.r - 4);
-        if (overlapsHouse(x, z, 7, 7)) continue;
+        if (Math.hypot(x - t.x, z - t.z) > t.r - 4 || !freeOfCity(t, x, z, 7, 7)) continue;
         const rot = srand() < 0.5;
         const stack = srand() < 0.35 ? 2 : 1;
         for (let s = 0; s < stack; s++) {
@@ -1945,22 +1985,13 @@ export function buildWorld(scene, opts = {}) {
     for (let i = 0; i < nCrates; i++) {
       const a = srand() * Math.PI * 2, rr = sr(3, t.r);
       const x = t.x + Math.cos(a) * rr, z = t.z + Math.sin(a) * rr;
-      if (overlapsHouse(x, z, 1.5, 1.5)) continue;
+      if (!freeOfCity(t, x, z, 1.5, 1.5)) continue;
       const s = sr(1.1, 1.4);
       const gy = terrainHeight(x, z);
       addCrate(s, s, s, x, gy + s / 2, z);
       if (srand() < 0.3) addCrate(s * 0.9, s * 0.9, s * 0.9, x + 0.1, gy + s + s * 0.45, z);
       if (srand() < 0.5) lootSpots.push(new THREE.Vector3(x + s, gy, z));
     }
-  }
-
-  // ── fontana al centro ──
-  {
-    const t = TOWNS[0];
-    chunkAt(t.x, t.z).specials.push({ type: 'fountain', x: t.x, z: t.z, h: t.h });
-    addCollider({ type: 'cyl', x: t.x, z: t.z, r: 3.3, minY: t.h - 1, maxY: t.h + 1 });
-    addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.5, minY: t.h, maxY: t.h + 3.5, noStand: true });
-    lootSpots.push(new THREE.Vector3(t.x, t.h + 1.05, t.z + 1.8));
   }
 
   // ── alberi (solo dati + collisori) ──
@@ -1999,7 +2030,7 @@ export function buildWorld(scene, opts = {}) {
   }
 
   for (const e of extraTrees) {
-    const h = terrainHeight(e.x, e.z);
+    const h = e.y ?? terrainHeight(e.x, e.z);
     const t = { x: e.x, z: e.z, h, s: sr(0.85, 1.25), rot: srand() * 6.28, hue: 0.28 + sr(-0.03, 0.04), light: sr(0.3, 0.38), k: e.k, pine: e.k === 'snowPine' };
     trees.push(t);
     chunkAt(t.x, t.z).trees.push(t);
@@ -2016,7 +2047,7 @@ export function buildWorld(scene, opts = {}) {
     if (srand() > (0.35 + forestK(x, z) * 0.65) * (1 - biomeAt(x, z)[1] * 0.75) * (1 - biomeAt(x, z)[2] * 0.6)) continue;
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL + 0.9 || h > 40) continue;
-    if (inTown(x, z, 2) || roadDist(x, z) < 3.5) continue;
+    if (inTown(x, z, 4) || roadDist(x, z) < 3.5) continue;
     chunkAt(x, z).bushes.push({ x, z, h, s: sr(0.7, 1.4), rot: srand() * 6.28, v: Math.floor(srand() * 4) });
     nb++;
   }
@@ -2028,7 +2059,7 @@ export function buildWorld(scene, opts = {}) {
   while (nr < NROCKS && tries < NROCKS * 20) {
     tries++;
     const x = sr(-HALF + 6, HALF - 6), z = sr(-HALF + 6, HALF - 6);
-    if (inTown(x, z, 3)) continue;
+    if (inTown(x, z, 4)) continue;
     const h = terrainHeight(x, z);
     if (h < WATER_LEVEL - 1) continue;
     const r = { x, z, h, s: sr(0.7, 2.4), e: [srand() * 3, srand() * 3, srand() * 3], k: [sr(0.9, 1.4), sr(0.6, 1), sr(0.9, 1.3)] };
@@ -2273,7 +2304,13 @@ export function buildWorld(scene, opts = {}) {
     const pos = [], nor = [], colr = [];
     const c = new THREE.Color();
     for (const b of list) {
-      const g = new THREE.BoxGeometry(b.w, b.h, b.d).toNonIndexed();
+      // v24: alberi lontani come coni / chiome sfaccettate (prima erano parallelepipedi scuri che all'orizzonte sembravano monoliti neri)
+      let g = b.shape === 'cone' ? new THREE.ConeGeometry(b.w / 2, b.h, 6, 1)
+        : b.shape === 'blob' ? new THREE.IcosahedronGeometry(b.w / 2, 0).scale(1, b.h / b.w, 1)
+        : new THREE.BoxGeometry(b.w, b.h, b.d);
+      if (b.ry) g.rotateY(b.ry);
+      if (g.index) { const ng = g.toNonIndexed(); g.dispose(); g = ng; }
+      if (b.shape) g.computeVertexNormals();
       g.translate(b.x, b.y, b.z);
       const p = g.attributes.position.array, n = g.attributes.normal.array;
       c.set(b.color);
@@ -2300,10 +2337,11 @@ export function buildWorld(scene, opts = {}) {
     group.add(t);
     const blocks = [];
     for (const h of ch.houses) {
-      blocks.push({ w: h.w, h: 4.1, d: h.d, x: h.cx, y: h.baseY + 2.05, z: h.cz, color: h.wallColor, top: h.roofColor });
+      const lh = h.lodH ?? 4.1;
+      blocks.push({ w: h.w, h: lh, d: h.d, x: h.cx, y: h.baseY + lh / 2, z: h.cz, color: h.wallColor, top: h.roofColor });
       if (h.pitch) for (let k = 1; k <= 2; k++) {                       // tetto a falde: due gradoni
         const f = 1 - k / 3, ax = h.pitch.alongX;
-        blocks.push({ w: ax ? h.w + 0.6 : (h.w + 1.5) * f, h: h.pitch.rise / 3, d: ax ? (h.d + 1.5) * f : h.d + 0.6, x: h.cx, y: h.baseY + 4.1 + h.pitch.rise * (k - 0.5) / 3, z: h.cz, color: h.roofColor, top: h.roofColor });
+        blocks.push({ w: ax ? h.w + 0.6 : (h.w + 1.5) * f, h: h.pitch.rise / 3, d: ax ? (h.d + 1.5) * f : h.d + 0.6, x: h.cx, y: h.baseY + lh + h.pitch.rise * (k - 0.5) / 3, z: h.cz, color: h.roofColor, top: h.roofColor });
       }
     }
     for (const b of ch.boxes) if (b.lodColor) blocks.push({ w: b.w, h: b.h, d: b.d, x: b.x, y: b.y, z: b.z, color: b.lodColor });
@@ -2312,10 +2350,17 @@ export function buildWorld(scene, opts = {}) {
       blocks.push({ w: q90 ? D.d - 0.6 : D.w - 0.6, h: D.h * 0.8, d: q90 ? D.w - 0.6 : D.d - 0.6, x: pr.x, y: pr.y + D.h * 0.4, z: pr.z, color: '#a8763f', top: '#8a3326' });
     }
     // alberi lontani: un cono semplice ogni 3 alberi
-    for (let i = 0; i < ch.trees.length; i += 3) {
+    for (let i = 0; i < ch.trees.length; i += 2) {
       const tr = ch.trees[i];
       const lc = LOD_TREE[tr.k] || LOD_TREE.oak;
-      blocks.push({ w: lc[1] * tr.s, h: lc[2] * tr.s, d: lc[1] * tr.s, x: tr.x, y: tr.h + lc[3] * tr.s, z: tr.z, color: lc[0] });
+      const cone = /pine/i.test(tr.k), thin = tr.k === 'cactus' || tr.k === 'deadTree';
+      const sz = tr.s * 1.15, ry = (tr.x * 7.1 + tr.z * 3.3) % 6.28;
+      // tronco sottile + chioma: cono per i pini, poliedro per le latifoglie
+      const base = Math.max(0.4, lc[3] - lc[2] / 2) * sz;
+      if (!thin) blocks.push({ w: 0.4 * sz, h: base + 0.6, d: 0.4 * sz, x: tr.x, y: tr.h + (base + 0.6) / 2, z: tr.z, color: '#6b4a32' });
+      if (thin) blocks.push({ w: lc[1] * sz, h: lc[2] * sz, d: lc[1] * sz, x: tr.x, y: tr.h + lc[3] * sz, z: tr.z, color: lc[0] });
+      else if (cone) blocks.push({ w: lc[1] * sz * 1.3, h: lc[2] * sz * 1.15, x: tr.x, y: tr.h + base + lc[2] * sz * 0.575, z: tr.z, color: lc[0], shape: 'cone', ry });
+      else blocks.push({ w: lc[1] * sz * 1.3, h: Math.min(lc[2], lc[1] * 1.5) * sz * 1.1, x: tr.x, y: tr.h + lc[3] * sz, z: tr.z, color: lc[0], shape: 'blob', ry });
     }
     const bg = mergedBlocks(blocks);
     if (bg) group.add(new THREE.Mesh(bg, blockMat));
@@ -2658,10 +2703,11 @@ export function buildWorld(scene, opts = {}) {
     terrain.receiveShadow = true;
     group.add(terrain);
     // box statici uniti per materiale; i tetti restano separati (uno per casa) per poterli nascondere
-    const byMat = new Map();
+    const byMat = new Map(), byGeo = new Map();
     const roofGroups = new Map();
     for (const b of ch.boxes) {
       if (b.roof && b.house) {
+        clipMat(b.material);
         let rg = roofGroups.get(b.house);
         if (!rg) { rg = new THREE.Group(); roofGroups.set(b.house, rg); group.add(rg); b.house.roofMesh = rg; }
         const mesh = new THREE.Mesh(b.geo || boxGeometry(b), b.material);
@@ -2671,11 +2717,13 @@ export function buildWorld(scene, opts = {}) {
         rg.add(mesh);
         continue;
       }
+      clipMat(b.material);
       if (b.geo) {
-        const mesh = new THREE.Mesh(b.geo, b.material);
-        mesh.position.set(b.x, b.y, b.z); if (b.rotY) mesh.rotation.y = b.rotY;
-        mesh.castShadow = b.cast; mesh.receiveShadow = true;
-        group.add(mesh);
+        // v24: geometrie uguali (lampade, piante, insegne, tende…) → una sola InstancedMesh
+        const gk = b.geo.uuid + b.material.uuid + (b.cast ? 1 : 0);
+        let e = byGeo.get(gk);
+        if (!e) { e = { geo: b.geo, material: b.material, cast: b.cast, list: [] }; byGeo.set(gk, e); }
+        e.list.push(b);
         continue;
       }
       const key = b.material.uuid + (b.cast ? 1 : 0);
@@ -2687,6 +2735,20 @@ export function buildWorld(scene, opts = {}) {
       const mesh = new THREE.Mesh(mergeBoxList(e.list), e.material);
       mesh.castShadow = e.cast; mesh.receiveShadow = true;
       group.add(mesh);
+    }
+    for (const e of byGeo.values()) {
+      if (e.list.length === 1) {
+        const b = e.list[0], mesh = new THREE.Mesh(b.geo, b.material);
+        mesh.position.set(b.x, b.y, b.z); if (b.rotY) mesh.rotation.y = b.rotY;
+        mesh.castShadow = b.cast; mesh.receiveShadow = true;
+        group.add(mesh);
+        continue;
+      }
+      const im = new THREE.InstancedMesh(e.geo, e.material, e.list.length);
+      e.list.forEach((b, i) => { q.setFromAxisAngle(up, b.rotY || 0); p.set(b.x, b.y, b.z); sc.set(1, 1, 1); mat4.compose(p, q, sc); im.setMatrixAt(i, mat4); });
+      im.castShadow = e.cast; im.receiveShadow = true;
+      im.computeBoundingSphere();
+      group.add(im);
     }
     for (const dr of ch.doors) buildDoorLeaves(dr, group);
     // alberi: abete, quercia, betulla (modelli low-poly con colori per vertice)
@@ -2841,13 +2903,13 @@ export function buildWorld(scene, opts = {}) {
         group.add(im); ch.nearOnly.push(im);
       }
     }
-    // oggetti speciali
+    // oggetti speciali (v24: instanziati per tipo, nelle città ce ne sono centinaia)
+    const spec = new Map();
     for (const s of ch.specials) {
       if (SPECIAL_GEO[s.type]) {
-        const mesh = new THREE.Mesh(specialGeo(s.type, s.c), propMaterial);
-        mesh.position.set(s.x, s.h, s.z); mesh.rotation.y = s.rot || 0;
-        mesh.castShadow = mesh.receiveShadow = true;
-        group.add(mesh);
+        const k = s.type + '|' + (s.c || 0);
+        if (!spec.has(k)) spec.set(k, []);
+        spec.get(k).push(s);
         continue;
       }
       if (s.type === 'fountain') {
@@ -2858,6 +2920,14 @@ export function buildWorld(scene, opts = {}) {
         const pp = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 3, 10), m('stone', '#b8b4a8'));
         pp.position.set(s.x, s.h + 2, s.z); pp.castShadow = true; group.add(pp);
       }
+    }
+    for (const list of spec.values()) {
+      clipMat(propMaterial);
+      const im = new THREE.InstancedMesh(specialGeo(list[0].type, list[0].c), propMaterial, list.length);
+      list.forEach((s, i) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); mat4.compose(p, q, sc); im.setMatrixAt(i, mat4); });
+      im.castShadow = im.receiveShadow = true;
+      im.computeBoundingSphere();
+      group.add(im);
     }
     scene.add(group);
     ch.detail = group;
@@ -2992,12 +3062,26 @@ export function buildWorld(scene, opts = {}) {
   // strade disegnate come linee (molto più veloce che calcolarle per pixel)
   g.strokeStyle = 'rgb(170,145,100)'; g.lineWidth = 2.2; g.lineCap = 'round';
   for (const [a, b] of roads) { g.beginPath(); g.moveTo((a.x + HALF) * k, (a.z + HALF) * k); g.lineTo((b.x + HALF) * k, (b.z + HALF) * k); g.stroke(); }
+  // v24: reticolo stradale delle città e piazze
+  for (const t of TOWNS) {
+    const pl = t.plan; if (!pl) continue;
+    const cw = (STREET.RW + STREET.SW) * 2 * k;
+    g.fillStyle = 'rgb(118,116,112)';
+    for (const o of pl.offs) {
+      const L = Math.sqrt(Math.max(0, pl.R * pl.R - o * o));
+      g.fillRect((t.x + o + HALF) * k - cw / 2, (t.z - L + HALF) * k, cw, 2 * L * k);
+      g.fillRect((t.x - L + HALF) * k, (t.z + o + HALF) * k - cw / 2, 2 * L * k, cw);
+    }
+    if (pl.offs.length >= 2) { const hp = (pl.P / 2) * k; g.fillStyle = 'rgb(160,150,135)'; g.fillRect((t.x + HALF) * k - hp + cw / 2, (t.z + HALF) * k - hp + cw / 2, 2 * hp - cw, 2 * hp - cw); }
+  }
   g.fillStyle = 'rgba(30,80,30,0.5)';
   for (const t of trees) g.fillRect((t.x + HALF) * k - 0.75, (t.z + HALF) * k - 0.75, 1.5, 1.5);
   g.fillStyle = 'rgba(150,170,60,0.55)';
   for (const p of TALL) { g.beginPath(); g.arc((p.x + HALF) * k, (p.z + HALF) * k, Math.max(1.5, p.r * k), 0, 7); g.fill(); }
   g.fillStyle = 'rgba(60,40,30,0.9)';
-  for (const h of houses) g.fillRect((h.cx - h.w / 2 + HALF) * k, (h.cz - h.d / 2 + HALF) * k, Math.max(2, h.w * k), Math.max(2, h.d * k));
+  for (const h of houses) if (h.city) { g.fillStyle = h.city === 'capannone' ? 'rgba(70,80,90,0.95)' : 'rgba(110,60,45,0.95)'; g.fillRect((h.cx - h.w / 2 + HALF) * k, (h.cz - h.d / 2 + HALF) * k, Math.max(2, h.w * k), Math.max(2, h.d * k)); }
+  g.fillStyle = 'rgba(60,40,30,0.9)';
+  for (const h of houses) if (!h.city) g.fillRect((h.cx - h.w / 2 + HALF) * k, (h.cz - h.d / 2 + HALF) * k, Math.max(2, h.w * k), Math.max(2, h.d * k));
 
   // casette e cataste sulla minimappa
   for (const ch of chunks.values()) for (const pr of ch.props) {
@@ -3015,5 +3099,6 @@ export function buildWorld(scene, opts = {}) {
     boxGeoCache.clear();
   }
 
+  Object.assign(stats, { city: cityStats });
   return { doors, setDoor, poseDoor, lootSpots, chestSpots, houses, barrels, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks, destroyBarrel, resetProps, dispose, seed: MAP.seed, random: MAP.random };
 }

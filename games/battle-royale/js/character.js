@@ -1,46 +1,89 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=12';
+import { normalFromHeight, NORMALS } from './texgen.js?v=13';
+import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=13';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=12';
-import { mergeParts } from './props.js?v=12';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=13';
+import { mergeParts } from './props.js?v=13';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
   const key = color + JSON.stringify(opts);
   if (matCache.has(key)) return matCache.get(key);
-  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05, ...opts });
+  const m = rimify(new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05, ...opts }));
   matCache.set(key, m);
   return m;
 }
-// trama di tessuto condivisa (quasi bianca: moltiplica il colore della skin senza cambiarlo)
-let _fabric = null;
-function fabricTex() {
-  if (_fabric) return _fabric;
-  const S = 64, c = document.createElement('canvas');
-  c.width = c.height = S;
-  const g = c.getContext('2d'), img = g.createImageData(S, S), d = img.data;
-  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    const weave = ((x >> 1) + (y >> 1)) % 2 ? 1 : 0;          // intreccio diagonale
-    const v = 236 + weave * 12 + (Math.random() - 0.5) * 18 - ((y % 16 === 0) ? 22 : 0);   // + cuciture
-    const j = (y * S + x) * 4;
-    d[j] = d[j + 1] = d[j + 2] = Math.max(0, Math.min(255, v)); d[j + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  _fabric = new THREE.CanvasTexture(c);
-  _fabric.wrapS = _fabric.wrapT = THREE.RepeatWrapping;
-  _fabric.repeat.set(2, 2);
-  _fabric.colorSpace = THREE.SRGBColorSpace;
-  return _fabric;
+/**
+ * Luce di contorno (rim light): i bordi del personaggio si schiariscono un poco verso il cielo,
+ * così si staccano dallo sfondo anche in ombra. Un'unica variante di shader per tutti.
+ */
+export const CHAR_RIM = { value: new THREE.Color(0.17, 0.2, 0.26) };
+function rimify(m) {
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uRim = CHAR_RIM;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uRim;')
+      .replace('#include <opaque_fragment>', 'outgoingLight += uRim * pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = () => 'charRim1';
+  return m;
 }
-function clothMat(color) {
-  const key = 'cloth' + color;
+/** materiali "fisici" (riflesso morbido dei tessuti) solo con qualità texture normale o alta */
+const HQ = NORMALS;
+const lighter = (hex, t = 0.45) => new THREE.Color(hex).lerp(new THREE.Color('#ffffff'), t);
+/** materiale di un tessuto: trama + rilievo + lucentezza tipica (seta lucida, jeans opaco, cuoio, metallo…) */
+function fabricMat(kind, color, opts = {}) {
+  const key = 'fab' + kind + color + JSON.stringify(opts);
   if (matCache.has(key)) return matCache.get(key);
-  const m = new THREE.MeshStandardMaterial({ color, map: fabricTex(), normalMap: nrm(fabricTex(), 0.9), normalScale: new THREE.Vector2(0.7, 0.7), roughness: 0.85, metalness: 0.02 });
+  const t = clothTexture(kind, color, opts.extra);
+  const L = CLOTH_LOOK[kind] || CLOTH_LOOK.cotton;
+  const o = {
+    color: COLORED.has(kind) ? '#ffffff' : color, map: t.map,
+    roughness: L.rough, metalness: L.metal ?? 0.02,
+    ...(t.normalMap ? { normalMap: t.normalMap, normalScale: new THREE.Vector2(0.5, 0.5) } : {}),
+  };
+  const extra = { ...opts }; delete extra.extra;
+  let m;
+  if (HQ && (L.sheen || L.coat)) {
+    m = new THREE.MeshPhysicalMaterial({ ...o, ...extra });
+    if (L.sheen) { m.sheen = L.sheen * 0.6; m.sheenRoughness = L.sheenRough ?? 0.75; m.sheenColor = lighter(COLORED.has(kind) ? '#9a9a9a' : color, 0.2); }
+    if (L.coat) { m.clearcoat = L.coat; m.clearcoatRoughness = 0.35; }
+  } else m = new THREE.MeshStandardMaterial({ ...o, ...extra });
+  rimify(m);
   matCache.set(key, m);
   return m;
 }
+/** pelle: pori leggerissimi e un velo rosato ai bordi (finto sottopelle) */
+function skinMat(color, opts = {}) {
+  const key = 'skin' + color + JSON.stringify(opts);
+  if (matCache.has(key)) return matCache.get(key);
+  const t = skinTexture();
+  const o = { color, map: t.map, roughness: 0.58, metalness: 0.0, ...(t.normalMap ? { normalMap: t.normalMap, normalScale: new THREE.Vector2(0.3, 0.3) } : {}), ...opts };
+  let m;
+  if (HQ) { m = new THREE.MeshPhysicalMaterial(o); m.sheen = 0.35; m.sheenRoughness = 0.5; m.sheenColor = new THREE.Color(color).lerp(new THREE.Color('#ff8a70'), 0.5); }
+  else m = new THREE.MeshStandardMaterial(o);
+  rimify(m);
+  matCache.set(key, m);
+  return m;
+}
+/** capelli: ciocche con riflesso lucido */
+function hairMat(color) {
+  const key = 'hair' + color;
+  if (matCache.has(key)) return matCache.get(key);
+  const t = hairTexture();
+  const o = { color, map: t.map, roughness: 0.55, metalness: 0.02, ...(t.normalMap ? { normalMap: t.normalMap, normalScale: new THREE.Vector2(0.9, 0.9) } : {}) };
+  let m;
+  if (HQ) { m = new THREE.MeshPhysicalMaterial(o); m.sheen = 0.8; m.sheenRoughness = 0.35; m.sheenColor = lighter(color, 0.55); }
+  else m = new THREE.MeshStandardMaterial(o);
+  rimify(m);
+  matCache.set(key, m);
+  return m;
+}
+// trama di tessuto condivisa: cotone fine (si moltiplica per il colore senza cambiarlo)
+function fabricTex() { return clothTexture('cotton').map; }
+function clothMat(color, kind = 'cotton') { return fabricMat(kind, color); }
 function glowMat(color) {
   const key = 'glow' + color;
   if (matCache.has(key)) return matCache.get(key);
@@ -155,57 +198,7 @@ function mesh(geo, material, x = 0, y = 0, z = 0, parent = null, sx = 1, sy = sx
 const sph = (r, material, x, y, z, parent, sy = 1, sz = 1, ws = 12, hs = 9) => mesh(sphereGeo(ws, hs), material, x, y, z, parent, r, r * sy, r * sz);
 
 // ─────────────── Texture dei personaggi ───────────────
-function noiseCanvas(S, base, amt, draw) {
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
-  const g = c.getContext('2d');
-  g.fillStyle = base; g.fillRect(0, 0, S, S);
-  const img = g.getImageData(0, 0, S, S), d = img.data;
-  for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - 0.5) * amt; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
-  g.putImageData(img, 0, 0);
-  if (draw) draw(g, S);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-let _denim = null, _leather = null, _brushed = null, _knit = null;
-/** tela diagonale da jeans (grigio chiaro: si moltiplica per il colore dei pantaloni) */
-function denimTex() {
-  return _denim || (_denim = noiseCanvas(64, '#e4e4e4', 22, (g, S) => {
-    g.lineWidth = 1;
-    for (let i = -S; i < S * 2; i += 3) { g.strokeStyle = `rgba(255,255,255,${0.12 + Math.random() * 0.1})`; g.beginPath(); g.moveTo(i, 0); g.lineTo(i + S, S); g.stroke(); }
-    g.strokeStyle = 'rgba(0,0,0,0.18)'; g.setLineDash([2, 2]);
-    g.beginPath(); g.moveTo(S * 0.5, 0); g.lineTo(S * 0.5, S); g.stroke();   // cucitura laterale
-    g.setLineDash([]);
-  }));
-}
-/** cuoio con pori e piccole pieghe */
-function leatherTex() {
-  return _leather || (_leather = noiseCanvas(64, '#dcdcdc', 30, (g, S) => {
-    for (let i = 0; i < 40; i++) { g.strokeStyle = `rgba(0,0,0,${0.06 + Math.random() * 0.08})`; g.beginPath(); const x = Math.random() * S, y = Math.random() * S; g.moveTo(x, y); g.quadraticCurveTo(x + rnd(-6, 6), y + rnd(-3, 3), x + rnd(-10, 10), y + rnd(-4, 4)); g.stroke(); }
-  }));
-}
-/** metallo spazzolato per armature */
-function brushedTex() {
-  return _brushed || (_brushed = noiseCanvas(64, '#e8e8e8', 12, (g, S) => {
-    for (let i = 0; i < 90; i++) { const y = Math.random() * S; g.strokeStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)'; g.beginPath(); g.moveTo(0, y); g.lineTo(S, y + rnd(-1, 1)); g.stroke(); }
-  }));
-}
-/** maglia di lana (cuffie, sciarpe) */
-function knitTex() {
-  return _knit || (_knit = noiseCanvas(32, '#e8e8e8', 16, (g, S) => {
-    for (let x = 0; x < S; x += 4) for (let y = 0; y < S; y += 4) { g.fillStyle = 'rgba(0,0,0,0.13)'; g.fillRect(x + 1.5, y, 1, 4); g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(x, y + ((x / 4) % 2) * 2, 1, 2); }
-  }));
-}
-function texMat(kind, color, opts = {}) {
-  const key = kind + color + JSON.stringify(opts);
-  if (matCache.has(key)) return matCache.get(key);
-  const map = kind === 'denim' ? denimTex() : kind === 'leather' ? leatherTex() : kind === 'knit' ? knitTex() : brushedTex();
-  const m = new THREE.MeshStandardMaterial({ color, map, normalMap: nrm(map, kind === 'metal' ? 0.4 : 1.2), normalScale: new THREE.Vector2(0.6, 0.6), roughness: kind === 'metal' ? 0.3 : kind === 'leather' ? 0.55 : 0.85, metalness: kind === 'metal' ? 0.85 : 0.03, ...opts });
-  matCache.set(key, m);
-  return m;
-}
+function texMat(kind, color, opts = {}) { return fabricMat(kind, color, opts); }
 
 /**
  * Texture della testa (sfera): pelle, capelli dipinti, occhi, sopracciglia, bocca.
@@ -354,7 +347,10 @@ function faceMaterial(skin) {
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
   const opts = { map, roughness: robot ? 0.35 : 0.62, metalness: robot ? 0.7 : 0.02 };
   if (glowEye) { const em = new THREE.CanvasTexture(e); em.colorSpace = THREE.SRGBColorSpace; Object.assign(opts, { emissive: '#ffffff', emissiveMap: em, emissiveIntensity: 1.4 }); }
-  const m = new THREE.MeshStandardMaterial(opts);
+  let m;
+  if (HQ && !robot) { m = new THREE.MeshPhysicalMaterial(opts); m.sheen = 0.35; m.sheenRoughness = 0.5; m.sheenColor = new THREE.Color(base).lerp(new THREE.Color('#ff8a70'), 0.5); }
+  else m = new THREE.MeshStandardMaterial(opts);
+  rimify(m);
   faceCache.set(skin.id, m);
   return m;
 }
@@ -375,9 +371,10 @@ export function buildCharacter(skin, cos = {}) {
   root.add(body);
 
   const metal = !!skin.metal;
-  const shirtM = metal ? texMat('metal', skin.shirt) : clothMat(skin.shirt);
-  const pantsM = metal ? texMat('metal', skin.pants) : texMat('denim', skin.pants);
-  const skinM = mat(skin.skin, { roughness: 0.6 });
+  const [shirtK, pantsK] = SKIN_CLOTH[skin.id] || ['cotton', 'denim'];
+  const shirtM = metal ? texMat('metal', skin.shirt) : fabricMat(shirtK, skin.shirt, shirtK === 'hex' ? { extra: skin.glow || '#00f0ff' } : {});
+  const pantsM = metal ? texMat('metal', skin.pants) : fabricMat(pantsK, skin.pants, pantsK === 'hex' ? { extra: skin.glow || '#00f0ff' } : {});
+  const skinM = skin.id === 'robot' || skin.banana ? mat(skin.skin, { roughness: 0.5 }) : skinMat(skin.skin);
   const shoeM = texMat('leather', skin.shoes);
   const soleM = mat('#1a1a1a', { roughness: 0.9 });
   const darkM = mat('#111111');
@@ -559,7 +556,7 @@ export function buildCharacter(skin, cos = {}) {
   }
   // ciuffo di capelli (volume sopra la texture)
   if (skin.hair && !hasHat && skin.hairStyle !== 'swept' && !HEAD_TOP.includes(skin.acc) && !['ninja', 'visor', 'knight', 'astro'].includes(skin.acc)) {
-    const hm = mat(skin.hair, { roughness: 0.8 });
+    const hm = hairMat(skin.hair);
     const tuft = mesh(cachedGeo('hairFringe', () => {
       const parts = [[new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.42), {}]];
       // ciocche della frangia e sulla nuca
@@ -586,7 +583,7 @@ export function buildCharacter(skin, cos = {}) {
     }
     case 'ponytail': {
       // frangia, coda di cavallo ed elastico
-      const hm = mat(skin.hair, { roughness: 0.75 });
+      const hm = hairMat(skin.hair);
       mesh(domeGeo(Math.PI * 0.5), hm, 0, 0.25, -0.005, head, 0.214, 0.225, 0.22).rotation.x = -0.2;
       mesh(torusGeo(0.045, 0.018, 10), mat(skin.accColor || '#e04a6a'), 0, 0.31, -0.215, head).rotation.x = 0.5;
       const tail = mesh(capsuleGeo(0.055, 0.24), hm, 0, 0.14, -0.25, head);
@@ -707,7 +704,7 @@ const heroGeo = (key, list) => cachedGeo('hero_' + key, () => mergeSmooth(list))
 
 function buildHero(skin, P) {
   const { legs, knees, feet, arms, elbows, hands, torso, head, skinM, shirtM, pantsM } = P;
-  const hairM = mat(skin.hair || '#333', { roughness: 0.7 });
+  const hairM = hairMat(skin.hair || '#333');
   const goldM = mat(skin.gold || '#f0c860', { metalness: 0.85, roughness: 0.3 });
   const DS = THREE.DoubleSide;
   switch (skin.hero) {
@@ -1049,7 +1046,7 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=12';
+export { buildWeaponMesh } from './weapons.js?v=13';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */

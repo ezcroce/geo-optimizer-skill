@@ -24,6 +24,14 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: personaggi con stoffe e materiali veri
+
+- Ogni skin ha il suo **tessuto**: mimetica (Recluta, Tattico), ripstop, jeans con cuciture, lino, seta con fantasia (Tamsin, Samurai), gessato (Agente), maglia (Vichingo, Rapper), scozzese (Cowboy), quadretti (Giardiniera), tuta imbottita (Astronauta), squame (Drago), esagoni luminosi (Cyber), brina (Spettro), macchie (Zombie).
+- Ogni stoffa ha rilievo (normal map) e **lucentezza propria**: riflesso morbido sui tessuti, cuoio leggermente laccato, metallo spazzolato con pannelli e rivetti.
+- Pelle con pori leggerissimi e un velo rosato ai bordi; capelli a ciocche con riflesso lucido.
+- Luce di contorno: i personaggi si staccano dallo sfondo anche in ombra.
+- Con "Qualità texture: bassa" (e al primo avvio su telefono) si usano materiali semplici, quindi niente costo extra.
+
 ### Novità: biomi, montagne, meteo, eventi e città tematiche
 
 - **Mappa più irregolare**: rilievo generato con rumore frattale e *domain warping*, coste frastagliate con isolotti, fiumi che scendono dalle montagne, colline e creste ovunque.
@@ -159,6 +167,7 @@ js/events.js    eventi della partita (rifornimento, meteoriti, nebbia, bufera, o
 js/props.js     modelli low-poly (alberi, rocce, legna, mattoni, barili, casetta) e caricamento dei .glb
 models/         cartella facoltativa per i file .glb originali
 js/character.js modelli 3D di personaggi, armi, deltaplano e bus
+js/chartex.js   texture dei personaggi: tessuti, fantasie, pelle, capelli
 js/audio.js     effetti sonori sintetizzati
 js/main.js      ciclo di gioco, giocatore, arrampicata, IA dei bot, combattimento, HUD
 js/site.js      scene 3D e animazioni del sito

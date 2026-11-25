@@ -5,26 +5,26 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=12';
-import * as PR from './progress.js?v=12';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=12';
-import { initMenu } from './menu.js?v=12';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=12';
-import { initSettingsUI } from './settings-ui.js?v=12';
-import { applyAnisotropy } from './texgen.js?v=12';
-import * as A from './audio.js?v=12';
+} from './config.js?v=13';
+import * as PR from './progress.js?v=13';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=13';
+import { initMenu } from './menu.js?v=13';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=13';
+import { initSettingsUI } from './settings-ui.js?v=13';
+import { applyAnisotropy } from './texgen.js?v=13';
+import * as A from './audio.js?v=13';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=12';
-import { createWeather } from './weather.js?v=12';
-import { createEvents } from './events.js?v=12';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=12';
-import { weaponIcon } from './weapons.js?v=12';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=12';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=12';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=12';
+} from './world.js?v=13';
+import { createWeather } from './weather.js?v=13';
+import { createEvents } from './events.js?v=13';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=13';
+import { weaponIcon } from './weapons.js?v=13';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=13';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=13';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=13';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);

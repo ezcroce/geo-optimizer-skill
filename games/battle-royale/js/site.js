@@ -1,8 +1,8 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
-import { SKINS, WEAPONS, RARITIES } from './config.js?v=12';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=12';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=12';
+import { SKINS, WEAPONS, RARITIES } from './config.js?v=13';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=13';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=13';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];

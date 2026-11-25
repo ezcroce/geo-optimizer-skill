@@ -4,8 +4,8 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { WEAPONS, RARITIES } from './config.js?v=12';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=12';
+import { WEAPONS, RARITIES } from './config.js?v=13';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=13';
 
 /** quante volte la texture si ripete in un metro di superficie */
 const UVK = 5;

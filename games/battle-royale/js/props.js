@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=10';
+import { normalFromHeight, NORMALS } from './texgen.js?v=11';
 
 function mulberry32(a) {
   return function () {

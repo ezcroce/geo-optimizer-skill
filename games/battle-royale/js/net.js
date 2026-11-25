@@ -40,7 +40,7 @@ function loadPeerJS() {
   peerLib = new Promise((res, rej) => {
     if (window.peerjs) { res(window.peerjs); return; }
     const s = document.createElement('script');
-    s.src = './vendor/peerjs.min.js?v=10';
+    s.src = './vendor/peerjs.min.js?v=11';
     s.onload = () => window.peerjs ? res(window.peerjs) : rej(new Error('PeerJS non disponibile'));
     s.onerror = () => { peerLib = null; rej(new Error('Impossibile caricare PeerJS')); };
     document.head.appendChild(s);

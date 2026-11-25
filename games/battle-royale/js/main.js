@@ -5,24 +5,24 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=10';
-import * as PR from './progress.js?v=10';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=10';
-import { initMenu } from './menu.js?v=10';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=10';
-import { initSettingsUI } from './settings-ui.js?v=10';
-import { applyAnisotropy } from './texgen.js?v=10';
-import * as A from './audio.js?v=10';
+} from './config.js?v=11';
+import * as PR from './progress.js?v=11';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=11';
+import { initMenu } from './menu.js?v=11';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=11';
+import { initSettingsUI } from './settings-ui.js?v=11';
+import { applyAnisotropy } from './texgen.js?v=11';
+import * as A from './audio.js?v=11';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=10';
-import { createWeather } from './weather.js?v=10';
-import { createEvents } from './events.js?v=10';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=10';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=10';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=10';
+} from './world.js?v=11';
+import { createWeather } from './weather.js?v=11';
+import { createEvents } from './events.js?v=11';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=11';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=11';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=11';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);

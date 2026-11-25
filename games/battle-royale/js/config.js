@@ -91,6 +91,10 @@ export const SKINS = [
   { id: 'banana', name: 'Agente Banana', rarity: 3, shirt: '#ffe03a', pants: '#ffe03a', skin: '#ffe03a', shoes: '#6b4a12', acc: 'banana', accColor: '#6b4a12', banana: true },
   { id: 'cavaliere', name: "Cavaliere d'Oro", rarity: 4, shirt: '#d8aa30', pants: '#8c6c1c', skin: '#e0b48a', shoes: '#6b5212', acc: 'knight', accColor: '#ffd24a', cape: '#a3122a', metal: true },
   { id: 'drago', name: 'Drago Rosso', rarity: 4, shirt: '#a3121a', pants: '#5e0a0f', skin: '#c2281f', shoes: '#2a0304', acc: 'horns', accColor: '#f2d28a', cape: '#2a0303', glow: '#ff6a00' },
+  // ── eroi anime originali (dal set Blender "Original Anime Heroes"): disponibili da subito ──
+  { id: 'leo', name: 'Leo l\'Esploratore', rarity: 3, hero: 'leo', shirt: '#6f7d48', pants: '#8f7352', skin: '#f2cdb0', shoes: '#b07a55', acc: 'glasses', accColor: '#7a5238', hair: '#8e6240', eyes: '#3fae6c', hat: 'bucket', hairStyle: 'curly', short: true, shorts: true, boots: true },
+  { id: 'tamsin', name: 'Tamsin la Monaca', rarity: 3, hero: 'tamsin', shirt: '#ad2738', pants: '#3a3a44', skin: '#e6c0a2', shoes: '#3a3a42', acc: 'none', hair: '#8a4038', eyes: '#eeb440', sleeveless: true, short: true, wide: true, hairStyle: 'braid', lashes: true, flats: true, gold: '#f2c85a' },
+  { id: 'oren', name: 'Oren l\'Ombra', rarity: 4, hero: 'oren', shirt: '#3c3c48', pants: '#3c3c48', skin: '#f4dfd0', shoes: '#56565e', acc: 'none', hair: '#cdd3e0', eyes: '#9a8ef0', faceMask: '#3d4356', gloves: '#4c4c55', belt: '#8d6e50', kneepads: '#a9b2bd', tabi: true, hairStyle: 'swept', browTilt: 1, gold: '#f0d080' },
   // ── sbloccabili: pass battaglia e negozio ──
   { id: 'cowboy', name: 'Cowboy Polveroso', rarity: 2, shirt: '#b0643a', pants: '#3b4a6b', skin: '#d9a478', shoes: '#4a2c14', acc: 'none', hair: '#5a3418', scarf: '#c0302a', belt: '#5a3a1a', boots: true, hat: 'cowboy', lock: 'pass' },
   { id: 'scienziata', name: 'Scienziata Pazza', rarity: 2, shirt: '#f2f2f0', pants: '#3a3a5a', skin: '#f0c8a8', shoes: '#2a2a3a', acc: 'ponytail', accColor: '#7a4ad0', hair: '#c0602a', coat: true, lock: 'pass' },
@@ -115,6 +119,7 @@ export const HATS = [
   { id: 'wizard', name: 'Cappello da mago', rarity: 3, color: '#3a2a8a', accent: '#ffd24a', lock: 'pass' },
   { id: 'crown', name: 'Corona reale', rarity: 4, color: '#ffc830', accent: '#e0203a', lock: 'pass' },
   { id: 'halo', name: 'Aureola', rarity: 4, color: '#fff2a0', lock: 'shop' },
+  { id: 'bucket', name: 'Cappello da esploratore', rarity: 2, color: '#e3b84c', accent: '#8a6440', lock: 'shop' },
 ];
 
 /** Zaini e oggetti sulla schiena */

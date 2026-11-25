@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=14';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=15';
 
 const once = (f) => { let v; return () => v || (v = f()); };
 function mulberry(a) {
@@ -135,7 +135,68 @@ const busMats = once(() => {
     rope: new THREE.MeshStandardMaterial({ color: '#c9b48a', roughness: 0.95 }),
     wood: new THREE.MeshStandardMaterial({ color: '#8a5a2b', roughness: 0.85 }),
     mouth: new THREE.MeshStandardMaterial({ color: '#2a2d33', roughness: 0.8, side: THREE.DoubleSide }),
+    gold: new THREE.MeshStandardMaterial({ color: '#ffd24a', emissive: '#a86a00', emissiveIntensity: 0.35, metalness: 0.9, roughness: 0.25 }),
+    sign: new THREE.MeshStandardMaterial({ map: busSign(), emissive: '#ffffff', emissiveMap: busSign(), emissiveIntensity: 0.9, roughness: 0.4 }),
+    plate: new THREE.MeshStandardMaterial({ map: busPlate(), roughness: 0.5, metalness: 0.2 }),
+    win: new THREE.MeshPhysicalMaterial({ map: busWindows(), roughness: 0.06, metalness: 0.35, clearcoat: 1, envMapIntensity: 1.3 }),
+    sand: new THREE.MeshStandardMaterial({ color: '#b39a6a', roughness: 1 }),
+    flag: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide }),
+    flame: new THREE.MeshBasicMaterial({ color: '#ff9a30', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
+    flameCore: new THREE.MeshBasicMaterial({ color: '#fff2b0', transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
+});
+/** insegna luminosa sul tetto */
+const busSign = once(() => {
+  const W = 512, H = 96, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#10141c'; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,190,40,0.07)';
+  for (let x = 4; x < W; x += 8) for (let y = 4; y < H; y += 8) { g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); }   // matrice di LED
+  g.font = '900 58px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.shadowColor = '#ffb020'; g.shadowBlur = 14; g.fillStyle = '#ffc640';
+  g.fillText('★ 100 ★ ISOLA', W / 2, H / 2 + 2);
+  return colorTex(c, false);
+});
+/** targa */
+const busPlate = once(() => {
+  const W = 256, H = 64, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f6f6f0'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1f4fb0'; g.fillRect(0, 0, 30, H); g.fillRect(W - 30, 0, 30, H);
+  g.strokeStyle = '#222'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4);
+  g.font = '800 40px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#16181c';
+  g.fillText('BR 100', W / 2, H / 2 + 2);
+  g.fillStyle = '#ffcc33'; g.font = '700 14px sans-serif'; g.fillText('I', 15, H / 2 + 14);
+  return colorTex(c, false);
+});
+/** finestrini: interno buio con sedili, passeggeri in sagoma e riflesso del cielo (6 riquadri diversi) */
+const busWindows = once(() => {
+  const N = 6, CW = 128, H = 128, c = document.createElement('canvas'); c.width = CW * N; c.height = H;
+  const g = c.getContext('2d'), rnd = mulberry(31);
+  const skins = ['#e8b48a', '#c58c5f', '#8a5a3a', '#f0c8a0', '#a8e070'];
+  const tops = ['#e83a3a', '#2f6fd6', '#ffcc33', '#44c070', '#a050e0', '#ff8a2a'];
+  for (let i = 0; i < N; i++) {
+    const x0 = i * CW;
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#24384e'); gr.addColorStop(1, '#0c1520');
+    g.fillStyle = gr; g.fillRect(x0, 0, CW, H);
+    // passeggeri: testa e spalle dietro allo schienale
+    const n = 1 + (rnd() * 2 | 0);
+    for (let k = 0; k < n; k++) {
+      const px = x0 + 24 + k * 56 + rnd() * 18, py = 62 + rnd() * 8;
+      g.fillStyle = tops[(rnd() * tops.length) | 0]; g.beginPath(); g.ellipse(px, py + 34, 24, 20, 0, 0, 7); g.fill();
+      g.fillStyle = skins[(rnd() * skins.length) | 0]; g.beginPath(); g.arc(px, py, 14, 0, 7); g.fill();
+      if (rnd() < 0.6) { g.fillStyle = tops[(rnd() * tops.length) | 0]; g.fillRect(px - 15, py - 16, 30, 8); }   // cappellino
+    }
+    // schienali rossi
+    g.fillStyle = '#9a2228'; g.fillRect(x0 + 6, 92, CW - 12, 36);
+    g.fillStyle = '#c3333a'; g.fillRect(x0 + 6, 92, CW - 12, 6);
+    // riflesso diagonale
+    g.save(); g.beginPath(); g.rect(x0, 0, CW, H); g.clip();
+    g.fillStyle = 'rgba(200,230,255,0.16)'; g.beginPath(); g.moveTo(x0 + 20, 0); g.lineTo(x0 + 70, 0); g.lineTo(x0 + 10, H); g.lineTo(x0 - 40, H); g.fill();
+    g.fillStyle = 'rgba(200,230,255,0.08)'; g.beginPath(); g.moveTo(x0 + 85, 0); g.lineTo(x0 + 100, 0); g.lineTo(x0 + 40, H); g.lineTo(x0 + 25, H); g.fill();
+    g.restore();
+  }
+  return colorTex(c, false);
 });
 /** Il "Battle Bus" volante: carrozzeria arrotondata, finestrini incassati, fari, ruote con cerchioni e mongolfiera a spicchi */
 export function buildBus() {
@@ -161,7 +222,9 @@ export function buildBus() {
   const glass = [], frames = [];
   for (const sx of [-1, 1]) {
     for (const z of winZ) {
-      glass.push(at(new THREE.BoxGeometry(0.04, 0.95, 0.98), sx * (W / 2), 0.45, z));
+      const wg = new THREE.BoxGeometry(0.04, 0.95, 0.98), U = wg.attributes.uv, cell = (winZ.indexOf(z) * 7 + (sx > 0 ? 3 : 0)) % 6;
+      for (let i = 0; i < U.count; i++) U.setX(i, (cell + (sx > 0 ? 1 - U.getX(i) : U.getX(i))) / 6);
+      glass.push(at(wg, sx * (W / 2 + 0.032), 0.45, z));
       frames.push(at(new THREE.BoxGeometry(0.05, 1.1, 1.12), sx * (W / 2 + 0.015), 0.45, z));
     }
     // fascia con la scritta e modanatura cromata
@@ -179,7 +242,7 @@ export function buildBus() {
     mesh(at(rbox(0.12, 0.42, 0.26, 0.06), sx * (W / 2 + 0.42), 0.55, 4.25), M.dark, g);
   }
   mesh(merge(frames), M.rubber, g, false);
-  mesh(merge(glass), M.glass, g, false);
+  mesh(merge(glass), M.win, g, false);
   // parabrezza inclinato e lunotto
   const ws = at(new THREE.BoxGeometry(W - 0.5, 1.15, 0.05), 0, 0.62, z1 - 0.12, -0.1);
   mesh(at(rbox(W - 0.32, 1.32, 0.08, 0.15, 0.02), 0, 0.62, z1 - 0.15, -0.1), M.rubber, g, false);
@@ -251,7 +314,158 @@ export function buildBus() {
   for (const x of [-1.2, 1.2]) for (const z of [-3.6, 2.2]) ropes.push(rod(new THREE.Vector3(x * 0.55, ringY + 0.4, z * 0.18), new THREE.Vector3(x, y1 + 0.35, z), 0.035, 5));
   for (const x of [-1, 1]) for (const z of [-1, 1]) ropes.push(rod(new THREE.Vector3(x * 3.2, 7.5 - 1.2, z * 4.0), new THREE.Vector3(x * 1.2, y1 + 0.35, z > 0 ? 2.2 : -3.6), 0.03, 4));
   mesh(merge(ropes), M.rope, g, false);
+  busExtras(g, M, { W, L, H, z0, z1, y1, ringY });
   return g;
+}
+
+/** dettagli aggiuntivi del bus: tetto, retro, ruote, eliche, bruciatore, bandierine e zavorre */
+function busExtras(g, M, { W, L, H, z0, z1, y1, ringY }) {
+  const parts = {};
+  const add = (k, geo) => (parts[k] || (parts[k] = [])).push(geo);
+  const roofTop = y1 + 0.17;
+  // ── tetto: insegna luminosa, lampeggiante, trombe, condizionatore, borsone ──
+  const signG = new THREE.BoxGeometry(1.7, 0.34, 0.1);
+  const sign = new THREE.Mesh(signG, [M.dark, M.dark, M.dark, M.dark, M.sign, M.sign]);
+  sign.position.set(0, roofTop + 0.3, 2.62); g.add(sign);
+  for (const x of [-0.7, 0.7]) add('dark', at(new THREE.BoxGeometry(0.06, 0.16, 0.06), x, roofTop + 0.06, 2.62));
+  add('dark', at(new THREE.CylinderGeometry(0.2, 0.22, 0.1, 16), 0, roofTop + 0.05, 3.15));
+  const beacon = new THREE.Group(); beacon.position.set(0, roofTop + 0.1, 3.15); g.add(beacon);
+  mesh(at(new THREE.SphereGeometry(0.16, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, 0, 0, 0, 0, 0, 1, 1.25, 1), M.amber, beacon, false);
+  mesh(at(new THREE.CylinderGeometry(0.1, 0.1, 0.16, 12, 1, true, 0, Math.PI), 0, 0.09, 0), M.chrome, beacon, false);
+  for (const x of [-0.45, 0.45]) {
+    add('chrome', at(new THREE.CylinderGeometry(0.11, 0.025, 0.5, 12, 1, true), x, roofTop + 0.12, 3.05, Math.PI / 2));
+    add('dark', at(new THREE.BoxGeometry(0.05, 0.1, 0.05), x, roofTop + 0.05, 2.9));
+  }
+  add('roof', at(rbox(1.7, 0.16, 1.3, 0.08), 0, roofTop + 0.08, 0.7));                        // condizionatore
+  for (const z of [0.4, 1.0]) {
+    add('dark', at(new THREE.CylinderGeometry(0.27, 0.27, 0.03, 18), 0.35, roofTop + 0.17, z));
+    add('dark', at(new THREE.CylinderGeometry(0.27, 0.27, 0.03, 18), -0.35, roofTop + 0.17, z));
+    for (const x of [-0.35, 0.35]) for (const r of [0, Math.PI / 2]) add('chrome', at(new THREE.BoxGeometry(0.54, 0.02, 0.03), x, roofTop + 0.19, z, 0, r, 0));
+  }
+  add('dark', at(new THREE.CapsuleGeometry(0.2, 0.7, 4, 10), -0.65, y1 + 0.58, 1.55, 0, 0, Math.PI / 2));   // borsone
+  for (const x of [-0.85, -0.45]) add('rubber', at(new THREE.TorusGeometry(0.205, 0.02, 4, 14), x, y1 + 0.58, 1.55, 0, Math.PI / 2, 0));
+  for (const [x, z, w, d, ry] of [[-0.4, -2.6, 1.2, 0.9, 0.2], [0.55, -1.4, 0.9, 0.7, -0.3]]) {       // cinghie sui bagagli
+    add('rubber', at(new THREE.BoxGeometry(w + 0.04, 0.04, 0.08), x, y1 + 0.62 + (w > 1 ? 0.29 : 0.24), z, 0, ry, 0));
+  }
+  // grondaie cromate lungo il tetto e antenna
+  for (const sx of [-1, 1]) add('chrome', at(new THREE.CylinderGeometry(0.03, 0.03, L - 1.6, 6), sx * (W / 2 + 0.02), y1 - 0.06, -0.45, Math.PI / 2));
+  add('dark', rod(new THREE.Vector3(1.2, roofTop, -3.95), new THREE.Vector3(1.32, roofTop + 1.1, -4.15), 0.012, 4));
+  add('tail', at(new THREE.SphereGeometry(0.035, 6, 4), 1.32, roofTop + 1.1, -4.15));
+  // bandiere sui pali posteriori del portapacchi
+  const flagGeo = (sx) => {
+    const fg = new THREE.PlaneGeometry(0.9, 0.55, 10, 1), P = fg.attributes.position, col = [];
+    for (let i = 0; i < P.count; i++) {
+      const x = P.getX(i) + 0.45, y = P.getY(i);
+      P.setZ(i, Math.sin(x * 6) * 0.07 * x);
+      const star = Math.hypot(x - 0.42, y) < 0.13;
+      const c = new THREE.Color(star ? '#ffffff' : (y > 0.09 ? '#ffcc33' : y < -0.09 ? '#e83a3a' : '#2f6fd6'));
+      col.push(c.r, c.g, c.b);
+    }
+    fg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    fg.translate(0.45, 0, 0); fg.rotateY(Math.PI / 2); fg.computeVertexNormals();
+    return fg;
+  };
+  const flags = [];
+  for (const sx of [-1, 1]) {
+    add('chrome', rod(new THREE.Vector3(sx * 1.2, y1 + 0.35, -3.6), new THREE.Vector3(sx * 1.2, y1 + 1.85, -3.6), 0.025, 6));
+    add('gold', at(new THREE.SphereGeometry(0.05, 8, 6), sx * 1.2, y1 + 1.88, -3.6));
+    const f = new THREE.Mesh(flagGeo(sx), M.flag); f.position.set(sx * 1.2, y1 + 1.55, -3.6); g.add(f); flags.push(f);
+  }
+  // ── eliche laterali (spingono il bus) ──
+  const props = [];
+  for (const sx of [-1, 1]) {
+    const px = sx * 2.15, py = y1 + 0.4, pz = -1.0;
+    add('chrome', rod(new THREE.Vector3(sx * 1.2, y1 + 0.35, pz + 0.3), new THREE.Vector3(px, py, pz + 0.2), 0.04, 6));
+    add('chrome', rod(new THREE.Vector3(sx * 1.2, y1 + 0.35, pz - 0.5), new THREE.Vector3(px, py, pz - 0.2), 0.04, 6));
+    add('paint', at(new THREE.CapsuleGeometry(0.2, 0.6, 4, 12), px, py, pz, Math.PI / 2));
+    add('gold', at(new THREE.CylinderGeometry(0.205, 0.205, 0.06, 14), px, py, pz + 0.1, Math.PI / 2));
+    add('dark', at(new THREE.CylinderGeometry(0.06, 0.12, 0.2, 10), px, py, pz - 0.5, Math.PI / 2));
+    const pr = new THREE.Group(); pr.position.set(px, py, pz - 0.62); g.add(pr); props.push(pr);
+    const blades = [];
+    for (let i = 0; i < 3; i++) blades.push(at(new THREE.BoxGeometry(0.1, 0.62, 0.025), 0, 0.33, 0, 0.25, 0, 0).applyMatrix4(new THREE.Matrix4().makeRotationZ(i / 3 * Math.PI * 2)));
+    mesh(merge(blades), M.wood, pr);
+    mesh(at(new THREE.SphereGeometry(0.075, 10, 6), 0, 0, -0.03), M.chrome, pr, false);
+  }
+  // ── retro: griglia del motore, scarico, targa, paraspruzzi ──
+  for (let i = 0; i < 6; i++) add('dark', at(new THREE.BoxGeometry(1.3, 0.05, 0.06), 0, -0.55 - i * 0.11, z0 - 0.15, -0.5));
+  add('chrome', at(new THREE.CylinderGeometry(0.075, 0.075, 0.7, 10, 1, true), 1.05, -1.58, z0 + 0.05, Math.PI / 2));
+  add('rubber', at(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 10), 1.05, -1.58, z0 - 0.3, Math.PI / 2));
+  add('roof', at(new THREE.BoxGeometry(0.7, 0.2, 0.03), 0, -1.32, z0 - 0.29));
+  for (const [z, sz] of [[z1 + 0.312, 1], [z0 - 0.312, -1]]) { const pl = new THREE.PlaneGeometry(0.66, 0.17); if (sz < 0) pl.rotateY(Math.PI); add('plate', at(pl, 0, z > 0 ? -1.32 : -1.32, z)); }
+  for (const sx of [-1, 1]) for (const z of [-3.68, 2.12]) {
+    add('rubber', at(new THREE.BoxGeometry(0.5, 0.4, 0.03), sx * (W / 2 - 0.15), -1.9, z));
+    add('chrome', at(new THREE.BoxGeometry(0.5, 0.04, 0.035), sx * (W / 2 - 0.15), -1.72, z));
+  }
+  // ── fianchi: luci di posizione, tappo del serbatoio, prese d'aria, predellino ──
+  for (const sx of [-1, 1]) {
+    for (const z of [-3.9, -0.6, 2.0]) add('amber', at(rbox(0.04, 0.08, 0.16, 0.02), sx * (W / 2 + 0.03), -1.05, z));
+    for (let i = 0; i < 5; i++) add('dark', at(new THREE.BoxGeometry(0.03, 0.04, 0.34), sx * (W / 2 + 0.02), -0.25 - i * 0.1, -4.12));
+  }
+  add('chrome', at(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 14), -(W / 2 + 0.02), -1.0, -2.1, 0, 0, Math.PI / 2));
+  add('chrome', at(new THREE.BoxGeometry(0.36, 0.05, 0.45), W / 2 + 0.14, -1.38, 3.82));
+  add('dark', at(new THREE.BoxGeometry(0.04, 0.2, 0.45), W / 2 + 0.3, -1.46, 3.82));
+  // ── muso: paracolpi, fendinebbia, stemma, trombe ──
+  for (const x of [-0.8, 0.8]) {
+    add('chrome', rod(new THREE.Vector3(x, -1.45, z1 + 0.42), new THREE.Vector3(x, -0.45, z1 + 0.42), 0.045, 8));
+    add('chrome', rod(new THREE.Vector3(x, -0.6, z1 + 0.42), new THREE.Vector3(x, -0.6, z1 + 0.1), 0.035, 6));
+    add('head', at(new THREE.CylinderGeometry(0.09, 0.09, 0.05, 14), x * 1.2, -1.3, z1 + 0.29, Math.PI / 2));
+    add('chrome', at(new THREE.TorusGeometry(0.095, 0.015, 4, 14), x * 1.2, -1.3, z1 + 0.31));
+  }
+  for (const y of [-0.5, -1.15]) add('chrome', rod(new THREE.Vector3(-0.8, y, z1 + 0.42), new THREE.Vector3(0.8, y, z1 + 0.42), 0.04, 8));
+  {
+    const st = new THREE.Shape();
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.07 : 0.17; i ? st.lineTo(Math.cos(a) * r, Math.sin(a) * r) : st.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    add('gold', at(new THREE.ExtrudeGeometry(st, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 1 }), 0, -0.75, z1 + 0.15));
+  }
+  // ── ruote: bulloni ──
+  for (const sx of [-1, 1]) for (const z of [-2.9, 2.9]) for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    add('chrome', at(new THREE.CylinderGeometry(0.028, 0.028, 0.06, 6), sx * (W / 2 + 0.12), -1.55 + Math.cos(a) * 0.2, z + Math.sin(a) * 0.2, 0, 0, Math.PI / 2));
+  }
+  // ── mongolfiera: bruciatore con fiamma, corona in cima, zavorre e festoni ──
+  const by = ringY + 0.55;
+  add('chrome', at(new THREE.CylinderGeometry(0.2, 0.24, 0.26, 14), 0, by, 0));
+  add('dark', at(new THREE.CylinderGeometry(0.25, 0.25, 0.05, 14), 0, by - 0.13, 0));
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4; add('chrome', rod(new THREE.Vector3(Math.cos(a) * 0.22, by - 0.1, Math.sin(a) * 0.22), new THREE.Vector3(Math.cos(a) * 0.8, ringY + 0.4, Math.sin(a) * 0.8), 0.025, 4)); }
+  for (const x of [-0.4, 0.4]) add('roof', at(new THREE.CapsuleGeometry(0.11, 0.3, 4, 10), x, ringY + 0.25, 0));   // bombole
+  const flame = new THREE.Group(); flame.position.set(0, by + 0.14, 0); g.add(flame);
+  mesh(at(new THREE.ConeGeometry(0.2, 0.9, 12, 1, true), 0, 0.45, 0), M.flame, flame, false);
+  mesh(at(new THREE.ConeGeometry(0.1, 0.55, 10, 1, true), 0, 0.28, 0), M.flameCore, flame, false);
+  const topY = 7.5 + 4.5 * 0.85;
+  add('gold', at(new THREE.TorusGeometry(0.7, 0.07, 6, 24), 0, topY - 0.06, 0, Math.PI / 2));
+  add('gold', at(new THREE.CylinderGeometry(0.35, 0.45, 0.12, 16), 0, topY, 0));
+  for (let i = 0; i < 8; i++) {                                                              // sacchi di zavorra
+    const a = i / 8 * Math.PI * 2 + 0.2, x = Math.cos(a) * 0.82, z = Math.sin(a) * 0.82;
+    add('rope', rod(new THREE.Vector3(x, ringY + 0.4, z), new THREE.Vector3(x * 1.05, ringY - 0.15, z * 1.05), 0.012, 3));
+    add('sand', at(new THREE.SphereGeometry(0.13, 8, 6), x * 1.05, ringY - 0.3, z * 1.05, 0, a, 0, 1, 1.3, 1));
+    add('rope', at(new THREE.TorusGeometry(0.07, 0.015, 3, 8), x * 1.05, ringY - 0.15, z * 1.05, Math.PI / 2));
+  }
+  // festoni di bandierine lungo le quattro funi d'angolo
+  {
+    const pos = [], col = [], cols = ['#e83a3a', '#ffcc33', '#2f6fd6', '#ffffff', '#44c070'].map(c => new THREE.Color(c));
+    let ci = 0;
+    for (const x of [-1, 1]) for (const z of [-1, 1]) {
+      const a = new THREE.Vector3(x * 3.2, 7.5 - 1.2, z * 4.0), b = new THREE.Vector3(x * 1.2, y1 + 0.35, z > 0 ? 2.2 : -3.6);
+      const d = b.clone().sub(a), len = d.length(); d.normalize();
+      for (let t = 0.3; t < len - 0.5; t += 0.42) {
+        const p0 = a.clone().addScaledVector(d, t), p1 = a.clone().addScaledVector(d, t + 0.3);
+        const p2 = a.clone().addScaledVector(d, t + 0.15); p2.y -= 0.32;
+        pos.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+        const c = cols[ci++ % cols.length]; for (let k = 0; k < 3; k++) col.push(c.r, c.g, c.b);
+      }
+    }
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    bg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    bg.computeVertexNormals();
+    mesh(bg, M.flag, g, false);
+  }
+  for (const [k, list] of Object.entries(parts)) mesh(merge(list), M[k], g, k !== 'head' && k !== 'amber' && k !== 'plate');
+  g.userData.props = props;
+  g.userData.flame = flame;
+  g.userData.beacon = beacon;
+  g.userData.flags = flags;
+  g.userData.exhaust = new THREE.Vector3(1.05, -1.58, z0 - 0.35);
 }
 
 // ───────────── Forziere ─────────────

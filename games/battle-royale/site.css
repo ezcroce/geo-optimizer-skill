@@ -150,6 +150,7 @@ em { font-style: normal; background: linear-gradient(90deg, var(--gold), var(--g
 .weapon img { max-width: 92%; max-height: 120px; position: relative; transition: transform .6s var(--spring); filter: drop-shadow(0 10px 10px rgba(0,0,0,.5)); }
 .weapon:hover img { transform: scale(1.12) rotate(-6deg); }
 .weapon h3 { font-size: 20px; display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 12px; }
+.weapon .wdesc { font-size: 13px; line-height: 1.35; color: var(--mute); margin: -6px 0 12px; min-height: 2.7em; }
 .weapon h3 small { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--mute); font-weight: 700; }
 .stat { display: grid; grid-template-columns: 82px 1fr 34px; align-items: center; gap: 10px; font-size: 13px; color: var(--mute); font-weight: 600; margin-top: 6px; }
 .stat .bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }

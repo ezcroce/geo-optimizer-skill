@@ -1,8 +1,10 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
-import { SKINS, WEAPONS, RARITIES } from './config.js?v=14';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=14';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=14';
+import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=15';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=15';
+// rarità più frequente di ogni arma (colore della scheda e dell'anteprima)
+const WEAPON_RAR = Object.fromEntries(WEAPON_POOL.map(e => [e.id, e.rar.indexOf(Math.max(...e.rar))]));
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=15';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -475,7 +477,7 @@ function renderThumbs() {
   r.setSize(WW, WH, false);
   cam.aspect = WW / WH; cam.fov = 22; cam.updateProjectionMatrix();
   for (const id of Object.keys(WEAPONS)) {
-    const g = buildWeaponMesh(id, id === 'rocket' ? 4 : id === 'sniper' ? 3 : 2);
+    const g = buildWeaponMesh(id, WEAPON_RAR[id] ?? 2);
     const piv = new THREE.Group(); piv.add(g); scene.add(piv);
     piv.rotation.set(0.1, -Math.PI / 2 + 0.35, 0);
     const box = new THREE.Box3().setFromObject(piv), c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
@@ -495,20 +497,24 @@ const thumbs = renderThumbs();
 
 // armi
 {
-  const maxDps = Math.max(...Object.values(WEAPONS).map(w => w.dmg * w.pellets / w.rate));
-  const rarOf = { pistol: 0, smg: 1, ar: 2, shotgun: 2, sniper: 3, rocket: 4 };
+  // DPS effettivo: la raffica conta i colpi con la loro pausa
+  const dpsOf = w => w.burst ? w.dmg * w.pellets * w.burst / (w.rate + w.burstGap * (w.burst - 1)) : w.dmg * w.pellets / w.rate;
+  const maxDps = Math.max(...Object.values(WEAPONS).map(dpsOf));
+  // colore: la rarità più frequente per quell'arma
+  const rarOf = WEAPON_RAR;
   const html = Object.entries(WEAPONS).map(([id, w], i) => {
     const rc = RARITIES[rarOf[id] ?? 0].color;
-    const dps = w.dmg * w.pellets / w.rate;
+    const dps = dpsOf(w);
     const stats = [
       ['Danno', w.dmg * w.pellets, Math.min(1, w.dmg * w.pellets / 110)],
       ['DPS', Math.round(dps), dps / maxDps],
-      ['Caricatore', w.mag, w.mag / 30],
+      ['Caricatore', w.mag, Math.min(1, w.mag / 30)],
       ['Gittata', w.range + 'm', Math.min(1, Math.sqrt(w.range / 600))],
     ];
     return `<article class="weapon reveal" style="--rc:${rc};--d:${(i % 3) * 0.08}s">
       <div class="pic"><img src="${thumbs.weapons[id]}" alt="${w.name}" loading="lazy" /></div>
-      <h3>${w.name}<small>${w.auto ? 'Automatica' : w.projectile ? 'Esplosiva' : 'Semi-auto'}</small></h3>
+      <h3>${w.name}<small>${w.spin ? 'Rotante' : w.auto ? 'Automatica' : w.projectile ? 'Esplosiva' : w.burst ? `Raffica ×${w.burst}` : 'Semi-auto'}</small></h3>
+      ${w.desc ? `<p class="wdesc">${w.desc}</p>` : ''}
       ${stats.map(([n, v, k], j) => `<div class="stat"><span>${n}</span><div class="bar"><i style="--v:${(k * 100).toFixed(0)}%;--k:${j}"></i></div><b>${v}</b></div>`).join('')}
     </article>`;
   }).join('');

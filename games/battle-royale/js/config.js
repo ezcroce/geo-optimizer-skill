@@ -24,40 +24,103 @@ export const WEAPONS = {
   pistol: {
     name: 'Pistola', speed: 260, drop: 1.15,  dmg: 25, pellets: 1, rate: 0.22, mag: 12, reload: 1.2,
     spread: 0.016, range: 140, ammo: 'light', auto: false, zoom: 1.25,
-    botRange: 35, sound: 'pistol', recoil: 0.012, muzzle: 0.28,
+    botRange: 35, sound: 'pistol', recoil: 0.012, muzzle: 0.28, role: 'pistol', cross: 'dot', sight: 'iron',
+    desc: 'Precisa e leggera, buona per finire chi scappa.',
     parts: [[0.08, 0.1, 0.34, 0, 0, 0.1, 'm'], [0.07, 0.18, 0.09, 0, -0.11, -0.02, 'b'], [0.086, 0.03, 0.22, 0, 0.055, 0.12, 'r']],
   },
   smg: {
     name: 'Mitraglietta', speed: 280, drop: 1.2,  dmg: 15, pellets: 1, rate: 0.075, mag: 30, reload: 1.9,
     spread: 0.042, range: 90, ammo: 'light', auto: true, zoom: 1.25,
-    botRange: 28, sound: 'smg', recoil: 0.006, muzzle: 0.57,
+    botRange: 28, sound: 'smg', recoil: 0.006, muzzle: 0.57, role: 'smg', cross: 'tri', sight: 'holo',
+    desc: 'Cadenza alta e mira stabile: domina la corta-media distanza.',
     parts: [[0.09, 0.12, 0.5, 0, 0, 0.13, 'm'], [0.06, 0.22, 0.07, 0, -0.15, 0.2, 'b'], [0.07, 0.14, 0.07, 0, -0.1, -0.02, 'b'], [0.05, 0.08, 0.2, 0, 0, -0.2, 'r'], [0.095, 0.025, 0.3, 0, 0.07, 0.15, 'r']],
   },
   ar: {
     name: "Fucile d'assalto", speed: 380, drop: 1.0,  dmg: 30, pellets: 1, rate: 0.13, mag: 30, reload: 2.1,
     spread: 0.02, range: 220, ammo: 'medium', auto: true, zoom: 1.6,
-    botRange: 60, sound: 'ar', recoil: 0.009, muzzle: 0.96,
+    botRange: 60, sound: 'ar', recoil: 0.009, muzzle: 0.96, role: 'ar', cross: 'cross', sight: 'reddot',
+    desc: "L'arma tuttofare: affidabile a ogni distanza.",
     parts: [[0.1, 0.14, 0.72, 0, 0, 0.18, 'b'], [0.05, 0.05, 0.32, 0, 0.02, 0.7, 'm'], [0.07, 0.24, 0.1, 0, -0.17, 0.25, 'm'], [0.07, 0.15, 0.08, 0, -0.12, -0.02, 'm'], [0.09, 0.16, 0.3, 0, -0.02, -0.3, 'b'], [0.06, 0.07, 0.22, 0, 0.11, 0.18, 'r']],
   },
   shotgun: {
     name: 'Fucile a pompa', speed: 230, drop: 1.3,  dmg: 12, pellets: 9, rate: 0.95, mag: 5, reload: 2.5,
     spread: 0.1, range: 45, ammo: 'shells', auto: false, zoom: 1.2,
-    botRange: 14, sound: 'shotgun', recoil: 0.05, muzzle: 0.88,
+    botRange: 14, sound: 'shotgun', recoil: 0.05, muzzle: 0.88, role: 'shotgun', cross: 'circle', sight: 'bead',
+    desc: 'Pochi colpi devastanti da vicino.',
     parts: [[0.1, 0.12, 0.5, 0, 0, 0.08, 'm'], [0.07, 0.07, 0.55, 0, 0.02, 0.58, 'm'], [0.11, 0.08, 0.26, 0, -0.07, 0.52, 'w'], [0.09, 0.15, 0.35, 0, -0.05, -0.3, 'w'], [0.105, 0.03, 0.3, 0, 0.065, 0.08, 'r']],
   },
   sniper: {
     name: 'Cecchino', speed: 520, drop: 1.0,  dmg: 105, pellets: 1, rate: 1.45, mag: 5, reload: 2.8,
     spread: 0.05, adsSpread: 0.0, range: 600, ammo: 'heavy', auto: false, zoom: 4.5, scope: true,
-    botRange: 120, sound: 'sniper', recoil: 0.06, muzzle: 1.18,
+    botRange: 120, sound: 'sniper', recoil: 0.06, muzzle: 1.18, role: 'sniper', cross: 'snipe', sight: 'scope',
+    desc: 'Ottica 4,5×: un colpo alla testa e la partita cambia.',
     parts: [[0.09, 0.12, 0.7, 0, 0, 0.15, 'b'], [0.04, 0.04, 0.6, 0, 0.02, 0.8, 'm'], [0.08, 0.08, 0.38, 0, 0.13, 0.15, 'm'], [0.085, 0.03, 0.06, 0, 0.13, 0.32, 'r'], [0.085, 0.03, 0.06, 0, 0.13, -0.02, 'r'], [0.09, 0.17, 0.32, 0, -0.04, -0.33, 'b'], [0.07, 0.14, 0.08, 0, -0.12, -0.04, 'm']],
   },
   rocket: {
     name: 'Lanciarazzi', speed: 55, drop: 0.18,  dmg: 100, pellets: 1, rate: 1.3, mag: 1, reload: 2.8,
     spread: 0.01, range: 300, ammo: 'rockets', auto: false, zoom: 1.4, projectile: true, splash: 6,
-    botRange: 45, sound: 'rocket', recoil: 0.06, muzzle: 0.92,
+    botRange: 45, sound: 'rocket', recoil: 0.06, muzzle: 0.92, role: 'rocket', cross: 'rocket', sight: 'rocket',
+    desc: 'Esplosione ad area: distrugge muri e gruppi.',
     parts: [[0.2, 0.2, 1.2, 0, 0.06, 0.2, 'b'], [0.22, 0.22, 0.08, 0, 0.06, 0.78, 'r'], [0.22, 0.22, 0.08, 0, 0.06, -0.38, 'r'], [0.07, 0.16, 0.08, 0, -0.12, 0.05, 'm'], [0.07, 0.16, 0.08, 0, -0.12, 0.35, 'm']],
   },
+  // ── varianti ──
+  revolver: {
+    name: 'Revolver', speed: 300, drop: 1.1, dmg: 48, pellets: 1, rate: 0.62, mag: 6, reload: 2.3,
+    spread: 0.012, range: 170, ammo: 'medium', auto: false, zoom: 1.4,
+    botRange: 40, sound: 'revolver', recoil: 0.03, muzzle: 0.36, role: 'pistol', cross: 'dot', sight: 'notch',
+    desc: 'Sei colpi pesanti: lento ma ogni proiettile conta.',
+  },
+  compact: {
+    name: 'Mitraglietta compatta', speed: 260, drop: 1.25, dmg: 11, pellets: 1, rate: 0.055, mag: 35, reload: 1.7,
+    spread: 0.056, range: 70, ammo: 'light', auto: true, zoom: 1.2,
+    botRange: 22, sound: 'compact', recoil: 0.005, muzzle: 0.34, role: 'smg', cross: 'tri', sight: 'holo',
+    desc: 'Danni bassi ma una raffica continua: perfetta da vicinissimo.',
+  },
+  burst: {
+    name: 'Fucile a raffica', speed: 390, drop: 1.0, dmg: 27, pellets: 1, rate: 0.42, burst: 3, burstGap: 0.07, mag: 24, reload: 2.2,
+    spread: 0.016, range: 230, ammo: 'medium', auto: false, zoom: 1.7,
+    botRange: 60, sound: 'ar', recoil: 0.007, muzzle: 0.5, role: 'ar', cross: 'chev', sight: 'reddot',
+    desc: 'Tre colpi per pressione del grilletto, molto preciso.',
+  },
+  heavyar: {
+    name: "Fucile d'assalto pesante", speed: 400, drop: 1.0, dmg: 38, pellets: 1, rate: 0.19, mag: 25, reload: 2.5,
+    spread: 0.024, range: 240, ammo: 'medium', auto: true, zoom: 1.6,
+    botRange: 60, sound: 'heavyar', recoil: 0.016, muzzle: 0.86, role: 'ar', cross: 'cross', sight: 'tri',
+    desc: 'Più danni ma rinculo forte: spara a brevi raffiche.',
+  },
+  dmr: {
+    name: 'Fucile tattico DMR', speed: 460, drop: 0.9, dmg: 46, pellets: 1, rate: 0.36, mag: 10, reload: 2.4,
+    spread: 0.03, adsSpread: 0.004, range: 380, ammo: 'medium', auto: false, zoom: 2.6, scope: true,
+    botRange: 90, sound: 'dmr', recoil: 0.02, muzzle: 1.17, role: 'sniper', cross: 'square', sight: 'acog',
+    desc: 'Semiautomatico con ottica 2,6×: il ponte fra fucile e cecchino.',
+  },
+  tactical: {
+    name: 'Fucile a pompa tattico', speed: 230, drop: 1.3, dmg: 8, pellets: 8, rate: 0.38, mag: 8, reload: 3.2,
+    spread: 0.085, range: 40, ammo: 'shells', auto: false, zoom: 1.2,
+    botRange: 14, sound: 'tactical', recoil: 0.035, muzzle: 0.78, role: 'shotgun', cross: 'circle', sight: 'bead',
+    desc: 'Meno danni del pompa, ma semiautomatico e con 8 colpi.',
+  },
+  drum: {
+    name: 'Fucile a tamburo', speed: 220, drop: 1.35, dmg: 6, pellets: 7, rate: 0.22, mag: 16, reload: 3.8,
+    spread: 0.11, range: 30, ammo: 'shells', auto: true, zoom: 1.15,
+    botRange: 12, sound: 'tactical', recoil: 0.028, muzzle: 0.665, role: 'shotgun', cross: 'circle2', sight: 'holo',
+    desc: 'Automatico con caricatore a tamburo: tanti pallini, poca gittata.',
+  },
+  hunting: {
+    name: 'Fucile da caccia', speed: 480, drop: 1.1, dmg: 90, pellets: 1, rate: 1.05, mag: 4, reload: 2.6,
+    spread: 0.03, adsSpread: 0.0, range: 420, ammo: 'heavy', auto: false, zoom: 2.4, scope: true,
+    botRange: 100, sound: 'hunting', recoil: 0.05, muzzle: 1.13, role: 'sniper', cross: 'hunt', sight: 'vintage',
+    desc: 'Noce e ottone, ottica d\'epoca 2,4×: più comune del cecchino e preciso anche senza mirare.',
+  },
+  minigun: {
+    name: 'Minigun', speed: 340, drop: 1.1, dmg: 12, pellets: 1, rate: 0.05, spin: 0.55, mag: 120, reload: 4.5,
+    spread: 0.06, range: 160, ammo: 'medium', auto: true, zoom: 1.15,
+    botRange: 35, moveMult: 0.82, sound: 'minigun', recoil: 0.004, muzzle: 0.955, role: 'smg', cross: 'square4', sight: 'none',
+    desc: 'Le canne devono girare prima di sparare, poi è una pioggia di piombo.',
+  },
 };
+// le varianti usano la sagoma semplificata dell'arma di base (icona di riserva senza WebGL)
+for (const [id, base] of [['revolver', 'pistol'], ['compact', 'smg'], ['burst', 'ar'], ['heavyar', 'ar'], ['dmr', 'sniper'], ['tactical', 'shotgun'], ['drum', 'shotgun'], ['hunting', 'sniper'], ['minigun', 'rocket']]) WEAPONS[id].parts = WEAPONS[base].parts;
 
 // speed = velocità del proiettile (m/s), drop = quanto la gravità lo fa cadere (1 = normale)
 // Rarità tipiche per arma (probabilità per livello)
@@ -68,6 +131,15 @@ export const WEAPON_POOL = [
   { id: 'shotgun', w: 20, rar: [25, 35, 25, 10, 5] },
   { id: 'sniper', w: 8, rar: [0, 0, 50, 35, 15] },
   { id: 'rocket', w: 5, rar: [0, 0, 0, 60, 40] },
+  { id: 'revolver', w: 9, rar: [20, 35, 30, 12, 3] },
+  { id: 'compact', w: 10, rar: [30, 35, 25, 8, 2] },
+  { id: 'burst', w: 11, rar: [25, 30, 28, 12, 5] },
+  { id: 'heavyar', w: 9, rar: [10, 25, 35, 20, 10] },
+  { id: 'dmr', w: 7, rar: [0, 20, 45, 25, 10] },
+  { id: 'tactical', w: 11, rar: [25, 35, 25, 10, 5] },
+  { id: 'drum', w: 6, rar: [0, 15, 40, 30, 15] },
+  { id: 'hunting', w: 7, rar: [10, 30, 35, 18, 7] },
+  { id: 'minigun', w: 4, rar: [0, 0, 20, 50, 30] },
 ];
 
 export const CONSUMABLES = {

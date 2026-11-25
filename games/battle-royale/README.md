@@ -24,6 +24,27 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: 15 armi con mirini propri, animazioni direzionali e Battle Bus più ricco
+
+- **9 nuove armi**, ognuna con pro e contro diversi:
+
+  | Arma | Caratteristica |
+  |---|---|
+  | Revolver | 6 colpi pesanti (48), lento ma preciso |
+  | Mitraglietta compatta | danno basso (11) ma cadenza altissima |
+  | Fucile a raffica | 3 colpi per pressione, molto preciso |
+  | Fucile d'assalto pesante | più danni (38) ma rinculo forte |
+  | Fucile tattico DMR | semiautomatico con ottica 2,6× e silenziatore |
+  | Fucile a pompa tattico | meno danni del pompa (8×8) ma semiautomatico, 8 colpi |
+  | Fucile a tamburo | automatico, 16 colpi, tanti pallini e poca gittata |
+  | **Fucile da caccia** | noce e ottone, ottica d'epoca 2,4×, 90 danni, preciso anche senza mirare |
+  | Minigun | le canne girano (e devono prendere giri) prima di sparare; rallenta chi la porta |
+- **Mirino diverso per ogni arma**: punto per le pistole, "T" per le mitragliette, croce per i fucili, chevron per la raffica, cerchio della rosata per i pompa (tratteggiato per il tamburo), angoli per il DMR, croce sottile per il fucile da caccia, scala di alzo per il lanciarazzi e anello che si riempie per la minigun.
+- **Ottica diversa in mira**: tacca e mirino (pistola), tacca a V con lama d'ottone (revolver), olografico, red dot, prismatico con chevron verde, bindella con perla d'ottone (pompa), telemetro (lanciarazzi). A schermo intero: cannocchiale con reticolo duplex e mil-dot (cecchino), ottica tattica con chevron e scala di caduta (DMR), ottica d'epoca con reticolo tedesco e anello d'ottone (fucile da caccia).
+- **Animazioni che seguono il movimento**: avanti, indietro (passi corti, busto eretto), di lato (bacino girato e passo laterale), in diagonale e passettini quando ti giri da fermo; il busto resta sempre rivolto al bersaglio. Valgono per te, i bot e gli altri giocatori online.
+- **Battle Bus**: passeggeri dietro i finestrini, insegna luminosa, lampeggiante, trombe, condizionatore, eliche laterali che girano, bruciatore con fiamma, zavorre, festoni di bandierine, bandiere, paracolpi, fendinebbia, stemma, targhe, scarico che fuma, paraspruzzi e bulloni sulle ruote.
+- Le missioni "elimina con il cecchino / pompa…" contano anche le varianti della stessa famiglia.
+
 ### Novità: erba fitta e mondo più tridimensionale
 
 - **Erba nuova**: ciuffi con più fili, curvi e a tre segmenti che si assottigliano fino alla punta; ogni filo prende la luce in modo diverso secondo l'orientamento (volume invece di un tappeto piatto). Densità aumentata vicino al giocatore e più ciuffi a media distanza. La densità resta regolabile nelle impostazioni (preset "basso" più leggero).
@@ -104,7 +125,7 @@ python3 -m http.server 8080
   - **Tamsin la Monaca**: top rosso smanicato con colletto e bordi dorati, fascia in vita con code, pantaloni larghi, bende a braccia, mani e caviglie, treccia lunga con anello d'oro, ciocche laterali e orecchini.
   - **Oren l'Ombra**: tuta scura, maschera sul viso, mantellina verde acqua con bordo dorato e cappuccio abbassato, sciarpa rossa, bracciali d'acciaio, fondina sulla coscia, bende alle gambe, calzature tabi, bastone sulla schiena e capelli argento.
   - **Occhi anime per tutti**: la texture del viso ora ha doppia risoluzione, iride sfumata con pupilla, due riflessi di luce, ciglia spesse con codina esterna (più ciglia per Tamsin) e sopracciglia inclinabili. Anche i bot possono usare le nuove skin.
-- **6 armi con texture procedurali** (metallo spazzolato, polimero zigrinato, legno di noce venato, pannello della rarità con motivo diverso per livello: righe, chevron, esagoni, oro inciso) e dettagli come mirini, red dot, ottica con lenti, bipiede, freno di bocca e cartucce sul fianco. 5 livelli di rarità (Comune → Leggendario, il danno cresce con la rarità): pistola, mitraglietta, fucile d'assalto, fucile a pompa, cecchino con mirino e lanciarazzi con danno ad area. Colpi alla testa ×2.
+- **15 armi con texture procedurali** (metallo spazzolato, polimero zigrinato, legno di noce venato, pannello della rarità con motivo diverso per livello: righe, chevron, esagoni, oro inciso) e dettagli come mirini, red dot, ottica con lenti, bipiede, freno di bocca e cartucce sul fianco. 5 livelli di rarità (Comune → Leggendario, il danno cresce con la rarità): pistola, mitraglietta, fucile d'assalto, fucile a pompa, cecchino con mirino e lanciarazzi con danno ad area. Colpi alla testa ×2.
 - **Balistica realistica**: i proiettili non arrivano più all'istante. Hanno una velocità propria e subiscono la gravità, quindi da lontano devi mirare un po' più in alto e anticipare chi si muove. I bot fanno lo stesso, con una precisione che dipende dalla difficoltà.
 
   | Arma | Velocità | Tempo per 100 m | Caduta a 100 m |

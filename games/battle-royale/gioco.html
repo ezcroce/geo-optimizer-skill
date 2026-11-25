@@ -12,9 +12,9 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=14" />
+<link rel="stylesheet" href="style.css?v=15" />
 <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=14", "three/addons/": "./vendor/addons/" } }
+  { "imports": { "three": "./vendor/three.module.js?v=15", "three/addons/": "./vendor/addons/" } }
 </script>
 </head>
 <body>
@@ -160,7 +160,8 @@
   <div id="eventBar" style="display:none"></div>
   <div id="minimapWrap"><canvas id="minimap" width="200" height="200"></canvas><div id="poiName"></div></div>
 
-  <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+  <div id="crosshair" data-c="cross"><i></i><i></i><i></i><i></i><b></b><u></u><s></s></div>
+  <div id="sight" class="hidden" data-s="reddot"><div class="o"></div><div class="r"></div><div class="name"></div></div>
   <div id="rangeInfo"></div>
   <div id="hitmarker"></div>
   <div id="centerMsg"></div>
@@ -188,7 +189,7 @@
 </div>
 <div id="vignette"></div>
 <div id="stormTint"></div>
-<div id="scope" class="hidden"><div class="ring"></div></div>
+<div id="scope" class="hidden" data-s="scope"><div class="ring"><div class="ret"></div></div><div class="mag"></div></div>
 
 <div id="bigmap" class="screen hidden">
   <div class="bigmap-box"><canvas id="bigmapCanvas" width="640" height="640"></canvas><div class="hint">M per chiudere</div></div>
@@ -231,7 +232,7 @@
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
 
-<script type="module" src="js/main.js?v=14"></script>
-<script src="js/transition.js?v=14"></script>
+<script type="module" src="js/main.js?v=15"></script>
+<script src="js/transition.js?v=15"></script>
 </body>
 </html>

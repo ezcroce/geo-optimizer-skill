@@ -58,6 +58,14 @@ const GUN = {
   shotgun: () => { noise(0.45, 900, 0.6, 0.85, 'lowpass', 0, 0.4); tone(90, 0.2, 0.45, 'square', 0, 40); },
   sniper: () => { noise(0.7, 1400, 0.6, 0.9, 'lowpass', 0, 0.7); tone(110, 0.3, 0.5, 'sawtooth', 0, 35); },
   rocket: () => { noise(0.6, 600, 0.5, 0.6, 'bandpass', 0, 0.6); tone(300, 0.5, 0.2, 'sawtooth', 0, 90); },
+  revolver: () => { noise(0.35, 1500, 0.7, 0.75, 'lowpass', 0, 0.38); tone(120, 0.14, 0.4, 'square', 0, 45); noise(0.05, 5000, 2, 0.2, 'bandpass', 0.16); },
+  compact: () => { noise(0.07, 3600, 0.8, 0.32); tone(260, 0.04, 0.14, 'square', 0, 110); },
+  heavyar: () => { noise(0.28, 1400, 0.7, 0.65, 'lowpass', 0, 0.3); tone(105, 0.12, 0.36, 'sawtooth', 0, 40); },
+  dmr: () => { noise(0.4, 1100, 0.6, 0.6, 'lowpass', 0, 0.42); tone(150, 0.16, 0.25, 'sawtooth', 0, 45); noise(0.04, 4200, 2, 0.15, 'bandpass', 0.05); },
+  tactical: () => { noise(0.36, 1000, 0.6, 0.75, 'lowpass', 0, 0.32); tone(100, 0.15, 0.4, 'square', 0, 45); },
+  hunting: () => { noise(0.8, 1200, 0.5, 0.9, 'lowpass', 0, 0.8); tone(95, 0.35, 0.5, 'sawtooth', 0, 30); noise(0.06, 3000, 3, 0.25, 'bandpass', 0.55); tone(700, 0.04, 0.08, 'square', 0.6, 400); },
+  minigun: () => { noise(0.06, 2600, 0.8, 0.34); tone(170, 0.05, 0.16, 'sawtooth', 0, 90); },
+  spin: () => { tone(90, 0.5, 0.12, 'sawtooth', 0, 420); noise(0.5, 1800, 4, 0.08, 'bandpass', 0, 0.5); },
   melee: () => { noise(0.12, 4000, 1.5, 0.25, 'bandpass'); },
 };
 

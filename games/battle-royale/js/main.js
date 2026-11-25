@@ -5,28 +5,28 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=14';
-import * as PR from './progress.js?v=14';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=14';
-import { initMenu } from './menu.js?v=14';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=14';
-import { initSettingsUI } from './settings-ui.js?v=14';
-import { applyAnisotropy } from './texgen.js?v=14';
-import * as A from './audio.js?v=14';
+} from './config.js?v=15';
+import * as PR from './progress.js?v=15';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=15';
+import { initMenu } from './menu.js?v=15';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=15';
+import { initSettingsUI } from './settings-ui.js?v=15';
+import { applyAnisotropy } from './texgen.js?v=15';
+import * as A from './audio.js?v=15';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=14';
-import { createWeather } from './weather.js?v=14';
-import { createEvents } from './events.js?v=14';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=14';
-import { weaponIcon } from './weapons.js?v=14';
-import { consIcon } from './items.js?v=14';
-import { buildChestMesh } from './models3d.js?v=14';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=14';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=14';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=14';
+} from './world.js?v=15';
+import { createWeather } from './weather.js?v=15';
+import { createEvents } from './events.js?v=15';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=15';
+import { weaponIcon } from './weapons.js?v=15';
+import { consIcon } from './items.js?v=15';
+import { buildChestMesh } from './models3d.js?v=15';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=15';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=15';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=15';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -737,9 +737,26 @@ function animateChar(ch, dt) {
   const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw);
   const fwd = ch.vel.x * fx + ch.vel.z * fz;
   const side = ch.vel.x * -fz + ch.vel.z * fx;   // positivo = verso destra
-  // in retromarcia le gambe girano al contrario
-  const dirSign = fwd < -0.5 && Math.abs(fwd) > Math.abs(side) ? -1 : 1;
-  ch.walkPhase += dt * (3.4 + spd * 1.45 + ck * 1.2) * (mv > 0.05 ? 1 : 0) * dirSign;
+  // ── direzione di marcia rispetto allo sguardo: avanti, indietro, di lato, in diagonale ──
+  //   il bacino (e le gambe) si gira verso dove cammini, il busto resta rivolto al bersaglio
+  const hspd = Math.hypot(fwd, side);
+  let hipT = 0, backT = 0, strafeT = 0;
+  if (hspd > 0.6 && !ch.inWater) {
+    const a = Math.atan2(side, fwd);                      // 0 avanti · +π/2 destra · ±π indietro
+    backT = Math.cos(a) < (ch.backK > 0.5 ? -0.05 : -0.3) ? 1 : 0;   // isteresi: niente scatti a 90°
+    strafeT = Math.abs(Math.sin(a));
+    const rel = backT ? a - Math.sign(a) * Math.PI : a;
+    hipT = -clamp(rel, -1.2, 1.2) * 0.55 * (1 - run * 0.4);
+  } else if (mv < 0.15 && ch.onGround) {
+    hipT = clamp(-yawRate * 0.06, -0.35, 0.35);           // girandosi da fermo il bacino resta indietro
+  }
+  ch.hipYaw = lerp(ch.hipYaw || 0, hipT, Math.min(1, dt * 9));
+  ch.backK = lerp(ch.backK || 0, backT, Math.min(1, dt * 9));
+  ch.strafeK = lerp(ch.strafeK || 0, strafeT, Math.min(1, dt * 7));
+  const sideSign = side >= 0 ? 1 : -1;
+  // in retromarcia le gambe girano al contrario e il passo è più corto
+  const dirSign = ch.backK > 0.5 ? -1 : 1;
+  ch.walkPhase += dt * (3.4 + spd * 1.45 + ck * 1.2) * (1 - ch.backK * 0.12) * (mv > 0.05 ? 1 : 0) * dirSign;
   const sw = Math.sin(ch.walkPhase) * mv;
   if (ch.isPlayer && mv > 0.3 && ch.onGround) {
     const step = Math.floor(ch.walkPhase / Math.PI);
@@ -750,15 +767,36 @@ function animateChar(ch, dt) {
   ch.leanSide = lerp(ch.leanSide || 0, clamp(-side * 0.022 - yawRate * 0.03, -0.2, 0.2), Math.min(1, dt * 8));
   m.body.rotation.x = ch.leanFwd * (1 - ck * 0.6);
   m.body.rotation.z = ch.leanSide * (1 - ck * 0.5);
+  m.body.rotation.y = ch.hipYaw;
 
   // gambe
   let bodyY = 0;
   if (!ch.onGround && !ch.inWater) legsAir(m, ch.vel.y / 6);
   else bodyY = legsLocomotion(m, ch.walkPhase, mv, run, ck);
-  // passo laterale: le gambe si aprono un po' di lato
-  if (ch.onGround && Math.abs(side) > 1 && Math.abs(side) > Math.abs(fwd)) {
-    const ss = Math.sin(ch.walkPhase) * 0.18 * Math.sign(side) * mv;
-    m.legs[0].rotation.z += ss; m.legs[1].rotation.z += ss;
+  if (ch.onGround && !ch.inWater) {
+    // passo laterale: falcata in avanti più corta, le gambe si aprono e chiudono di lato
+    const sk2 = ch.strafeK * mv;
+    if (sk2 > 0.02) for (let i = 0; i < 2; i++) {
+      const ph = ch.walkPhase + i * Math.PI;
+      if (ck < 0.5) m.legs[i].rotation.x *= 1 - 0.4 * sk2;
+      m.legs[i].rotation.z += (Math.sin(ph) * 0.2 + (i ? 0.04 : -0.04)) * sk2 * sideSign;
+      m.feet[i].rotation.z = -m.legs[i].rotation.z * 0.6;
+    }
+    // indietro: passi corti, ginocchia più piegate, punta del piede che tocca per prima
+    const bk = ch.backK * mv;
+    if (bk > 0.02) for (let i = 0; i < 2; i++) {
+      m.legs[i].rotation.x *= 1 - 0.25 * bk * (1 - ck);
+      m.knees[i].rotation.x += 0.15 * bk;
+      m.feet[i].rotation.x += 0.12 * bk;
+    }
+    // girandosi da fermo: piccoli passi sul posto
+    if (mv < 0.15 && Math.abs(yawRate) > 1.3 && ck < 0.5) {
+      ch.turnPh = (ch.turnPh || 0) + dt * 11;
+      for (let i = 0; i < 2; i++) {
+        const lift = Math.max(0, Math.sin(ch.turnPh + i * Math.PI));
+        m.legs[i].rotation.x -= lift * 0.32; m.knees[i].rotation.x += lift * 0.62; m.feet[i].rotation.x -= lift * 0.3;
+      }
+    }
   }
   // respiro e spostamento del peso da fermo
   const idle = 1 - mv;
@@ -770,7 +808,8 @@ function animateChar(ch, dt) {
   m.body.position.y = bodyY - land * 0.45 + breath * 0.01 * idle;
   // busto: si piega in avanti da accovacciato, ruota con le spalle quando cammini
   m.torso.rotation.x = 0.32 * ck + land * 0.5 + breath * 0.022 * idle + run * 0.06;
-  m.torso.rotation.y = Math.sin(ch.walkPhase) * (0.1 + run * 0.08) * mv * (1 - ck * 0.7);
+  m.torso.rotation.y = Math.sin(ch.walkPhase) * (0.1 + run * 0.08) * mv * (1 - ck * 0.7) * (1 - ch.strafeK * 0.5) - ch.hipYaw;
+  m.torso.rotation.x -= 0.07 * ch.backK * mv;   // indietro: busto un po' più eretto
   m.torso.rotation.z = Math.sin(t * 0.9) * 0.015 * idle;
   m.torso.position.y = RIG.hip + Math.abs(Math.cos(ch.walkPhase)) * 0.008 * mv;
 
@@ -853,7 +892,10 @@ function animateChar(ch, dt) {
     m.head.rotation.z = h * 0.25 * (ch.hitDir || 1);
   }
   m.head.rotation.x += -p * 0.5 - m.torso.rotation.x * 0.6;
-  m.head.rotation.y = ch.lookCur - m.torso.rotation.y;
+  m.head.rotation.y = ch.lookCur - m.torso.rotation.y - ch.hipYaw;
+  // canne della minigun che girano
+  const wm = m.gunPivot.children[0];
+  if (wm && wm.userData.spin) wm.userData.spin.rotation.z += dt * 38 * (ch.spinK || 0);
   if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.08 + mv * 0.55 + run * 0.25 + Math.sin(t * 6) * 0.04 * mv + (ch.onGround ? 0 : 0.5), Math.min(1, dt * 6));
 }
 
@@ -924,11 +966,13 @@ function startReload(ch) {
   if (ch.isPlayer) A.playReload();
 }
 
-function fireWeapon(ch, aimFn) {
+function fireWeapon(ch, aimFn, again = null) {
   const s = ch.weapon;
   if (!s) return false;
   const def = WEAPONS[s.id];
   if (ch.fireCd > 0 || ch.reloading > 0 || ch.using || ch.mode === 'climb') return false;
+  // minigun: le canne devono prima prendere giri
+  if (def.spin) { ch.spinReq = G.time; if ((ch.spinK || 0) < 1) return false; }
   if (s.mag <= 0) {
     if (ch.ammo[def.ammo] > 0) startReload(ch);
     else { if (ch.isPlayer) { A.playEmpty(); showMsg('', 'Munizioni esaurite!', 1.2); } ch.fireCd = 0.3; }
@@ -936,8 +980,15 @@ function fireWeapon(ch, aimFn) {
   }
   s.mag--;
   ch.fireCd = def.rate;
+  // raffica: il primo colpo programma i successivi a distanza di burstGap
+  if (def.burst) {
+    if (ch.burstLeft > 0 && ch.burstSlot === s) ch.burstLeft--;
+    else { ch.burstLeft = def.burst - 1; ch.burstSlot = s; ch.burstNext = again || (() => fireWeapon(ch, aimFn)); }
+    if (s.mag <= 0) ch.burstLeft = 0;
+    if (ch.burstLeft > 0) ch.fireCd = def.burstGap;
+  }
   ch.emote = null;
-  ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : 0.7;
+  ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : def.spin ? 0.35 : 0.7;
   const mult = RARITIES[s.rarity].mult * (ch.isPlayer ? 1 : G.diff.dmgMult);
   const muzzle = muzzlePos(ch);
   A.playGun(def.sound, ch.isPlayer ? 0 : muzzle.distanceTo(camera.position));
@@ -1056,7 +1107,12 @@ function kill(t, attacker, how) {
   if (attacker === G.player && t !== G.player) {
     PR.track('kill', 1);
     const wid = Object.keys(WEAPONS).find(k => WEAPONS[k].name === how);
-    if (wid) PR.track('kill_' + wid, 1);
+    if (wid) {
+      PR.track('kill_' + wid, 1);
+      // le missioni per tipo contano anche le varianti (es. DMR e fucile da caccia per il cecchino)
+      const fam = { pistol: 'pistol', smg: 'smg', ar: 'ar', shotgun: 'shotgun', sniper: 'sniper', rocket: 'rocket' }[WEAPONS[wid].role];
+      if (fam && fam !== wid) PR.track('kill_' + fam, 1);
+    }
     A.playKill();
     showMsg('', `Hai eliminato ${t.name}!`, 2);
   }
@@ -1622,18 +1678,28 @@ function updateBus(dt) {
   B.pos.lerpVectors(B.a, B.b, Math.min(k, 1.3));
   busMesh.position.copy(B.pos);
   busMesh.position.y += Math.sin(G.time * 1.5) * 0.6;
+  // eliche, fiamma del bruciatore, lampeggiante, bandiere e fumo dello scarico
+  const u = busMesh.userData;
+  if (u.props) for (const pr of u.props) pr.rotation.z += dt * 22;
+  if (u.flame) { const f = 0.85 + Math.random() * 0.3; u.flame.scale.set(f, 0.7 + Math.random() * 0.6, f); }
+  if (u.beacon) u.beacon.rotation.y += dt * 7;
+  if (u.flags) u.flags.forEach((f, i) => { f.rotation.y = Math.sin(G.time * 5 + i * 1.7) * 0.18; });
+  if (u.exhaust && busMesh.visible && (B._smk = (B._smk || 0) - dt) <= 0 && busMesh.position.distanceToSquared(camera.position) < 120 * 120) {
+    B._smk = 0.12;
+    emit(busMesh.localToWorld(_p.copy(u.exhaust)), '#7a7a7a', 1, 0.8, 1.1, 0.32, -0.15);
+  }
   if (k > 0.93) for (const c of G.chars) if (c.alive && c.mode === 'bus') jumpFromBus(c);
   if (k > 1.3) busMesh.visible = false;
   for (const c of G.chars) if (c.mode === 'bus') c.pos.copy(B.pos);
 }
 
 // ─────────────── Intelligenza artificiale dei bot ───────────────
-const WEAPON_VALUE = { pistol: 1, smg: 2, shotgun: 2.4, ar: 2.7, sniper: 2.3, rocket: 2.4 };
+const WEAPON_VALUE = { pistol: 1, smg: 2, shotgun: 2.4, ar: 2.7, sniper: 2.3, rocket: 2.4, revolver: 1.5, compact: 1.9, burst: 2.6, heavyar: 2.6, dmr: 2.4, tactical: 2.3, drum: 2.5, hunting: 2.1, minigun: 2.6 };
 function weaponScore(s, dist) {
   if (!s || s.kind !== 'weapon') return -1;
   const id = s.id;
   let v;
-  switch (id) {
+  switch (WEAPONS[id].role) {
     case 'shotgun': v = dist < 10 ? 5 : dist < 18 ? 2.5 : 0.3; break;
     case 'smg': v = dist < 20 ? 4 : dist < 40 ? 2.5 : 0.8; break;
     case 'ar': v = dist < 8 ? 2.5 : dist < 80 ? 4 : 2.5; break;
@@ -1664,7 +1730,7 @@ function botThink(b) {
   if (tgt && tgt.pos.distanceTo(b.pos) > 130) tgt = null;
   if (!tgt || Math.random() < 0.15) {
     let best = null, bd = Infinity;
-    const range = b.slots.some(s => s && s.id === 'sniper') ? 110 : 75;
+    const range = b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].role === 'sniper') ? 110 : 75;
     for (const c of G.chars) {
       if (c === b || !c.alive || c.mode === 'bus' || c.mode === 'fall') continue;
       const d = c.pos.distanceTo(b.pos);
@@ -2134,6 +2200,7 @@ const settingsUI = initSettingsUI({
 $('#setPauseBtn').onclick = e => { e.stopPropagation(); settingsUI.open(); };
 $('#setMenuBtn').onclick = () => { A.playUI(); settingsUI.open(); };
 
+const SIGHT_NAMES = { iron: 'Tacca e mirino', notch: 'Tacca a V', holo: 'Olografico', reddot: 'Red dot', tri: 'Prismatico', bead: 'Perla', rocket: 'Telemetro', scope: 'Cannocchiale', acog: 'Ottica tattica', vintage: "Ottica d'epoca" };
 function currentZoom() {
   const w = G.player && G.player.weapon;
   return w ? WEAPONS[w.id].zoom : 1.2;
@@ -2237,6 +2304,7 @@ function updatePlayer(dt) {
   let speed = sprint ? 7.6 : 5.3;
   if (p.crouch) speed = 2.8;
   if (G.ads) speed = Math.min(speed, 3.4);
+  if (p.weapon && WEAPONS[p.weapon.id].moveMult) speed *= WEAPONS[p.weapon.id].moveMult;
   if (p.using) speed = Math.min(speed, 2.6);
   if (p.inWater) { speed *= 0.6; p.crouch = false; }
   if (stoodUp) p._noJumpUntilRelease = true;
@@ -2277,7 +2345,7 @@ function playerFire(p, def) {
     const d = target.sub(origin);
     const len = d.length();
     return { origin, dir: d.divideScalar(len), max: len + 0.5 };
-  });
+  }, () => playerFire(p, def));
   if (fired) {
     G.camPitch = clamp(G.camPitch + def.recoil * (G.ads ? 0.6 : 1), -1.35, 1.35);
     G.camYaw += rand(-1, 1) * def.recoil * 0.3;
@@ -2338,10 +2406,23 @@ function updateCamera(dt) {
     G.shake = Math.max(0, G.shake - dt * 2.5);
   }
   camera.lookAt(base.addScaledVector(dir, 50));
-  // nascondi il modello quando si usa il mirino del cecchino o la camera è troppo vicina
-  const scoped = G.ads && p.weapon && WEAPONS[p.weapon.id].scope && G.fov < 30;
+  // nascondi il modello quando si usa un cannocchiale o la camera è troppo vicina
+  const wdef = p.alive && p.mode === 'ground' && p.weapon ? WEAPONS[p.weapon.id] : null;
+  const zFov = wdef ? F0 / wdef.zoom : F0;
+  const scoped = !!(G.ads && wdef && wdef.scope && G.fov < zFov * 1.12 + 0.5);
+  // ottica da mira (red dot, olografico, tacca e mirino…) quando lo zoom è quasi completo
+  const sighted = !!(G.ads && wdef && !wdef.scope && wdef.sight !== 'none' && !G.build.on && G.fov < F0 - (F0 - zFov) * 0.6);
   if (p.alive && p.mode !== 'bus') p.m.root.visible = !scoped && d > 0.9;
-  $('#scope').classList.toggle('hidden', !scoped);
+  const scEl = $('#scope'), siEl = $('#sight');
+  if (wdef && scEl.dataset.s !== wdef.sight) {
+    scEl.dataset.s = wdef.sight; siEl.dataset.s = wdef.sight;
+    const label = SIGHT_NAMES[wdef.sight] || '';
+    scEl.querySelector('.mag').textContent = `${label} · ${String(wdef.zoom).replace('.', ',')}×`;
+    siEl.querySelector('.name').textContent = `${label} · ${String(wdef.zoom).replace('.', ',')}×`;
+  }
+  scEl.classList.toggle('hidden', !scoped);
+  siEl.classList.toggle('hidden', !sighted);
+  G.sighted = sighted;
   // ombre e cielo seguono la camera
   const focus = p.alive && p.mode !== 'bus' ? p.pos : camera.position;
   sun.position.copy(focus).add(SUN_OFF);
@@ -2497,7 +2578,13 @@ function updateHUD(dt) {
   const px = Math.tan(Math.max(spread, 0.004)) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * (innerHeight / 2);
   hud.cross.style.setProperty('--s', Math.min(60, 3 + px) + 'px');
   const scopedNow = !$('#scope').classList.contains('hidden');
-  hud.cross.style.display = (p.alive && p.mode === 'ground' && !G.build.on && !scopedNow) ? 'block' : 'none';
+  hud.cross.style.display = (p.alive && p.mode === 'ground' && !G.build.on && !scopedNow && !G.sighted) ? 'block' : 'none';
+  {
+    const cdef = p.slot && p.slot.kind === 'weapon' ? WEAPONS[p.slot.id] : null;
+    const ct = cdef ? cdef.cross : 'dot';
+    if (hud.cross.dataset.c !== ct) hud.cross.dataset.c = ct;
+    if (cdef && cdef.spin) hud.cross.style.setProperty('--spin', (p.spinK || 0).toFixed(2));
+  }
   // telemetro: distanza, tempo di volo e caduta del proiettile mentre miri
   {
     const w = p.alive && p.mode === 'ground' && G.ads && p.weapon ? WEAPONS[p.weapon.id] : null;
@@ -2516,6 +2603,7 @@ function updateHUD(dt) {
       }
       el.style.display = 'block';
       el.classList.toggle('scoped', !$('#scope').classList.contains('hidden'));
+      el.classList.toggle('sighted', !!G.sighted);
     } else el.style.display = 'none';
   }
   G.hitT -= dt;
@@ -3082,7 +3170,8 @@ function remoteShot(ch, m) {
   const def = WEAPONS[m.w];
   if (!def || !ch) return;
   ch.lastShotT = G.time;
-  ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : 0.7;
+  if (def.spin) { ch.spinReq = G.time; ch.spinK = 1; }
+  ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : def.spin ? 0.35 : 0.7;
   ch.emote = null;
   const o = new THREE.Vector3(m.o[0], m.o[1], m.o[2]);
   const dist = o.distanceTo(camera.position);
@@ -3238,6 +3327,16 @@ function update(dt) {
     c.hidden = c.alive && c.mode === 'ground' && c.crouch && !c.inWater && tallGrassAt(c.pos.x, c.pos.z);
     if (c.alive) {
       c.fireCd = Math.max(0, c.fireCd - dt);
+      if (c.burstLeft > 0 && c.fireCd <= 0) {
+        if (c.weapon !== c.burstSlot || c.reloading > 0) c.burstLeft = 0;
+        else c.burstNext();
+      }
+      const wdef = c.weapon && WEAPONS[c.weapon.id];
+      if (wdef && wdef.spin) {
+        const want = G.time - (c.spinReq ?? -9) < 0.15 && c.reloading <= 0;
+        if (want && c.isPlayer && (c.spinK || 0) < 0.05 && !(c._spinSnd > G.time)) { A.playGun('spin'); c._spinSnd = G.time + 0.5; }
+        c.spinK = want ? Math.min(1, (c.spinK || 0) + dt / wdef.spin) : Math.max(0, (c.spinK || 0) - dt * 0.9);
+      } else c.spinK = 0;
       if (c.mode !== 'climb' && c.onGround) c.stamina = Math.min(100, c.stamina + dt * 22);
       c.swing = Math.max(0, c.swing - dt);
       if (c.reloading > 0) {

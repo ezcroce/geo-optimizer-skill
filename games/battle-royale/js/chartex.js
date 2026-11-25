@@ -5,7 +5,7 @@
 //  macchie). Tutte ripetibili, con normal map ricavata dal rilievo.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=18';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=19';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -111,7 +111,37 @@ const T = {
     for (let k = 0; k < S; k += 32) { g.fillRect(k, 0, 1, S); g.fillRect(0, k, S, 1); }
     g.fillStyle = 'rgba(0,0,0,0.035)';
     for (let k = 1; k < S; k += 32) { g.fillRect(k, 0, 1, S); g.fillRect(0, k, S, 1); }
-  }, (g, S) => { g.fillStyle = '#a0a0a0'; for (let k = 0; k < S; k += 32) { g.fillRect(k, 0, 2, S); g.fillRect(0, k, S, 2); } }, 0.5, 2),
+  }, (g, S) => { g.fillStyle = '#a0a0a0'; for (let k = 0; k < S; k += 32) { g.fillRect(k, 0, 1, S); g.fillRect(0, k, S, 1); } }, 0.5, 5),
+  /** v23: gomma con battistrada a tasselli (suole, parti degli elmetti) */
+  rubber: () => make('rubber', 64, (g, S, rnd) => {
+    g.fillStyle = '#e4e4e4'; g.fillRect(0, 0, S, S);
+    dots(g, S, rnd, 260, 'rgba(255,255,255,0.05)', 'rgba(0,0,0,0.06)');
+    g.fillStyle = 'rgba(0,0,0,0.07)';
+    for (let y = 0; y < S; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < S; x += 8) g.fillRect(x + 1, y + 1, 5, 5);
+  }, (g, S) => { g.fillStyle = '#b8b8b8'; for (let y = 0; y < S; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < S; x += 8) g.fillRect(x + 1, y + 1, 5, 5); }, 0.7, 1),
+  /** v23: paglia intrecciata */
+  straw: () => make('straw', 64, (g, S, rnd) => {
+    g.fillStyle = '#ececec'; g.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 8) {
+      const o = (y / 4) % 2 ? 4 : 0;
+      g.fillStyle = `rgba(255,255,255,${0.12 + rnd() * 0.1})`; g.fillRect(x + o, y, 7, 3);
+      g.fillStyle = 'rgba(0,0,0,0.16)'; g.fillRect(x + o + 7, y, 1, 4); g.fillRect(x + o, y + 3, 8, 1);
+    }
+  }, (g, S) => { for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 8) { const o = (y / 4) % 2 ? 4 : 0; g.fillStyle = '#c8c8c8'; g.fillRect(x + o, y, 7, 3); g.fillStyle = '#404040'; g.fillRect(x + o + 7, y, 1, 4); } }, 1.3, 3),
+  /** v23: cordura (nylon spesso degli zaini) a trama a canestro */
+  cordura: () => make('cordura', 64, (g, S, rnd) => {
+    g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, S, S);
+    for (let y = 0; y < S; y += 2) for (let x = 0; x < S; x += 2) {
+      const on = ((x >> 1) + (y >> 1)) % 2;
+      g.fillStyle = on ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'; g.fillRect(x, y, 2, 2);
+    }
+    dots(g, S, rnd, 200, 'rgba(255,255,255,0.05)', 'rgba(0,0,0,0.05)');
+  }, (g, S) => { for (let y = 0; y < S; y += 2) for (let x = 0; x < S; x += 2) { g.fillStyle = ((x >> 1) + (y >> 1)) % 2 ? '#a8a8a8' : '#585858'; g.fillRect(x, y, 2, 2); } }, 0.9, 4),
+  /** v23: fettuccia (cinghie) con righe in lunghezza */
+  webbing: () => make('webbing', 32, (g, S) => {
+    g.fillStyle = '#e6e6e6'; g.fillRect(0, 0, S, S);
+    for (let x = 0; x < S; x += 2) { g.fillStyle = x % 4 ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.12)'; g.fillRect(x, 0, 1, S); }
+  }, (g, S) => { for (let x = 0; x < S; x += 2) { g.fillStyle = x % 4 ? '#505050' : '#b0b0b0'; g.fillRect(x, 0, 1, S); } }, 1.0, 4),
   /** maglia: colonne di punti a V */
   knit: () => make('knit', 64, (g, S) => {
     g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, S, S);
@@ -341,6 +371,7 @@ export const CLOTH_LOOK = {
   camo: { rough: 0.85, sheen: 0.35 }, plaid: { rough: 0.85, sheen: 0.5 }, gingham: { rough: 0.85, sheen: 0.5 },
   hex: { rough: 0.38, sheen: 0, coat: 0.6 }, scales: { rough: 0.45, sheen: 0, coat: 0.45 }, frost: { rough: 0.35, sheen: 0.6, coat: 0.3 },
   stains: { rough: 0.95, sheen: 0.3 },
+  rubber: { rough: 0.85, sheen: 0 }, straw: { rough: 0.9, sheen: 0.2 }, cordura: { rough: 0.7, sheen: 0.35 }, webbing: { rough: 0.75, sheen: 0.4 },
 };
 
 /** stoffa di ogni skin: [maglia, pantaloni] (il resto usa cotone e jeans) */

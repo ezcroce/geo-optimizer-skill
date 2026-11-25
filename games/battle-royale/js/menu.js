@@ -2,9 +2,10 @@
 //  Menu principale: Gioca · Armadietto · Pass battaglia · Negozio · Missioni
 //  + lobby online (codice stanza, chat, compagni)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES } from './config.js?v=18';
-import * as PR from './progress.js?v=18';
-import * as N from './net.js?v=18';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS } from './config.js?v=19';
+import { NEWS, NEWS_VERSION } from './news.js?v=19';
+import * as PR from './progress.js?v=19';
+import * as N from './net.js?v=19';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -77,14 +78,15 @@ export function initMenu(api) {
   // ── pagina Gioca ──
   const nm = $('#playerName');
   nm.value = S.name;
-  nm.oninput = () => { S.name = nm.value.trim().slice(0, 16) || 'Giocatore'; api.save(); N.updateMe(meInfo()); };
+  nm.oninput = () => { S.name = nm.value.trim().slice(0, 16) || 'Giocatore'; api.save(); N.updateMe(meInfo()); renderSquad(); };
+  nm.addEventListener('keydown', e => e.stopPropagation());
   document.querySelectorAll('#players button').forEach(b => {
     b.classList.toggle('on', Number(b.dataset.p) === Number(S.players));
-    b.onclick = () => { S.players = Number(b.dataset.p); api.save(); document.querySelectorAll('#players button').forEach(x => x.classList.toggle('on', x === b)); api.ui(); };
+    b.onclick = () => { S.players = Number(b.dataset.p); api.save(); document.querySelectorAll('#players button').forEach(x => x.classList.toggle('on', x === b)); api.ui(); renderSummary(); };
   });
   document.querySelectorAll('#difficulty button').forEach(b => {
     b.classList.toggle('on', b.dataset.d === S.difficulty);
-    b.onclick = () => { S.difficulty = b.dataset.d; api.save(); document.querySelectorAll('#difficulty button').forEach(x => x.classList.toggle('on', x === b)); api.ui(); };
+    b.onclick = () => { S.difficulty = b.dataset.d; api.save(); document.querySelectorAll('#difficulty button').forEach(x => x.classList.toggle('on', x === b)); api.ui(); renderSummary(); };
   });
   $('#playBtn').onclick = () => { api.ui(); api.play(); };
 
@@ -102,22 +104,132 @@ export function initMenu(api) {
         api.ui();
         S.mode = m.id; api.save();
         if (N.NET.role === 'host') N.setMode(m.id);
-        renderModes();
+        renderModes(); renderSummary();
       };
       wrap.appendChild(b);
     }
   }
+  // ── v23: squadre (singolo/duo/trio/squad) + Squadra/Versus online ──
+  const curTeam = () => (N.NET.role === 'off' ? S.team : N.NET.team) || 'solo';
+  const curVs = () => (N.NET.role === 'off' ? false : !!N.NET.vs);
+  const person = (c) => `<svg viewBox="0 0 20 28" class="pp"><circle cx="10" cy="6.5" r="5.2" fill="${c}"/><path d="M1.5 27c0-8 3.6-12.6 8.5-12.6S18.5 19 18.5 27z" fill="${c}"/></svg>`;
+  function renderTeams() {
+    const wrap = $('#teamModes'), cur = curTeam(), locked = N.NET.role === 'client';
+    wrap.innerHTML = '';
+    for (const m of TEAM_MODES) {
+      const b = document.createElement('button');
+      b.className = 'tmode' + (m.id === cur ? ' on' : '') + (locked && m.id !== cur ? ' locked' : '');
+      b.innerHTML = `<div class="people">${Array.from({ length: m.size }, (_, i) => person(i === 0 ? '#ffcf2e' : 'currentColor')).join('')}</div><b>${esc(m.name)}</b>`;
+      b.title = m.desc;
+      b.onclick = () => {
+        if (locked) { toast("Le squadre le sceglie l'host della lobby"); return; }
+        api.ui();
+        S.team = m.id; api.save();
+        if (N.NET.role === 'host') N.setTeam(m.id, N.NET.vs);
+        renderTeamsAll();
+      };
+      wrap.appendChild(b);
+    }
+    $('#teamDesc').textContent = (TEAM_MODES.find(t => t.id === cur) || TEAM_MODES[0]).desc;
+    // Squadra / Versus: solo in lobby e con squadre da 2+
+    const vr = $('#vsRow');
+    vr.classList.toggle('hidden', N.NET.role === 'off' || teamSize(cur) === 1);
+    vr.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('on', (b.dataset.vs === '1') === curVs());
+      b.classList.toggle('locked', locked);
+      b.onclick = () => {
+        if (locked) { toast("Squadra o Versus lo sceglie l'host"); return; }
+        api.ui(); S.vs = b.dataset.vs === '1'; api.save();
+        N.setTeam(curTeam(), S.vs);
+        renderTeamsAll();
+      };
+    });
+  }
+  function renderTeamsAll() { renderTeams(); renderSquad(); renderSummary(); api.lobbyChanged(); }
+  /** chi è nella mia squadra (stessa regola che usa l'host all'avvio) */
+  function myTeamPlan() {
+    const T = teamSize(curTeam());
+    if (N.NET.role === 'off') return { T, mates: [{ name: S.name, skin: S.skin, me: true }], foes: [] };
+    const P = N.NET.players, vs = curVs() || T === 1;
+    const team = (i) => vs ? i : Math.floor(i / T);
+    const mi = Math.max(0, P.findIndex(p => p.id === N.NET.myId));
+    const mates = [], foes = [];
+    P.forEach((p, i) => { const e = { name: p.name, skin: p.skin, host: p.host, me: p.id === N.NET.myId }; (team(i) === team(mi) ? mates : foes).push(e); });
+    return { T, mates, foes };
+  }
+  function renderSquad() {
+    const { T, mates, foes } = myTeamPlan();
+    const bar = $('#squadBar');
+    let html = '';
+    for (let i = 0; i < T; i++) {
+      const m = mates[i];
+      const col = MATE_COLORS[i % MATE_COLORS.length];
+      if (m) {
+        const sk = SKINS.find(x => x.id === m.skin) || SKINS[0];
+        html += `<div class="sq ${m.me ? 'me' : 'friend'}" style="--mc:${col}"><i class="av" style="background:${sk.shirt}">${esc((m.name || '?')[0].toUpperCase())}</i><div><b>${esc(m.name)}</b><span>${m.me ? 'Tu' : 'Amico'}${m.host ? ' · host' : ''}</span></div></div>`;
+      } else {
+        const canInvite = N.NET.role !== 'client';
+        html += `<div class="sq bot ${canInvite ? 'invite' : ''}" style="--mc:${col}"><i class="av">${canInvite ? '＋' : '🤖'}</i><div><b>${canInvite ? 'Invita' : 'Bot'}</b><span>${canInvite ? 'o gioca un bot' : 'compagno'}</span></div></div>`;
+      }
+    }
+    if (foes.length) html += `<div class="sqvs"><b>VS</b>${foes.map(f => `<span>${esc(f.name)}</span>`).join('')}</div>`;
+    bar.innerHTML = html;
+    bar.classList.toggle('solo', T === 1); bar.classList.toggle('n4', T >= 4);
+    bar.querySelectorAll('.sq.invite').forEach(el => el.onclick = () => {
+      api.ui();
+      if (N.NET.role === 'off') { $('#hostBtn').click(); }
+      else $('#copyCode').click();
+    });
+    const me = SKINS.find(x => x.id === S.skin) || SKINS[0];
+    $('#meAvatar').style.background = `linear-gradient(160deg, ${me.shirt}, ${me.pants})`;
+    $('#meAvatar').textContent = (S.name || 'G')[0].toUpperCase();
+  }
+  function renderSummary() {
+    const tm = TEAM_MODES.find(t => t.id === curTeam()) || TEAM_MODES[0];
+    const mp = MODES.find(m => m.id === (N.NET.role === 'off' ? S.mode : N.NET.mode)) || MODES[0];
+    const extra = N.NET.role === 'off' ? `${S.players} giocatori · ${{ facile: 'facile', normale: 'normale', difficile: 'difficile' }[S.difficulty] || ''}` : (tm.size > 1 ? (curVs() ? 'Versus' : 'Squadra con gli amici') : 'Online · 100 giocatori');
+    $('#playSummary').innerHTML = `<b>${esc(tm.name.toUpperCase())}</b><i>·</i>${mp.icon} ${esc(mp.name)}<i>·</i><span>${esc(extra)}</span>`;
+    $('#optsSum').textContent = `${S.players} · ${S.difficulty}`;
+  }
+  // ── cartello delle novità ──
+  let newsI = 0, newsT = 0;
+  function renderNews() {
+    const n = NEWS[newsI];
+    const unseen = localStorage.getItem('arenaNews') !== NEWS_VERSION;
+    $('#newsBoard').innerHTML = `<h3><span>📰 Novità ${unseen ? '<em class="newtag">NUOVO</em>' : ''}</span><span class="nav"><button data-d="-1" aria-label="Precedente">‹</button><button data-d="1" aria-label="Successiva">›</button></span></h3>
+      <div class="nslide" style="--nc:${n.color}"><div class="nv"><span>${n.icon}</span><b>${n.v}</b><em>${esc(n.title)}</em></div>
+      <ul>${n.items.slice(0, 3).map(t => `<li>${esc(t)}</li>`).join('')}</ul>${n.items.length > 3 ? `<div class="more">+${n.items.length - 3} altre · tocca per leggere tutto</div>` : ''}</div>
+      <div class="ndots">${NEWS.map((_, i) => `<i class="${i === newsI ? 'on' : ''}"></i>`).join('')}</div>`;
+    $('#newsBoard').querySelectorAll('.nav button').forEach(b => b.onclick = e => { e.stopPropagation(); api.ui(); stepNews(Number(b.dataset.d)); });
+  }
+  function stepNews(d) { newsI = (newsI + d + NEWS.length) % NEWS.length; renderNews(); clearInterval(newsT); newsT = setInterval(() => stepNews(1), 7000); }
+  function openNews() {
+    $('#newsList').innerHTML = NEWS.map((n, i) => `<div class="nitem" style="--nc:${n.color};animation-delay:${i * 0.07}s"><div class="nv"><span>${n.icon}</span><b>${n.v}</b><em>${esc(n.title)}</em>${i === 0 ? '<em class="newtag">NUOVO</em>' : ''}</div><ul>${n.items.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`).join('');
+    $('#newsModal').classList.remove('hidden');
+    localStorage.setItem('arenaNews', NEWS_VERSION);
+    renderNews();
+  }
+  $('#newsBoard').onclick = () => { api.ui(); openNews(); };
+  $('#newsClose').onclick = () => { api.ui(); $('#newsModal').classList.add('hidden'); };
+  $('#newsModal').onclick = e => { if (e.target.id === 'newsModal') $('#newsModal').classList.add('hidden'); };
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#newsModal').classList.contains('hidden')) { e.stopPropagation(); $('#newsModal').classList.add('hidden'); } }, true);
+  renderNews();
+  newsT = setInterval(() => stepNews(1), 7000);
+
   function renderPlayBtn() {
     const b = $('#playBtn');
     const r = N.NET.role;
     b.disabled = r === 'client';
-    b.style.opacity = r === 'client' ? 0.6 : 1;
-    b.textContent = r === 'host' ? `AVVIA (${N.NET.players.length} + BOT)` : r === 'client' ? "IN ATTESA DELL'HOST…" : 'GIOCA';
+    b.classList.toggle('wait', r === 'client');
+    b.innerHTML = `<span>${r === 'host' ? 'AVVIA PARTITA' : r === 'client' ? "IN ATTESA DELL'HOST…" : 'GIOCA'}</span>`;
     $('#offlineOpts').classList.toggle('hidden', r === 'client');
     $('#players').parentElement && document.querySelectorAll('#players button').forEach(x => { x.disabled = r !== 'off'; x.style.opacity = r !== 'off' ? 0.45 : 1; });
   }
   function renderPlay() {
     renderModes();
+    renderTeams();
+    renderSquad();
+    renderSummary();
     renderPlayBtn();
     const M = PR.missionsNow();
     $('#playMissions').innerHTML = `<h3><span>Missioni di oggi</span><span>›</span></h3>` + M.daily.map(m => `
@@ -288,7 +400,16 @@ export function initMenu(api) {
     while (chatLog.children.length > 60) chatLog.firstChild.remove();
     chatLog.scrollTop = chatLog.scrollHeight;
   }
-  function renderOnline() {
+  /** v23: riga di riepilogo sotto la lista dei giocatori online */
+function lobbyHint() {
+  const NET = N.NET, n = NET.players.length, T = teamSize(NET.team);
+  if (T === 1) return `gli altri ${100 - n} posti sono bot`;
+  const teams = Math.floor(100 / T);
+  if (NET.vs) return `versus: ogni amico guida una squadra di bot · ${teams} squadre`;
+  const friendTeams = Math.ceil(n / T);
+  return `${friendTeams === 1 ? 'siete nella stessa squadra' : `amici divisi in ${friendTeams} squadre`} · ${teams} squadre da ${T}, il resto sono bot`;
+}
+function renderOnline() {
     const inLobby = NET.role !== 'off';
     $('#onlineIdle').classList.toggle('hidden', inLobby);
     $('#onlineLobby').classList.toggle('hidden', !inLobby);
@@ -297,9 +418,13 @@ export function initMenu(api) {
       $('#lobbyPlayers').innerHTML = NET.players.map(p => {
         const sk = SKINS.find(s => s.id === p.skin) || SKINS[0];
         return `<div class="lp"><i style="background:${sk.shirt}"></i>${esc(p.name)}${p.host ? '<span class="tag">HOST</span>' : ''}${p.id === NET.myId ? '<span class="tag me">TU</span>' : ''}</div>`;
-      }).join('') + `<div class="hint">${NET.players.length}/${N.MAX_PLAYERS} giocatori · gli altri ${100 - NET.players.length} posti sono bot</div>`;
+      }).join('') + `<div class="hint">${NET.players.length}/${N.MAX_PLAYERS} giocatori · ${lobbyHint()}</div>`;
     }
+    $('#onlineBadge').innerHTML = inLobby ? `<span class="live">● ${NET.players.length} in lobby</span>` : '';
     renderModes();
+    renderTeams();
+    renderSquad();
+    renderSummary();
     renderPlayBtn();
     api.lobbyChanged();
   }
@@ -312,9 +437,9 @@ export function initMenu(api) {
     api.ui();
     status('Creazione della lobby…');
     try {
-      NET.mode = S.mode;
+      NET.mode = S.mode; NET.team = S.team; NET.vs = !!S.vs;
       await N.createLobby(meInfo());
-      N.setMode(S.mode);
+      N.setMode(S.mode); N.setTeam(S.team, !!S.vs);
       chatLog.innerHTML = '';
       addChat('', `Lobby creata! Dai il codice ${NET.code} ai tuoi amici.`);
       status('Fino a 8 giocatori: gli altri posti sono riempiti dai bot.');

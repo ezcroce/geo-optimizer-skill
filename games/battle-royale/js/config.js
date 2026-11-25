@@ -222,6 +222,17 @@ export const MODES = [
   { id: 'random', name: 'Random Map', icon: '🎲', desc: 'Ogni partita un\'isola nuova: città, montagne e laghi generati a caso.' },
 ];
 
+/** Dimensione delle squadre (v23) */
+export const TEAM_MODES = [
+  { id: 'solo', name: 'Singolo', size: 1, icon: '1', desc: 'Tutti contro tutti: vince l\'ultimo sopravvissuto.' },
+  { id: 'duo', name: 'Duo', size: 2, icon: '2', desc: 'Squadre da 2: vince l\'ultima coppia in piedi.' },
+  { id: 'trio', name: 'Trio', size: 3, icon: '3', desc: 'Squadre da 3: coordinatevi e coprite i compagni.' },
+  { id: 'squad', name: 'Squad', size: 4, icon: '4', desc: 'Squadre da 4: la modalità più tattica.' },
+];
+export const teamSize = (id) => (TEAM_MODES.find(t => t.id === id) || TEAM_MODES[0]).size;
+/** colori dei compagni di squadra (HUD, minimappa, targhette) */
+export const MATE_COLORS = ['#ffd23a', '#3ad6ff', '#7dff5a', '#ff7ad6'];
+
 export const GLIDERS = [
   { id: 'classico', name: 'Classico', color: '#3a8dff', accent: '#ffffff' },
   { id: 'fiamma', name: 'Fiamma', color: '#ff4a1a', accent: '#ffd23a' },

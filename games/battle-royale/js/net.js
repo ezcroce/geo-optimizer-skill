@@ -7,7 +7,7 @@
 
 export const MAX_PLAYERS = 8;
 const PREFIX = 'arenaroyale3d-';
-const VERSION = 8;
+const VERSION = 9;
 
 export const NET = {
   role: 'off',          // 'off' | 'host' | 'client'
@@ -16,6 +16,8 @@ export const NET = {
   hostId: '',
   players: [],          // lobby: [{ id, name, skin, hat, back, host }]
   mode: 'br',           // modalità scelta dall'host
+  team: 'solo',         // v23: singolo / duo / trio / squad
+  vs: false,            // v23: true = amici uno contro l'altro (ognuno con la sua squadra di bot)
   inMatch: false,
   status: '',
   transport: null,
@@ -40,7 +42,7 @@ function loadPeerJS() {
   peerLib = new Promise((res, rej) => {
     if (window.peerjs) { res(window.peerjs); return; }
     const s = document.createElement('script');
-    s.src = './vendor/peerjs.min.js?v=18';
+    s.src = './vendor/peerjs.min.js?v=19';
     s.onload = () => window.peerjs ? res(window.peerjs) : rej(new Error('PeerJS non disponibile'));
     s.onerror = () => { peerLib = null; rej(new Error('Impossibile caricare PeerJS')); };
     document.head.appendChild(s);
@@ -112,7 +114,7 @@ class LocalTransport {
   async join(code, onData, onDrop) {
     this.ch = new BroadcastChannel(PREFIX + code);
     return new Promise((res, rej) => {
-      const to = setTimeout(() => rej(new Error('Nessuna lobby con questo codice')), 3000);
+      const to = setTimeout(() => rej(new Error('Nessuna lobby con questo codice')), 10000);
       this.ch.onmessage = ({ data: m }) => {
         if (m.to !== this.id) return;
         if (m.kind === 'here') this.ch.postMessage({ kind: 'connect', from: this.id, to: m.from });
@@ -129,7 +131,7 @@ class LocalTransport {
 
 // ── API della lobby ──
 let me = null;   // { name, skin, hat, back }
-function lobbyMsg() { return { t: 'lobby', players: NET.players, mode: NET.mode, code: NET.code }; }
+function lobbyMsg() { return { t: 'lobby', players: NET.players, mode: NET.mode, team: NET.team, vs: NET.vs, code: NET.code }; }
 function hostBroadcastLobby() { broadcast(lobbyMsg()); NET.onLobby && NET.onLobby(); }
 
 function hostOnData(from, msg) {
@@ -169,7 +171,7 @@ function hostOnDrop(id) {
 }
 function clientOnData(from, msg) {
   if (!msg || typeof msg !== 'object') return;
-  if (msg.t === 'lobby') { NET.players = msg.players; NET.mode = msg.mode; NET.onLobby && NET.onLobby(); return; }
+  if (msg.t === 'lobby') { NET.players = msg.players; NET.mode = msg.mode; NET.team = msg.team || 'solo'; NET.vs = !!msg.vs; NET.onLobby && NET.onLobby(); return; }
   if (msg.t === 'chat') { NET.onChat && NET.onChat(msg.name, msg.text); return; }
   if (msg.t === 'kick') { const why = msg.why; leaveLobby(true); NET.onClose && NET.onClose(why); return; }
   NET.onMessage && NET.onMessage(from, msg);
@@ -233,6 +235,8 @@ export function updateMe(info) {
   else if (NET.role === 'client') NET.transport.send(NET.hostId, { t: 'hello', ver: VERSION, ...me });
 }
 export function setMode(mode) { NET.mode = mode; if (NET.role === 'host') hostBroadcastLobby(); }
+/** v23: dimensione squadre e Squadra/Versus (solo l'host) */
+export function setTeam(team, vs) { NET.team = team; NET.vs = !!vs; if (NET.role === 'host') hostBroadcastLobby(); }
 export function chat(text) {
   text = String(text || '').trim().slice(0, 140);
   if (!text || NET.role === 'off') return;

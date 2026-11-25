@@ -1,11 +1,11 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=18';
-import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=18';
+import { normalFromHeight, NORMALS } from './texgen.js?v=19';
+import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=19';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=18';
-import { mergeParts } from './props.js?v=18';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=19';
+import { mergeParts } from './props.js?v=19';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -19,7 +19,7 @@ function mat(color, opts = {}) {
  * Luce di contorno (rim light): i bordi del personaggio si schiariscono un poco verso il cielo,
  * così si staccano dallo sfondo anche in ombra. Un'unica variante di shader per tutti.
  */
-export const CHAR_RIM = { value: new THREE.Color(0.17, 0.2, 0.26) };
+export const CHAR_RIM = { value: new THREE.Color(0.1, 0.12, 0.16) };   // v23: più tenue (meno effetto plastica)
 function rimify(m) {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uRim = CHAR_RIM;
@@ -42,7 +42,7 @@ function fabricMat(kind, color, opts = {}) {
   const o = {
     color: COLORED.has(kind) ? '#ffffff' : color, map: t.map,
     roughness: L.rough, metalness: L.metal ?? 0.02,
-    ...(t.normalMap ? { normalMap: t.normalMap, normalScale: new THREE.Vector2(0.5, 0.5) } : {}),
+    ...(t.normalMap ? { normalMap: t.normalMap, normalScale: new THREE.Vector2(...(kind === 'leather' || kind === 'ripstop' ? [0.4, 0.4] : [0.8, 0.8])) } : {}),
   };
   const extra = { ...opts }; delete extra.extra;
   let m;
@@ -145,6 +145,35 @@ const shoeGeo = () => cachedGeo('shoe', () => {
   return g;
 });
 
+// suola: sagoma della scarpa (punta tonda, arco plantare) estrusa con bordo smussato
+const soleGeo = () => cachedGeo('sole23', () => {
+  const sh = new THREE.Shape();
+  sh.moveTo(-0.05, -0.125); sh.quadraticCurveTo(-0.064, -0.13, -0.062, -0.07);
+  sh.quadraticCurveTo(-0.054, 0.0, -0.064, 0.06); sh.quadraticCurveTo(-0.07, 0.14, 0.0, 0.142);
+  sh.quadraticCurveTo(0.07, 0.14, 0.064, 0.06); sh.quadraticCurveTo(0.058, 0.0, 0.062, -0.07);
+  sh.quadraticCurveTo(0.064, -0.13, 0.05, -0.125); sh.quadraticCurveTo(0.0, -0.138, -0.05, -0.125);
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 6 });
+  g.rotateX(Math.PI / 2); g.translate(0, 0.022, 0);
+  // uv dall'alto per il battistrada
+  const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) * 6 + 0.5, p.getZ(i) * 6 + 0.5);
+  g.computeVertexNormals();
+  return g;
+});
+/** scatola con spigoli arrotondati (zaini, tasche) */
+const roundBoxGeo = (w, h, d, r, seg = 5) => cachedGeo(`rbox${w}|${h}|${d}|${r}`, () => {
+  const g = new THREE.BoxGeometry(1, 1, 1, seg * 2, seg * 2, seg * 2);
+  const p = g.attributes.position, nr = g.attributes.normal, v = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  const ix = w / 2 - r, iy = h / 2 - r, iz = d / 2 - r;
+  for (let i = 0; i < p.count; i++) {
+    v.set(p.getX(i) * w, p.getY(i) * h, p.getZ(i) * d);
+    c.set(Math.max(-ix, Math.min(ix, v.x)), Math.max(-iy, Math.min(iy, v.y)), Math.max(-iz, Math.min(iz, v.z)));
+    n.copy(v).sub(c);
+    if (n.lengthSq() > 1e-12) { n.normalize(); v.copy(c).addScaledVector(n, r); nr.setXYZ(i, n.x, n.y, n.z); }
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  return g;
+});
 // gamba dei pantaloni larghi: si gonfia sotto il ginocchio e si stringe alla caviglia (nelle bende)
 const widePantGeo = () => cachedGeo('widePant', () => {
   const pts = [[0.001, -0.33], [0.06, -0.33], [0.075, -0.3], [0.098, -0.22], [0.1, -0.12], [0.092, -0.03], [0.085, 0.02], [0.001, 0.03]].map(([r, y]) => new THREE.Vector2(r, y));
@@ -376,7 +405,8 @@ export function buildCharacter(skin, cos = {}) {
   const pantsM = metal ? texMat('metal', skin.pants) : fabricMat(pantsK, skin.pants, pantsK === 'hex' ? { extra: skin.glow || '#00f0ff' } : {});
   const skinM = skin.id === 'robot' || skin.banana ? mat(skin.skin, { roughness: 0.5 }) : skinMat(skin.skin);
   const shoeM = texMat('leather', skin.shoes);
-  const soleM = mat('#1a1a1a', { roughness: 0.9 });
+  const soleM = texMat('rubber', '#1c1c1c');
+  const midM = mat('#efece4', { roughness: 0.65 });
   const darkM = mat('#111111');
   const gloveM = metal ? texMat('metal', skin.accColor || skin.shirt) : skin.gloves ? texMat('leather', skin.gloves) : skinM;
 
@@ -389,14 +419,26 @@ export function buildCharacter(skin, cos = {}) {
     const knee = new THREE.Group(); knee.position.y = -RIG.thigh; hip.add(knee);
     if (skin.wide) mesh(widePantGeo(), pantsM, 0, 0, -0.005, knee);
     const ankle = new THREE.Group(); ankle.position.y = -RIG.shin; knee.add(ankle);
-    mesh(shoeGeo(), shoeM, 0, -0.005, 0.05, ankle);
-    mesh(boxGeo(0.125, 0.025, 0.27), soleM, 0, -0.045, 0.05, ankle);
+    if (skin.boots) mesh(shoeGeo(), shoeM, 0, -0.012, 0.06, ankle, 1.12, 1.3, 1.2);   // v23: scarpone pieno, raccordato al gambale
+    else mesh(shoeGeo(), shoeM, 0, -0.005, 0.05, ankle);
+    // v23: suola sagomata in gomma (battistrada), intersuola chiara sulle sneaker, rinforzo del tallone
+    mesh(soleGeo(), soleM, 0, -0.058, skin.boots ? 0.062 : 0.05, ankle, 1, 1, skin.boots ? 1.16 : 1);
+    if (!skin.boots && !metal && !skin.tabi && !skin.flats) {
+      mesh(soleGeo(), midM, 0, -0.04, 0.05, ankle, 1.01, 0.75, 1.0);
+      mesh(cachedGeo('heelTab', () => new THREE.CylinderGeometry(0.058, 0.062, 0.05, 10, 1, true, Math.PI * 0.62, Math.PI * 0.76)), texMat('leather', darker(skin.shoes, 0.7), { side: THREE.DoubleSide }), 0, 0.0, -0.035, ankle);
+      mesh(boxGeo(0.034, 0.03, 0.006), mat('#e8e8e8', { roughness: 0.5 }), 0.064, 0.002, 0.02, ankle).rotation.y = Math.PI / 2;   // logo laterale
+    }
     if (!skin.boots && !metal && !skin.tabi && !skin.flats) mesh(cachedGeo('laces', () => mergeSmooth([
       [new THREE.BoxGeometry(0.066, 0.008, 0.011), { y: 0.044, z: 0.035 }], [new THREE.BoxGeometry(0.06, 0.008, 0.011), { y: 0.042, z: 0.062 }],
       [new THREE.BoxGeometry(0.052, 0.008, 0.011), { y: 0.038, z: 0.089 }],
       [new THREE.BoxGeometry(0.128, 0.014, 0.1), { y: -0.008, z: 0.02 }],
     ])), mat('#f2f0ea', { roughness: 0.7 }), 0, -0.005, 0.05, ankle);
-    if (skin.boots) mesh(cylGeo(0.088, 0.08, 0.2, 10), shoeM, 0, 0.07, 0, ankle);
+    if (skin.boots) {
+      // v23: gambale sagomato (più largo in alto), risvolto cucito e tacco
+      mesh(cachedGeo('bootShaft', () => { const g = new THREE.LatheGeometry([[0.07, -0.03], [0.08, 0.0], [0.083, 0.08], [0.088, 0.15], [0.092, 0.18]].map(([r, y]) => new THREE.Vector2(r, y)), 16); g.scale(1, 1, 1.08); return g; }), shoeM, 0, 0.0, 0, ankle);
+      mesh(torusGeo(0.09, 0.008, 16), texMat('leather', darker(skin.shoes, 0.65)), 0, 0.178, 0, ankle, 1, 1, 1.08).rotation.x = Math.PI / 2;
+      mesh(boxGeo(0.1, 0.03, 0.07), soleM, 0, -0.035, -0.045, ankle);
+    }
     if (skin.tabi) mesh(cylGeo(0.082, 0.078, 0.1, 10), shoeM, 0, 0.025, 0, ankle);
     if (skin.kneepads) mesh(capsuleGeo(0.06, 0.04), mat(skin.kneepads), 0, 0, 0.065, knee, 1.1, 1, 0.6);
     if (skin.glow) mesh(boxGeo(0.03, 0.3, 0.02), glowMat(skin.glow), 0.04 * side, -0.2, 0.072, knee);
@@ -685,19 +727,105 @@ function limbProfile(pts, capTop = true, capBottom = true) {
 }
 const ARM_PROFILE = limbProfile([[0, 0.08], [0.06, 0.076], [0.14, 0.071], [0.2, 0.067], [0.24, 0.064], [0.27, 0.062], [0.3, 0.061], [0.33, 0.06], [0.36, 0.06], [0.42, 0.058], [0.48, 0.054], [0.53, 0.049], [0.575, 0.043]]);
 const LEG_PROFILE = limbProfile([[0, 0.095], [0.08, 0.1], [0.18, 0.098], [0.28, 0.092], [0.35, 0.086], [0.39, 0.081], [0.42, 0.078], [0.44, 0.076], [0.46, 0.076], [0.49, 0.077], [0.54, 0.078], [0.6, 0.075], [0.68, 0.068], [0.76, 0.06], [0.83, 0.055]]);
-const NECK_PROFILE = [[0, 0.074], [0.06, 0.068], [0.12, 0.064], [0.18, 0.062], [0.22, 0.062]];
+const NECK_PROFILE = [[0, 0.088], [0.05, 0.08], [0.11, 0.074], [0.17, 0.072], [0.22, 0.072]];   // v23: collo più robusto
 const SEG = 14;
 const skinGeoCache = new Map();
+
+/**
+ * v23: occlusione ambientale "cotta" sui vertici del corpo (ascelle, inguine, sotto il mento, fra le gambe).
+ * Ogni vertice è un dischetto che oscura gli altri che lo "vedono" davanti a sé; la testa è un ellissoide.
+ */
+function bakeAO(P, N) {
+  const n = P.length / 3, src = [];
+  for (let i = 0; i < n; i++) src.push([P[i * 3], P[i * 3 + 1], P[i * 3 + 2], N[i * 3], N[i * 3 + 1], N[i * 3 + 2], 0.0011]);
+  // testa (centro a 1,825 m) e mani (sotto i polsi)
+  const hc = [0, RIG.hip + RIG.headY + 0.225, 0], hr = [0.2, 0.225, 0.205];
+  for (let k = 0; k < 90; k++) {
+    const yy = 1 - (k + 0.5) / 90 * 2, rr = Math.sqrt(1 - yy * yy), th = k * 2.39996;
+    const ux = Math.cos(th) * rr, uz = Math.sin(th) * rr;
+    src.push([hc[0] + ux * hr[0], hc[1] + yy * hr[1], hc[2] + uz * hr[2], ux, yy, uz, 0.0062]);
+  }
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const px = P[i * 3], py = P[i * 3 + 1], pz = P[i * 3 + 2], nx = N[i * 3], ny = N[i * 3 + 1], nz = N[i * 3 + 2];
+    let occ = 0;
+    for (const e of src) {
+      let dx = e[0] - px, dy = e[1] - py, dz = e[2] - pz;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < 4e-5 || d2 > 0.09) continue;
+      const d = Math.sqrt(d2); dx /= d; dy /= d; dz /= d;
+      const ce = nx * dx + ny * dy + nz * dz;
+      if (ce <= 0.05) continue;
+      const cr = Math.abs(e[3] * dx + e[4] * dy + e[5] * dz);
+      occ += e[6] * ce * (0.35 + 0.65 * cr) / (Math.PI * d2 + e[6]);
+    }
+    const ground = 0.8 + 0.2 * smoothstep(0.02, 0.4, py);
+    out[i] = Math.max(0.42, 1 - occ * 0.55) * ground;
+  }
+  return out;
+}
+/**
+ * v23: materiale del corpo con occlusione cotta, pieghe dei vestiti (rilievo procedurale vicino alle
+ * articolazioni) e cuciture laterali con impunture. Variante per materiale, in cache.
+ */
+const bodyMatCache = new Map();
+function bodyMat(base, cloth) {
+  const key = base.uuid + (cloth ? 'c' : 's');
+  if (bodyMatCache.has(key)) return bodyMatCache.get(key);
+  const m = base.clone();
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uRim = CHAR_RIM;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aAO;\nattribute float aFold;\nvarying float vAO;\nvarying float vFold;\nvarying vec2 vBUv;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAO = aAO; vFold = aFold; vBUv = uv;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform vec3 uRim;
+varying float vAO;
+varying float vFold;
+varying vec2 vBUv;
+float foldH(vec2 uv) {
+  float a = sin(uv.y * 58.0 + 2.6 * sin(uv.x * 12.566 + uv.y * 6.0) + 1.1 * sin(uv.x * 31.4));
+  float b = sin(uv.y * 36.0 - uv.x * 25.13 + 1.3 * sin(uv.y * 7.0));
+  float crease = (0.5 + 0.5 * a) * (0.5 + 0.5 * a) * 0.8 + (0.5 + 0.5 * b) * (0.5 + 0.5 * b) * 0.4;
+  float drape = sin(uv.y * 19.0 + 1.5 * sin(uv.x * 12.566)) * 0.25;
+  return (crease * vFold + drape * 0.3) * ${cloth ? '1.0' : '0.0'};
+}
+float seamD(vec2 uv) { return abs(fract(uv.x * 2.0) - 0.5) * 0.5; }
+vec3 bodyPerturb(vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float fd) {
+  vec3 vSigmaX = normalize(dFdx(surf_pos)); vec3 vSigmaY = normalize(dFdy(surf_pos));
+  vec3 R1 = cross(vSigmaY, surf_norm); vec3 R2 = cross(surf_norm, vSigmaX);
+  float fDet = dot(vSigmaX, R1) * fd;
+  vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2);
+  return normalize(abs(fDet) * surf_norm - vGrad);
+}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+${cloth ? `{ float fh = foldH(vBUv); diffuseColor.rgb *= 1.0 - 0.3 * vFold * (1.0 - clamp(fh / max(vFold, 0.01) / 1.1, 0.0, 1.0));
+  float sd = seamD(vBUv), fw = fwidth(vBUv.x) * 0.6 + 1e-4;
+  float line = 1.0 - smoothstep(0.005, 0.005 + fw, sd);
+  float st = smoothstep(0.009 - fw, 0.009, sd) * (1.0 - smoothstep(0.0125, 0.0125 + fw, sd)) * step(0.45, fract(vBUv.y * 70.0));
+  diffuseColor.rgb *= 1.0 - 0.4 * line;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.35 + 0.04, st * 0.55); }` : ''}
+diffuseColor.rgb *= vAO;`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+${cloth ? `{ float H = foldH(vBUv) * 0.0045 + (1.0 - smoothstep(0.0, 0.008, seamD(vBUv))) * 0.0012;
+  normal = bodyPerturb(-vViewPosition, normal, vec2(dFdx(H), dFdy(H)) * 1.0, faceDirection); }` : ''}`)
+      .replace('#include <opaque_fragment>', 'outgoingLight += uRim * vAO * pow(1.0 - saturate(dot(normalize(vViewPosition), normal)), 3.0);\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = () => 'charBody23' + (cloth ? 'c' : 's');
+  bodyMatCache.set(key, m);
+  return m;
+}
 
 /**
  * Costruisce la geometria del corpo (coordinate del gruppo "body" a riposo).
  * B = indici delle ossa; mats = indici dei materiali; opz = varianti della skin.
  */
 function bodyGeometry(o) {
-  const P = [], N = [], U = [], SI = [], SW = [], tris = new Map();
+  const P = [], N = [], U = [], SI = [], SW = [], F = [], tris = new Map();
   const tri = (m, a, b, c) => { if (!tris.has(m)) tris.set(m, []); tris.get(m).push(a, b, c); };
-  const vert = (x, y, z, nx, ny, nz, u, v, w) => {
-    P.push(x, y, z); N.push(nx, ny, nz); U.push(u, v);
+  const vert = (x, y, z, nx, ny, nz, u, v, w, f = 0) => {
+    P.push(x, y, z); N.push(nx, ny, nz); U.push(u, v); F.push(f);
     const e = Object.entries(w).filter(([, k]) => k > 1e-4).sort((a, b) => b[1] - a[1]).slice(0, 4);
     const tot = e.reduce((s, [, k]) => s + k, 0) || 1;
     for (let i = 0; i < 4; i++) { SI.push(e[i] ? +e[i][0] : 0); SW.push(e[i] ? e[i][1] / tot : 0); }
@@ -735,7 +863,7 @@ function bodyGeometry(o) {
         const rx = -sn, rz = -cs;                                    // giunzione delle uv sul retro
         let nx = row.n[0] * rx / R.sx, ny = row.n[1] * sgn, nz = row.n[0] * rz;
         const l = Math.hypot(nx, ny, nz) || 1;
-        out.push(vert(cx + rx * row.r * R.s * R.sx, y, cz + rz * row.r * R.s, nx / l, ny / l, nz / l, j / SEG, len / 0.5, R.w));
+        out.push(vert(cx + rx * row.r * R.s * R.sx, y, cz + rz * row.r * R.s, nx / l, ny / l, nz / l, j / SEG, len / 0.5, R.w, R.f || 0));
       }
       return { out, m: R.m };
     });
@@ -755,7 +883,9 @@ function bodyGeometry(o) {
     tube(LEG_PROFILE, 0.105 * sd, RIG.hip, 0, (d) => {
       const kw = smoothstep(0.37, 0.51, d), aw = 0.7 * smoothstep(0.8, 0.88, d);
       const thighX = 1.04 * o.wk, s = d > hemD ? 0.86 : 1;
-      return { m: d > hemD ? o.M.skin : o.M.pants, s, sx: thighX + (1 - thighX) * smoothstep(0.3, 0.46, d), w: { [L[0]]: (1 - kw), [L[1]]: kw * (1 - aw), [L[2]]: kw * aw } };
+      // pieghe: dietro/davanti al ginocchio, stoffa che si accumula alla caviglia, inguine
+      const f = d > hemD ? 0 : Math.max(Math.exp(-(((d - 0.45) / 0.07) ** 2)), 0.85 * smoothstep(0.66, 0.8, d), 0.55 * smoothstep(0.1, 0.0, d), 0.18);
+      return { m: d > hemD ? o.M.skin : o.M.pants, s, sx: thighX + (1 - thighX) * smoothstep(0.3, 0.46, d), w: { [L[0]]: (1 - kw), [L[1]]: kw * (1 - aw), [L[2]]: kw * aw }, f };
     }, false, o.shorts ? [hemD] : []);
   }
   // ── braccia ──
@@ -766,17 +896,19 @@ function bodyGeometry(o) {
       const ew = smoothstep(0.24, 0.36, d), hw = 0.6 * smoothstep(0.56, 0.63, d);
       const upper = d < hemD;
       const s = upper ? (o.sleeveless ? 0.89 : 1) : (o.short ? 0.9 : 1);
-      return { m: upper ? o.upperM : o.foreM, s, sx: 1, w: { [A[0]]: 1 - ew, [A[1]]: ew * (1 - hw), [A[2]]: ew * hw } };
+      const cloth = (upper ? o.upperM : o.foreM) === o.M.shirt;
+      const f = !cloth ? 0 : Math.max(Math.exp(-(((d - 0.31) / 0.06) ** 2)), 0.7 * smoothstep(0.45, 0.56, d), 0.5 * smoothstep(0.08, 0.0, d), 0.18);
+      return { m: upper ? o.upperM : o.foreM, s, sx: 1, w: { [A[0]]: 1 - ew, [A[1]]: ew * (1 - hw), [A[2]]: ew * hw }, f };
     }, false, hemD < 9 ? [hemD] : []);
   }
   // ── collo: dal busto alla testa ──
   tube(NECK_PROFILE, 0, RIG.hip + 0.54, 0, (d) => ({ m: o.M.neck, s: 1, sx: 1, w: { [B.torso]: 1 - smoothstep(0.08, 0.17, d), [B.head]: smoothstep(0.08, 0.17, d) } }), true);
   // ── busto e bacino (le spalle seguono un po' le braccia, il bacino un po' le gambe) ──
-  const addRigid = (g, dy, m, wfn) => {
+  const addRigid = (g, dy, m, wfn, ffn = () => 0) => {
     const gp = g.attributes.position, gn = g.attributes.normal, gu = g.attributes.uv, base = P.length / 3;
     for (let k = 0; k < gp.count; k++) {
       const x = gp.getX(k), y = gp.getY(k) + dy, z = gp.getZ(k);
-      vert(x, RIG.hip + y, z, gn.getX(k), gn.getY(k), gn.getZ(k), gu.getX(k), gu.getY(k), wfn(x, y, z));
+      vert(x, RIG.hip + y, z, gn.getX(k), gn.getY(k), gn.getZ(k), gu.getX(k), gu.getY(k), wfn(x, y, z), ffn(x, y, z));
     }
     const id = g.index;
     for (let k = 0; k < id.count; k += 3) tri(m, base + id.getX(k), base + id.getX(k + 1), base + id.getX(k + 2));
@@ -784,11 +916,11 @@ function bodyGeometry(o) {
   addRigid(torsoGeo(1), 0.02, o.M.shirt, (x, y) => {
     const ws = 0.55 * smoothstep(0.15, 0.235, Math.abs(x)) * smoothstep(0.36, 0.47, y);
     return { [B.torso]: 1 - ws, [x < 0 ? B.armL[0] : B.armR[0]]: ws };
-  });
+  }, (x, y) => Math.max(0.6 * smoothstep(0.16, 0.04, y), 0.45 * smoothstep(0.17, 0.22, Math.abs(x)) * smoothstep(0.28, 0.4, y), 0.15));
   addRigid(pelvisGeo(), 0.04, o.M.pants, (x, y) => {
     const wh = 0.45 * smoothstep(0.0, 0.11, Math.abs(x)) * smoothstep(0.04, -0.07, y);
     return { [B.torso]: 1 - wh, [x < 0 ? B.legL[0] : B.legR[0]]: wh };
-  });
+  }, () => 0.3);
   // gruppi per materiale (un'unica draw call per stoffa)
   const g = new THREE.BufferGeometry(), index = [];
   for (const [m, t] of [...tris.entries()].sort((a, b) => a[0] - b[0])) { g.addGroup(index.length, t.length, m); index.push(...t); }
@@ -797,6 +929,8 @@ function bodyGeometry(o) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(SI, 4));
   g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(SW, 4));
+  g.setAttribute('aFold', new THREE.Float32BufferAttribute(F, 1));
+  g.setAttribute('aAO', new THREE.Float32BufferAttribute(bakeAO(P, N), 1));
   g.setIndex(index);
   g.userData.shared = true;
   return g;
@@ -806,7 +940,8 @@ function buildBodySkin(skin, R) {
   const bones = [R.torso, R.legs[0], R.knees[0], R.feet[0], R.legs[1], R.knees[1], R.feet[1], R.arms[0], R.elbows[0], R.hands[0], R.arms[1], R.elbows[1], R.hands[1], R.head];
   const B = { torso: 0, legL: [1, 2, 3], legR: [4, 5, 6], armL: [7, 8, 9], armR: [10, 11, 12], head: 13 };
   // materiali: indici fissi 0..3 (maglia, pantaloni, pelle, collo)
-  const materials = [R.shirtM, R.pantsM, R.skinM, R.neckM];
+  const isCloth = (mm) => mm !== R.skinM && !(mm.metalness > 0.5);
+  const materials = [R.shirtM, R.pantsM, R.skinM, R.neckM].map(mm => bodyMat(mm, isCloth(mm)));
   const M = { shirt: 0, pants: 1, skin: 2, neck: 3 };
   const upperM = skin.sleeveless ? M.skin : M.shirt, foreM = skin.short ? M.skin : M.shirt;
   const key = [skin.shorts ? 1 : 0, skin.wide ? 1 : 0, upperM, foreM].join('|');
@@ -1022,13 +1157,30 @@ function mulberryLocal(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let
 /** cappelli sbloccabili (config HATS) */
 function buildHat(id, skin, head) {
   const H = HATS.find(h => h.id === id) || { color: '#444' };
-  const c = mat(H.color, { roughness: 0.8 }), a = mat(H.accent || '#ffffff', { roughness: 0.6 });
+  // v23: tessuti veri (trama + rilievo) al posto dei colori pieni
+  const c = texMat(['tophat'].includes(id) ? 'suit' : 'cotton', H.color), a = mat(H.accent || '#ffffff', { roughness: 0.6 });
   const g = new THREE.Group(); g.position.y = 0.3; head.add(g);
   switch (id) {
-    case 'cap':
-      mesh(domeGeo(Math.PI / 2), c, 0, -0.01, 0, g, 0.218, 0.17, 0.225);
-      mesh(cylGeo(0.13, 0.13, 0.018, 14), c, 0, 0, 0.21, g, 1, 1, 1.25).rotation.x = 0.12;
+    case 'cap': {
+      // berretto da baseball: 6 spicchi con cuciture, bottone, occhielli, visiera curva e cinturino dietro
+      const seam = mat(darker(H.color, 0.55), { roughness: 0.9 });
+      mesh(domeGeo(Math.PI / 2, 24), c, 0, -0.01, 0, g, 0.218, 0.17, 0.225);
+      mesh(cachedGeo('capSeams', () => mergeSmooth([0, 1, 2, 3, 4, 5].map(i => [new THREE.TorusGeometry(1, 0.012, 3, 20, Math.PI / 2), { ry: i / 6 * Math.PI * 2 + Math.PI / 2, rz: 0 }]))), seam, 0, -0.01, 0, g, 0.219, 0.171, 0.226);
+      sph(0.016, c, 0, 0.158, 0, g, 0.55);
+      for (const an of [0.6, 1.6, 2.6, -0.6, -1.6, -2.6]) mesh(torusGeo(0.007, 0.002, 8), seam, Math.sin(an) * 0.135, 0.1, Math.cos(an) * 0.14, g).rotation.set(-0.9, an, 0, 'YXZ');
+      // visiera: mezzo ovale sottile e smussato, curvata verso il basso ai lati
+      mesh(cachedGeo('capBrim23', () => {
+        const sh = new THREE.Shape(); sh.moveTo(-0.2, 0); sh.bezierCurveTo(-0.2, 0.34, 0.2, 0.34, 0.2, 0); sh.quadraticCurveTo(0, 0.06, -0.2, 0);
+        const b = new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 10 });
+        b.rotateX(Math.PI / 2);
+        const q = b.attributes.position;
+        for (let i = 0; i < q.count; i++) q.setY(i, q.getY(i) - 0.9 * q.getX(i) * q.getX(i) - 0.15 * q.getZ(i) * q.getZ(i));
+        b.computeVertexNormals(); return b;
+      }), c, 0, 0.005, 0.085, g).rotation.x = 0.08;
+      mesh(boxGeo(0.07, 0.022, 0.012), mat('#1e1e1e', { roughness: 0.5 }), 0, -0.02, -0.222, g);
+      mesh(boxGeo(0.02, 0.014, 0.006), mat('#c8ccd2', { metalness: 0.85, roughness: 0.3 }), 0.022, -0.02, -0.229, g);
       break;
+    }
     case 'beanie': {
       const k = texMat('knit', H.color);
       mesh(domeGeo(Math.PI / 2), k, 0, -0.03, 0, g, 0.222, 0.22, 0.228).rotation.x = -0.12;
@@ -1054,7 +1206,7 @@ function buildHat(id, skin, head) {
       }
       break;
     case 'straw': {
-      const st = mat(H.color, { roughness: 0.95, map: fabricTex() });
+      const st = texMat('straw', H.color);
       mesh(cylGeo(0.38, 0.4, 0.02, 20), st, 0, 0, 0, g);
       mesh(cylGeo(0.18, 0.21, 0.13, 16), st, 0, 0.07, 0, g);
       mesh(cylGeo(0.215, 0.215, 0.035, 16), mat('#c0302a'), 0, 0.03, 0, g);
@@ -1092,7 +1244,7 @@ function buildHat(id, skin, head) {
       mesh(torusGeo(0.17, 0.02, 20), glowMat(H.color), 0, 0.22, 0, g).rotation.x = Math.PI / 2;
       break;
     case 'beret': {
-      const bm = mat(H.color, { roughness: 0.95, map: fabricTex() });
+      const bm = texMat('knit', H.color);
       const bg = new THREE.Group(); bg.rotation.set(-0.08, 0, 0.22); g.add(bg);
       mesh(sphereGeo(18, 10), bm, -0.03, 0.125, -0.01, bg, 0.255, 0.075, 0.245);
       mesh(torusGeo(0.206, 0.016, 22), mat(darker(H.color, 0.6), { roughness: 0.8 }), 0, 0.07, 0, bg).rotation.x = Math.PI / 2;
@@ -1103,7 +1255,7 @@ function buildHat(id, skin, head) {
     }
     case 'tactical': {
       // elmetto da combattimento: calotta in tessuto, binari laterali, paraorecchie e visore notturno alzato
-      const hm = mat(H.color, { roughness: 0.75, map: fabricTex() }), dk = mat('#23251f', { roughness: 0.6 });
+      const hm = texMat('ripstop', H.color), dk = texMat('rubber', '#23251f');
       mesh(domeGeo(Math.PI / 2, 20), hm, 0, -0.035, -0.005, g, 0.243, 0.24, 0.252);
       mesh(torusGeo(0.243, 0.011, 24), dk, 0, -0.035, -0.005, g, 1, 1, 1.035).rotation.x = Math.PI / 2;
       for (const sx of [-1, 1]) {
@@ -1167,7 +1319,7 @@ function buildHat(id, skin, head) {
     }
     case 'bucket': {
       // cappello a secchiello da esploratore (Leo), leggermente inclinato all'indietro
-      const bm = mat(H.color, { roughness: 0.9, map: fabricTex(), side: THREE.DoubleSide });
+      const bm = texMat('cotton', H.color, { side: THREE.DoubleSide });
       const bg = new THREE.Group(); bg.rotation.x = -0.12; g.add(bg);
       mesh(cylGeo(0.17, 0.2, 0.16, 22), bm, 0, 0.12, 0, bg);
       mesh(domeGeo(Math.PI / 2, 22), bm, 0, 0.199, 0, bg, 0.17, 0.035, 0.17);
@@ -1184,10 +1336,11 @@ function buildHat(id, skin, head) {
 /** zaini e oggetti sulla schiena (config BACKPACKS) */
 function buildBack(id, skin, torso) {
   const B = BACKPACKS.find(b => b.id === id) || { color: skin.backpack || '#7a5a2a', accent: skin.accColor || '#333' };
-  const c = id === 'skinpack' ? mat(skin.backpack, { roughness: 0.85, map: fabricTex() }) : mat(B.color, { roughness: 0.85, map: fabricTex() });
-  const a = mat(B.accent || '#333', { roughness: 0.6 });
+  const nylon = ['skinpack', 'school', 'hiker'].includes(id);
+  const c = nylon ? texMat('ripstop', id === 'skinpack' ? skin.backpack : B.color) : mat(B.color, { roughness: 0.85, map: fabricTex() });
+  const a = nylon ? texMat('cordura', B.accent || '#333') : mat(B.accent || '#333', { roughness: 0.6 });
   const g = new THREE.Group(); g.position.set(0, 0.36, -0.15); torso.add(g);
-  const web = mat('#24252a', { roughness: 0.7, map: fabricTex() }), buckle = mat('#9aa0a8', { metalness: 0.85, roughness: 0.3 });
+  const web = texMat('webbing', '#24252a'), buckle = mat('#9aa0a8', { metalness: 0.85, roughness: 0.3 });
   // spallacci che passano sopra le spalle e scendono sul petto
   const straps = (m = web) => {
     for (const sx of [-1, 1]) {
@@ -1201,15 +1354,25 @@ function buildBack(id, skin, torso) {
   const sling = (m = web) => mesh(cachedGeo('sling', () => surfTube([onTorso(0.15, 0.2, 0.014, true), onTorso(0.02, 0.36, 0.014, true), onTorso(-0.1, 0.5, 0.014, true), new THREE.Vector3(-0.12, 0.585, 0), onTorso(-0.1, 0.5, 0.012), onTorso(0.0, 0.38, 0.012), onTorso(0.1, 0.27, 0.012), onTorso(0.16, 0.18, 0.012)], 0.016)), m, 0, 0, 0, torso, 1);
   switch (id) {
     case 'skinpack':
-    case 'school':
-      mesh(capsuleGeo(0.15, 0.14, 10), c, 0, 0, -0.07, g, 1.05, 1, 0.55);
-      mesh(capsuleGeo(0.075, 0.06, 8), a, 0, -0.08, -0.135, g, 1.25, 0.85, 0.5);                 // tasca frontale
-      mesh(torusGeo(0.155, 0.006, 20), mat('#1e1e22', { roughness: 0.5 }), 0, 0.0, -0.075, g, 1.02, 1.42, 1).rotation.y = Math.PI / 2;   // cerniera
-      mesh(boxGeo(0.012, 0.03, 0.01), buckle, 0.07, 0.17, -0.12, g);
-      mesh(torusGeo(0.035, 0.008, 10), web, 0, 0.215, -0.04, g).rotation.y = Math.PI / 2;        // maniglia
-      for (const sx of [-1, 1]) mesh(cylGeo(0.035, 0.035, 0.09, 10), a, 0.15 * sx, -0.06, -0.07, g);   // tasche laterali
+    case 'school': {
+      // v23: zaino vero: corpo squadrato con spigoli morbidi, tasca frontale, cerniere con cursori, tasche laterali a rete
+      const zipM = mat('#1e1e22', { roughness: 0.5 });
+      mesh(roundBoxGeo(0.3, 0.37, 0.13, 0.05), c, 0, 0.0, -0.08, g);
+      mesh(roundBoxGeo(0.25, 0.3, 0.035, 0.015), texMat('cordura', darker(B.color || skin.backpack || '#555', 0.6)), 0, 0.0, -0.012, g);   // schienale imbottito
+      mesh(roundBoxGeo(0.23, 0.14, 0.055, 0.025), a, 0, -0.085, -0.155, g);                       // tasca frontale
+      // cerniere: arco sul fianco del corpo e sulla tasca
+      mesh(cachedGeo('zipMain', () => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-0.152, -0.15, 0), new THREE.Vector3(-0.152, 0.12, 0), new THREE.Vector3(-0.12, 0.178, 0), new THREE.Vector3(0, 0.188, 0), new THREE.Vector3(0.12, 0.178, 0), new THREE.Vector3(0.152, 0.12, 0), new THREE.Vector3(0.152, -0.15, 0)]), 30, 0.005, 4)), zipM, 0, 0, -0.105, g);
+      mesh(cachedGeo('zipPocket', () => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-0.11, -0.13, 0), new THREE.Vector3(-0.1, -0.03, 0), new THREE.Vector3(0, -0.012, 0), new THREE.Vector3(0.1, -0.03, 0), new THREE.Vector3(0.11, -0.13, 0)]), 20, 0.004, 4)), zipM, 0, 0, -0.184, g);
+      for (const [x, y, z] of [[-0.07, 0.186, -0.105], [0.07, 0.186, -0.105], [0.04, -0.016, -0.186]]) {
+        mesh(boxGeo(0.016, 0.01, 0.01), buckle, x, y, z, g);
+        mesh(boxGeo(0.009, 0.034, 0.004), zipM, x, y - 0.02, z - 0.008, g).rotation.x = 0.3;
+      }
+      mesh(torusGeo(0.035, 0.008, 10), web, 0, 0.2, -0.04, g).rotation.y = Math.PI / 2;           // maniglia
+      for (const sx of [-1, 1]) mesh(roundBoxGeo(0.045, 0.12, 0.09, 0.02), texMat('cordura', darker(B.accent || '#333', 0.85)), 0.165 * sx, -0.09, -0.08, g);   // tasche laterali
+      mesh(boxGeo(0.12, 0.012, 0.004), mat('#d8dde4', { metalness: 0.6, roughness: 0.25 }), 0, -0.12, -0.184, g);   // striscia riflettente
       straps();
       break;
+    }
     case 'hiker':
       mesh(capsuleGeo(0.15, 0.3, 10), c, 0, 0.06, -0.08, g, 1, 1, 0.6);
       mesh(sphereGeo(14, 8), c, 0, 0.27, -0.085, g, 0.155, 0.06, 0.1);                           // coperchio
@@ -1353,8 +1516,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=18';
-import { buildConsumableMesh } from './items.js?v=18';
+export { buildWeaponMesh } from './weapons.js?v=19';
+import { buildConsumableMesh } from './items.js?v=19';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
@@ -1404,4 +1567,4 @@ export function buildGlider(glider) {
 }
 
 /** Il "Battle Bus" volante: modello in models3d.js */
-export { buildBus } from './models3d.js?v=18';
+export { buildBus } from './models3d.js?v=19';

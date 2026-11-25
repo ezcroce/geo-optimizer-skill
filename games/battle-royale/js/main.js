@@ -4,30 +4,30 @@
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
-  DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=18';
-import * as PR from './progress.js?v=18';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=18';
-import { initMenu } from './menu.js?v=18';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=18';
-import { initSettingsUI } from './settings-ui.js?v=18';
-import { applyAnisotropy } from './texgen.js?v=18';
-import * as A from './audio.js?v=18';
+  DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
+} from './config.js?v=19';
+import * as PR from './progress.js?v=19';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
+import { initMenu } from './menu.js?v=19';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
+import { initSettingsUI } from './settings-ui.js?v=19';
+import { applyAnisotropy } from './texgen.js?v=19';
+import * as A from './audio.js?v=19';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=18';
-import { createWeather } from './weather.js?v=18';
-import { createEvents } from './events.js?v=18';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=18';
-import { weaponIcon } from './weapons.js?v=18';
-import { consIcon } from './items.js?v=18';
-import { buildChestMesh } from './models3d.js?v=18';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=18';
-import { createInventory } from './inventory.js?v=18';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=18';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=18';
+} from './world.js?v=19';
+import { createWeather } from './weather.js?v=19';
+import { createEvents } from './events.js?v=19';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=19';
+import { weaponIcon } from './weapons.js?v=19';
+import { consIcon } from './items.js?v=19';
+import { buildChestMesh } from './models3d.js?v=19';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=19';
+import { createInventory } from './inventory.js?v=19';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=19';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=19';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -59,7 +59,7 @@ function rollRarity(weights) {
 
 // ─────────────── Impostazioni salvate ───────────────
 const SETTINGS_DEFAULT = () => ({
-  name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', players: 100, sens: 1, vol: 0.5, mode: 'br', hat: 'none', back: 'none',
+  name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', players: 100, sens: 1, vol: 0.5, mode: 'br', team: 'solo', hat: 'none', back: 'none',
   // controlli, audio e interfaccia
   adsSens: 1, invertY: false, fov: 70, crouchHold: false, shake: true, amb: 1, chColor: '#ffffff', chSize: 1, minimap: 'normal',
   touch: 'auto', touchSens: 1, touchSize: 1,
@@ -76,6 +76,8 @@ if (!PR.owns('glider', settings.glider)) settings.glider = 'classico';
 if (!PR.owns('hat', settings.hat)) settings.hat = 'none';
 if (!PR.owns('back', settings.back)) settings.back = 'none';
 if (!MODES.some(m => m.id === settings.mode)) settings.mode = 'br';
+if (typeof settings.vs !== 'boolean') settings.vs = false;
+if (!TEAM_MODES.some(m => m.id === settings.team)) settings.team = 'solo';
 function saveSettings() { localStorage.setItem('arenaRoyale', JSON.stringify(settings)); }
 
 // ─────────────── Renderer & scena ───────────────
@@ -1147,6 +1149,8 @@ function melee(ch) {
 const BOT_VS_BOT = 0.2;
 function damage(t, amount, attacker, head = false, how = '', ignoreShield = false) {
   if (!t.alive || amount <= 0) return;
+  // v23: niente fuoco amico fra compagni di squadra
+  if (attacker && attacker !== t && G.teamSize > 1 && attacker.team === t.team) return;
   if (G.net && !G.netForce && !netDamageGate(t, amount, attacker, head, how, ignoreShield)) return;
   // con 100 giocatori i bot fra loro si fanno meno male: la partita dura di più e tu resti protagonista
   if (attacker && !attacker.human && !t.human && attacker !== t) amount *= BOT_VS_BOT;
@@ -1175,6 +1179,7 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
     if (!t.ai.target || Math.random() < 0.6) { t.ai.target = attacker; t.ai.lastSeen = G.time; t.ai.lastSeenPos.copy(attacker.pos); }
     t.ai.alert = 3;
   }
+  if (G.teamSize > 1 && attacker && attacker !== t && attacker.alive) teamAssist(t, attacker);
   if (G.net && NET.role === 'host' && (t.human || (attacker && attacker.human))) {
     netSend({ t: 'hp', v: t.idx, hp: Math.max(0, Math.round(t.hp)), sh: Math.round(t.shield), a: attacker ? attacker.idx : -1, amt: amount, h: head ? 1 : 0, w: how });
   }
@@ -1182,6 +1187,32 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
 }
 
 function aliveCount() { let n = 0; for (const c of G.chars) if (c.alive) n++; return n; }
+/** squadre ancora in gara (in singolo = giocatori vivi) */
+function aliveTeams() { const s = new Set(); for (const c of G.chars) if (c.alive) s.add(c.team); return s.size; }
+const teamOf = (c) => (G.teams && G.teams.get(c.team)) || [c];
+const teamAlive = (team) => G.chars.some(c => c.alive && c.team === team);
+const isMate = (a, b) => a !== b && G.teamSize > 1 && a.team === b.team;
+/** il capogruppo che il bot segue: il primo compagno vivo (gli umani hanno la precedenza) */
+function leaderOf(b) {
+  if (G.teamSize <= 1) return null;
+  for (const c of teamOf(b)) if (c.alive) return c === b ? null : c;
+  return null;
+}
+/** un compagno viene colpito (o colpisce): i bot della squadra lì vicino entrano in combattimento */
+function teamAssist(victim, attacker) {
+  const now = G.time;
+  for (const side of [[victim, attacker], [attacker, victim]]) {
+    const [friend, foe] = side;
+    if (friend.team === foe.team) continue;
+    for (const m of teamOf(friend)) {
+      if (m === friend || !m.alive || !m.ai || m.remote || m.mode !== 'ground') continue;
+      if (m.ai.target && m.ai.target.alive && Math.random() < 0.7) continue;
+      if (m.pos.distanceTo(foe.pos) > 70) continue;
+      m.ai.target = foe; m.ai.lastSeen = now; m.ai.lastSeenPos.copy(foe.pos); m.ai.alert = 3;
+    }
+  }
+}
+function mateToWatch() { return G.player ? teamOf(G.player).find(c => c.alive && c !== G.player) : null; }
 
 function kill(t, attacker, how) {
   if (!t.alive) return;
@@ -1189,8 +1220,10 @@ function kill(t, attacker, how) {
   t.alive = false; t.hp = 0; t.shield = 0; t.deadT = 0;
   t.using = null; t.reloading = 0;
   showGlider(t, false);
-  const place = aliveCount() + 1;
-  t.place = place;
+  const teamDead = !teamAlive(t.team);
+  const place = aliveTeams() + 1;
+  t.place = teamDead ? place : place - 1;
+  if (teamDead) for (const m of teamOf(t)) m.place = place;
   // rilascia l'inventario
   const drops = [];
   if (!t.remote) for (const s of t.slots) if (s) drops.push(s.kind === 'weapon' ? { kind: 'weapon', id: s.id, rarity: s.rarity, mag: s.mag } : { kind: 'cons', id: s.id, count: s.count });
@@ -1226,12 +1259,24 @@ function kill(t, attacker, how) {
   }
   if (t === G.player) {
     G.placement = place;
-    G.spectate = attacker && attacker.alive ? attacker : null;
     G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'storm' ? 'la tempesta' : 'te stesso');
     G.ads = false;
-    setTimeout(() => endMatch(false), 1800);
+    const mate = mateToWatch();
+    if (mate) {
+      // squadre: guardi un compagno, la partita finisce quando cade tutta la squadra
+      G.spectate = mate;
+      showMsg('SEI STATO ELIMINATO', `Ora guardi ${mate.name}: se la tua squadra vince, vinci anche tu!`, 4);
+    } else {
+      G.spectate = attacker && attacker.alive ? attacker : null;
+      setTimeout(() => endMatch(false), 1800);
+    }
+  } else if (G.player && !G.player.alive && t.team === G.player.team) {
+    if (teamDead) { G.placement = place; G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'storm' ? 'la tempesta' : G.killedBy || 'la tempesta'); G.teamWiped = true; setTimeout(() => endMatch(false), 1800); }
+    else if (G.spectate === t || !G.spectate) G.spectate = mateToWatch();
   }
-  if (aliveCount() <= 1 && G.player.alive && !G.endShown) setTimeout(() => endMatch(true), 1200);
+  if (G.player && G.spectate === t && t !== G.player) G.spectate = mateToWatch() || (attacker && attacker.alive ? attacker : null);
+  if (G.player && teamDead && G.teamSize > 1 && t.team !== G.player.team && attacker && attacker.team === G.player.team) addFeed(`<span style="color:#ffd23a">✔ La tua squadra ha eliminato la squadra di ${esc(t.name)}</span>`, true);
+  if (G.player && aliveTeams() <= 1 && teamAlive(G.player.team) && !G.endShown) setTimeout(() => endMatch(true), 1200);
 }
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
@@ -1837,7 +1882,7 @@ function dist0(a, b) { return a.pos.distanceTo(b.pos); }
 function botThink(b) {
   const ai = b.ai;
   // scegli il bersaglio
-  let tgt = ai.target && ai.target.alive && ai.target.mode !== 'bus' ? ai.target : null;
+  let tgt = ai.target && ai.target.alive && ai.target.mode !== 'bus' && !isMate(b, ai.target) ? ai.target : null;
   if (tgt && tgt.pos.distanceTo(b.pos) > 130) tgt = null;
   if (!tgt || Math.random() < 0.15) {
     let best = null, bd = Infinity;
@@ -1845,6 +1890,7 @@ function botThink(b) {
     const range = b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].role === 'sniper') ? 85 : 55;
     for (const c of G.chars) {
       if (c === b || !c.alive || c.mode === 'bus' || c.mode === 'fall') continue;
+      if (isMate(b, c)) continue;
       const d = c.pos.distanceTo(b.pos);
       if (d > (c.human ? range : range * 0.38) || d >= bd) continue;
       if (c.hidden && d > hideRange(c)) continue;
@@ -1905,6 +1951,18 @@ function botThink(b) {
     }
     ai.state = 'zone';
     return;
+  }
+  // squadra: resta vicino al capogruppo (umano: molto vicino, bot: più libero)
+  const L = leaderOf(b);
+  if (L && L.mode !== 'bus' && L.mode !== 'fall' && L.mode !== 'glide') {
+    const far = L.human ? 16 : 30, dl = Math.hypot(L.pos.x - b.pos.x, L.pos.z - b.pos.z);
+    if (dl > far || (ai.state === 'follow' && dl > far * 0.45)) {
+      if (!ai.fo) ai.fo = { x: rand(-3.5, 3.5), z: rand(-3.5, 3.5) };
+      ai.state = 'follow'; ai.goalLoot = ai.goalChest = null;
+      ai.goal = new THREE.Vector3(L.pos.x + ai.fo.x, 0, L.pos.z + ai.fo.z);
+      return;
+    }
+    if (ai.state === 'follow') ai.state = 'idle';
   }
   // bottino
   if (ai.state === 'chest' && ai.goalChest && !ai.goalChest.opened) return;
@@ -2013,8 +2071,19 @@ function navPoint(b, goal) {
 function updateBot(b, dt) {
   const ai = b.ai;
   if (!b.alive) return;
-  if (b.mode === 'bus') { if (G.bus.t >= ai.jumpT) jumpFromBus(b); return; }
+  const Ld = G.teamSize > 1 ? leaderOf(b) : null;
+  if (b.mode === 'bus') {
+    // i compagni bot di un umano saltano subito dopo di lui
+    if (Ld && Ld.human) {
+      if (Ld.mode !== 'bus') { if (ai.followJump == null) ai.followJump = G.bus.t + rand(0.25, 1.4); if (G.bus.t >= ai.followJump) jumpFromBus(b); }
+    } else if (G.bus.t >= ai.jumpT) jumpFromBus(b);
+    return;
+  }
   if (b.mode === 'fall' || b.mode === 'glide') {
+    if (Ld && Ld.human && Ld.alive && Ld.mode !== 'bus') {
+      if (!ai.fo) ai.fo = { x: rand(-4, 4), z: rand(-4, 4) };
+      ai.dropTarget.set(Ld.pos.x + ai.fo.x * 1.6, 0, Ld.pos.z + ai.fo.z * 1.6);
+    }
     const dx = ai.dropTarget.x - b.pos.x, dz = ai.dropTarget.z - b.pos.z;
     const d = Math.hypot(dx, dz);
     const mx = d > 2 ? dx / d : 0, mz = d > 2 ? dz / d : 0;
@@ -2097,7 +2166,7 @@ function updateBot(b, dt) {
         if (ai.state !== 'zone') ai.state = 'idle';
       } else {
         mx = dx / d; mz = dz / d;
-        speed = d > 25 || ai.state === 'zone' || ai.state === 'flee' ? 7 : 5.2;
+        speed = d > 25 || ai.state === 'zone' || ai.state === 'flee' || ai.state === 'follow' ? 7 : 5.2;
         b.yaw = angLerp(b.yaw, Math.atan2(mx, mz), dt * 6);
         b.pitch = lerp(b.pitch, 0, dt * 3);
       }
@@ -2721,7 +2790,9 @@ function fmtTime(t) { t = Math.max(0, Math.ceil(t)); return `${Math.floor(t / 60
 function updateHUD(dt) {
   inventory.update();
   const p = G.player;
-  setHTML(hud.alive, 'alive', String(aliveCount()));
+  setHTML(hud.alive, 'alive', G.teamSize > 1 ? `${aliveCount()}<small> · ${aliveTeams()} sq.</small>` : String(aliveCount()));
+  renderTeamHud(false);
+  updateMateTags();
   setHTML(hud.kills, 'kills', String(p.kills));
   const s = G.storm;
   let st;
@@ -2856,7 +2927,17 @@ function drawMinimap() {
     mmCtx.fillStyle = 'rgba(0,0,0,.6)'; mmCtx.fillText(t.name, x + 1, y + 1);
     mmCtx.fillStyle = '#fff'; mmCtx.fillText(t.name, x, y);
   }
+  drawMates(mmCtx, S, c.x, c.z, view, 4.5);
   drawPlayerArrow(mmCtx, w2m(p.pos.x, c.x, view, S), w2m(p.pos.z, c.z, view, S), 7);
+}
+function drawMates(ctx, S, cx, cz, view, r) {
+  if (!G.player || G.teamSize <= 1) return;
+  for (const m of teamOf(G.player)) {
+    if (m === G.player || !m.alive || m.mode === 'bus') continue;
+    const x = clamp(w2m(m.pos.x, cx, view, S), r, S - r), y = clamp(w2m(m.pos.z, cz, view, S), r, S - r);
+    ctx.fillStyle = m.mateColor || '#3ad6ff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
 }
 function drawStormOn(ctx, S, cx, cz, view) {
   const s = G.storm;
@@ -2913,6 +2994,7 @@ function drawBigMap() {
   }
   const p = G.player;
   const pp = p.mode === 'bus' ? G.bus.pos : p.pos;
+  drawMates(bmCtx, S, 0, 0, view, 6);
   drawPlayerArrow(bmCtx, w2m(pp.x, 0, view, S), w2m(pp.z, 0, view, S), 10);
 }
 
@@ -2979,9 +3061,17 @@ async function startMatch() {
       const total = 100;
       const names = makeBotNames(total - players.length);
       const bots = names.map(n => ({ name: n, skin: pick(SKINS).id, cos: randomCos() }));
+      // v23: squadre. "Squadra" = gli amici insieme (a gruppi della dimensione scelta), "Versus" = ognuno nella sua squadra con i bot
+      const T = teamSize(NET.team), vs = NET.vs || T === 1;
+      players.forEach((p, i) => { p.team = vs ? i : Math.floor(i / T); });
+      const used = players.length ? Math.max(...players.map(p => p.team)) + 1 : 0;
+      const fill = new Array(used).fill(0); players.forEach(p => fill[p.team]++);
+      let bi = 0;
+      for (let tm = 0; tm < used; tm++) for (let k = fill[tm]; k < T && bi < bots.length; k++) bots[bi++].team = tm;
+      for (let k = 0; bi < bots.length; k++) bots[bi++].team = used + Math.floor(k / T);
       const busAng = Math.random() * Math.PI * 2, busOff = rand(-50, 50) * SCALE;
       const st = newStorm();
-      const start = { t: 'start', seed, random, mode, lootSeed: Math.floor(Math.random() * 2e9), players, bots, bus: [busAng, busOff], storm: stormState(st), diff: settings.difficulty };
+      const start = { t: 'start', seed, random, mode, team: NET.team, vs: !!NET.vs, lootSeed: Math.floor(Math.random() * 2e9), players, bots, bus: [busAng, busOff], storm: stormState(st), diff: settings.difficulty };
       NET.inMatch = true;
       netSend(start);
       beginMatch(start);
@@ -3020,6 +3110,9 @@ function beginMatch(net) {
   A.setVolume(settings.vol);
   clearMatch();
   G.mode = net ? net.mode : settings.mode;
+  G.team = net ? (net.team || 'solo') : settings.team;
+  G.teamSize = teamSize(G.team);
+  G.teamWiped = false; G.killedBy = '';
   G.net = net ? { sendT: 0, snapT: 0, stormT: 0, byPeer: new Map() } : null;
   G.diff = DIFFICULTY[(net && net.diff) || settings.difficulty] || DIFFICULTY.normale;
   G.time = 0; G.endShown = false; G.spectate = null; G.paused = false; G.ads = false;
@@ -3055,7 +3148,7 @@ function beginMatch(net) {
       const skin = SKINS.find(x => x.id === pl.skin) || SKINS[0];
       const me = pl.id === NET.myId;
       const c = new Character(pl.name, skin, me, pl.cos);
-      c.human = true;
+      c.human = true; c.team = pl.team ?? G.chars.length;
       if (me) { G.player = c; myIdx = G.chars.length; }
       else { c.remote = true; c.mats = 0; c.netId = pl.id; G.net.byPeer.set(pl.id, c); }
       G.chars.push(c);
@@ -3063,6 +3156,7 @@ function beginMatch(net) {
     G.lootPrefix = myIdx + ':';
     for (const bt of net.bots) {
       const b = new Character(bt.name, SKINS.find(x => x.id === bt.skin) || SKINS[0], false, bt.cos);
+      b.team = bt.team ?? 1000 + G.chars.length;
       if (NET.role === 'host') setupBot(b); else { b.remote = true; b.mats = 0; }
       G.chars.push(b);
     }
@@ -3071,17 +3165,22 @@ function beginMatch(net) {
     G.storm = newStorm();
     const skin = SKINS.find(s => s.id === settings.skin) || SKINS[0];
     const player = new Character(settings.name || 'Giocatore', skin, true, myCos());
+    player.team = 0;
     G.player = player;
     G.chars.push(player);
-    const nb = clamp((Number(settings.players) || 100) - 1, 1, 99);
+    const T = G.teamSize;
+    const nb = clamp((Number(settings.players) || 100) - 1, T, 99);
     const names = makeBotNames(nb);
     for (let i = 0; i < nb; i++) {
       const b = new Character(names[i % names.length], pick(SKINS), false, randomCos());
+      // i primi T-1 bot sono i tuoi compagni, gli altri a gruppi di T
+      b.team = i < T - 1 ? 0 : 1 + Math.floor((i - (T - 1)) / T);
       setupBot(b);
       G.chars.push(b);
     }
   }
   G.chars.forEach((c, i) => { c.idx = i; });
+  buildTeams();
   const player = G.player;
   for (const c of G.chars) c.pos.copy(G.bus.pos);
   G.camYaw = Math.atan2(G.bus.b.x - G.bus.a.x, G.bus.b.z - G.bus.a.z) + Math.PI * 0.5;
@@ -3099,6 +3198,71 @@ function beginMatch(net) {
   requestLock();
 }
 
+/** raggruppa i personaggi per squadra; le squadre di soli bot atterrano insieme */
+function buildTeams() {
+  G.teams = new Map();
+  for (const c of G.chars) {
+    if (c.team === undefined) c.team = 5000 + c.idx;
+    if (!G.teams.has(c.team)) G.teams.set(c.team, []);
+    G.teams.get(c.team).push(c);
+  }
+  for (const arr of G.teams.values()) {
+    arr.sort((a, b) => (b.human ? 1 : 0) - (a.human ? 1 : 0));
+    if (arr.length < 2 || arr[0].human) continue;
+    const lead = arr[0];
+    if (!lead.ai) continue;
+    for (const m of arr.slice(1)) {
+      if (!m.ai) continue;
+      m.ai.dropTarget.set(lead.ai.dropTarget.x + rand(-5, 5), 0, lead.ai.dropTarget.z + rand(-5, 5));
+      m.ai.jumpT = lead.ai.jumpT + rand(0, 0.8);
+    }
+  }
+  // targhette dei compagni
+  const box = $('#mateTags'); box.innerHTML = '';
+  G.mateTags = [];
+  if (G.teamSize > 1) {
+    teamOf(G.player).filter(c => c !== G.player).forEach((c, i) => {
+      const el = document.createElement('div'); el.className = 'mtag';
+      el.style.setProperty('--mc', MATE_COLORS[(i + 1) % MATE_COLORS.length]);
+      el.innerHTML = `<b>${esc(c.name)}</b><i><u></u></i>`;
+      box.appendChild(el);
+      c.mateColor = MATE_COLORS[(i + 1) % MATE_COLORS.length];
+      G.mateTags.push({ c, el, bar: el.querySelector('u') });
+    });
+  }
+  G.player.mateColor = MATE_COLORS[0];
+  renderTeamHud(true);
+}
+function renderTeamHud(force) {
+  const box = $('#teamHud');
+  if (!G.player || G.teamSize <= 1) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const mates = teamOf(G.player);
+  const key = mates.map(c => `${c.alive ? 1 : 0}${Math.ceil(Math.max(0, c.hp) / 5)}|${Math.ceil(c.shield / 5)}`).join(',');
+  if (!force && key === G._teamKey) return;
+  G._teamKey = key;
+  box.innerHTML = `<div class="th-h">${TEAM_MODES.find(t => t.id === G.team).name.toUpperCase()}</div>` + mates.map(c => `<div class="tm ${c.alive ? '' : 'dead'}" style="--mc:${c.mateColor || '#fff'}">
+    <span class="dot"></span><span class="nm">${esc(c.name)}${c === G.player ? ' (tu)' : ''}</span>
+    <span class="bars"><i class="sh" style="width:${clamp(c.shield, 0, 100)}%"></i><i class="hp" style="width:${clamp(c.hp, 0, 100)}%"></i></span></div>`).join('');
+}
+const _tagV = new THREE.Vector3();
+function updateMateTags() {
+  if (!G.mateTags || !G.mateTags.length) return;
+  const W = innerWidth, H = innerHeight;
+  for (const t of G.mateTags) {
+    const c = t.c;
+    if (!c.alive || c.mode === 'bus' || G.state === 'end') { t.el.style.display = 'none'; continue; }
+    _tagV.set(c.pos.x, c.pos.y + 2.35, c.pos.z).project(camera);
+    if (_tagV.z > 1) { t.el.style.display = 'none'; continue; }
+    const x = clamp((_tagV.x * 0.5 + 0.5) * W, 30, W - 30), y = clamp((-_tagV.y * 0.5 + 0.5) * H, 30, H - 30);
+    const d = c.pos.distanceTo(camera.position);
+    t.el.style.display = '';
+    t.el.style.transform = `translate(${x.toFixed(0)}px,${y.toFixed(0)}px) translate(-50%,-100%) scale(${clamp(1.25 - d / 160, 0.7, 1.1).toFixed(2)})`;
+    t.el.dataset.d = d > 25 ? Math.round(d) + ' m' : '';
+    t.bar.style.width = clamp(c.hp, 0, 100) + '%';
+  }
+}
+
 function endMatch(win) {
   if (win && G.player && G.player.alive && G.player.mode === 'ground') startEmote(G.player, 'tifo');
   if (G.endShown) return;
@@ -3111,8 +3275,11 @@ function endMatch(win) {
   const place = win ? 1 : G.placement;
   $('#end').classList.toggle('win', win);
   $('#endPlace').textContent = '#' + place;
-  $('#endTitle').textContent = win ? 'VITTORIA REALE!' : 'ELIMINATO';
-  $('#endSub').textContent = win ? 'Sei l\'ultimo sopravvissuto. Leggendario! 🏆' : `Sei stato eliminato da ${G.killedBy}`;
+  const squad = G.teamSize > 1;
+  $('#endTitle').textContent = win ? 'VITTORIA REALE!' : (squad ? 'SQUADRA ELIMINATA' : 'ELIMINATO');
+  $('#endSub').textContent = win
+    ? (squad ? (p.alive ? 'La tua squadra è l\'ultima in piedi. Leggendari! 🏆' : 'I tuoi compagni hanno chiuso la partita: vittoria di squadra! 🏆') : 'Sei l\'ultimo sopravvissuto. Leggendario! 🏆')
+    : (squad ? `La tua squadra è caduta · ultimo colpo: ${G.killedBy}` : `Sei stato eliminato da ${G.killedBy}`);
   const surv = G.time;
   $('#endStats').innerHTML = `<div><b>${p.kills}</b><span>Uccisioni</span></div><div><b>${Math.round(p.damageDealt)}</b><span>Danni inflitti</span></div><div><b>${fmtTime(surv)}</b><span>Tempo</span></div><div><b>${G.chars.length}</b><span>Giocatori</span></div>`;
   // progressi: XP del pass, monete, missioni
@@ -3197,34 +3364,59 @@ function setLobbyLook(look) {
   $('#skinName').innerHTML = `${skin.name} · <span style="color:${RARITIES[skin.rarity].color}">${RARITIES[skin.rarity].name}</span>`;
 }
 function setLobbySkin(skin) { setLobbyLook({ skin: skin.id }); }
-/** compagni della lobby online ai lati del personaggio */
+/** v23: compagni di squadra (amici o bot) accanto al personaggio, avversari della lobby più indietro */
 let lobbyMatesKey = '';
+function lobbyTeamPlan() {
+  const team = NET.role === 'off' ? settings.team : NET.team;
+  const T = teamSize(team);
+  const mates = [], foes = [];
+  if (NET.role !== 'off') {
+    const vs = NET.vs || T === 1;
+    const tf = (i) => vs ? i : Math.floor(i / T);
+    const mi = Math.max(0, NET.players.findIndex(p => p.id === NET.myId));
+    NET.players.forEach((p, i) => { if (p.id !== NET.myId) (tf(i) === tf(mi) ? mates : foes).push(p); });
+  }
+  for (let i = mates.length; i < T - 1; i++) {
+    const sk = SKINS[(i * 7 + 3 + settings.skin.length) % SKINS.length];
+    mates.push({ id: 'bot' + i, name: 'BOT', skin: sk.id, hat: 'none', back: i === 1 ? 'tactical' : 'none', bot: true });
+  }
+  return { T, mates: mates.slice(0, 3), foes: foes.slice(0, 6) };
+}
+function nameSprite(text, color, bg = 'rgba(0,0,0,.55)') {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+  const g = cv.getContext('2d');
+  g.fillStyle = bg; g.beginPath(); g.roundRect(4, 8, 248, 48, 14); g.fill();
+  g.fillStyle = color; g.font = 'bold 28px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 128, 33);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+  sp.scale.set(1.2, 0.3, 1); sp.position.y = 2.35;
+  return sp;
+}
 function refreshLobbyMates() {
-  const others = NET.role === 'off' ? [] : NET.players.filter(p => p.id !== NET.myId).slice(0, 6);
-  const key = JSON.stringify(others.map(o => [o.id, o.skin, o.hat, o.back, o.name]));
+  const plan = lobbyTeamPlan();
+  const key = JSON.stringify([plan.mates.map(o => [o.id, o.skin, o.hat, o.back, o.name]), plan.foes.map(o => [o.id, o.skin, o.hat, o.back, o.name])]);
   if (key === lobbyMatesKey) return;
   lobbyMatesKey = key;
   for (const m of lobby.mates) lobby.scene.remove(m.root);
   lobby.mates = [];
-  const SPOTS = [[1.7, -0.9], [3.0, -1.7], [4.3, -2.6], [1.1, -2.8], [2.5, -3.5], [3.9, -4.3]];
-  others.forEach((o, i) => {
+  const SQUAD = plan.mates.length === 1 ? [[1.1, -0.5]] : [[-1.05, -0.5], [1.05, -0.5], [2.05, -1.45]];
+  const FAR = [[2.3, -3.6], [-2.3, -3.6], [1.1, -4.6], [-1.1, -4.6], [3.0, -5.6], [-3.0, -5.6]];   // dentro lo spazio libero tra i pannelli
+  const add = (o, spot, tag, color, bg) => {
     const c = buildCharacter(SKINS.find(s => s.id === o.skin) || SKINS[0], { hat: o.hat, back: o.back });
-    c.root.position.set(SPOTS[i][0], 0, SPOTS[i][1]);
-    c.root.rotation.y = -0.45;
+    c.root.position.set(spot[0], 0, spot[1]);
+    c.root.rotation.y = -Math.sign(spot[0]) * 0.35;
     c.root.traverse(q => { if (q.isMesh) q.castShadow = true; });
-    // targhetta con il nome
-    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
-    const g = cv.getContext('2d');
-    g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.roundRect(4, 8, 248, 48, 14); g.fill();
-    g.fillStyle = o.host ? '#ffcf2e' : '#ffffff'; g.font = 'bold 28px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText((o.host ? '★ ' : '') + o.name, 128, 33);
-    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-    sp.scale.set(1.2, 0.3, 1); sp.position.y = 2.35; c.root.add(sp);
+    c.root.add(nameSprite(tag, color, bg));
     c.phase = Math.random() * 6;
+    c.appear = 0;
+    c.root.scale.setScalar(0.001);
     lobby.scene.add(c.root);
     lobby.mates.push(c);
-  });
+  };
+  plan.mates.forEach((o, i) => add(o, SQUAD[i], o.bot ? 'BOT' : (o.host ? '★ ' : '') + o.name, o.bot ? '#bfc8e0' : MATE_COLORS[(i + 1) % MATE_COLORS.length]));
+  plan.foes.forEach((o, i) => add(o, FAR[i], 'VS · ' + o.name, '#ffffff', 'rgba(200,30,50,.75)'));
+  lobby.squadN = plan.mates.length;
 }
 lobby.mates = [];
 canvas.addEventListener('pointerdown', () => { if (G.state === 'menu') lobby.drag = true; });
@@ -3239,7 +3431,12 @@ addEventListener('pointerup', () => { lobby.drag = false; });
 function renderLobby(dt) {
   const c = lobby.char;
   const t = performance.now() / 1000;
-  lobby.rot += lobby.rotV + dt * 0.35;
+  // v23: con i compagni in lobby il personaggio resta rivolto verso la camera (si può comunque girare trascinando)
+  const faceFront = menuApi && menuApi.tab() === 'play' && lobby.squadN > 0;
+  if (faceFront && Math.abs(lobby.rotV) < 0.004) {
+    const front = Math.round(lobby.rot / (Math.PI * 2)) * Math.PI * 2 + Math.sin(t * 0.5) * 0.18;
+    lobby.rot += (front - lobby.rot) * Math.min(1, dt * 3) + lobby.rotV;
+  } else lobby.rot += lobby.rotV + dt * 0.35;
   lobby.rotV *= 0.9;
   if (c) {
     c.root.rotation.y = lobby.rot;
@@ -3257,7 +3454,12 @@ function renderLobby(dt) {
     c.head.rotation.y = Math.sin(t * 0.7) * 0.25;
     if (c.cape) c.cape.rotation.x = 0.12 + Math.sin(t * 1.5) * 0.05;
   }
+  const tab0 = menuApi ? menuApi.tab() : 'play';
   for (const m of lobby.mates) {
+    m.root.visible = tab0 === 'play';
+    m.appear = Math.min(1, m.appear + dt * 2.2);
+    const e = 1 - Math.pow(1 - m.appear, 3);
+    m.root.scale.setScalar(Math.max(0.001, e * (1 + Math.sin(m.appear * Math.PI) * 0.08)));
     resetPose(m);
     const tt = t + m.phase;
     poseHold(m, -0.3, 0, 0, 0);
@@ -3268,10 +3470,13 @@ function renderLobby(dt) {
   lobby.stars.rotation.y = t * 0.02;
   // personaggio centrato nello spazio libero tra i pannelli (metri per pixel alla distanza della camera)
   const tab = menuApi ? menuApi.tab() : 'play';
-  const mpp = 2 * 7.4 * Math.tan(THREE.MathUtils.degToRad(lobby.cam.fov / 2)) / innerHeight;
+  // con la squadra la camera si allontana un po' per inquadrare tutti
+  const wantZ = tab === 'play' ? 7.4 + (lobby.squadN || 0) * 1.1 : 7.4;
+  lobby.cam.position.z += (wantZ - lobby.cam.position.z) * Math.min(1, dt * 4);
+  const mpp = 2 * lobby.cam.position.z * Math.tan(THREE.MathUtils.degToRad(lobby.cam.fov / 2)) / innerHeight;
   let sx = 0, ly = 0.95;
   if (innerWidth > 900) {
-    if (tab === 'play') sx = -((380 + 34) - (340 + 34)) / 2 * mpp;
+    if (tab === 'play') sx = -((380 + 34) - (340 + 34)) / 2 * mpp + (lobby.squadN === 1 ? 0.5 : lobby.squadN === 3 ? 0.45 : 0);
     else if (tab === 'pass') { sx = 0; ly = 0.15; }
     else sx = (440 + 34) / 2 * mpp;
   }

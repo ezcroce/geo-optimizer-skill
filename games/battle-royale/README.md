@@ -24,6 +24,25 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: squadre (Duo, Trio, Squad), Versus e lobby nuova
+
+- **Modalità a squadre** nella scheda GIOCA: *Singolo*, *Duo*, *Trio* e *Squad* (squadre da 1, 2, 3 o 4 su 100 giocatori). Vince l'ultima squadra in piedi.
+  - Offline i posti liberi della tua squadra sono **bot compagni**: ti seguono, saltano dal Battle Bus con te e ti aiutano negli scontri.
+  - **Niente fuoco amico**. I compagni hanno una **targhetta col nome** sopra la testa, sono nell'**HUD squadra** a sinistra con la salute e compaiono come punti colorati sulla minimappa.
+  - Quando muori **guardi un compagno** ancora vivo. Se cade tutta la squadra compare *SQUADRA ELIMINATA* con il piazzamento.
+- **Online con gli amici**: l'host sceglie la modalità.
+  - **Squadra**: gli amici giocano insieme nella stessa squadra, con i bot a riempire i posti.
+  - **Versus**: ogni amico guida la propria squadra di bot e vi affrontate.
+- **Lobby ridisegnata**:
+  - I compagni (amici o bot) stanno accanto al tuo personaggio sulla pedana, con targhetta e animazione d'entrata. Gli avversari del Versus stanno più indietro.
+  - Sotto ci sono gli slot squadra (*Invita* per i posti liberi) e il riepilogo della partita.
+  - A destra c'è il **cartello delle Novità** a scorrimento: toccalo per leggere tutte le versioni.
+- **Skin più realistiche**:
+  - Le stoffe hanno **pieghe, cuciture e ombre** nei punti di contatto.
+  - Scarpe con suola in gomma e intersuola, stivali da cowboy in pelle con tacco.
+  - Cappellino a 6 spicchi con visiera curva; cappelli e zaini in tessuti veri (ripstop, cordura, paglia, maglia).
+  - Zaino da scuola con cerniere, tasca e catarifrangente.
+
 ### Novità: inventario (TAB), legno e rocce rifatti
 
 - **Inventario con <kbd>TAB</kbd>** (sul telefono c'è il pulsante 🎒 in alto). Si apre un pannello con i 5 slot, che mostrano l'icona 3D, il colore della rarità, il caricatore, le munizioni di riserva e le quantità.

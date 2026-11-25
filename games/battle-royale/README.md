@@ -24,6 +24,17 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: erba in 3D, accessori, ottiche rifinite e sottobosco
+
+- **Erba davvero tridimensionale**: ogni filo ora ha una sezione a "V" con la nervatura centrale, due metà con luce diversa e una leggera traslucenza, così resta pieno da ogni angolazione invece di sembrare un foglio piatto.
+- **Accessori sulle armi** (solo estetici): torce tattiche con lente accesa, moduli laser rossi o verdi, impugnature verticali e angolate, copriottiche ribaltabili sul fucile da cecchino, magliette per la cinghia e una cinghia di cuoio sul fucile da caccia.
+- **Ottiche rifinite**: torrette di regolazione e riflessi ambrati sul red dot, cappuccio con pulsanti sull'olografico, scala di distanza sul prismatico, alette di protezione sulle mire metalliche.
+- **5 nuovi cappelli**: basco, elmetto tattico con visore notturno, cappello di Natale, orecchie da volpe e kabuto da samurai.
+- **4 nuovi oggetti sulla schiena**: zaino tattico con radio, faretra con frecce, tavola da surf e scudo del guerriero. Gli zaini hanno spallacci e cinghia sternale sul petto, gli oggetti a tracolla una cinghia in diagonale; zainetto e zaino da trekking hanno tasche, cerniere, telaio e borraccia.
+- **Mappa**: funghi (porcini e amanite), ceppi con radici e muschio, felci nel sottobosco dei boschi.
+- **Battle Bus**: adesivi sui fianchi, bottazzi in gomma cromati, fango sulla parte bassa e barra luminosa sul tetto.
+- **Personaggi**: la trama della mimetica non forma più una griglia chiara; nuovi suoni per il fucile a raffica e lo shotgun a tamburo.
+
 ### Novità: 15 armi con mirini propri, animazioni direzionali e Battle Bus più ricco
 
 - **9 nuove armi**, ognuna con pro e contro diversi:
@@ -103,7 +114,7 @@ python3 -m http.server 8080
 - **Pass battaglia** con 40 livelli, una fila gratuita e una premium (950 monete), con skin, cappelli, zaini, deltaplani e monete. Gli XP si guadagnano giocando (sopravvivenza, eliminazioni, forzieri, danni, piazzamento) e con le missioni.
 - **Negozio** a rotazione giornaliera, con 2 offerte in evidenza (una scontata) e 4 giornaliere, e **monete** guadagnate a ogni partita.
 - **Missioni**: 3 giornaliere e 3 settimanali (eliminazioni, forzieri, erba alta, arrampicata, colpi alla testa, partite in Random Map o online…), con notifiche durante la partita.
-- **Armadietto** con 24 skin, 12 cappelli, 8 zaini e 7 deltaplani: quelli bloccati si possono provare in anteprima e mostrano come sbloccarli.
+- **Armadietto** con 24 skin, 17 cappelli, 12 zaini e 7 deltaplani: quelli bloccati si possono provare in anteprima e mostrano come sbloccarli.
 - **Erba alta**: macchie d'erba di circa 1,4 m nei prati. Se ti accovacci (C) dentro, sei *nascosto*: i bot ti vedono solo entro 10 m, o 25 m se hai appena sparato.
 - **Personaggi più realistici**: corpo arrotondato con articolazioni (gomiti, ginocchia, mani, piedi). Le animazioni sono nuove: camminata e corsa con le ginocchia, passo laterale, respiro, atterraggio, accovacciamento con il busto in avanti, arrampicata mano sopra mano e scavalcamento del bordo.
 - I progressi si salvano nel browser (localStorage).

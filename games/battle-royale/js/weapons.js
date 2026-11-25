@@ -4,8 +4,8 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { WEAPONS, RARITIES } from './config.js?v=15';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=15';
+import { WEAPONS, RARITIES } from './config.js?v=16';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=16';
 
 /** quante volte la texture si ripete in un metro di superficie */
 const UVK = 5;
@@ -463,10 +463,91 @@ const MODELS = {
 
 const GEO = new Map();
 /** geometrie unite per materiale (condivise da tutte le rarità della stessa arma) */
+// ───────────── accessori (solo estetici) ─────────────
+//  Laser, torce, impugnature, copriottiche e cinghie montati sopra i modelli base.
+//  Materiali in più: lens vetro acceso della torcia, gdot laser verde, l cuoio.
+function ring(r, x, y, z, t = 0.0028) { const g = new THREE.TorusGeometry(r, t, 4, 12); g.rotateY(Math.PI / 2); g.translate(x, y, z); return finish(g); }
+/** modulo laser: corpo, attacco, emettitore acceso e lente IR; (x, y, z) = centro, punta verso +z */
+function laser(P, x, y, z, beam = 'dot') {
+  P('k', bx(0.026, 0.03, 0.07, x, y, z));
+  P('m', bx(0.02, 0.006, 0.05, x, y + 0.017, z));
+  P(beam, cyl(0.0055, 0.0055, z + 0.035, z + 0.038, { x, y: y + 0.006, seg: 8 }));
+  P('g', cyl(0.0065, 0.0065, z + 0.035, z + 0.037, { x, y: y - 0.007, seg: 8 }));
+  P('r', bx(0.004, 0.008, 0.012, x + Math.sign(x || 1) * 0.014, y + 0.004, z - 0.016));
+}
+/** torcia tattica: corpo zigrinato, testa più larga, lente accesa, pulsante posteriore; z = fronte */
+function torch(P, x, y, z, len = 0.1, r = 0.016) {
+  P('k', cyl(r, r, z - len, z - 0.022, { x, y, seg: 12 }));
+  P('k', cyl(r, r * 1.3, z - 0.022, z - 0.006, { x, y, seg: 12 }));
+  P('m', cyl(r * 1.36, r * 1.36, z - 0.006, z, { x, y, seg: 12 }));
+  P('lens', cyl(r * 1.1, r * 1.1, z, z + 0.002, { x, y, seg: 12 }));
+  for (let i = 0; i < 3; i++) P('m', cyl(r * 1.04, r * 1.04, z - len + 0.015 + i * 0.014, z - len + 0.02 + i * 0.014, { x, y, seg: 12 }));
+  P('p', cyl(r * 0.7, r * 0.7, z - len - 0.008, z - len, { x, y, seg: 10 }));
+}
+/** impugnatura verticale con anelli in gomma */
+function vgrip(P, y, z, h = 0.11) {
+  P('m', bx(0.03, 0.014, 0.05, 0, y - 0.006, z));
+  P('p', cylY(0.017, h, 0, y - h / 2 - 0.01, z, 10));
+  for (let i = 0; i < 4; i++) P('k', cylY(0.0182, 0.006, 0, y - 0.035 - i * 0.02, z, 10));
+  P('k', cylY(0.02, 0.01, 0, y - h - 0.01, z, 10));
+}
+/** impugnatura angolata */
+function agrip(P, y, z) {
+  P('p', prof([[z - 0.065, y + 0.002], [z + 0.035, y + 0.002], [z + 0.04, y - 0.012], [z - 0.035, y - 0.052], [z - 0.07, y - 0.046]], 0.034, { bevel: 0.006 }));
+  P('k', bx(0.036, 0.006, 0.09, 0, y - 0.002, z - 0.012));
+}
+/** copriottica ribaltabile aperto sopra la lente */
+function flipCap(P, y, z, r, dir = 1) {
+  P('k', cylY(r + 0.004, 0.006, 0, y + r + 0.012, z + dir * (r + 0.006)));
+  P('m', bx(0.012, 0.014, 0.012, 0, y + r + 0.004, z));
+}
+const ACCESSORIES = {
+  pistol(P) { P('k', bx(0.03, 0.014, 0.07, 0, -0.049, 0.2)); torch(P, 0, -0.066, 0.272, 0.11, 0.017); },
+  smg(P) {
+    P('k', bx(0.016, 0.02, 0.04, 0.046, 0.02, 0.26)); laser(P, 0.064, 0.02, 0.26);
+    for (const x of [-0.012, 0.012]) P('r', bx(0.01, 0.008, 0.01, x, 0.09, -0.034));     // tasti dell'olografico
+    P('k', cylX(0.012, 0.03, 0.04, 0.1, 0.0));                                              // batteria
+  },
+  ar(P) {
+    vgrip(P, -0.046, 0.5);
+    P('k', bx(0.016, 0.02, 0.05, -0.044, 0.03, 0.6)); torch(P, -0.062, 0.03, 0.665, 0.1, 0.016);
+    P('m', cylY(0.009, 0.014, 0, 0.152, 0.14)); P('m', cylX(0.009, 0.014, 0.031, 0.122, 0.14));   // torrette del red dot
+    P('m', ring(0.012, 0.04, -0.03, -0.44)); P('m', ring(0.012, -0.04, 0.0, 0.64));
+  },
+  shotgun(P) {
+    P('k', bx(0.07, 0.078, 0.022, -0.014, 0.003, 0.75)); torch(P, -0.045, 0.004, 0.79, 0.09, 0.015);
+    P('m', ring(0.012, 0, -0.145, -0.4)); P('m', ring(0.011, 0, -0.06, 0.81));
+  },
+  sniper(P) {
+    flipCap(P, 0.115, 0.425, 0.048, 1); flipCap(P, 0.115, -0.165, 0.038, -1);
+    P('m', ring(0.013, 0, -0.165, -0.4)); P('m', ring(0.012, 0, -0.058, 0.4));
+    laser(P, -0.05, 0.03, 0.36, 'gdot'); P('k', bx(0.02, 0.016, 0.04, -0.034, 0.03, 0.36));
+  },
+  compact(P) { laser(P, 0, -0.055, 0.2); },
+  burst(P) { P('k', bx(0.014, 0.02, 0.04, 0.046, 0.0, 0.14)); laser(P, 0.062, 0.0, 0.14); },
+  heavyar(P) { P('k', bx(0.03, 0.02, 0.05, 0, -0.054, 0.46)); torch(P, 0, -0.07, 0.51, 0.1, 0.016); },
+  dmr(P) {
+    agrip(P, -0.046, 0.52);
+    P('k', bx(0.016, 0.02, 0.04, -0.044, 0.02, 0.7)); laser(P, -0.06, 0.02, 0.7, 'gdot');
+    P('m', ring(0.012, 0, -0.06, 0.74));
+  },
+  tactical(P) { P('k', bx(0.03, 0.05, 0.022, 0, -0.045, 0.66)); torch(P, 0, -0.068, 0.71, 0.09, 0.015); },
+  drum(P) { P('k', bx(0.016, 0.02, 0.04, -0.05, 0.03, 0.26)); laser(P, -0.066, 0.03, 0.26, 'gdot'); },
+  hunting(P) {
+    // cinghia di cuoio che pende sotto l'arma, con le magliette d'acciaio
+    const curve = new THREE.CatmullRomCurve3([[-0.44, -0.165], [-0.25, -0.215], [0.0, -0.21], [0.22, -0.15], [0.42, -0.045]].map(([z, y]) => new THREE.Vector3(0, y, z)));
+    const tg = new THREE.TubeGeometry(curve, 28, 0.0065, 5, false); tg.scale(2.2, 1, 1);
+    P('l', finish(tg));
+    P('m', ring(0.012, 0, -0.152, -0.44)); P('m', ring(0.011, 0, -0.035, 0.42));
+  },
+};
+
 function weaponGeo(id) {
   if (GEO.has(id)) return GEO.get(id);
   const byKey = new Map();
-  MODELS[id]((k, g) => { if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(g); });
+  const push = (k, g) => { if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(g); };
+  MODELS[id](push);
+  if (ACCESSORIES[id]) ACCESSORIES[id](push);
   const out = [];
   for (const [k, list] of byKey) {
     const g = list.length === 1 ? list[0] : mergeGeometries(list, false);
@@ -700,6 +781,9 @@ function weaponMats(rarity) {
     sh: std({ color: '#c0302a', roughness: 0.5 }),
     wh: std({ color: '#dcd8cc', roughness: 0.45, metalness: 0.1 }),
     y: std({ color: '#f2c230', roughness: 0.5 }),
+    lens: std({ color: '#fff8e0', emissive: '#fff0c0', emissiveIntensity: 1.6, roughness: 0.1 }),
+    gdot: std({ color: '#3aff5a', emissive: '#3aff5a', emissiveIntensity: 2 }),
+    l: std({ color: '#5a3820', roughness: 0.68, metalness: 0.02 }),
   };
   MATS.set(rarity, m);
   return m;

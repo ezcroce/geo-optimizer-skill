@@ -3,9 +3,9 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=15';
-import { makeNoise, fbm, ridged } from './noise.js?v=15';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=15';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=16';
+import { makeNoise, fbm, ridged } from './noise.js?v=16';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=16';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -1856,39 +1856,50 @@ export function buildWorld(scene, opts = {}) {
    * Le normali sono a metà tra "verso l'alto" e la faccia del filo, così ogni filo prende la luce
    * in modo diverso secondo l'orientamento (volume invece di un tappeto piatto).
    */
-  function makeTuft(blades, seed, h0 = 0.32, hr = 0.42, rad = 0.16, wMul = 1, dryK = 0.18) {
+  function makeTuft(blades, seed, h0 = 0.32, hr = 0.42, rad = 0.16, wMul = 1, dryK = 0.18, lite = false) {
+    // fili veri in 3D: sezione a "V" (piegati lungo la nervatura centrale), 4 segmenti curvi,
+    // ogni metà ha la sua normale → un lato prende luce e l'altro resta in ombra, come l'erba vera
     const rnd = mulberry32(seed);
     const P = [], C = [], N = [];
+    const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _n = new THREE.Vector3();
     for (let b = 0; b < blades; b++) {
-      const a = rnd() * 6.283, r0 = Math.sqrt(rnd()) * rad, h = h0 + rnd() * hr, w = (0.032 + rnd() * 0.024) * wMul;
-      const lean = 0.1 + rnd() * 0.32, la = a + (rnd() - 0.5) * 0.9;
+      const a = rnd() * 6.283, r0 = Math.sqrt(rnd()) * rad, h = h0 + rnd() * hr, w = (0.034 + rnd() * 0.026) * wMul;
+      const lean = 0.12 + rnd() * 0.36, la = a + (rnd() - 0.5) * 0.9;
       const bx = Math.cos(a) * r0, bz = Math.sin(a) * r0;
-      const fa = rnd() * 6.283;                                   // orientamento della lama
-      const px = Math.cos(fa) * w, pz = Math.sin(fa) * w;         // larghezza
-      const fnx = -Math.sin(fa), fnz = Math.cos(fa);              // normale della faccia
+      const fa = la + Math.PI / 2 + (rnd() - 0.5) * 0.8;        // la lama guarda verso dove si piega
+      const px = Math.cos(fa) * w, pz = Math.sin(fa) * w;         // mezza larghezza
+      const fnx = -Math.sin(fa), fnz = Math.cos(fa);              // lato della piega (nervatura in fuori)
       const lx = Math.cos(la) * lean, lz = Math.sin(la) * lean;   // curvatura
-      const tone = 0.9 + rnd() * 0.24, dry = rnd() < dryK ? 1 : 0;
-      // punti lungo il filo: t, larghezza relativa, colore
-      const st = [[0, 1, 0.4], [0.38, 0.82, 0.68], [0.72, 0.5, 0.92], [1, 0, 1.15]];
+      const fold = 0.55 + rnd() * 0.35;                           // profondità della V
+      const tone = 0.88 + rnd() * 0.26, dry = rnd() < dryK ? 1 : 0;
+      // punti lungo il filo: t, larghezza relativa, luminosità
+      const st = lite ? [[0, 0.9, 0.36], [0.5, 0.85, 0.78], [1, 0, 1.15]] : [[0, 0.85, 0.32], [0.28, 1, 0.58], [0.55, 0.85, 0.8], [0.8, 0.52, 0.98], [1, 0, 1.18]];
       const ring = st.map(([t, k, c]) => {
-        const cx = bx + lx * t * t, cz = bz + lz * t * t, y = h * t * (1 - lean * 0.25 * t);
-        return [[cx - px * k, y, cz - pz * k], [cx + px * k, y, cz + pz * k], c];
+        const cx = bx + lx * t * t, cz = bz + lz * t * t, y = h * t * (1 - lean * 0.28 * t);
+        const m = w * fold * k;
+        return { L: [cx - px * k, y, cz - pz * k], M: [cx + fnx * m, y + w * 0.15 * k, cz + fnz * m], R: [cx + px * k, y, cz + pz * k], c };
       });
-      const nUp = 0.62, nS = 0.5;
-      const push = (v, c, ti) => {
-        P.push(v[0], v[1], v[2]);
-        const nx = fnx * nS + lx * 0.3 * ti, nz = fnz * nS + lz * 0.3 * ti, ny = nUp, l = Math.hypot(nx, ny, nz);
-        N.push(nx / l, ny / l, nz / l);
-        const cc = c * tone;
-        C.push(cc * (dry ? 1.18 : 1), cc * (dry ? 1.05 : 1), cc * (dry ? 0.7 : 1));
+      const tri = (v0, c0, v1, c1, v2, c2) => {
+        _a.set(v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]);
+        _b.set(v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]);
+        _n.crossVectors(_a, _b).normalize();
+        if (_n.x * fnx + _n.z * fnz < 0) _n.negate();             // normale verso il lato esterno della V
+        _n.y = _n.y * 0.7 + 0.32; _n.normalize();                 // un po' verso l'alto: niente fili neri controluce
+        for (const [v, c] of [[v0, c0], [v1, c1], [v2, c2]]) {
+          P.push(v[0], v[1], v[2]); N.push(_n.x, _n.y, _n.z);
+          const cc = c * tone;
+          C.push(cc * (dry ? 1.18 : 1), cc * (dry ? 1.05 : 1), cc * (dry ? 0.68 : 1));
+        }
       };
-      for (let i = 0; i < 3; i++) {
-        const A = ring[i], B = ring[i + 1], ta = st[i][0], tb = st[i + 1][0];
-        if (i < 2) {
-          push(A[0], A[2], ta); push(A[1], A[2], ta); push(B[1], B[2], tb);
-          push(A[0], A[2], ta); push(B[1], B[2], tb); push(B[0], B[2], tb);
+      for (let i = 0; i < ring.length - 1; i++) {
+        const A = ring[i], B = ring[i + 1];
+        // metà sinistra (L-M) e destra (M-R); la nervatura è un po' più chiara
+        const cm = 1.07;
+        if (i < ring.length - 2) {
+          tri(A.L, A.c, A.M, A.c * cm, B.M, B.c * cm); tri(A.L, A.c, B.M, B.c * cm, B.L, B.c);
+          tri(A.M, A.c * cm, A.R, A.c, B.R, B.c); tri(A.M, A.c * cm, B.R, B.c, B.M, B.c * cm);
         } else {
-          push(A[0], A[2], ta); push(A[1], A[2], ta); push(B[0], B[2], tb);
+          tri(A.L, A.c, A.M, A.c * cm, B.M, B.c); tri(A.M, A.c * cm, A.R, A.c, B.M, B.c);
         }
       }
     }
@@ -1920,18 +1931,21 @@ export function buildWorld(scene, opts = {}) {
     return g;
   }
   const tuftGeo = makeTuft(9, 9001, 0.3, 0.42, 0.22);
-  const tuftFarGeo = makeTuft(6, 9002, 0.34, 0.4, 0.26, 1.25);
+  const tuftFarGeo = makeTuft(6, 9002, 0.34, 0.4, 0.26, 1.25, 0.18, true);
   const tallGeo = makeTuft(7, 4242, 0.85, 0.6, 0.3, 1.5, 0.3);   // erba alta: fili fino a 1,45 m
   const flowerGeo = makeFlower();
   /** materiale dell'erba: vento a raffiche, si piega attorno al giocatore e sfuma con la distanza */
-  function grassMaterial(fade0, fade1, key, sway = 0.55, scaled = true) {
+  function grassMaterial(fade0, fade1, key, sway = 0.55, scaled = true, flat = false) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uWind = WIND;
       sh.uniforms.uPlayer = GRASS_PLAYER;
       sh.uniforms.uFadeK = GRASS_FADE;
-        // i fili sono sottili e a doppia faccia: la normale resta sempre verso l'alto (niente retro scuro)
-      sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('float faceDirection = gl_FrontFacing ? 1.0 : - 1.0;', 'float faceDirection = 1.0;'));
+      // doppia faccia: si usa sempre la normale "esterna" della V (le due metà del filo restano
+      // una più chiara e una più scura da qualunque lato le guardi); un filo di traslucenza nelle foglie
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('float faceDirection = gl_FrontFacing ? 1.0 : - 1.0;', 'float faceDirection = 1.0;'))
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + (flat ? '' : ' totalEmissiveRadiance += diffuseColor.rgb * vec3(0.04, 0.07, 0.015);'));
     sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\nuniform float uWind;\nuniform vec3 uPlayer;\nuniform float uFadeK;')
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -1959,7 +1973,8 @@ export function buildWorld(scene, opts = {}) {
   }
   const grassNearMat = grassMaterial(42, 62, 'near');
   const grassFarMat = grassMaterial(140, 190, 'far', 0.55, false);
-  const flowerMat = grassMaterial(40, 60, 'flower');
+  const flowerMat = grassMaterial(40, 60, 'flower', 0.55, true, true);
+  const fernMat = grassMaterial(46, 66, 'fern', 0.22);
   const tallMat = grassMaterial(95, 135, 'tall', 0.16, false);
   /** dove può crescere l'erba (niente acqua, sabbia, rocce ripide, neve, strade e piazze) */
   function grassOK(x, z, h, slope = 0) {
@@ -1991,6 +2006,36 @@ export function buildWorld(scene, opts = {}) {
     const gm = new THREE.InstancedMesh(tuftGeo, grassNearMat, NT);
     const fm = new THREE.InstancedMesh(flowerGeo, flowerMat, NF);
     const pm = new THREE.InstancedMesh(PROPS.pebbles, rockMaterial, NP);
+    // dettagli del sottobosco: funghi, ceppi e felci (solo estetici, senza collisioni)
+    const NMx = 5, NSx = 2, NFe = Math.round(10 * Math.min(1, QUALITY.grassDens / 0.8));
+    const mm = PROPS.mushrooms.map(g => new THREE.InstancedMesh(g, propMaterial, NMx));
+    const sm = PROPS.stumps.map(g => new THREE.InstancedMesh(g, propMaterial, NSx));
+    const fe = new THREE.InstancedMesh(PROPS.fern, fernMat, Math.max(1, NFe));
+    const mc = mm.map(() => 0), scnt = sm.map(() => 0); let nfe = 0;
+    {
+      const rnd2 = mulberry32((gx * 19349663) ^ (gz * 83492791) ^ 0x1234567);
+      for (let i = 0; i < NMx * 2 + NSx * 2 + NFe; i++) {
+        const x = x0 + rnd2() * GCELL, z = z0 + rnd2() * GCELL, r1 = rnd2(), r2 = rnd2();
+        const h = terrainHeight(x, z);
+        if (!grassOK(x, z, h) || underBox(x, z, h) || inTown(x, z, 2)) continue;
+        const b = biomeAt(x, z);
+        if (b[2] > 0.45 || b[1] > 0.6) continue;                 // niente sottobosco nel deserto e sulla neve
+        const forest = forestK(x, z);
+        q.setFromAxisAngle(up, r1 * 6.28);
+        if (i < NMx * 2) {                                      // funghi nelle zone più ombrose
+          if (forest < 0.55) continue;
+          const k = Math.floor(r2 * 3 * 0.999), im = mm[k]; if (mc[k] >= NMx) continue;
+          const s = 0.8 + r2 * 0.6; sc.set(s, s, s); p.set(x, h - 0.02, z); mat4.compose(p, q, sc); im.setMatrixAt(mc[k]++, mat4);
+        } else if (i < NMx * 2 + NSx * 2) {                     // ceppi
+          if (forest < 0.7) continue;
+          const k = r2 < 0.5 ? 0 : 1; if (scnt[k] >= NSx) continue;
+          const s = 0.85 + r2 * 0.5; sc.set(s, s, s); p.set(x, h - 0.05, z); mat4.compose(p, q, sc); sm[k].setMatrixAt(scnt[k]++, mat4);
+        } else {                                                // felci
+          if (forest < 0.45 || b[3] > 0.5 || nfe >= NFe) continue;
+          const s = 0.8 + r2 * 0.7; sc.set(s, s * (0.8 + r1 * 0.4), s); p.set(x, h - 0.03, z); mat4.compose(p, q, sc); fe.setMatrixAt(nfe++, mat4);
+        }
+      }
+    }
     let n = 0, nf = 0, np = 0;
     const flowerCols = ['#ffffff', '#ffe14d', '#ff7eb6', '#b48cff', '#ff6a4d'];
     const fpatch = patch(x0 + 16, z0 + 16, 0.05, 3.3);      // alcune zone più fiorite
@@ -2023,7 +2068,8 @@ export function buildWorld(scene, opts = {}) {
       gm.setColorAt(n, col.multiplyScalar(1.05 + r3 * 0.2));
       n++;
     }
-    for (const [im, cnt] of [[gm, n], [fm, nf], [pm, np]]) {
+    for (const [im, cnt] of [[gm, n], [fm, nf], [pm, np], [fe, nfe], ...mm.map((im, k) => [im, mc[k]]), ...sm.map((im, k) => [im, scnt[k]])]) {
+      if (im !== gm && im !== fm && im !== fe && im !== pm) im.castShadow = cnt > 0;
       im.count = cnt;
       if (!cnt) continue;
       if (im.instanceColor) im.instanceColor.needsUpdate = true;
@@ -2032,7 +2078,7 @@ export function buildWorld(scene, opts = {}) {
       grp.add(im);
     }
     scene.add(grp);
-    return { grp, ims: [gm, fm, pm] };
+    return { grp, ims: [gm, fm, pm, fe, ...mm, ...sm] };
   }
   function disposeGrassCell(c) {
     scene.remove(c.grp);

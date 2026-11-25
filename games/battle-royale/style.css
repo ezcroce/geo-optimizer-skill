@@ -623,3 +623,18 @@ body.touch #fps { top: auto; bottom: 4px; left: 50%; transform: translateX(-50%)
 #scope[data-s=vintage] .ret::before { content: ''; position: absolute; left: calc(50% - 1.6vh); top: calc(62% - 1.6vh); width: 3.2vh; height: 2vh; background: #0d0a06; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 #scope[data-s=vintage] .mag { color: rgba(230,190,110,.75); }
 #rangeInfo.sighted { top: calc(50% + 112px); }
+
+/* ───── rifiniture delle ottiche (v20): torrette, cappucci, riflessi del vetro ───── */
+#sight .o::before, #sight .o::after { pointer-events: none; }
+/* red dot: torrette di regolazione in alto e a destra, riflesso ambrato sul bordo della lente */
+#sight[data-s=reddot] .o::before { content: ''; position: absolute; left: 50%; top: -34px; width: 34px; height: 22px; transform: translateX(-50%); border-radius: 6px 6px 2px 2px; background: repeating-linear-gradient(to right, #1c1f22 0 3px, #2c3035 3px 5px); box-shadow: 0 0 0 2px #30343a; }
+#sight[data-s=reddot] .o::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.10), transparent 22%), radial-gradient(circle, transparent 72%, rgba(255,160,60,.16) 92%); box-shadow: 99px 0 0 -2px transparent; }
+#sight[data-s=reddot] .r { box-shadow: 0 0 6px 2px rgba(255,40,30,.75), 0 0 0 1px rgba(255,200,180,.35); }
+/* olografico: cappuccio con pulsanti e vano batteria, lente con riflesso bluastro */
+#sight[data-s=holo] .o::before { content: ''; position: absolute; left: 50%; bottom: -27px; width: 74px; height: 16px; transform: translateX(-50%); border-radius: 3px; background: radial-gradient(circle at 18px 8px, #4a4f56 0 4px, transparent 5px), radial-gradient(circle at 56px 8px, #4a4f56 0 4px, transparent 5px), #0f1113; box-shadow: 0 0 0 1px #2b2f34; }
+#sight[data-s=holo] .o::after { content: ''; position: absolute; inset: 0; border-radius: 2px; background: linear-gradient(125deg, rgba(160,220,255,.13), transparent 30%, transparent 70%, rgba(160,220,255,.08)); }
+/* prismatico: torretta, scala di distanza sotto il reticolo e vetro verdastro */
+#sight[data-s=tri] .o::before { content: ''; position: absolute; left: 50%; top: -36px; width: 40px; height: 20px; transform: translateX(-50%); border-radius: 6px 6px 2px 2px; background: repeating-linear-gradient(to right, #1a1c1e 0 3px, #2e3236 3px 5px); box-shadow: 0 0 0 2px #303438; }
+#sight[data-s=tri] .o::after { content: ''; position: absolute; left: 50%; top: 92px; width: 2px; height: 0; transform: translateX(-50%); box-shadow: -14px -26px 0 1px rgba(107,255,107,.85), 14px -26px 0 1px rgba(107,255,107,.85), -9px -14px 0 1px rgba(107,255,107,.7), 9px -14px 0 1px rgba(107,255,107,.7); }
+/* mire metalliche: alette di protezione ai lati del mirino */
+#sight[data-s=iron] .r::after { content: ''; position: absolute; left: -10px; top: 8px; width: 32px; height: 60px; border-left: 4px solid #2a2d31; border-right: 4px solid #2a2d31; border-radius: 10px 10px 0 0; -webkit-mask: linear-gradient(#000 40%, transparent); mask: linear-gradient(#000 40%, transparent); }

@@ -1,11 +1,11 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=15';
-import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=15';
+import { normalFromHeight, NORMALS } from './texgen.js?v=16';
+import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=16';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=15';
-import { mergeParts } from './props.js?v=15';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=16';
+import { mergeParts } from './props.js?v=16';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -1041,6 +1041,9 @@ function buildHat(id, skin, head) {
       mesh(cylGeo(0.36, 0.36, 0.02, 20), l, 0, 0.02, 0, g, 1, 1, 0.85).rotation.x = 0.04;
       mesh(cylGeo(0.15, 0.2, 0.17, 14), l, 0, 0.11, 0, g, 1, 1, 1.1);
       mesh(cylGeo(0.2, 0.2, 0.035, 14), mat('#2a1a10'), 0, 0.045, 0, g, 1, 1, 1.1);
+      mesh(boxGeo(0.045, 0.035, 0.01), mat('#d8c070', { metalness: 0.9, roughness: 0.25 }), 0, 0.045, 0.222, g);   // fibbia
+      mesh(boxGeo(0.03, 0.025, 0.2), mat('#2a1a10'), 0, 0.19, 0.01, g);                                              // piega della corona
+      for (const sx of [-1, 1]) { const b = mesh(boxGeo(0.12, 0.018, 0.4), l, 0.31 * sx, 0.05, 0, g); b.rotation.z = 0.45 * sx; }   // tesa rialzata ai lati
       break;
     }
     case 'headphones':
@@ -1088,6 +1091,80 @@ function buildHat(id, skin, head) {
     case 'halo':
       mesh(torusGeo(0.17, 0.02, 20), glowMat(H.color), 0, 0.22, 0, g).rotation.x = Math.PI / 2;
       break;
+    case 'beret': {
+      const bm = mat(H.color, { roughness: 0.95, map: fabricTex() });
+      const bg = new THREE.Group(); bg.rotation.set(-0.08, 0, 0.22); g.add(bg);
+      mesh(sphereGeo(18, 10), bm, -0.03, 0.125, -0.01, bg, 0.255, 0.075, 0.245);
+      mesh(torusGeo(0.206, 0.016, 22), mat(darker(H.color, 0.6), { roughness: 0.8 }), 0, 0.07, 0, bg).rotation.x = Math.PI / 2;
+      mesh(cylGeo(0.007, 0.011, 0.03, 6), bm, -0.03, 0.2, -0.01, bg);
+      const badge = mesh(cylGeo(0.03, 0.03, 0.008, 12), mat(H.accent, { metalness: 0.9, roughness: 0.25 }), -0.075, 0.105, 0.19, bg);
+      badge.rotation.x = Math.PI / 2 - 0.35;
+      break;
+    }
+    case 'tactical': {
+      // elmetto da combattimento: calotta in tessuto, binari laterali, paraorecchie e visore notturno alzato
+      const hm = mat(H.color, { roughness: 0.75, map: fabricTex() }), dk = mat('#23251f', { roughness: 0.6 });
+      mesh(domeGeo(Math.PI / 2, 20), hm, 0, -0.035, -0.005, g, 0.243, 0.24, 0.252);
+      mesh(torusGeo(0.243, 0.011, 24), dk, 0, -0.035, -0.005, g, 1, 1, 1.035).rotation.x = Math.PI / 2;
+      for (const sx of [-1, 1]) {
+        mesh(boxGeo(0.018, 0.026, 0.17), dk, 0.236 * sx, 0.01, -0.01, g).rotation.z = 0.18 * sx;
+        mesh(cylGeo(0.062, 0.062, 0.035, 14), dk, 0.218 * sx, -0.085, 0, g).rotation.z = Math.PI / 2;
+        mesh(cylGeo(0.045, 0.045, 0.037, 12), mat('#3a3d34', { roughness: 0.5 }), 0.22 * sx, -0.085, 0, g).rotation.z = Math.PI / 2;
+      }
+      mesh(boxGeo(0.06, 0.045, 0.025), dk, 0, 0.09, 0.228, g).rotation.x = -0.45;
+      const nv = new THREE.Group(); nv.position.set(0, 0.17, 0.255); nv.rotation.x = -0.35; g.add(nv);
+      mesh(boxGeo(0.1, 0.03, 0.035), dk, 0, -0.035, 0, nv);
+      for (const sx of [-1, 1]) {
+        mesh(cylGeo(0.021, 0.026, 0.085, 10), dk, 0.034 * sx, 0.01, 0, nv);
+        mesh(cylGeo(0.017, 0.017, 0.004, 10), glowMat(H.accent), 0.034 * sx, 0.054, 0, nv);
+      }
+      mesh(boxGeo(0.035, 0.02, 0.045), glowMat('#ff3030'), 0, 0.12, -0.2, g).rotation.x = 0.7;   // luce stroboscopica
+      mesh(boxGeo(0.07, 0.045, 0.01), mat('#8a9070'), 0.17, 0.11, -0.12, g).rotation.set(0.4, -0.9, 0.5);   // toppa in velcro
+      break;
+    }
+    case 'santa': {
+      const red = texMat('knit', H.color), fur = mat(H.accent, { roughness: 1, map: fabricTex() });
+      mesh(torusGeo(0.212, 0.042, 22), fur, 0, -0.01, 0, g).rotation.x = Math.PI / 2;
+      const c1 = mesh(cylGeo(0.07, 0.212, 0.26, 18), red, 0, 0.15, -0.02, g); c1.rotation.x = -0.3;
+      sph(0.07, red, 0, 0.274, -0.058, g);
+      const c2 = mesh(coneGeo(0.07, 0.22, 14), red, 0, 0.228, -0.158, g); c2.rotation.x = -2.0;
+      sph(0.05, fur, 0, 0.182, -0.262, g);
+      break;
+    }
+    case 'foxears': {
+      const fm = mat(H.color, { roughness: 0.95 }), inner = mat('#f2b8a8', { roughness: 1 }), tip = mat('#2a1a12', { roughness: 1 });
+      mesh(cachedGeo('foxband', () => new THREE.TorusGeometry(0.226, 0.013, 6, 22, Math.PI)), mat('#2a2a2a', { roughness: 0.5 }), 0, -0.02, 0.02, g);
+      for (const sx of [-1, 1]) {
+        const e = new THREE.Group(); e.position.set(0.12 * sx, 0.17, 0.0); e.rotation.set(-0.12, 0, -0.38 * sx); g.add(e);
+        mesh(coneGeo(0.075, 0.17, 6), fm, 0, 0, 0, e, 1, 1, 0.45);
+        mesh(coneGeo(0.048, 0.115, 6), inner, 0, -0.015, 0.02, e, 1, 1, 0.3);
+        mesh(coneGeo(0.03, 0.05, 6), tip, 0, 0.062, 0, e, 1, 1, 0.47);
+        mesh(coneGeo(0.03, 0.06, 5), mat(H.accent, { roughness: 1 }), 0.02 * sx, -0.06, 0.03, e, 1, 1, 0.5).rotation.z = 0.5 * sx;
+      }
+      break;
+    }
+    case 'samurai': {
+      // kabuto laccato con corna dorate (kuwagata) e paranuca a lamelle
+      const lq = mat(H.color, { roughness: 0.32, metalness: 0.35 }), gold = mat(H.accent, { metalness: 0.9, roughness: 0.25 });
+      const lqDS = mat(H.color, { roughness: 0.32, metalness: 0.35, side: THREE.DoubleSide });
+      mesh(domeGeo(Math.PI / 2, 20), lq, 0, -0.02, -0.005, g, 0.24, 0.225, 0.248);
+      for (let i = 0; i < 4; i++) { const r = mesh(cachedGeo('kabutoRib', () => new THREE.TorusGeometry(1, 0.022, 4, 24, Math.PI)), gold, 0, -0.02, -0.005, g, 0.242, 0.228, 0.25); r.rotation.y = i / 4 * Math.PI; }
+      mesh(torusGeo(0.24, 0.012, 24), gold, 0, -0.02, -0.005, g, 1, 1, 1.035).rotation.x = Math.PI / 2;
+      mesh(cylGeo(0.034, 0.04, 0.025, 12), gold, 0, 0.21, 0, g);
+      for (let i = 0; i < 3; i++) {
+        const r0 = 0.25 + i * 0.03;
+        mesh(cachedGeo('shikoro' + i, () => new THREE.CylinderGeometry(r0, r0 + 0.05, 0.05, 22, 1, true, Math.PI * 0.32, Math.PI * 1.36)), lqDS, 0, -0.05 - i * 0.042, -0.01, g);
+        mesh(cachedGeo('shikoroG' + i, () => new THREE.CylinderGeometry(r0 + 0.05, r0 + 0.052, 0.008, 22, 1, true, Math.PI * 0.32, Math.PI * 1.36)), gold, 0, -0.075 - i * 0.042, -0.01, g);
+      }
+      for (const sx of [-1, 1]) {
+        mesh(boxGeo(0.02, 0.09, 0.1), lq, 0.255 * sx, -0.05, 0.12, g).rotation.y = 0.55 * sx;
+        mesh(boxGeo(0.022, 0.06, 0.07), gold, 0.257 * sx, -0.05, 0.12, g).rotation.y = 0.55 * sx;
+        mesh(boxGeo(0.026, 0.26, 0.012), gold, 0.075 * sx, 0.16, 0.235, g).rotation.set(-0.2, 0, -0.42 * sx);
+      }
+      mesh(cylGeo(0.04, 0.04, 0.012, 16), mat('#c0202a', { roughness: 0.4 }), 0, 0.055, 0.238, g).rotation.x = Math.PI / 2 - 0.15;
+      mesh(boxGeo(0.3, 0.014, 0.08), lq, 0, -0.012, 0.215, g).rotation.x = 0.28;
+      break;
+    }
     case 'bucket': {
       // cappello a secchiello da esploratore (Leo), leggermente inclinato all'indietro
       const bm = mat(H.color, { roughness: 0.9, map: fabricTex(), side: THREE.DoubleSide });
@@ -1110,18 +1187,96 @@ function buildBack(id, skin, torso) {
   const c = id === 'skinpack' ? mat(skin.backpack, { roughness: 0.85, map: fabricTex() }) : mat(B.color, { roughness: 0.85, map: fabricTex() });
   const a = mat(B.accent || '#333', { roughness: 0.6 });
   const g = new THREE.Group(); g.position.set(0, 0.36, -0.15); torso.add(g);
+  const web = mat('#24252a', { roughness: 0.7, map: fabricTex() }), buckle = mat('#9aa0a8', { metalness: 0.85, roughness: 0.3 });
+  // spallacci che passano sopra le spalle e scendono sul petto
+  const straps = (m = web) => {
+    for (const sx of [-1, 1]) {
+      mesh(cachedGeo('strap' + sx, () => surfTube([onTorso(0.1 * sx, 0.44, 0.014, true), new THREE.Vector3(0.1 * sx, 0.585, 0), onTorso(0.1 * sx, 0.5, 0.012), onTorso(0.108 * sx, 0.38, 0.012), onTorso(0.118 * sx, 0.24, 0.01)], 0.014)), m, 0, 0, 0, torso, 1);
+      const bk = onTorso(0.108 * sx, 0.36, 0.024); mesh(boxGeo(0.04, 0.03, 0.012), buckle, bk.x, bk.y, bk.z, torso);
+    }
+    const sc = onTorso(0, 0.42, 0.016);
+    mesh(boxGeo(0.2, 0.018, 0.012), m, sc.x, sc.y, sc.z - 0.004, torso);   // cinghia sternale
+  };
+  // tracolla in diagonale (spada, chitarra, faretra...)
+  const sling = (m = web) => mesh(cachedGeo('sling', () => surfTube([onTorso(0.15, 0.2, 0.014, true), onTorso(0.02, 0.36, 0.014, true), onTorso(-0.1, 0.5, 0.014, true), new THREE.Vector3(-0.12, 0.585, 0), onTorso(-0.1, 0.5, 0.012), onTorso(0.0, 0.38, 0.012), onTorso(0.1, 0.27, 0.012), onTorso(0.16, 0.18, 0.012)], 0.016)), m, 0, 0, 0, torso, 1);
   switch (id) {
     case 'skinpack':
     case 'school':
       mesh(capsuleGeo(0.15, 0.14, 10), c, 0, 0, -0.07, g, 1.05, 1, 0.55);
-      mesh(boxGeo(0.18, 0.1, 0.05), a, 0, -0.08, -0.14, g);
-      for (const s of [-1, 1]) mesh(boxGeo(0.035, 0.36, 0.02), mat('#2a2a2a'), 0.12 * s, 0.03, 0.03, g);
+      mesh(capsuleGeo(0.075, 0.06, 8), a, 0, -0.08, -0.135, g, 1.25, 0.85, 0.5);                 // tasca frontale
+      mesh(torusGeo(0.155, 0.006, 20), mat('#1e1e22', { roughness: 0.5 }), 0, 0.0, -0.075, g, 1.02, 1.42, 1).rotation.y = Math.PI / 2;   // cerniera
+      mesh(boxGeo(0.012, 0.03, 0.01), buckle, 0.07, 0.17, -0.12, g);
+      mesh(torusGeo(0.035, 0.008, 10), web, 0, 0.215, -0.04, g).rotation.y = Math.PI / 2;        // maniglia
+      for (const sx of [-1, 1]) mesh(cylGeo(0.035, 0.035, 0.09, 10), a, 0.15 * sx, -0.06, -0.07, g);   // tasche laterali
+      straps();
       break;
     case 'hiker':
       mesh(capsuleGeo(0.15, 0.3, 10), c, 0, 0.06, -0.08, g, 1, 1, 0.6);
+      mesh(sphereGeo(14, 8), c, 0, 0.27, -0.085, g, 0.155, 0.06, 0.1);                           // coperchio
       mesh(cylGeo(0.06, 0.06, 0.32, 10), a, 0, 0.3, -0.06, g).rotation.z = Math.PI / 2;   // sacco a pelo
-      mesh(boxGeo(0.2, 0.12, 0.06), a, 0, -0.1, -0.16, g);
+      for (const sx of [-1, 1]) mesh(torusGeo(0.064, 0.007, 12), web, 0.1 * sx, 0.3, -0.06, g).rotation.y = Math.PI / 2;
+      mesh(boxGeo(0.2, 0.12, 0.06), a, 0, -0.08, -0.16, g);
+      for (const sx of [-1, 1]) {
+        mesh(cylGeo(0.008, 0.008, 0.5, 6), buckle, 0.15 * sx, 0.07, -0.02, g);                   // telaio
+        mesh(boxGeo(0.02, 0.014, 0.1), web, 0.148 * sx, 0.12, -0.08, g);                          // cinghie di compressione
+        mesh(boxGeo(0.02, 0.014, 0.1), web, 0.148 * sx, -0.02, -0.08, g);
+      }
+      mesh(cylGeo(0.032, 0.032, 0.13, 12), mat('#2a8ad0', { roughness: 0.3, metalness: 0.3 }), 0.17, -0.07, -0.08, g);   // borraccia
+      mesh(cylGeo(0.018, 0.018, 0.02, 8), mat('#1a1a1a'), 0.17, 0.005, -0.08, g);
+      mesh(torusGeo(0.02, 0.004, 10), mat('#ff7a1a', { metalness: 0.6, roughness: 0.3 }), -0.1, -0.15, -0.2, g);       // moschettone
+      straps();
       break;
+    case 'tactical': {
+      const tm = texMat('ripstop', B.color);
+      mesh(boxGeo(0.3, 0.36, 0.12), tm, 0, 0.02, -0.07, g);
+      mesh(boxGeo(0.26, 0.15, 0.06), tm, 0, -0.06, -0.16, g);                                    // tasca grande
+      for (let i = 0; i < 4; i++) mesh(boxGeo(0.305, 0.016, 0.125), web, 0, 0.16 - i * 0.045, -0.07, g);   // fettucce MOLLE
+      for (let i = 0; i < 2; i++) mesh(boxGeo(0.265, 0.014, 0.065), web, 0, -0.02 - i * 0.05, -0.16, g);
+      for (const sx of [-1, 1]) mesh(boxGeo(0.07, 0.12, 0.08), tm, 0.18 * sx, -0.04, -0.07, g);   // tasche laterali
+      mesh(boxGeo(0.07, 0.1, 0.045), mat(B.accent, { roughness: 0.55 }), 0.1, 0.18, -0.04, g);   // radio
+      mesh(cylGeo(0.004, 0.006, 0.5, 6), mat('#111'), 0.12, 0.47, -0.04, g).rotation.z = -0.08;   // antenna
+      sph(0.01, mat('#111'), 0.14, 0.72, -0.04, g);
+      mesh(boxGeo(0.012, 0.012, 0.004), glowMat('#3aff6a'), 0.08, 0.22, -0.064, g);
+      mesh(boxGeo(0.09, 0.055, 0.006), mat('#7a8460'), -0.05, 0.1, -0.133, g);                  // toppa
+      straps();
+      break;
+    }
+    case 'quiver': {
+      const qg = new THREE.Group(); qg.rotation.z = 0.45; qg.position.set(0, 0.04, -0.07); g.add(qg);
+      const lm = texMat('leather', B.color);
+      mesh(cylGeo(0.07, 0.055, 0.5, 14), lm, 0, 0, -0.02, qg);
+      mesh(torusGeo(0.07, 0.01, 14), mat('#d8b048', { metalness: 0.85, roughness: 0.3 }), 0, 0.25, -0.02, qg).rotation.x = Math.PI / 2;
+      for (const y of [-0.12, 0.1]) mesh(torusGeo(0.068 - (y + 0.12) * 0.03, 0.008, 14), mat('#2a1a10'), 0, y, -0.02, qg).rotation.x = Math.PI / 2;
+      const shaft = mat('#c8a070', { roughness: 0.7 }), fl = mat(B.accent, { roughness: 0.8, side: THREE.DoubleSide });
+      for (let i = 0; i < 6; i++) {
+        const an = i / 6 * Math.PI * 2, ax = Math.cos(an) * 0.035, az = Math.sin(an) * 0.035 - 0.02, h = 0.12 + (i % 3) * 0.03;
+        mesh(cylGeo(0.005, 0.005, h, 5), shaft, ax, 0.25 + h / 2, az, qg);
+        for (const r of [0, Math.PI / 2]) mesh(boxGeo(0.002, 0.06, 0.026), i % 2 ? fl : mat('#f2f2ea', { side: THREE.DoubleSide }), ax, 0.22 + h, az, qg).rotation.y = r + an;
+      }
+      sling(texMat('leather', '#3a2414'));
+      break;
+    }
+    case 'surf': {
+      const sg = new THREE.Group(); sg.rotation.z = 0.28; sg.position.set(0, 0.05, -0.1); g.add(sg);
+      mesh(capsuleGeo(0.16, 0.74, 14), mat(B.color, { roughness: 0.25, metalness: 0.05 }), 0, 0, 0, sg, 1, 1, 0.13);
+      mesh(boxGeo(0.045, 0.92, 0.044), mat(B.accent, { roughness: 0.3 }), 0, 0, 0, sg);
+      for (const y of [0.3, -0.28]) mesh(boxGeo(0.25, 0.02, 0.043), mat('#ff7a2a', { roughness: 0.3 }), 0, y, 0, sg);
+      mesh(boxGeo(0.008, 0.08, 0.07), mat(B.accent), 0, -0.4, -0.05, sg).rotation.x = 0.2;   // pinna
+      sling();
+      break;
+    }
+    case 'shield': {
+      const shg = new THREE.Group(); shg.position.set(0, 0.0, -0.1); shg.rotation.z = 0.12; g.add(shg);
+      const wood = mat(B.color, { roughness: 0.85, map: fabricTex() }), met = mat(B.accent, { metalness: 0.85, roughness: 0.3 });
+      mesh(cylGeo(0.27, 0.27, 0.03, 26), wood, 0, 0, 0, shg).rotation.x = Math.PI / 2;
+      for (let i = -2; i <= 2; i++) mesh(boxGeo(0.006, 0.5 - Math.abs(i) * 0.08, 0.034), mat(darker(B.color, 0.55)), i * 0.1, 0, 0, shg);
+      mesh(cylGeo(0.13, 0.13, 0.032, 22), mat('#a01e22', { roughness: 0.7 }), 0, 0, -0.001, shg, 1, 1, 1).rotation.x = Math.PI / 2;
+      mesh(torusGeo(0.27, 0.016, 28), met, 0, 0, 0, shg);
+      sph(0.065, met, 0, 0, -0.018, shg, 1, 0.55);
+      for (let i = 0; i < 8; i++) { const an = i / 8 * Math.PI * 2; sph(0.012, met, Math.cos(an) * 0.22, Math.sin(an) * 0.22, -0.017, shg); }
+      sling(texMat('leather', '#3a2414'));
+      break;
+    }
     case 'guitar': {
       const gg = new THREE.Group(); gg.rotation.z = 0.6; gg.position.z = -0.08; g.add(gg);
       const w = mat(B.color, { roughness: 0.4, map: fabricTex() });
@@ -1130,6 +1285,8 @@ function buildBack(id, skin, torso) {
       mesh(cylGeo(0.04, 0.04, 0.062, 10), a, 0, -0.06, 0.002, gg).rotation.x = Math.PI / 2;
       mesh(boxGeo(0.045, 0.42, 0.03), a, 0, 0.36, 0, gg);
       mesh(boxGeo(0.07, 0.1, 0.03), a, 0, 0.6, 0, gg);
+      for (let i = 0; i < 6; i++) mesh(boxGeo(0.0025, 0.62, 0.004), mat('#d8d8d8', { metalness: 0.9, roughness: 0.3 }), -0.015 + i * 0.006, 0.18, -0.034, gg);   // corde
+      sling(mat('#1a1a1a', { roughness: 0.6 }));
       break;
     }
     case 'sword': {
@@ -1138,6 +1295,7 @@ function buildBack(id, skin, torso) {
       mesh(boxGeo(0.24, 0.04, 0.05), mat(B.accent, { metalness: 0.9, roughness: 0.25 }), 0, 0.29, 0, sg);
       mesh(cylGeo(0.022, 0.022, 0.16, 6), texMat('leather', '#3a2414'), 0, 0.39, 0, sg);
       sph(0.035, glowMat('#ff3a3a'), 0, 0.48, 0, sg);
+      sling(texMat('leather', '#3a2414'));
       break;
     }
     case 'jetpack': {
@@ -1195,8 +1353,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=15';
-import { buildConsumableMesh } from './items.js?v=15';
+export { buildWeaponMesh } from './weapons.js?v=16';
+import { buildConsumableMesh } from './items.js?v=16';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
@@ -1246,4 +1404,4 @@ export function buildGlider(glider) {
 }
 
 /** Il "Battle Bus" volante: modello in models3d.js */
-export { buildBus } from './models3d.js?v=15';
+export { buildBus } from './models3d.js?v=16';

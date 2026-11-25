@@ -5,7 +5,7 @@
 //  macchie). Tutte ripetibili, con normal map ricavata dal rilievo.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=15';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=16';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -229,7 +229,7 @@ const P = {
       for (let i = 0; i < n; i++) { const x = rnd() * S, y = rnd() * S, rr = r * (0.6 + rnd() * 0.7); wrap(S, x, y, rr * 1.8, (px, py) => blob(g, px, py, rr, mulberry(i * 31 + n))); }
     }
     weave(g, S, rnd, 1, 0.04, 0.03);
-  }, (g, S) => { g.fillStyle = '#d8d8d8'; for (let k = 0; k < S; k += 16) { g.fillRect(k, 0, 1.5, S); g.fillRect(0, k, S, 1.5); } }, 1.0, 2),
+  }, (g, S) => { g.fillStyle = '#929292'; for (let k = 0; k < S; k += 16) { g.fillRect(k, 0, 1, S); g.fillRect(0, k, S, 1); } }, 0.6, 2),   // trama ripstop appena accennata (prima sembrava una griglia)
   /** scozzese (camicia da cowboy) */
   plaid: (c) => make('plaid' + c, 64, (g, S) => {
     g.fillStyle = c; g.fillRect(0, 0, S, S);

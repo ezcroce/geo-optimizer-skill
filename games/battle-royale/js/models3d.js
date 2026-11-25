@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=15';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=16';
 
 const once = (f) => { let v; return () => v || (v = f()); };
 function mulberry(a) {
@@ -144,6 +144,43 @@ const busMats = once(() => {
     flame: new THREE.MeshBasicMaterial({ color: '#ff9a30', transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
     flameCore: new THREE.MeshBasicMaterial({ color: '#fff2b0', transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
+});
+/** adesivi sul fianco: «100», stella con fulmine, logo della mongolfiera */
+const busStickers = once(() => {
+  const W = 768, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  // 1) cerchio «100 giocatori»
+  g.fillStyle = '#ffd24a'; g.beginPath(); g.arc(128, 128, 112, 0, 7); g.fill();
+  g.lineWidth = 14; g.strokeStyle = '#c0242a'; g.stroke();
+  g.fillStyle = '#c0242a'; g.font = 'bold 96px Arial Black, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('100', 128, 118);
+  g.font = 'bold 30px Arial, sans-serif'; g.fillText('GIOCATORI', 128, 190);
+  // 2) stella con fulmine
+  g.save(); g.translate(384, 128);
+  g.fillStyle = '#ffffff'; g.beginPath();
+  for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 50 : 118; i ? g.lineTo(Math.cos(a) * r, Math.sin(a) * r) : g.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+  g.closePath(); g.fill(); g.lineWidth = 8; g.strokeStyle = '#1b2a6a'; g.stroke();
+  g.fillStyle = '#ffb020'; g.beginPath(); g.moveTo(14, -70); g.lineTo(-30, 10); g.lineTo(0, 10); g.lineTo(-14, 70); g.lineTo(34, -14); g.lineTo(4, -14); g.closePath(); g.fill();
+  g.restore();
+  // 3) mongolfiera stilizzata
+  g.save(); g.translate(640, 120);
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0, 0, 118, 0, 7); g.fill();
+  for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#c0242a' : '#f2f2ee'; g.beginPath(); g.moveTo(0, 70); g.ellipse(0, -10, 72 - i * 12, 80, 0, Math.PI, 0); g.closePath(); g.fill(); }
+  g.fillStyle = '#8a5a2b'; g.fillRect(-20, 82, 40, 26);
+  g.strokeStyle = '#8a5a2b'; g.lineWidth = 4; g.beginPath(); g.moveTo(-40, 50); g.lineTo(-18, 84); g.moveTo(40, 50); g.lineTo(18, 84); g.stroke();
+  g.restore();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+});
+/** sporco e fango sulla parte bassa della carrozzeria (trasparente in alto) */
+const busMud = once(() => {
+  const W = 512, H = 64, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(80,60,40,0)'); gr.addColorStop(0.6, 'rgba(80,60,40,0.35)'); gr.addColorStop(1, 'rgba(60,45,30,0.7)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 260; i++) { const x = rnd() * W, y = H * (0.35 + rnd() * 0.65), r = 1 + rnd() * 4; g.fillStyle = `rgba(70,52,34,${0.25 + rnd() * 0.45})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 });
 /** insegna luminosa sul tetto */
 const busSign = once(() => {
@@ -417,6 +454,24 @@ function busExtras(g, M, { W, L, H, z0, z1, y1, ringY }) {
     for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.07 : 0.17; i ? st.lineTo(Math.cos(a) * r, Math.sin(a) * r) : st.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
     add('gold', at(new THREE.ExtrudeGeometry(st, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 1 }), 0, -0.75, z1 + 0.15));
   }
+  // ── fianchi: bottazzi in gomma, adesivi, fango e barra luminosa sul tetto ──
+  const stM = new THREE.MeshStandardMaterial({ map: busStickers(), transparent: true, alphaTest: 0.5, roughness: 0.45 });
+  const mudM = new THREE.MeshStandardMaterial({ map: busMud(), transparent: true, depthWrite: false, roughness: 1 });
+  for (const sx of [-1, 1]) {
+    add('rubber', at(rbox(0.06, 0.12, 4.3, 0.03), sx * (W / 2 + 0.02), -1.3, 0));
+    add('chrome', at(new THREE.BoxGeometry(0.03, 0.02, 4.25), sx * (W / 2 + 0.05), -1.3, 0));
+    [[0, -1.4], [2, 0.2], [1, 1.3]].forEach(([k, z]) => {
+      const pg = new THREE.PlaneGeometry(0.42, 0.42), U = pg.attributes.uv;
+      for (let i = 0; i < U.count; i++) U.setX(i, (k + U.getX(i)) / 3);
+      pg.rotateY(sx * Math.PI / 2);
+      g.add(new THREE.Mesh(at(pg, sx * (W / 2 + 0.024), -1.04, z), stM));
+    });
+    const mud = new THREE.PlaneGeometry(L - 0.6, 0.45); mud.rotateY(sx * Math.PI / 2);
+    const mm = new THREE.Mesh(at(mud, sx * (W / 2 + 0.022), -1.27, 0), mudM);
+    mm.renderOrder = 1; g.add(mm);
+  }
+  add('dark', at(rbox(1.9, 0.14, 0.22, 0.05), 0, roofTop + 0.07, 3.3));                        // barra luminosa anteriore
+  for (let i = 0; i < 6; i++) add(i % 5 === 0 ? 'amber' : 'head', at(rbox(0.22, 0.08, 0.04, 0.02), -0.8 + i * 0.32, roofTop + 0.07, 3.42));
   // ── ruote: bulloni ──
   for (const sx of [-1, 1]) for (const z of [-2.9, 2.9]) for (let i = 0; i < 6; i++) {
     const a = i / 6 * Math.PI * 2;

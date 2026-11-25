@@ -79,7 +79,7 @@ export const WEAPONS = {
   burst: {
     name: 'Fucile a raffica', speed: 390, drop: 1.0, dmg: 27, pellets: 1, rate: 0.42, burst: 3, burstGap: 0.07, mag: 24, reload: 2.2,
     spread: 0.016, range: 230, ammo: 'medium', auto: false, zoom: 1.7,
-    botRange: 60, sound: 'ar', recoil: 0.007, muzzle: 0.5, role: 'ar', cross: 'chev', sight: 'reddot',
+    botRange: 60, sound: 'burst', recoil: 0.007, muzzle: 0.5, role: 'ar', cross: 'chev', sight: 'reddot',
     desc: 'Tre colpi per pressione del grilletto, molto preciso.',
   },
   heavyar: {
@@ -103,7 +103,7 @@ export const WEAPONS = {
   drum: {
     name: 'Fucile a tamburo', speed: 220, drop: 1.35, dmg: 6, pellets: 7, rate: 0.22, mag: 16, reload: 3.8,
     spread: 0.11, range: 30, ammo: 'shells', auto: true, zoom: 1.15,
-    botRange: 12, sound: 'tactical', recoil: 0.028, muzzle: 0.665, role: 'shotgun', cross: 'circle2', sight: 'holo',
+    botRange: 12, sound: 'drum', recoil: 0.028, muzzle: 0.665, role: 'shotgun', cross: 'circle2', sight: 'holo',
     desc: 'Automatico con caricatore a tamburo: tanti pallini, poca gittata.',
   },
   hunting: {
@@ -192,6 +192,11 @@ export const HATS = [
   { id: 'crown', name: 'Corona reale', rarity: 4, color: '#ffc830', accent: '#e0203a', lock: 'pass' },
   { id: 'halo', name: 'Aureola', rarity: 4, color: '#fff2a0', lock: 'shop' },
   { id: 'bucket', name: 'Cappello da esploratore', rarity: 2, color: '#e3b84c', accent: '#8a6440', lock: 'shop' },
+  { id: 'beret', name: 'Basco', rarity: 1, color: '#2a3a6a', accent: '#d0a040', lock: 'pass' },
+  { id: 'tactical', name: 'Elmetto tattico con visore', rarity: 2, color: '#5a6248', accent: '#2ae07a', lock: 'pass' },
+  { id: 'santa', name: 'Cappello di Natale', rarity: 2, color: '#c8202a', accent: '#f6f2ea', lock: 'shop' },
+  { id: 'foxears', name: 'Orecchie da volpe', rarity: 3, color: '#e0702a', accent: '#fff0e0', lock: 'shop' },
+  { id: 'samurai', name: 'Kabuto da samurai', rarity: 4, color: '#1a1a22', accent: '#e8b830', lock: 'shop' },
 ];
 
 /** Zaini e oggetti sulla schiena */
@@ -204,6 +209,10 @@ export const BACKPACKS = [
   { id: 'jetpack', name: 'Jetpack', rarity: 3, color: '#a0a8b8', accent: '#ff6a1a', lock: 'shop' },
   { id: 'wings', name: "Ali d'angelo", rarity: 4, color: '#f8f8ff', accent: '#ffe8a0', lock: 'pass' },
   { id: 'dragonwings', name: 'Ali di drago', rarity: 4, color: '#7a0a12', accent: '#ff8a1a', lock: 'shop' },
+  { id: 'tactical', name: 'Zaino tattico con radio', rarity: 1, color: '#4e5640', accent: '#2a2c26', lock: 'pass' },
+  { id: 'quiver', name: 'Faretra', rarity: 2, color: '#6a3e1e', accent: '#e04a3a', lock: 'shop' },
+  { id: 'surf', name: 'Tavola da surf', rarity: 2, color: '#f2f0e6', accent: '#1aa0d8', lock: 'shop' },
+  { id: 'shield', name: 'Scudo del guerriero', rarity: 3, color: '#8a5a30', accent: '#c8ccd4', lock: 'pass' },
 ];
 
 /** Modalità di gioco */

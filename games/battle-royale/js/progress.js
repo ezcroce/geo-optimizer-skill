@@ -2,7 +2,7 @@
 //  Progressi del giocatore: pass battaglia, negozio, missioni, monete
 //  (tutto salvato nel browser con localStorage)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=15';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=16';
 
 const KEY = 'arenaRoyaleProfile';
 export const XP_PER_TIER = 1000;
@@ -19,12 +19,12 @@ export function itemOf(type, id) { return (CATALOG[type] || []).find(x => x.id =
 const R = (type, idOrN) => type === 'coins' ? { type, n: idOrN } : { type, id: idOrN };
 const FREE = [
   [1, R('hat', 'beanie')], [4, R('coins', 100)], [6, R('back', 'hiker')], [8, R('coins', 100)], [10, R('skin', 'cowboy')],
-  [13, R('coins', 150)], [16, R('glider', 'arcobaleno')], [19, R('coins', 150)], [22, R('hat', 'cowboy')], [25, R('skin', 'scienziata')],
-  [28, R('coins', 200)], [32, R('back', 'sword')], [36, R('coins', 200)], [40, R('coins', 500)],
+  [12, R('hat', 'beret')], [13, R('coins', 150)], [16, R('glider', 'arcobaleno')], [19, R('coins', 150)], [22, R('hat', 'cowboy')], [25, R('skin', 'scienziata')],
+  [28, R('coins', 200)], [30, R('back', 'tactical')], [32, R('back', 'sword')], [36, R('coins', 200)], [40, R('coins', 500)],
 ];
 const PREMIUM = [
-  [1, R('coins', 300)], [3, R('hat', 'viking')], [7, R('coins', 200)], [9, R('skin', 'vichingo')], [14, R('hat', 'wizard')],
-  [18, R('coins', 250)], [24, R('back', 'wings')], [29, R('glider', 'oro')], [34, R('coins', 300)], [37, R('hat', 'crown')], [40, R('skin', 'samurai')],
+  [1, R('coins', 300)], [3, R('hat', 'viking')], [7, R('coins', 200)], [9, R('skin', 'vichingo')], [12, R('hat', 'tactical')], [14, R('hat', 'wizard')],
+  [18, R('coins', 250)], [21, R('back', 'shield')], [24, R('back', 'wings')], [29, R('glider', 'oro')], [34, R('coins', 300)], [37, R('hat', 'crown')], [40, R('skin', 'samurai')],
 ];
 /** tutti i livelli del pass con le due ricompense (gratis / premium) */
 export const PASS = Array.from({ length: PASS_TIERS }, (_, i) => ({

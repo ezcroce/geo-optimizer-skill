@@ -5,28 +5,28 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES,
-} from './config.js?v=15';
-import * as PR from './progress.js?v=15';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=15';
-import { initMenu } from './menu.js?v=15';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=15';
-import { initSettingsUI } from './settings-ui.js?v=15';
-import { applyAnisotropy } from './texgen.js?v=15';
-import * as A from './audio.js?v=15';
+} from './config.js?v=16';
+import * as PR from './progress.js?v=16';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=16';
+import { initMenu } from './menu.js?v=16';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=16';
+import { initSettingsUI } from './settings-ui.js?v=16';
+import { applyAnisotropy } from './texgen.js?v=16';
+import * as A from './audio.js?v=16';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL,
-} from './world.js?v=15';
-import { createWeather } from './weather.js?v=15';
-import { createEvents } from './events.js?v=15';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=15';
-import { weaponIcon } from './weapons.js?v=15';
-import { consIcon } from './items.js?v=15';
-import { buildChestMesh } from './models3d.js?v=15';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=15';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=15';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=15';
+} from './world.js?v=16';
+import { createWeather } from './weather.js?v=16';
+import { createEvents } from './events.js?v=16';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=16';
+import { weaponIcon } from './weapons.js?v=16';
+import { consIcon } from './items.js?v=16';
+import { buildChestMesh } from './models3d.js?v=16';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=16';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=16';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=16';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);

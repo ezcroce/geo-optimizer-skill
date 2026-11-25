@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=15';
+import { normalFromHeight, NORMALS } from './texgen.js?v=16';
 
 function mulberry32(a) {
   return function () {
@@ -294,6 +294,59 @@ function makePebbles() {
   }
   return withUV(mergeParts(parts, 78));
 }
+/** gruppetto di funghi: porcini e qualche amanita rossa a pois */
+function makeMushrooms(seed, red) {
+  const parts = [], rnd = mulberry32(seed);
+  const n = 3 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const a = rnd() * 6.28, d = i ? 0.08 + rnd() * 0.2 : 0, s = (i ? 0.6 + rnd() * 0.4 : 1) * 0.15;
+    const x = Math.cos(a) * d, z = Math.sin(a) * d, h = s * (1.3 + rnd() * 0.6), lean = (rnd() - 0.5) * 0.3;
+    parts.push(part(new THREE.CylinderGeometry(s * 0.22, s * 0.3, h, 7), '#efe6d2', { x, y: h / 2, z, rz: lean, jit: 0.05 }));
+    const capC = red ? '#d0281e' : (rnd() < 0.5 ? '#8a5428' : '#a8743a');
+    parts.push(part(new THREE.SphereGeometry(s * 0.62, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2), capC, { x: x - lean * h * 0.5, y: h * 0.92, z, sy: red ? 0.75 : 0.62, rz: lean, jit: 0.06 }));
+    parts.push(part(new THREE.CircleGeometry(s * 0.6, 9), '#e8d8b8', { x: x - lean * h * 0.5, y: h * 0.92, z, rx: Math.PI / 2, jit: 0.04 }));   // lamelle
+    if (red) for (let k = 0; k < 5; k++) {
+      const b = rnd() * 6.28, rr = s * (0.15 + rnd() * 0.32);
+      parts.push(part(new THREE.SphereGeometry(s * 0.07, 5, 3), '#ffffff', { x: x - lean * h * 0.5 + Math.cos(b) * rr, y: h * 0.92 + Math.sqrt(Math.max(0, (s * 0.62) ** 2 - rr * rr)) * 0.75, z: z + Math.sin(b) * rr, sy: 0.5, jit: 0.02, noSky: true }));
+    }
+  }
+  return withUV(mergeParts(parts, seed + 1));
+}
+/** ceppo d'albero con radici e anelli del legno */
+function makeStump(seed) {
+  const parts = [], rnd = mulberry32(seed);
+  const r = 0.26 + rnd() * 0.08, h = 0.28 + rnd() * 0.18;
+  parts.push(part(wobble(new THREE.CylinderGeometry(r, r * 1.18, h, 9, 1), 0.03, seed, true), '#5e4024', { y: h / 2, jit: 0.12,
+    colorFn: (nx, ny) => ny > 0.9 ? (rnd() < 0.5 ? '#c99a5b' : '#b8864a') : (rnd() < 0.3 ? '#4a321c' : '#5e4024') }));
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * 6.28 + rnd() * 0.6;
+    parts.push(part(new THREE.ConeGeometry(r * 0.32, r * 1.5, 5), '#553a20', { x: Math.cos(a) * r * 1.1, y: 0.04, z: Math.sin(a) * r * 1.1, rx: Math.sin(a) * 1.35, rz: -Math.cos(a) * 1.35, jit: 0.1 }));
+  }
+  parts.push(part(new THREE.SphereGeometry(r * 0.55, 7, 4), '#5f8a2e', { x: r * 0.35, y: h - 0.01, z: r * 0.3, sx: 1, sy: 0.18, sz: 0.8, jit: 0.15 }));   // muschio sul taglio
+  return withUV(mergeParts(parts, seed + 1));
+}
+/** felce: fronde arcuate, ognuna con una fila di foglioline triangolari ai due lati della costa */
+function makeFern(seed) {
+  const parts = [], rnd = mulberry32(seed);
+  const fr = 8, N = 9;
+  for (let i = 0; i < fr; i++) {
+    const a = i / fr * 6.28 + rnd() * 0.5, len = 0.6 + rnd() * 0.35, lift = 0.45 + rnd() * 0.25;
+    const d = new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), sd = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a));
+    const P = (t) => d.clone().multiplyScalar(t * len).setY(len * lift * t * (1.7 - 1.45 * t) + 0.02);
+    const pos = [];
+    for (let k = 0; k < N; k++) {
+      const t0 = k / N, t1 = (k + 1) / N, tm = (t0 + t1) / 2;
+      const p0 = P(t0), p1 = P(t1 + 0.03), w = 0.15 * len * (1 - 0.8 * tm);
+      for (const sx of [-1, 1]) {
+        const tip = P(tm).addScaledVector(sd, sx * w).addScaledVector(d, w * 0.45); tip.y -= w * 0.25;
+        pos.push(p0.x, p0.y, p0.z, ...(sx > 0 ? [tip.x, tip.y, tip.z, p1.x, p1.y, p1.z] : [p1.x, p1.y, p1.z, tip.x, tip.y, tip.z]));
+      }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    parts.push(part(g, '#3f7a24', { jit: 0.06, colorFn: (nx, ny, nz, x, y, z) => Math.hypot(x, z) > len * 0.6 ? '#5a9a30' : '#3f7a24' }));
+  }
+  return withUV(mergeParts(parts, seed + 1));
+}
 /** aggiunge coordinate uv fittizie (servono per usare lo slot `map`) */
 function withUV(g) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
@@ -526,6 +579,9 @@ export const PROPS = {
   pebbles: makePebbles(),
   bushes: [makeBush(401), makeBush(433), makeBush(467, ['#f2f2f2', '#ffe066']), makeBush(491, ['#e86fa8', '#c77dff'])],
   logs: makeLogs(), bricks: makeBricks(),
+  mushrooms: [makeMushrooms(611, false), makeMushrooms(631, true), makeMushrooms(653, false)],
+  stumps: [makeStump(701), makeStump(733)],
+  fern: makeFern(811),
   barrelWood: makeBarrel('wood'), barrelBlue: makeBarrel('blue'), barrelRed: makeBarrel('red'),
   shed: makeShed(),
 };

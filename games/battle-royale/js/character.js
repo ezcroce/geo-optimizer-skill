@@ -386,13 +386,8 @@ export function buildCharacter(skin, cos = {}) {
     const hip = new THREE.Group();
     hip.position.set(0.105 * side, RIG.hip, 0);
     body.add(hip);
-    const wk = skin.wide ? 1.13 : 1;   // pantaloni larghi da arti marziali
-    mesh(capsuleGeo(0.098, 0.27), pantsM, 0, -0.21, 0, hip, 1.04 * wk, 1, wk);           // coscia
     const knee = new THREE.Group(); knee.position.y = -RIG.thigh; hip.add(knee);
-    const shinM = skin.shorts ? skinM : pantsM;                                            // pantaloncini: gamba nuda
     if (skin.wide) mesh(widePantGeo(), pantsM, 0, 0, -0.005, knee);
-    else mesh(capsuleGeo(0.075, 0.27), shinM, 0, -0.19, -0.005, knee, skin.shorts ? 0.86 : 1, 1, skin.shorts ? 0.86 : 1);   // stinco
-    sph(skin.wide ? 0.088 : skin.shorts ? 0.066 : 0.074, shinM, 0, 0, 0.005, knee);       // ginocchio
     const ankle = new THREE.Group(); ankle.position.y = -RIG.shin; knee.add(ankle);
     mesh(shoeGeo(), shoeM, 0, -0.005, 0.05, ankle);
     mesh(boxGeo(0.125, 0.025, 0.27), soleM, 0, -0.045, 0.05, ankle);
@@ -413,10 +408,7 @@ export function buildCharacter(skin, cos = {}) {
   const torso = new THREE.Group();
   torso.position.set(0, RIG.hip, 0);
   body.add(torso);
-  mesh(pelvisGeo(), pantsM, 0, 0.04, 0, torso);
-  const chestM = skin.vest ? shirtM : shirtM;
-  mesh(torsoGeo(1), chestM, 0, 0.02, 0, torso);
-  mesh(cylGeo(0.062, 0.07, 0.16, 10), mask(skin) ? shirtM : skin.faceMask ? mat(skin.faceMask, { roughness: 0.9 }) : skinM, 0, 0.64, 0, torso);   // collo
+  const neckM = mask(skin) ? shirtM : skin.faceMask ? mat(skin.faceMask, { roughness: 0.9 }) : skinM;
   // dettagli dei vestiti: colletto, orlo e bottoni (un'unica mesh), tasche posteriori
   const trimM = metal ? shirtM : clothMat(darker(skin.shirt, 0.72));
   if (!metal) {
@@ -515,17 +507,13 @@ export function buildCharacter(skin, cos = {}) {
     const sh = new THREE.Group();
     sh.position.set(RIG.shoulderX * side, RIG.shoulderY, 0);
     torso.add(sh);
-    const upperM = skin.sleeveless ? skinM : shirtM;
-    sph(skin.sleeveless ? 0.074 : 0.082, upperM, 0, 0, 0, sh);                             // spalla
-    mesh(capsuleGeo(skin.sleeveless ? 0.062 : 0.07, 0.18), upperM, 0, -0.15, 0, sh);      // braccio
     const el = new THREE.Group(); el.position.y = -RIG.upper; sh.add(el);
-    const sleeve = skin.short ? skinM : shirtM;
-    mesh(capsuleGeo(skin.short ? 0.054 : 0.06, 0.17), sleeve, 0, -0.13, 0, el);          // avambraccio
+    if (skin.short && !skin.sleeveless) mesh(cylGeo(0.07, 0.072, 0.03, 14, true), trimM, 0, -0.215, 0, sh);   // orlo della manica corta
     const hand = new THREE.Group(); hand.position.y = -RIG.fore; el.add(hand);
     mesh(handGeo(side), gloveM, 0, 0, 0, hand);                                           // mano con dita
     // polsini della manica
-    if (!skin.short && !metal && !skin.glow && !skin.coat) mesh(cylGeo(0.064, 0.062, 0.035, 10), trimM, 0, -0.245, 0, el);
-    if (skin.glow) mesh(cylGeo(0.064, 0.064, 0.03, 10), glowMat(skin.glow), 0, -0.2, 0, el);
+    if (!skin.short && !metal && !skin.glow && !skin.coat) mesh(cylGeo(0.056, 0.053, 0.035, 12), trimM, 0, -0.245, 0, el);
+    if (skin.glow) mesh(cylGeo(0.058, 0.058, 0.03, 12), glowMat(skin.glow), 0, -0.2, 0, el);
     if (metal) mesh(cylGeo(0.072, 0.066, 0.14, 10), texMat('metal', skin.accColor), 0, -0.16, 0, el);
     arms.push(sh); elbows.push(el); hands.push(hand);
   }
@@ -660,6 +648,8 @@ export function buildCharacter(skin, cos = {}) {
     }
     default: break;
   }
+  // ── corpo unico senza giunture: busto, collo, braccia e gambe in una sola mesh deformabile ──
+  body.add(buildBodySkin(skin, { torso, head, legs, knees, feet, arms, elbows, hands, shirtM, pantsM, skinM, neckM }));
   if (hasHat) buildHat(hasHat, skin, head);
   if (skin.hero) buildHero(skin, { legs, knees, feet, arms, elbows, hands, torso, head, skinM, shirtM, pantsM, hasHat });
 
@@ -679,6 +669,165 @@ export function buildCharacter(skin, cos = {}) {
   return { root, body, legs, knees, feet, arms, elbows, hands, torso, head, gunPivot, cape, lod, lids };
 }
 function mask(skin) { return skin.acc === 'ninja'; }
+
+// ─────────────── Corpo unico (skinning) ───────────────
+// Le articolazioni del rig restano gli stessi gruppi animati da anim.js, ma ora fanno da "ossa"
+// di un'unica SkinnedMesh: braccia e gambe sono tubi continui che si piegano morbidamente a
+// gomiti e ginocchia, le spalle sfumano nel busto e il collo nella testa. Niente sfere ai giunti.
+const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+/** profilo [distanza lungo l'arto, raggio] con calotte arrotondate in cima e in fondo */
+function limbProfile(pts, capTop = true, capBottom = true) {
+  const out = [];
+  if (capTop) { const [d0, R] = pts[0]; for (let k = 0; k < 4; k++) { const f = k / 4 * Math.PI / 2; out.push([d0 - R * Math.cos(f), R * Math.sin(f)]); } }
+  out.push(...pts);
+  if (capBottom) { const [d1, R] = pts[pts.length - 1]; for (let k = 1; k <= 4; k++) { const f = k / 4 * Math.PI / 2; out.push([d1 + R * Math.sin(f), R * Math.cos(f)]); } }
+  return out;
+}
+const ARM_PROFILE = limbProfile([[0, 0.08], [0.06, 0.076], [0.14, 0.071], [0.2, 0.067], [0.24, 0.064], [0.27, 0.062], [0.3, 0.061], [0.33, 0.06], [0.36, 0.06], [0.42, 0.058], [0.48, 0.054], [0.53, 0.049], [0.575, 0.043]]);
+const LEG_PROFILE = limbProfile([[0, 0.095], [0.08, 0.1], [0.18, 0.098], [0.28, 0.092], [0.35, 0.086], [0.39, 0.081], [0.42, 0.078], [0.44, 0.076], [0.46, 0.076], [0.49, 0.077], [0.54, 0.078], [0.6, 0.075], [0.68, 0.068], [0.76, 0.06], [0.83, 0.055]]);
+const NECK_PROFILE = [[0, 0.074], [0.06, 0.068], [0.12, 0.064], [0.18, 0.062], [0.22, 0.062]];
+const SEG = 14;
+const skinGeoCache = new Map();
+
+/**
+ * Costruisce la geometria del corpo (coordinate del gruppo "body" a riposo).
+ * B = indici delle ossa; mats = indici dei materiali; opz = varianti della skin.
+ */
+function bodyGeometry(o) {
+  const P = [], N = [], U = [], SI = [], SW = [], tris = new Map();
+  const tri = (m, a, b, c) => { if (!tris.has(m)) tris.set(m, []); tris.get(m).push(a, b, c); };
+  const vert = (x, y, z, nx, ny, nz, u, v, w) => {
+    P.push(x, y, z); N.push(nx, ny, nz); U.push(u, v);
+    const e = Object.entries(w).filter(([, k]) => k > 1e-4).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const tot = e.reduce((s, [, k]) => s + k, 0) || 1;
+    for (let i = 0; i < 4; i++) { SI.push(e[i] ? +e[i][0] : 0); SW.push(e[i] ? e[i][1] / tot : 0); }
+    return P.length / 3 - 1;
+  };
+  /**
+   * tubo verticale: profile [d, r] (d cresce verso il basso, o verso l'alto se up), centro (cx, y0, cz).
+   * ring(d) → { m: materiale, s: scala raggio, sx: scala in x, w: pesi {osso: peso} }; split = d dove cambia stoffa (orlo)
+   */
+  const tube = (profile, cx, y0, cz, ring, up = false, splits = []) => {
+    // normali dal profilo (prima degli orli)
+    const nrm = profile.map((p, i) => {
+      const a = profile[Math.max(0, i - 1)], b = profile[Math.min(profile.length - 1, i + 1)];
+      const dr = b[1] - a[1], dd = b[0] - a[0];
+      if (p[1] < 1e-4) return [0, i === 0 ? -1 : 1];
+      const l = Math.hypot(dr, dd) || 1; return [dd / l, -dr / l];   // [radiale, lungo d]
+    });
+    const rows = [];
+    profile.forEach((p, i) => {
+      rows.push({ d: p[0], r: p[1], n: nrm[i] });
+      const sp = splits.find(x => x > p[0] && i + 1 < profile.length && x <= profile[i + 1][0]);
+      if (sp !== undefined) {
+        const nx = profile[i + 1], k = (sp - p[0]) / (nx[0] - p[0]), r = p[1] + (nx[1] - p[1]) * k;
+        rows.push({ d: sp - 1e-5, r, n: nrm[i], hemA: true });
+        rows.push({ d: sp + 1e-5, r, n: nrm[i + 1], hemB: true });
+      }
+    });
+    let len = 0;
+    const idx = rows.map((row, i) => {
+      if (i) len += Math.hypot(row.d - rows[i - 1].d, row.r - rows[i - 1].r);
+      const R = ring(row.d), sgn = up ? 1 : -1, y = y0 + sgn * row.d;
+      const out = [];
+      for (let j = 0; j <= SEG; j++) {
+        const th = j / SEG * Math.PI * 2, sn = Math.sin(th), cs = Math.cos(th);
+        const rx = -sn, rz = -cs;                                    // giunzione delle uv sul retro
+        let nx = row.n[0] * rx / R.sx, ny = row.n[1] * sgn, nz = row.n[0] * rz;
+        const l = Math.hypot(nx, ny, nz) || 1;
+        out.push(vert(cx + rx * row.r * R.s * R.sx, y, cz + rz * row.r * R.s, nx / l, ny / l, nz / l, j / SEG, len / 0.5, R.w));
+      }
+      return { out, m: R.m };
+    });
+    for (let i = 0; i < idx.length - 1; i++) {
+      const A = idx[i].out, Bv = idx[i + 1].out, m = idx[i].m;
+      for (let j = 0; j < SEG; j++) {
+        if (up) { tri(m, A[j], A[j + 1], Bv[j]); tri(m, A[j + 1], Bv[j + 1], Bv[j]); }
+        else { tri(m, A[j], Bv[j], A[j + 1]); tri(m, A[j + 1], Bv[j], Bv[j + 1]); }
+      }
+    }
+  };
+  const B = o.B;
+  // ── gambe ──
+  for (let i = 0; i < 2; i++) {
+    const sd = i ? 1 : -1, L = i ? B.legR : B.legL;
+    const hemD = o.shorts ? 0.36 : 99;
+    tube(LEG_PROFILE, 0.105 * sd, RIG.hip, 0, (d) => {
+      const kw = smoothstep(0.37, 0.51, d), aw = 0.7 * smoothstep(0.8, 0.88, d);
+      const thighX = 1.04 * o.wk, s = d > hemD ? 0.86 : 1;
+      return { m: d > hemD ? o.M.skin : o.M.pants, s, sx: thighX + (1 - thighX) * smoothstep(0.3, 0.46, d), w: { [L[0]]: (1 - kw), [L[1]]: kw * (1 - aw), [L[2]]: kw * aw } };
+    }, false, o.shorts ? [hemD] : []);
+  }
+  // ── braccia ──
+  for (let i = 0; i < 2; i++) {
+    const sd = i ? 1 : -1, A = i ? B.armR : B.armL;
+    const hemD = o.upperM === o.foreM ? 99 : o.upperM === o.M.shirt ? 0.215 : 0.3;
+    tube(ARM_PROFILE, RIG.shoulderX * sd, RIG.hip + RIG.shoulderY, 0, (d) => {
+      const ew = smoothstep(0.24, 0.36, d), hw = 0.6 * smoothstep(0.56, 0.63, d);
+      const upper = d < hemD;
+      const s = upper ? (o.sleeveless ? 0.89 : 1) : (o.short ? 0.9 : 1);
+      return { m: upper ? o.upperM : o.foreM, s, sx: 1, w: { [A[0]]: 1 - ew, [A[1]]: ew * (1 - hw), [A[2]]: ew * hw } };
+    }, false, hemD < 9 ? [hemD] : []);
+  }
+  // ── collo: dal busto alla testa ──
+  tube(NECK_PROFILE, 0, RIG.hip + 0.54, 0, (d) => ({ m: o.M.neck, s: 1, sx: 1, w: { [B.torso]: 1 - smoothstep(0.08, 0.17, d), [B.head]: smoothstep(0.08, 0.17, d) } }), true);
+  // ── busto e bacino (le spalle seguono un po' le braccia, il bacino un po' le gambe) ──
+  const addRigid = (g, dy, m, wfn) => {
+    const gp = g.attributes.position, gn = g.attributes.normal, gu = g.attributes.uv, base = P.length / 3;
+    for (let k = 0; k < gp.count; k++) {
+      const x = gp.getX(k), y = gp.getY(k) + dy, z = gp.getZ(k);
+      vert(x, RIG.hip + y, z, gn.getX(k), gn.getY(k), gn.getZ(k), gu.getX(k), gu.getY(k), wfn(x, y, z));
+    }
+    const id = g.index;
+    for (let k = 0; k < id.count; k += 3) tri(m, base + id.getX(k), base + id.getX(k + 1), base + id.getX(k + 2));
+  };
+  addRigid(torsoGeo(1), 0.02, o.M.shirt, (x, y) => {
+    const ws = 0.55 * smoothstep(0.15, 0.235, Math.abs(x)) * smoothstep(0.36, 0.47, y);
+    return { [B.torso]: 1 - ws, [x < 0 ? B.armL[0] : B.armR[0]]: ws };
+  });
+  addRigid(pelvisGeo(), 0.04, o.M.pants, (x, y) => {
+    const wh = 0.45 * smoothstep(0.0, 0.11, Math.abs(x)) * smoothstep(0.04, -0.07, y);
+    return { [B.torso]: 1 - wh, [x < 0 ? B.legL[0] : B.legR[0]]: wh };
+  });
+  // gruppi per materiale (un'unica draw call per stoffa)
+  const g = new THREE.BufferGeometry(), index = [];
+  for (const [m, t] of [...tris.entries()].sort((a, b) => a[0] - b[0])) { g.addGroup(index.length, t.length, m); index.push(...t); }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+  g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(SI, 4));
+  g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(SW, 4));
+  g.setIndex(index);
+  g.userData.shared = true;
+  return g;
+}
+
+function buildBodySkin(skin, R) {
+  const bones = [R.torso, R.legs[0], R.knees[0], R.feet[0], R.legs[1], R.knees[1], R.feet[1], R.arms[0], R.elbows[0], R.hands[0], R.arms[1], R.elbows[1], R.hands[1], R.head];
+  const B = { torso: 0, legL: [1, 2, 3], legR: [4, 5, 6], armL: [7, 8, 9], armR: [10, 11, 12], head: 13 };
+  // materiali: indici fissi 0..3 (maglia, pantaloni, pelle, collo)
+  const materials = [R.shirtM, R.pantsM, R.skinM, R.neckM];
+  const M = { shirt: 0, pants: 1, skin: 2, neck: 3 };
+  const upperM = skin.sleeveless ? M.skin : M.shirt, foreM = skin.short ? M.skin : M.shirt;
+  const key = [skin.shorts ? 1 : 0, skin.wide ? 1 : 0, upperM, foreM].join('|');
+  let geo = skinGeoCache.get(key);
+  if (!geo) {
+    geo = bodyGeometry({ B, M, upperM, foreM, shorts: !!skin.shorts, sleeveless: !!skin.sleeveless, short: !!skin.short, wk: skin.wide ? 1.13 : 1 });
+    skinGeoCache.set(key, geo);
+  }
+  const m = new THREE.SkinnedMesh(geo, materials);
+  m.castShadow = true;
+  m.name = 'bodySkin';
+  // rig a riposo per il "bind": tutte le articolazioni sono ancora nella posa iniziale
+  const top = R.torso.parent;
+  top.add(m);
+  let root = top; while (root.parent) root = root.parent;
+  root.updateMatrixWorld(true);
+  m.bind(new THREE.Skeleton(bones), m.matrixWorld);
+  top.remove(m);
+  m.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.95, 0), 1.35);   // copre tutte le pose
+  return m;
+}
 
 // ─────────────── Eroi anime originali (Leo, Tamsin, Oren) ───────────────
 // Riproducono i tre personaggi dello script Blender "original_anime_heroes_rigged.py"
@@ -1047,37 +1196,15 @@ function lodGeometry(skin, cos = {}) {
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
 export { buildWeaponMesh } from './weapons.js?v=13';
+import { buildConsumableMesh } from './items.js?v=13';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
 export function buildItemMesh(kind, id) {
   const g = new THREE.Group();
   if (kind === 'cons') {
-    switch (id) {
-      case 'bandage':
-        box(0.35, 0.12, 0.25, mat('#f2ece0'), 0, 0, 0, g);
-        box(0.36, 0.13, 0.06, mat('#d03030'), 0, 0, 0, g);
-        break;
-      case 'medkit':
-        box(0.5, 0.35, 0.22, mat('#f4f4f4'), 0, 0, 0, g);
-        box(0.08, 0.24, 0.23, mat('#e02828'), 0, 0, 0, g);
-        box(0.24, 0.08, 0.23, mat('#e02828'), 0, 0, 0, g);
-        break;
-      case 'minishield': {
-        const m = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8),
-          new THREE.MeshStandardMaterial({ color: '#4ab8ff', emissive: '#1a70ff', emissiveIntensity: 0.8, transparent: true, opacity: 0.85 }));
-        g.add(m);
-        box(0.06, 0.08, 0.06, mat('#dddddd'), 0, 0.18, 0, g);
-        break;
-      }
-      case 'shield': {
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.36, 10),
-          new THREE.MeshStandardMaterial({ color: '#3a7dff', emissive: '#1a4aff', emissiveIntensity: 0.9, transparent: true, opacity: 0.85 }));
-        g.add(m);
-        box(0.1, 0.1, 0.1, mat('#dddddd'), 0, 0.23, 0, g);
-        break;
-      }
-    }
+    const c = buildConsumableMesh(id);
+    if (c) return c;
   } else if (kind === 'ammo') {
     box(0.4, 0.22, 0.26, mat('#3e4a2c'), 0, 0, 0, g);
     box(0.41, 0.07, 0.27, mat(idColor(id)), 0, 0.04, 0, g);

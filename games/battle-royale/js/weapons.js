@@ -529,17 +529,26 @@ function iconTeardown() {
 }
 /** immagine (data URL) dell'arma vista di lato, oppure null se WebGL non è disponibile */
 export function weaponIcon(id, rarity = 0) {
-  const key = id + '|' + rarity;
+  if (!MODELS[id]) return null;
+  return renderIcon(id + '|' + rarity, () => buildWeaponMesh(id, rarity), [0.05, -Math.PI / 2 + 0.12, 0], IW, IH);   // canna verso destra
+}
+/**
+ * Foto di un oggetto 3D su sfondo trasparente (data URL, in cache per chiave).
+ * build() crea l'oggetto, rot è la rotazione [x, y, z], w×h la dimensione in pixel.
+ */
+export function renderIcon(key, build, rot = [0, 0, 0], w = IW, h = IH) {
   if (ICONS.has(key)) return ICONS.get(key);
-  if (!MODELS[id] || !iconSetup()) { ICONS.set(key, null); return null; }
-  const g = buildWeaponMesh(id, rarity);
+  if (!iconSetup()) { ICONS.set(key, null); return null; }
+  iconR.setSize(w, h, false);
+  iconCam.aspect = w / h; iconCam.updateProjectionMatrix();
+  const g = build();
   const piv = new THREE.Group(); piv.add(g);
-  piv.rotation.set(0.05, -Math.PI / 2 + 0.12, 0);     // canna verso destra, un filo di prospettiva
+  piv.rotation.set(rot[0], rot[1], rot[2]);
   iconScene.add(piv);
   piv.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(piv), c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
   piv.position.sub(c);
-  const fit = Math.max(size.x / (IW / IH), size.y) * 1.08;
+  const fit = Math.max(size.x / (w / h), size.y) * 1.08;
   iconCam.position.set(0, 0.04 * fit, fit / (2 * Math.tan(THREE.MathUtils.degToRad(iconCam.fov / 2))) + size.z * 0.5);
   iconCam.lookAt(0, 0, 0);
   iconR.setClearColor(0x000000, 0);

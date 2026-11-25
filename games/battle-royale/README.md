@@ -24,6 +24,16 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: corpo unico senza giunture e cure rifatte
+
+- **Personaggi senza giunture**: busto, collo, braccia e gambe sono ora un'unica mesh deformabile (skinning). Gomiti e ginocchia si piegano in modo morbido, le spalle sfumano nel busto e il collo nella testa: niente più sfere o pezzi staccati alle articolazioni. Le animazioni sono le stesse di prima e il corpo costa meno draw call.
+- Maniche corte e pantaloncini hanno un orlo vero; i polsini aderiscono al braccio.
+- **Bende**: due rotoli di garza con trama, spirale sulla testa, fascetta con croce rossa e un lembo srotolato.
+- **Medikit**: valigetta arrotondata in plastica graffiata, croce rossa in rilievo su entrambi i lati, fascia e angoli in gomma rossa, maniglia e chiusure in metallo.
+- **Mini scudo**: fiaschetta tonda di vetro con liquido azzurro luminoso, bollicine, tappo di sughero ed etichetta "+25".
+- **Pozione scudo**: bottiglia alta con liquido blu intenso, tappo zigrinato, anelli dorati ed etichetta con scudo e fulmine "+50".
+- **Icone nuove**: nella barra degli oggetti e nel messaggio "Raccogli" le emoji sono sostituite da foto dei modelli 3D.
+
 ### Novità: personaggi con stoffe e materiali veri
 
 - Ogni skin ha il suo **tessuto**: mimetica (Recluta, Tattico), ripstop, jeans con cuciture, lino, seta con fantasia (Tamsin, Samurai), gessato (Agente), maglia (Vichingo, Rapper), scozzese (Cowboy), quadretti (Giardiniera), tuta imbottita (Astronauta), squame (Drago), esagoni luminosi (Cyber), brina (Spettro), macchie (Zombie).
@@ -168,6 +178,7 @@ js/props.js     modelli low-poly (alberi, rocce, legna, mattoni, barili, casetta
 models/         cartella facoltativa per i file .glb originali
 js/character.js modelli 3D di personaggi, armi, deltaplano e bus
 js/chartex.js   texture dei personaggi: tessuti, fantasie, pelle, capelli
+js/items.js     consumabili 3D (bende, medikit, scudi) e loro icone
 js/audio.js     effetti sonori sintetizzati
 js/main.js      ciclo di gioco, giocatore, arrampicata, IA dei bot, combattimento, HUD
 js/site.js      scene 3D e animazioni del sito

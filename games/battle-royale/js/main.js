@@ -22,6 +22,7 @@ import { createWeather } from './weather.js?v=13';
 import { createEvents } from './events.js?v=13';
 import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=13';
 import { weaponIcon } from './weapons.js?v=13';
+import { consIcon } from './items.js?v=13';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=13';
 import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=13';
 import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=13';
@@ -2396,6 +2397,11 @@ function weaponIconHTML(id, rarity, cls = 'wi') {
   const url = weaponIcon(id, rarity);
   return url ? `<img class="${cls}" src="${url}" alt="" draggable="false">` : weaponSVG(id, rarity);
 }
+/** icona del consumabile: foto del modello 3D (o emoji se WebGL non riesce a farla) */
+function consIconHTML(id, cls = 'ci') {
+  const url = consIcon(id);
+  return url ? `<img class="${cls}" src="${url}" alt="" draggable="false">` : CONSUMABLES[id].icon;
+}
 function weaponSVG(id, rarity) {
   const def = WEAPONS[id];
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -2473,7 +2479,7 @@ function updateHUD(dt) {
       let inner = '', rb = '', cnt = '';
       if (!x) inner = i === p.active ? '<span style="font-size:24px">⛏️</span>' : '';
       else if (x.kind === 'weapon') { inner = weaponIconHTML(x.id, x.rarity); rb = RARITIES[x.rarity].color; }
-      else { inner = CONSUMABLES[x.id].icon; rb = RARITIES[CONSUMABLES[x.id].rarity].color; cnt = 'x' + x.count; }
+      else { inner = consIconHTML(x.id); rb = RARITIES[CONSUMABLES[x.id].rarity].color; cnt = 'x' + x.count; }
       const bg = rb ? `background:linear-gradient(180deg, rgba(0,0,0,.45), ${rb}55)` : '';
       return `<div class="slot ${i === p.active ? 'on' : ''}" style="${bg}"><span class="k">${i + 1}</span>${inner}<span class="c">${cnt}</span>${rb ? `<div class="rbar" style="background:${rb}"></div>` : ''}</div>`;
     }).join('');
@@ -2494,7 +2500,7 @@ function updateHUD(dt) {
     if (G.interact.loot) {
       const it = G.interact.loot.item;
       const col = it.kind === 'weapon' ? RARITIES[it.rarity].color : '#fff';
-      pr = `<span style="border-color:${col}"><kbd class="kbE">E</kbd> Raccogli ${it.kind === 'weapon' ? weaponIconHTML(it.id, it.rarity, 'wi pi') : ''}${itemLabel(it)}</span>`;
+      pr = `<span style="border-color:${col}"><kbd class="kbE">E</kbd> Raccogli ${it.kind === 'weapon' ? weaponIconHTML(it.id, it.rarity, 'wi pi') : it.kind === 'cons' ? consIconHTML(it.id, 'ci pi') : ''}${it.kind === 'cons' ? `${CONSUMABLES[it.id].name} x${it.count}` : itemLabel(it)}</span>`;
       hud.prompt.style.borderLeftColor = col;
     } else { pr = tk('<kbd>E</kbd> Apri il forziere ✨', 'Forziere ✨ tocca <b>APRI</b>'); hud.prompt.style.borderLeftColor = '#ffd24a'; }
   } else if (G.climbHint && p.alive && p.mode === 'ground') { pr = tk('🧗 <kbd>W</kbd> + <kbd>Spazio</kbd> per arrampicarti', '🧗 Spingi avanti + <b>SALTA</b> per arrampicarti'); hud.prompt.style.borderLeftColor = '#7fe07a'; }
@@ -3327,8 +3333,9 @@ $('#loading').classList.add('hidden');
 // icone delle armi: preparate poco per volta, quando il menu è già visibile
 {
   const q = [];
+  for (const id of Object.keys(CONSUMABLES)) q.push([id, -1]);
   for (const id of Object.keys(WEAPONS)) for (let r = 0; r < RARITIES.length; r++) q.push([id, r]);
-  const tick = () => { if (!q.length) return; const [id, r] = q.shift(); weaponIcon(id, r); setTimeout(tick, 40); };
+  const tick = () => { if (!q.length) return; const [id, r] = q.shift(); if (r < 0) consIcon(id); else weaponIcon(id, r); setTimeout(tick, 40); };
   setTimeout(tick, 1200);
 }
 requestAnimationFrame(frame);

@@ -1,8 +1,8 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { REAL, attachReal, realKind } from './realchar.js?v=30';
+import { REAL, attachReal, realKind } from './realchar.js?v=31';
 import { normalFromHeight, NORMALS } from './texgen.js?v=19';
-import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=30';
+import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=31';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
 import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=29';
@@ -1241,8 +1241,8 @@ function buildHat(id, skin, head) {
     }
     case 'cowboy': {
       // v30: corona con la piega in cima e tesa in cuoio rialzata ai lati, fascia con fibbia
-      const l = texMat('leather', H.color, { side: THREE.DoubleSide });
-      mesh(cachedGeo('cowCrown30', () => lathe([[0.214, -0.012], [0.213, 0.04], [0.205, 0.13], [0.196, 0.19], [0.17, 0.215], [0.1, 0.212], [0.03, 0.185], [0.0, 0.18]], 22, 1, 1.12)), l, 0, 0, 0, g);
+      const l = texMat('felt', H.color, { side: THREE.DoubleSide });   // v31: feltro (prima cuoio)
+      mesh(cachedGeo('cowCrown31', () => lathe([[0.214, -0.012], [0.213, 0.04], [0.205, 0.13], [0.196, 0.19], [0.17, 0.215], [0.1, 0.212], [0.03, 0.185], [0.0, 0.18]], 32, 1, 1.12, 3)), l, 0, 0, 0, g);
       mesh(cachedGeo('cowDent30', () => { const b = new THREE.BoxGeometry(0.035, 0.03, 0.3, 1, 1, 6); return b; }), mat(darker(H.color, 0.55), { roughness: 0.6 }), 0, 0.188, 0.0, g);
       mesh(cachedGeo('cowBrim30', () => brimGeo(0.212, 0.4, 1.12, (r, a) => 2.4 * r * r * Math.cos(a) ** 2 - 0.35 * r * r * Math.sin(a) ** 2 * (Math.sin(a) > 0 ? 1 : 0.4))), l, 0, -0.005, 0, g);
       mesh(cachedGeo('cowBand30', () => lathe([[0.2155, 0.0], [0.2145, 0.04]], 22, 1, 1.12)), texMat('leather', '#2a1a10', { side: THREE.DoubleSide }), 0, 0, 0, g);
@@ -1283,8 +1283,8 @@ function buildHat(id, skin, head) {
     }
     case 'tophat': {
       // v30: cilindro in feltro con la corona appena svasata e la tesa arrotolata ai lati
-      const felt = texMat('suit', H.color, { side: THREE.DoubleSide });
-      mesh(cachedGeo('topCrown30', () => lathe([[0.213, -0.01], [0.206, 0.08], [0.2, 0.18], [0.208, 0.3], [0.218, 0.355], [0.214, 0.362], [0.0, 0.364]], 24, 1, 1.1)), felt, 0, 0, 0, g);
+      const felt = texMat('felt', H.color, { side: THREE.DoubleSide });
+      mesh(cachedGeo('topCrown31', () => lathe([[0.213, -0.01], [0.206, 0.08], [0.2, 0.18], [0.208, 0.3], [0.218, 0.355], [0.214, 0.362], [0.0, 0.364]], 32, 1, 1.1, 3)), felt, 0, 0, 0, g);
       mesh(cachedGeo('topBrim30', () => brimGeo(0.21, 0.315, 1.1, (r, a) => 3.6 * r * r * Math.cos(a) ** 2 - 0.4 * r * r)), felt, 0, -0.004, 0, g);
       mesh(cachedGeo('topBand30', () => lathe([[0.2075, 0.012], [0.2045, 0.07]], 24, 1, 1.1)), texMat('silk', H.accent || '#a01a2a', { side: THREE.DoubleSide }), 0, 0, 0, g);
       mesh(boxGeo(0.04, 0.05, 0.012), texMat('silk', H.accent || '#a01a2a'), 0.12, 0.04, 0.19, g).rotation.y = 0.55;
@@ -1304,7 +1304,7 @@ function buildHat(id, skin, head) {
     }
     case 'wizard': {
       // v30: cappello a punta floscio, piegato all'indietro, tesa ondulata, nastro e stelle
-      const c2 = texMat('silk', H.color, { side: THREE.DoubleSide });
+      const c2 = texMat('felt', H.color, { side: THREE.DoubleSide });
       mesh(cachedGeo('wizBrim30', () => brimGeo(0.21, 0.37, 1.05, (r, a) => 0.035 * Math.sin(a * 3 + 0.5) * (r / 0.16) - 0.3 * r * r)), c2, 0, -0.006, 0, g);
       mesh(cachedGeo('wizCone30', () => {
         const b = new THREE.ConeGeometry(0.214, 0.62, 22, 14, true); b.translate(0, 0.31, 0);
@@ -1346,7 +1346,7 @@ function buildHat(id, skin, head) {
       mesh(torusGeo(0.17, 0.02, 20), glowMat(H.color), 0, 0.22, 0, g).rotation.x = Math.PI / 2;
       break;
     case 'beret': {
-      const bm = texMat('knit', H.color);
+      const bm = texMat('felt', H.color);
       const bg = new THREE.Group(); bg.rotation.set(-0.08, 0, 0.22); bg.position.y = -0.055; g.add(bg);
       mesh(sphereGeo(18, 10), bm, -0.03, 0.125, -0.01, bg, 0.255, 0.075, 0.245);
       mesh(torusGeo(0.206, 0.016, 22), mat(darker(H.color, 0.6), { roughness: 0.8 }), 0, 0.07, 0, bg).rotation.x = Math.PI / 2;
@@ -1377,12 +1377,31 @@ function buildHat(id, skin, head) {
       break;
     }
     case 'santa': {
-      const red = texMat('knit', H.color), fur = mat(H.accent, { roughness: 1, map: fabricTex() });
-      mesh(torusGeo(0.212, 0.042, 22), fur, 0, -0.01, 0, g).rotation.x = Math.PI / 2;
-      const c1 = mesh(cylGeo(0.07, 0.212, 0.26, 18), red, 0, 0.15, -0.02, g); c1.rotation.x = -0.3;
-      sph(0.07, red, 0, 0.274, -0.058, g);
-      const c2 = mesh(coneGeo(0.07, 0.22, 14), red, 0, 0.228, -0.158, g); c2.rotation.x = -2.0;
-      sph(0.05, fur, 0, 0.182, -0.262, g);
+      // v31: velluto morbido che si piega e ricade di lato, bordo e pon pon di pelliccia a ciuffi
+      const red = texMat('felt', H.color, { side: THREE.DoubleSide }), fur = texMat('plush', H.accent);
+      const tipAt = (t) => new THREE.Vector3(0.2 * t * t * t * t + 0.01 * t, 0.43 * t - 0.17 * t * t * t * t, -0.1 * t * t);
+      mesh(cachedGeo('santaCone31b', () => {
+        const b = new THREE.CylinderGeometry(0.0, 1, 1, 24, 16, true); b.translate(0, 0.5, 0);
+        const q = b.attributes.position;
+        for (let i = 0; i < q.count; i++) {
+          const t = q.getY(i), r = 0.216 * (1 - Math.pow(t, 1.25)) * (1 - 0.15 * t) + 0.012 * (1 - t) * Math.sin(Math.atan2(q.getX(i), q.getZ(i)) * 5 + t * 9);
+          const c = tipAt(t), ax = q.getX(i), az = q.getZ(i), l = Math.hypot(ax, az) || 1;
+          q.setXYZ(i, c.x + ax / l * r, c.y, c.z + az / l * r * 1.04);
+        }
+        b.computeVertexNormals(); return b;
+      }), red, 0, 0.0, 0, g);
+      mesh(cachedGeo('santaTrim31', () => {
+        const b = new THREE.TorusGeometry(0.218, 0.045, 10, 40); b.rotateX(Math.PI / 2);
+        const q = b.attributes.position;
+        for (let i = 0; i < q.count; i++) { const x = q.getX(i), y = q.getY(i), z = q.getZ(i), a = Math.atan2(x, z); const k = 1 + 0.06 * Math.sin(a * 23) * Math.cos(y * 60); q.setXYZ(i, x * (1 + (k - 1) * 0.3), y * k, z * 1.04 * (1 + (k - 1) * 0.3)); }
+        b.computeVertexNormals(); return b;
+      }), fur, 0, 0.0, 0, g);
+      const tp = tipAt(1);
+      mesh(cachedGeo('santaPom31', () => {
+        const b = new THREE.IcosahedronGeometry(0.055, 3), q = b.attributes.position;
+        for (let i = 0; i < q.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(q, i); const k = 1 + 0.12 * Math.sin(v.x * 140) * Math.sin(v.y * 130) * Math.sin(v.z * 150); q.setXYZ(i, v.x * k, v.y * k, v.z * k); }
+        b.computeVertexNormals(); return b;
+      }), fur, tp.x + 0.02, tp.y - 0.04, tp.z, g);
       break;
     }
     case 'foxears': {
@@ -1421,7 +1440,7 @@ function buildHat(id, skin, head) {
     }
     case 'bucket': {
       // cappello a secchiello da esploratore (Leo), leggermente inclinato all'indietro
-      const bm = texMat('cotton', H.color, { side: THREE.DoubleSide });
+      const bm = texMat('ripstop', H.color, { side: THREE.DoubleSide });
       const bg = new THREE.Group(); bg.rotation.x = -0.12; g.add(bg);
       mesh(cylGeo(0.17, 0.2, 0.16, 22), bm, 0, 0.12, 0, bg);
       mesh(domeGeo(Math.PI / 2, 22), bm, 0, 0.199, 0, bg, 0.17, 0.035, 0.17);
@@ -1532,10 +1551,18 @@ function buildBack(id, skin, torso) {
     }
     case 'surf': {
       const sg = new THREE.Group(); sg.rotation.z = 0.28; sg.position.set(0, 0.05, -0.1); g.add(sg);
-      mesh(capsuleGeo(0.16, 0.74, 14), texMat('wood', B.color, { roughness: 0.22 }), 0, 0, 0, sg, 1, 1, 0.13);
-      mesh(boxGeo(0.045, 0.92, 0.044), mat(B.accent, { roughness: 0.3 }), 0, 0, 0, sg);
-      for (const y of [0.3, -0.28]) mesh(boxGeo(0.25, 0.02, 0.043), mat('#ff7a2a', { roughness: 0.3 }), 0, y, 0, sg);
-      mesh(boxGeo(0.008, 0.08, 0.07), mat(B.accent), 0, -0.4, -0.05, sg).rotation.x = 0.2;   // pinna
+      // v31: tavola in vetroresina lucida (niente venature di legno), listello centrale, bordi colorati e grafica
+      sg.scale.setScalar(0.9);
+      const glass = new THREE.MeshPhysicalMaterial({ color: B.color, roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.08 });
+      const accM = new THREE.MeshPhysicalMaterial({ color: B.accent, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.1 });
+      mesh(capsuleGeo(0.16, 0.74, 18), glass, 0, 0, 0, sg, 1, 1, 0.13);
+      mesh(capsuleGeo(0.163, 0.74, 18), accM, 0, 0, 0.0, sg, 1, 1.002, 0.06);                    // bordo (rail) colorato
+      mesh(boxGeo(0.006, 1.02, 0.044), texMat('wood', '#c89a5a'), 0, 0, 0, sg);                   // listello di legno
+      for (const [y, w] of [[0.27, 0.2], [0.21, 0.24]]) mesh(boxGeo(w, 0.018, 0.0435), accM, 0, y, 0, sg);
+      mesh(cylGeo(0.06, 0.06, 0.0436, 20), mat('#ff7a2a', { roughness: 0.3 }), 0, -0.12, 0, sg).rotation.x = Math.PI / 2;   // logo
+      mesh(cylGeo(0.04, 0.04, 0.0438, 20), glass, 0, -0.12, 0, sg).rotation.x = Math.PI / 2;
+      for (const [dx, h] of [[0, 0.09], [0.06, 0.07], [-0.06, 0.07]]) mesh(boxGeo(0.006, h, 0.075), accM, dx, -0.42, -0.055, sg).rotation.x = 0.25;   // tre pinne
+      mesh(cylGeo(0.004, 0.004, 0.3, 6), mat('#202020', { roughness: 0.6 }), 0, -0.6, -0.03, sg);   // leash
       sling();
       break;
     }

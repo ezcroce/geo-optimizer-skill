@@ -120,7 +120,7 @@ const T = {
     for (let y = 0; y < S; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < S; x += 8) g.fillRect(x + 1, y + 1, 5, 5);
   }, (g, S) => { g.fillStyle = '#b8b8b8'; for (let y = 0; y < S; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < S; x += 8) g.fillRect(x + 1, y + 1, 5, 5); }, 0.7, 1),
   /** v23: paglia intrecciata */
-  straw: () => make('straw', 64, (g, S, rnd) => {
+  straw: () => make('straw', 128, (g, S, rnd) => {
     g.fillStyle = '#ececec'; g.fillRect(0, 0, S, S);
     for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 8) {
       const o = (y / 4) % 2 ? 4 : 0;
@@ -129,7 +129,7 @@ const T = {
     }
   }, (g, S) => { for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 8) { const o = (y / 4) % 2 ? 4 : 0; g.fillStyle = '#c8c8c8'; g.fillRect(x + o, y, 7, 3); g.fillStyle = '#404040'; g.fillRect(x + o + 7, y, 1, 4); } }, 1.3, 3),
   /** v23: cordura (nylon spesso degli zaini) a trama a canestro */
-  cordura: () => make('cordura', 64, (g, S, rnd) => {
+  cordura: () => make('cordura', 128, (g, S, rnd) => {
     g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, S, S);
     for (let y = 0; y < S; y += 2) for (let x = 0; x < S; x += 2) {
       const on = ((x >> 1) + (y >> 1)) % 2;
@@ -143,7 +143,7 @@ const T = {
     for (let x = 0; x < S; x += 2) { g.fillStyle = x % 4 ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.12)'; g.fillRect(x, 0, 1, S); }
   }, (g, S) => { for (let x = 0; x < S; x += 2) { g.fillStyle = x % 4 ? '#505050' : '#b0b0b0'; g.fillRect(x, 0, 1, S); } }, 1.0, 4),
   /** maglia: colonne di punti a V */
-  knit: () => make('knit', 64, (g, S) => {
+  knit: () => make('knit', 128, (g, S) => {
     g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, S, S);
     for (let x = 0; x < S; x += 6) for (let y = 0; y < S; y += 5) {
       g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1.6;
@@ -174,6 +174,25 @@ const T = {
       for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); g.stroke(); }
     }
   }, 0.6, 2),
+  /** v31: feltro (cappelli): fibre corte intrecciate a caso, leggera peluria e variazioni di tono */
+  felt: () => make('felt', 128, (g, S, rnd) => {
+    g.fillStyle = '#e6e6e6'; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 9; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},0.035)`; const x = rnd() * S, y = rnd() * S; wrap(S, x, y, 40, (px, py) => blob(g, px, py, 18 + rnd() * 16, mulberry(i * 31 + 5), 1.2)); }
+    for (let i = 0; i < 2600; i++) {
+      const x = rnd() * S, y = rnd() * S, a = rnd() * Math.PI, l = 1.5 + rnd() * 3;
+      g.strokeStyle = rnd() < 0.5 ? `rgba(255,255,255,${0.06 + rnd() * 0.08})` : `rgba(0,0,0,${0.05 + rnd() * 0.07})`; g.lineWidth = 0.6;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+  }, (g, S, rnd) => {
+    for (let i = 0; i < 2000; i++) { const x = rnd() * S, y = rnd() * S, a = rnd() * Math.PI, l = 1.5 + rnd() * 3; g.strokeStyle = rnd() < 0.5 ? '#9a9a9a' : '#666'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke(); }
+  }, 0.8, 3),
+  /** v31: pelliccia sintetica (bordi del cappello di Natale): ciuffi morbidi */
+  plush: () => make('plush', 128, (g, S, rnd) => {
+    g.fillStyle = '#ececec'; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 700; i++) { const x = rnd() * S, y = rnd() * S, r = 2 + rnd() * 4; const gr = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 0.5, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0.12)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  }, (g, S, rnd) => {
+    for (let i = 0; i < 700; i++) { const x = rnd() * S, y = rnd() * S, r = 2 + rnd() * 4; const gr = g.createRadialGradient(x, y, 0.5, x, y, r); gr.addColorStop(0, '#d8d8d8'); gr.addColorStop(1, '#505050'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  }, 1.6, 2),
   /** abito gessato */
   suit: () => make('suit', 64, (g, S, rnd) => {
     g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, S, S);
@@ -200,14 +219,14 @@ const T = {
     }
   }, 2.2, 2),
   /** cuoio con grana a puntini e piccole pieghe */
-  leather: () => make('leather', 128, (g, S, rnd) => {
+  leather: () => make('leather', 256, (g, S, rnd) => {
     g.fillStyle = '#e2e2e2'; g.fillRect(0, 0, S, S);
-    for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.04 + rnd() * 0.06})`; g.beginPath(); g.arc(rnd() * S, rnd() * S, 0.8 + rnd() * 1.4, 0, 7); g.fill(); }
-    for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(0,0,0,${0.06 + rnd() * 0.08})`; g.lineWidth = 0.8; g.beginPath(); const x = rnd() * S, y = rnd() * S; g.moveTo(x, y); g.quadraticCurveTo(x + (rnd() - 0.5) * 14, y + (rnd() - 0.5) * 6, x + (rnd() - 0.5) * 22, y + (rnd() - 0.5) * 8); g.stroke(); }
+    for (let i = 0; i < 3600; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.04 + rnd() * 0.06})`; g.beginPath(); g.arc(rnd() * S, rnd() * S, 0.8 + rnd() * 1.4, 0, 7); g.fill(); }
+    for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(0,0,0,${0.06 + rnd() * 0.08})`; g.lineWidth = 0.8; g.beginPath(); const x = rnd() * S, y = rnd() * S; g.moveTo(x, y); g.quadraticCurveTo(x + (rnd() - 0.5) * 14, y + (rnd() - 0.5) * 6, x + (rnd() - 0.5) * 22, y + (rnd() - 0.5) * 8); g.stroke(); }
     const gr = g.createLinearGradient(0, 0, S, S); gr.addColorStop(0, 'rgba(255,255,255,0.06)'); gr.addColorStop(1, 'rgba(0,0,0,0.06)');
     g.fillStyle = gr; g.fillRect(0, 0, S, S);
   }, (g, S, rnd) => {
-    for (let i = 0; i < 700; i++) { g.fillStyle = rnd() < 0.5 ? '#949494' : '#6c6c6c'; g.beginPath(); g.arc(rnd() * S, rnd() * S, 1 + rnd() * 1.6, 0, 7); g.fill(); }
+    for (let i = 0; i < 2800; i++) { g.fillStyle = rnd() < 0.5 ? '#949494' : '#6c6c6c'; g.beginPath(); g.arc(rnd() * S, rnd() * S, 1 + rnd() * 1.6, 0, 7); g.fill(); }
   }, 0.7, 2),
   /** metallo spazzolato con pannelli e rivetti */
   metal: () => make('metal', 128, (g, S, rnd) => {
@@ -423,7 +442,7 @@ export const CLOTH_LOOK = {
   hex: { rough: 0.38, sheen: 0, coat: 0.6 }, scales: { rough: 0.45, sheen: 0, coat: 0.45 }, frost: { rough: 0.35, sheen: 0.6, coat: 0.3 },
   stains: { rough: 0.95, sheen: 0.3 },
   wood: { rough: 0.42, sheen: 0, coat: 0.55 }, feather: { rough: 0.9, sheen: 0.8, sheenRough: 0.5 }, membrane: { rough: 0.6, sheen: 0.25 },
-  rubber: { rough: 0.85, sheen: 0 }, straw: { rough: 0.9, sheen: 0.2 }, cordura: { rough: 0.7, sheen: 0.35 }, webbing: { rough: 0.75, sheen: 0.4 },
+  rubber: { rough: 0.85, sheen: 0 }, felt: { rough: 0.93, sheen: 0.8, sheenRough: 0.6 }, plush: { rough: 1, sheen: 1, sheenRough: 0.5 }, straw: { rough: 0.9, sheen: 0.2 }, cordura: { rough: 0.7, sheen: 0.35 }, webbing: { rough: 0.75, sheen: 0.4 },
 };
 
 /** stoffa di ogni skin: [maglia, pantaloni] (il resto usa cotone e jeans) */

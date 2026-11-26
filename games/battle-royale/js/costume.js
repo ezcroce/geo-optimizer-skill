@@ -512,6 +512,15 @@ function flushParts(ctx) {
     for (const o of list.slice(1)) { o.removeFromParent(); o.geometry.dispose(); }
   }
 }
+/** superficie della schiena (z minima del corpo + vestiti) alla quota y, entro |x - x0| < xr */
+function backAt(y, x0 = 0, xr = 0.06, dy = 0.03) {
+  let z = Infinity;
+  for (const m of [BODY, ...CLOTH]) {
+    const P = restOf(m).P;
+    for (let i = 0; i < P.length; i += 3) if (Math.abs(P[i + 1] - y) < dy && Math.abs(P[i] - x0) < xr && P[i + 2] < z) z = P[i + 2];
+  }
+  return z;
+}
 const mesh = (g, m, name) => { const o = new THREE.Mesh(g, m); o.name = 'cos_' + name; return o; };
 const hideMesh = (ctx, part) => { for (const k of Object.keys(ctx.meshes)) if (k.includes(part)) { ctx.meshes[k].removeFromParent(); delete ctx.meshes[k]; } };
 const meshBy = (ctx, part) => { const k = Object.keys(ctx.meshes).find(k => k.includes(part)); return k ? ctx.meshes[k] : null; };
@@ -538,6 +547,13 @@ function longsword(L = 1.05, grip = MAT.leather('#3a2414'), metal = MAT.gold()) 
   g.add(mesh(taper([v3(0, blade + 0.02, 0), v3(0, blade + 0.2, 0)], () => 0.013, 6, 8, { along: true }), grip, 'impugnatura'));
   g.add(mesh(rigid(new THREE.SphereGeometry(0.024, 12, 8).scale(1, 1, 0.6).translate(0, blade + 0.22, 0)), metal, 'pomolo'));
   return g;
+}
+
+/** spada appesa al fianco: guardia in `guard`, il fodero scende inclinato all'indietro di `back` rad e in fuori di `out` */
+function hangSword(ctx, sw, blade, guard, back, out) {
+  const dir = v3(-out, 1, Math.tan(back)).normalize();                     // dal puntale verso l'elsa
+  const tip = guard.clone().addScaledVector(dir, -blade);
+  return attach(ctx, 'Hips', sw, tip, new THREE.Quaternion().setFromUnitVectors(v3(0, 1, 0), dir));
 }
 
 // ═════════ costumi ═════════
@@ -641,13 +657,22 @@ const COSTUMES = {
 
   // ── Ninja Ombra: cappuccio con la fessura per gli occhi, maschera sul viso, fascia, katana sulla schiena ──
   ninja(ctx, M) {
-    hideMesh(ctx, 'mask'); hideMesh(ctx, 'hood');
     const body = ctx.meshes.body, E = M.eye, J = M.J;
     const neckY = J.Neck.y - 0.05;
+    // v31: il corpo MakeHuman del ninja NON ha la nuca né la calotta (erano coperte dal cappuccio del modello):
+    // il cappuccio nero si costruisce quindi anche sul cappuccio originale, altrimenti da dietro la testa è un buco
+    const hood = meshBy(ctx, 'hood');
+    let backZ = M.back, topY = M.top;
     shell(body, 'cappuccio', MAT.ninjaHood(E), { sel: (p) => p.y > neckY && Math.hypot(p.x - J.Neck.x, p.z - J.Neck.z) < 0.24, off: (p) => 0.007 + THREE.MathUtils.smoothstep(p.y, M.top - 0.06, M.top) * 0.006 });
+    if (hood && hood.isSkinnedMesh) {
+      const HP = restOf(hood).P;
+      for (let i = 0; i < HP.length; i += 3) { backZ = Math.min(backZ, HP[i + 2]); topY = Math.max(topY, HP[i + 1]); }
+      shell1(hood, 'cappuccio', MAT.ninjaHood(E), { off: () => 0.003 });
+    }
     shell(body, 'maschera', MAT.ninjaMask(E), { sel: (p) => p.y > M.chin - 0.04 && p.y < E.y - 0.012 && Math.hypot(p.x - J.Neck.x, p.z - J.Neck.z) < 0.24 && p.y > neckY + 0.02, off: () => 0.0115 });
+    hideMesh(ctx, 'mask'); hideMesh(ctx, 'hood');
     // nodo della maschera dietro la testa, con le due code
-    const kn = v3(0, E.y - 0.03, M.back - 0.004);
+    const kn = v3(0, E.y - 0.03, backZ - 0.006);
     attach(ctx, 'Head', mesh(rigid(new THREE.SphereGeometry(0.02, 10, 8).scale(1.4, 0.9, 0.7).translate(kn.x, kn.y, kn.z)), MAT.ninjaCloth(), 'nodo'));
     for (const s of [-1, 1]) {
       const a = kn.clone().add(v3(s * 0.01, -0.01, -0.005));
@@ -666,9 +691,18 @@ const COSTUMES = {
       if (k && f) shell(body, 'kyahan', MAT.wraps('#202126'), { sel: (p, n, b) => b === s + 'Leg' && p.y < k.y - 0.07 && p.y > f.y + 0.05, off: () => 0.016 });
     }
     // katana sulla schiena in diagonale (manico sopra la spalla destra) con la cinghia sul petto
-    const kt = katana(1.0);
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, -0.62));
-    attach(ctx, 'Spine2', kt, v3(0.06, J.Spine2.y - 0.32, J.Spine2.z - 0.16), q);
+    // v31: puntale vicino al fianco sinistro (+x), manico che spunta sopra la spalla destra (−x), appoggiata alla schiena
+    {
+      const S2 = J.Spine2, L = 0.9;
+      const yT = hy + 0.06, yS = S2.y + 0.05;
+      const zT = backAt(yT, S2.x + 0.1, 0.05), zS = backAt(yS, S2.x - 0.035, 0.05);
+      const tip = v3(S2.x + 0.13, yT - 0.03, (isFinite(zT) ? zT : S2.z - 0.14) - 0.03);
+      const mid = v3(S2.x - 0.035, yS, (isFinite(zS) ? zS : S2.z - 0.16) - 0.035);
+      const top = tip.clone().add(mid.clone().sub(tip).normalize().multiplyScalar(L));
+      const dir = top.clone().sub(tip).normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(v3(0, 1, 0), dir);
+      attach(ctx, 'Spine2', katana(L, MAT.lacquer('#4a1218', 'n')), tip, q);   // fodero laccato rosso scuro: si vede sul vestito nero
+    }
     const strap = pmat('ninjaStrap', { color: '#2a1c14', rough: 0.6, code: `CLIP = abs(p.x + (p.y - ${f4(J.Spine1.y)}) * 0.9) > 0.022; H = fbm(p * 140.0) * 0.0005;` });
     shell(body, 'cinghia', strap, { sel: (p, n, b) => !isArm(b) && p.y > hy && p.y < J.Neck.y && Math.abs(p.x + (p.y - J.Spine1.y) * 0.9) < 0.05, off: () => 0.016 });
   },
@@ -702,8 +736,9 @@ const COSTUMES = {
     // kabuto: coppa a costole con rivetti, shikoro a tre giri, fukigaeshi, visiera e mezzaluna d'oro
     shell(body, 'kabuto', MAT.kabuto(), { sel: (p) => p.y > E.y + 0.03 && Math.hypot(p.x - J.Neck.x, p.z - J.Neck.z) < 0.24, off: (p) => 0.03 + (p.y - E.y) * 0.08 });
     const hc = M.hc, rimY = E.y + 0.035, R0 = M.hw + 0.035;
+    // v31: shikoro aperto davanti (prima copriva la faccia e lasciava scoperta la nuca)
     for (let tier = 0; tier < 3; tier++) {
-      const g = surf((u, v) => { const a = Math.PI * 0.18 + u * Math.PI * 1.64; const r = R0 + 0.012 + tier * 0.02 + v * 0.05; const y = rimY - tier * 0.045 - v * 0.05; return [hc.x + Math.sin(a) * r, y, hc.z - 0.005 - Math.cos(a) * r * 1.08 * (a > Math.PI * 0.5 && a < Math.PI * 1.5 ? 1 : 1)]; }, 24, 3, false);
+      const g = surf((u, v) => { const a = Math.PI * 0.24 + u * Math.PI * 1.52; const r = R0 + 0.012 + tier * 0.02 + v * 0.05; const y = rimY - tier * 0.045 - v * 0.05; return [hc.x + Math.sin(a) * r, y, hc.z - 0.005 + Math.cos(a) * r * 1.08]; }, 24, 3, false);
       const P = g.attributes.position, Rr = g.attributes.aRest;
       for (let i = 0; i < P.count; i++) Rr.setXYZ(i, Math.atan2(P.getX(i) - hc.x, -(P.getZ(i) - hc.z)) * 1.2, P.getY(i), 0);
       attach(ctx, 'Head', mesh(g, MAT.lamellar(crimson, 1), 'shikoro'));
@@ -723,9 +758,14 @@ const COSTUMES = {
     // mempo (maschera sulla bocca) laccata
     shell(body, 'mempo', MAT.lacquer('#3a0a0e', 'm'), { sel: (p) => p.y > M.chin - 0.03 && p.y < E.y - 0.038 && p.z > hc.z && Math.abs(p.x) < 0.075, off: (p) => 0.012 + Math.max(0, 1 - Math.abs(p.x) / 0.03) * 0.004 });
     // katana e wakizashi al fianco sinistro
-    const k1 = katana(1.0), k2 = katana(0.66);
-    attach(ctx, 'Hips', k1, v3(0.2, hy - 0.02, J.Hips.z - 0.32), new THREE.Euler(-1.15, 0, -0.18));
-    attach(ctx, 'Hips', k2, v3(0.17, hy + 0.02, J.Hips.z - 0.2), new THREE.Euler(-1.25, 0, -0.1));
+    // v31: infilate nell'obi sul fianco sinistro (+x): tsuba davanti al fianco, fodero che scende all'indietro
+    const sideSword = (L, guard, up, out) => {
+      const dir = v3(-out, Math.sin(up), Math.cos(up)).normalize();          // dal puntale verso il manico
+      const tip = guard.clone().addScaledVector(dir, -L * 0.72);
+      attach(ctx, 'Hips', katana(L), tip, new THREE.Quaternion().setFromUnitVectors(v3(0, 1, 0), dir));
+    };
+    sideSword(0.98, v3(0.255, hy + 0.05, J.Hips.z + 0.1), 0.42, 0.12);
+    sideSword(0.66, v3(0.225, hy + 0.08, J.Hips.z + 0.12), 0.36, 0.08);
   },
 
   // ── Cavaliere d'Oro: armatura completa a piastre dorate su cotta di maglia, elmo con pennacchio, mantello e spada ──
@@ -798,7 +838,8 @@ const COSTUMES = {
     }, 18, 12, false);
     attach(ctx, 'Spine2', mesh(capeG, MAT.cape('#8e0f22'), 'mantello'));
     // spada al fianco
-    attach(ctx, 'Hips', longsword(1.05), v3(0.2, hy + 0.04, J.Hips.z - 0.05), new THREE.Euler(-0.35, 0, Math.PI - 0.12));
+    // v31: guardia alla cintura sul fianco sinistro, fodero che scende verso il polpaccio inclinato all'indietro
+    hangSword(ctx, longsword(1.05), 1.05 * 0.75, v3(0.235, hy + 0.02, J.Hips.z + 0.05), 0.36, 0.1);
   },
 
   // ── Astronauta: casco rigido bianco con visiera dorata a specchio, zaino PLSS e pannello sul petto ──
@@ -915,7 +956,7 @@ const COSTUMES = {
     // giacca rossa (busto, maniche e falde) con fusciacca e cinturone
     shell(body, 'giacca', MAT.coat('#5e0f18'), { sel: (p, n, b) => !/Hand|Head|Foot|Toe/.test(b) && !(/Leg/.test(b) && !/UpLeg/.test(b)) && p.y > hy - 0.38 && p.y < J.Neck.y - 0.015 && !(/ForeArm/.test(b) && J.LeftHand && p.y < J.LeftHand.y + 0.06), off: (p) => 0.022 + Math.max(0, hy - p.y) * 0.12, edge: (p, n, b) => (isArm(b) ? 1 : p.y - (hy - 0.38)) });
     shell(body, 'fusciacca', MAT.sash('#a8202a'), { sel: (p, n, b) => !isArm(b) && p.y > hy + 0.02 && p.y < hy + 0.11, off: () => 0.04, edge: (p) => Math.min(p.y - hy - 0.02, hy + 0.11 - p.y) });
-    attach(ctx, 'Hips', longsword(0.86, MAT.leather('#2a1a10'), MAT.steel('#b9a070', 'b')), v3(0.22, hy + 0.03, J.Hips.z + 0.02), new THREE.Euler(-0.5, 0, Math.PI - 0.2));
+    hangSword(ctx, longsword(0.86, MAT.leather('#2a1a10'), MAT.steel('#b9a070', 'b')), 0.86 * 0.75, v3(0.245, hy + 0.0, J.Hips.z + 0.06), 0.45, 0.12);
   },
 
   // ── Vichingo: elmo di ferro con corna e nasale, mantello di pelliccia, scudo rotondo sulla schiena, ascia ──
@@ -945,7 +986,7 @@ const COSTUMES = {
     ax.add(mesh(taper([v3(0, 0, 0), v3(0, 0.62, 0)], () => 0.015, 4, 8, { along: true }), MAT.wood('#5a3a20'), 'manico'));
     const bl = new THREE.Shape(); bl.moveTo(0, 0); bl.lineTo(0.05, 0.02); bl.quadraticCurveTo(0.14, -0.02, 0.15, -0.09); bl.quadraticCurveTo(0.1, -0.06, 0.05, -0.08); bl.lineTo(0, -0.07);
     ax.add(mesh(rigid(new THREE.ExtrudeGeometry(bl, { depth: 0.01, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.002, bevelSegments: 1 }).translate(0.01, 0.6, -0.005)), MAT.steel('#8a8e92', 'a'), 'lama'));
-    attach(ctx, 'Hips', ax, v3(0.21, hy - 0.42, J.Hips.z + 0.04), new THREE.Euler(0, Math.PI / 2, 0.08));
+    attach(ctx, 'Hips', ax, v3(0.225, hy - 0.5, J.Hips.z + 0.05), new THREE.Euler(0, Math.PI / 2, 0.1));
   },
 
   // ── Spettro Gelido: veste di ghiaccio semitrasparente e luminosa, pelle livida, occhi azzurri accesi ──

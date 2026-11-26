@@ -1,7 +1,7 @@
 // Pose e animazioni dei personaggi articolati (anche, ginocchia, caviglie, spalle, gomiti).
 // Condivise tra il gioco (main.js) e il sito (site.js), così le animazioni sono identiche.
 import * as THREE from 'three';
-import { RIG } from './character.js?v=30';
+import { RIG } from './character.js?v=31';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -43,6 +43,38 @@ export function setArm(m, i, x, z, elbow, twist = 0) {
  * spinta di punta allo stacco, in corsa il tallone sale verso il gluteo; il bacino ondeggia sulla
  * gamba d'appoggio.
  */
+// v31: piega del ginocchio che porta la caviglia esattamente a `drop` metri sotto la posizione in piedi
+const TH = RIG.thigh, SH = RIG.shin;
+function kneeFor(h, drop) { return Math.max(0, Math.acos(clamp((TH + SH - drop - TH * Math.cos(h)) / SH, -1, 1)) - h); }
+/** punto più basso dei piedi (tallone o punta) rispetto al suolo, con il corpo a y = 0 */
+export function footContact(m) {
+  let lo = Infinity;
+  for (let i = 0; i < 2; i++) {
+    const h = m.legs[i].rotation.x, k = m.knees[i].rotation.x, f = m.feet[i].rotation.x, sd = Math.cos(m.legs[i].rotation.z);
+    const ank = RIG.hip - (TH * Math.cos(h) + SH * Math.cos(h + k)) * sd;
+    const a = h + k + f, ca = Math.cos(a), sa = Math.sin(a);
+    const heelY = -0.06 * ca + 0.05 * sa, toeY = -0.05 * ca - 0.16 * sa;
+    lo = Math.min(lo, ank + Math.min(heelY, toeY));
+  }
+  return lo;
+}
+const _ck = [0, 0, 0];
+/** posa accovacciata di una gamba: da ferma mezzo inginocchiata (destra avanti, sinistra indietro sulle punte), in movimento passi bassi */
+function crouchLeg(i, phase, mv) {
+  const ph = phase + i * Math.PI, s = Math.sin(ph), c = Math.cos(ph);
+  const D = 0.43 - 0.1 * smooth(mv * 1.5);                       // quanto si abbassa il bacino
+  // camminata accovacciata: anca flessa, il piede in volo si alza appena, appoggio a piede piatto
+  const hW = -0.95 - s * 0.4 * mv;
+  let lift = 0, toe = 0;
+  if (c > 0) { const t = (Math.atan2(s, c) + Math.PI / 2) / Math.PI; lift = Math.sin(Math.PI * t) * 0.085 * mv; toe = Math.sin(Math.PI * t) * 0.3 * mv; }
+  const kW = kneeFor(hW, D + lift), fW = -(hW + kW) + toe;
+  // ferma: gamba destra (0) avanti col piede piatto, sinistra (1) indietro col ginocchio quasi a terra e il tallone alzato
+  const hI = i ? -0.42 : -1.3, upI = i ? 0.035 : 0;
+  const kI = kneeFor(hI, D + upI), fI = -(hI + kI) + (i ? 0.75 : 0.02);
+  const w = 1 - smooth(mv * 2.2);
+  _ck[0] = lerp(hW, hI, w); _ck[1] = lerp(kW, kI, w); _ck[2] = lerp(fW, fI, w);
+  return _ck;
+}
 export function legsLocomotion(m, phase, mv, run, ck) {
   const toeOff = 0.42 + 0.3 * run, heel = 0.26 - 0.12 * run;
   for (let i = 0; i < 2; i++) {
@@ -66,18 +98,35 @@ export function legsLocomotion(m, phase, mv, run, ck) {
     const hipW = -s * (0.46 + 0.32 * run) * mv - run * 0.1 * mv;
     const kW = 0.05 + kneeW * mv;
     const footW = -(hipW + kW) + footAdd * mv;
-    // accovacciato: anche flesse, ginocchia molto piegate, passi corti e bassi
-    const hipC = -1.12 - s * 0.38 * mv - (i ? 0.05 : -0.05) * (1 - mv);
-    const kneeC = 2.02 - (i ? 0.08 : -0.08) * (1 - mv) + Math.max(0, c) * 0.3 * mv;
-    const footC = -(hipC + kneeC) + Math.max(0, c) * 0.12 * mv;
-    setLeg(m, i, lerp(hipW, hipC, ck), lerp(kW, kneeC, ck), lerp(footW, footC, ck), (i ? 1 : -1) * 0.03 * ck);
+    // accovacciato (v31): ginocchia calcolate perché i piedi restino a terra, mezza ginocchiata da fermi
+    if (ck > 0.001) {
+      const C = crouchLeg(i, phase, mv);
+      setLeg(m, i, lerp(hipW, C[0], ck), lerp(kW, C[1], ck), lerp(footW, C[2], ck), (i ? 1 : -1) * (0.015 + 0.05 * ck));
+    } else setLeg(m, i, hipW, kW, footW, (i ? 1 : -1) * 0.015 * (1 - mv));
   }
   // bacino che si sposta sulla gamba d'appoggio (gamba 0 = x negativa)
   m.body.position.x = Math.cos(phase) * 0.024 * mv * (1 - 0.6 * run) * (1 - ck * 0.5);
   // dondolio: camminando il punto più alto è a metà appoggio; correndo è nella fase di volo
   const ac = Math.abs(Math.cos(phase));
-  const bob = lerp((ac - 0.6) * 0.036, (0.55 - ac) * 0.075, run) * mv * (1 - ck * 0.6);
-  return bob - 0.4 * ck;
+  const bob = lerp((ac - 0.6) * 0.036, (0.55 - ac) * 0.075, run) * mv;
+  if (ck <= 0.001) return bob;
+  // v31: da accovacciati (e durante la transizione) il bacino scende quanto serve perché il piede più basso tocchi terra:
+  // niente piedi che affondano o galleggiano a metà movimento
+  return lerp(bob, -footContact(m), smooth(ck * 3));
+}
+
+/** v31: fonde la posa in volo con quella attuale delle gambe (k 0..1): salti e atterraggi senza scatti */
+const _lg = new Float32Array(8);
+export function legsAirBlend(m, up, k) {
+  if (k <= 0.001) return;
+  for (let i = 0; i < 2; i++) { _lg[i * 4] = m.legs[i].rotation.x; _lg[i * 4 + 1] = m.legs[i].rotation.z; _lg[i * 4 + 2] = m.knees[i].rotation.x; _lg[i * 4 + 3] = m.feet[i].rotation.x; }
+  legsAir(m, up);
+  for (let i = 0; i < 2; i++) {
+    m.legs[i].rotation.x = lerp(_lg[i * 4], m.legs[i].rotation.x, k);
+    m.legs[i].rotation.z = lerp(_lg[i * 4 + 1], m.legs[i].rotation.z, k);
+    m.knees[i].rotation.x = lerp(_lg[i * 4 + 2], m.knees[i].rotation.x, k);
+    m.feet[i].rotation.x = lerp(_lg[i * 4 + 3], m.feet[i].rotation.x, k);
+  }
 }
 
 /** gambe in volo: raccolte in salita, distese in discesa */

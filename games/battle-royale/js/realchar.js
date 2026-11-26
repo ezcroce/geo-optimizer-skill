@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { dressUp, HAS_COSTUME } from './costume.js?v=28';
+import { dressUp, HAS_COSTUME } from './costume.js?v=31';
 
 export const REAL = { ready: false, bases: {}, promise: null, prefix: 'models/chars/' };
 const FILES = { soldier: 'soldato.glb', woman: 'donna.glb' };
@@ -405,7 +405,7 @@ export function attachReal(m, skin, keep = {}) {
     if (f) {
       // un filo più largo e più alto della testa: la calotta copre anche i capelli
       const k = THREE.MathUtils.clamp((f.rx / 0.2 + f.rz / 0.205) / 2 * 1.12, 0.36, 0.95), ky = k * 1.15;
-      a = anchor(bones.Head, new THREE.Vector3(f.cx, f.top - 0.452 * ky + 0.008, f.cz - 0.004));
+      a = anchor(bones.Head, new THREE.Vector3(f.cx, f.top - 0.452 * ky - 0.004, f.cz - 0.004));   // v31: calza un filo più in basso
       a.scale.multiply(_v.set(k, ky, k));
     } else {
       const hy = base.own ? base.headTop - 0.4 : HEAD_Y + (base.kind === 'woman' ? -0.12 : 0.04);

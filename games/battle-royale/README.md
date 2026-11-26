@@ -24,6 +24,23 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: skin sistemate, accovacciamento realistico e accessori più curati (v31)
+
+- **Testa del ninja** (`js/costume.js`): il corpo MakeHuman del ninja non ha la nuca né la calotta (erano coperte
+  dal cappuccio del modello, che il costume nascondeva): da dietro la testa era un buco. Ora il cappuccio nero è
+  un guscio costruito anche sul cappuccio originale, che poi viene nascosto.
+- **Armi delle skin al posto giusto**: katana del ninja appoggiata alla schiena (la profondità si misura sul corpo
+  con `backAt`), daishō del samurai infilati nell'obi con l'elsa in avanti, spade di cavaliere e pirata appese al
+  fianco con `hangSword` (prima erano capovolte, con l'elsa vicino al ginocchio); paranuca del kabuto rivolto
+  all'indietro (prima copriva la faccia e lasciava scoperta la nuca).
+- **Accovacciamento** (`js/anim.js`): le ginocchia si calcolano perché i piedi tocchino terra (`kneeFor`), il
+  bacino scende quanto serve al piede più basso (`footContact`), da fermi mezza ginocchiata, camminando passi bassi;
+  la posa segue una molla smorzata (`crouchA` in `js/main.js`), quindi niente scatti né piedi che affondano.
+- **Salti e atterraggi**: `legsAirBlend` fonde la posa in aria con quella a terra; i saltini brevi non la cambiano.
+  Da fermi il peso passa lentamente da una gamba all'altra.
+- **Accessori**: trame di feltro e pelliccia (`js/chartex.js`), cuoio/paglia/lana/cordura a risoluzione doppia,
+  cappello di Natale morbido, tavola da surf in vetroresina; in deltaplano la camera sale sopra la vela.
+
 ### Novità: accessori su misura, deltaplani rifatti e lobby nel bosco (v30)
 
 - **Cappelli e zaini calzano davvero** (`js/realchar.js`): al caricamento di ogni personaggio si misurano la

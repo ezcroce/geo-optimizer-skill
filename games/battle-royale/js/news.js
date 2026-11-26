@@ -1,9 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v30';
+export const NEWS_VERSION = 'v31';
 
 export const NEWS = [
+  {
+    v: 'v31', title: 'Skin sistemate, animazioni più fluide e accessori più belli', color: '#ff7a4a', icon: '🥷',
+    items: [
+      'Ninja: la testa non è più invisibile da dietro (il cappuccio copre di nuovo tutta la nuca); la katana ora è appoggiata alla schiena in diagonale, dal fianco sinistro alla spalla destra, con il fodero laccato rosso scuro che si vede sul vestito nero',
+      'Samurai: katana e wakizashi infilate nella fascia sul fianco sinistro con l’elsa in avanti (prima spuntavano dietro come due bastoni); il paranuca dell’elmo copre la nuca e lascia libero il viso',
+      'Cavaliere e Pirata: le spade pendono dal fianco con l’elsa alla cintura e la lama verso il basso e all’indietro (prima erano al contrario, con l’elsa vicino al ginocchio); l’ascia del vichingo sta più in basso nella cintura',
+      'Accovacciarsi è più realistico: da fermi mezzo in ginocchio (una gamba avanti, l’altra indietro sulle punte), camminando passi bassi; i piedi restano sempre a terra anche durante la transizione, che parte e arriva morbida',
+      'Salti e atterraggi senza scatti: la posa delle gambe in aria si fonde con quella a terra; da fermi il peso passa lentamente da una gamba all’altra',
+      'Cappelli in feltro vero (cowboy, cilindro, mago, basco), cappello di Natale morbido che ricade di lato con pelliccia a ciuffi, texture di cuoio, paglia, lana e cordura più definite; tavola da surf in vetroresina lucida con listello e tre pinne',
+      'Deltaplano: in volo la camera sale sopra la vela, così si vede la tela con il suo disegno invece del bordo sottile',
+    ],
+  },
   {
     v: 'v30', title: 'Accessori su misura, deltaplani nuovi e una lobby nel bosco', color: '#7ad04a', icon: '🪂',
     items: [

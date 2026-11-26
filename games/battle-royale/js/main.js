@@ -20,16 +20,16 @@ import {
 } from './world.js?v=27';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=30';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=31';
 import { weaponIcon } from './weapons.js?v=29';
 import { consIcon, ammoIcon } from './items.js?v=29';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
 import { createInventory } from './inventory.js?v=29';
 import { loadModelOverrides, MODEL_SOURCE, PROPS, treeMaterial, bushMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=26';
-import { loadRealChars, syncAllReal } from './realchar.js?v=30';
+import { loadRealChars, syncAllReal } from './realchar.js?v=31';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=29';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=31';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -792,6 +792,7 @@ function updateCharVisual(c, dt) {
   m.lod.position.y = falling ? 1 : 0;
 }
 
+const smooth01 = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };
 function animateChar(ch, dt) {
   const m = ch.m;
   m.root.position.copy(ch.pos);
@@ -831,6 +832,13 @@ function animateChar(ch, dt) {
   m.body.rotation.x = lerp(m.body.rotation.x, 0, Math.min(1, dt * 8));
   resetPose(m);
   ch.crouchK = lerp(ch.crouchK, ch.crouch && ch.mode === 'ground' ? 1 : 0, Math.min(1, dt * 10));
+  // v31: per la posa una molla smorzata (parte e arriva morbida, senza rimbalzi) invece dello scatto lineare
+  {
+    const tgt = ch.crouch && ch.mode === 'ground' ? 1 : 0, h = Math.min(dt, 0.05);
+    ch.crouchV = (ch.crouchV || 0) + ((tgt - (ch.crouchA ?? 0)) * 160 - (ch.crouchV || 0) * 25) * h;
+    ch.crouchA = clamp((ch.crouchA ?? 0) + ch.crouchV * h, 0, 1);
+    if (ch.crouchA === 0 || ch.crouchA === 1) ch.crouchV *= 0.5;
+  }
   if (ch.mode === 'climb') {
     m.root.rotation.y = Math.atan2(ch.climbDir.x, ch.climbDir.z);
     m.gunPivot.visible = false;
@@ -860,7 +868,7 @@ function animateChar(ch, dt) {
   m.gunPivot.visible = true;
   ch.animSpd = lerp(ch.animSpd || 0, ch.moveAmt, Math.min(1, dt * 10));
   const spd = ch.animSpd;
-  const ck = ch.crouchK;
+  const ck = ch.crouchA ?? ch.crouchK;
   const mv = Math.min(1, spd / (5.2 - ck * 2.6));
   const run = clamp((spd - 5.6) / 2, 0, 1) * (1 - ck);
   const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw);
@@ -899,9 +907,13 @@ function animateChar(ch, dt) {
   m.body.rotation.y = ch.hipYaw;
 
   // gambe
-  let bodyY = 0;
-  if (!ch.onGround && !ch.inWater) legsAir(m, ch.vel.y / 6);
-  else bodyY = legsLocomotion(m, ch.walkPhase, mv, run, ck);
+  let bodyY = legsLocomotion(m, ch.walkPhase, mv, run, ck);
+  // v31: in aria la posa delle gambe si fonde con quella a terra (niente scatto staccando o atterrando;
+  // i saltini di un attimo, scendendo da un marciapiede, non cambiano posa)
+  ch.airT = ch.onGround || ch.inWater ? 0 : (ch.airT || 0) + dt;
+  const airborne = !ch.onGround && !ch.inWater && (ch.airT > 0.12 || ch.vel.y > 1.5);
+  ch.airK = lerp(ch.airK || 0, airborne ? 1 : 0, Math.min(1, dt * (airborne ? 10 : 18)));
+  if (ch.airK > 0.001) { legsAirBlend(m, ch.vel.y / 6, smooth01(ch.airK)); bodyY *= 1 - ch.airK; }
   if (ch.onGround && !ch.inWater) {
     // passo laterale: falcata in avanti più corta, le gambe si aprono e chiudono di lato
     const sk2 = ch.strafeK * mv;
@@ -929,6 +941,14 @@ function animateChar(ch, dt) {
   }
   // respiro e spostamento del peso da fermo
   const idle = 1 - mv;
+  // v31: da fermi in piedi il peso passa lentamente da una gamba all'altra (ginocchio libero appena piegato)
+  if (ch.onGround && !ch.inWater && ck < 0.5 && idle > 0.05) {
+    const ws = Math.sin(t * 0.42 + (ch._wsPh ??= Math.random() * 6.3)) * idle * (1 - ck * 2);
+    const free = ws > 0 ? 1 : 0, a = Math.abs(ws);
+    m.knees[free].rotation.x += a * 0.14; m.legs[free].rotation.x -= a * 0.04; m.feet[free].rotation.x -= a * 0.1;
+    m.body.position.x += (free ? -1 : 1) * a * 0.018;
+    m.torso.rotation.z += (free ? 1 : -1) * a * 0.02;
+  }
   const breath = Math.sin(t * 2.1) * 0.5 + 0.5;
   // atterraggio: piccolo affondo elastico (piega le ginocchia)
   if (ch.landT > 0) ch.landT = Math.max(0, ch.landT - dt);
@@ -936,7 +956,7 @@ function animateChar(ch, dt) {
   if (land > 0) for (let i = 0; i < 2; i++) { m.legs[i].rotation.x -= land * 1.6; m.knees[i].rotation.x += land * 3.2; m.feet[i].rotation.x -= land * 1.6; }
   m.body.position.y = bodyY - land * 0.45 + breath * 0.01 * idle;
   // busto: si piega in avanti da accovacciato, ruota con le spalle quando cammini
-  m.torso.rotation.x = 0.32 * ck + land * 0.5 + breath * 0.022 * idle + run * 0.06;
+  m.torso.rotation.x = (0.26 + 0.08 * mv) * ck + land * 0.5 + breath * 0.022 * idle * (1 + ck) + run * 0.06;
   m.torso.rotation.y = Math.sin(ch.walkPhase) * (0.1 + run * 0.08) * mv * (1 - ck * 0.7) * (1 - ch.strafeK * 0.5) - ch.hipYaw;
   m.torso.rotation.x -= 0.07 * ch.backK * mv;   // indietro: busto un po' più eretto
   // bacino/spalle: piccolo rollio opposto allo spostamento sulla gamba d'appoggio
@@ -2715,14 +2735,21 @@ function updateCamera(dt) {
     pivot = camTarget.copy(G.bus.pos).add(new THREE.Vector3(0, 3, 0));
     dist = 26; shoulder = 0; wantFov = F0 + 5;
   } else if (p.mode === 'fall' || p.mode === 'glide') {
-    pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, 1.5, 0));
-    dist = p.mode === 'fall' ? 7 : 6; shoulder = 0; wantFov = p.mode === 'fall' ? F0 + 15 : F0 + 5;
+    // v31: in deltaplano la camera sta sopra la vela (a 2.9 m sul pilota): si vede la tela dall'alto, non di taglio
+    pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, p.mode === 'glide' ? 3.3 : 1.5, 0));
+    dist = p.mode === 'fall' ? 7 : 6.8; shoulder = 0; wantFov = p.mode === 'fall' ? F0 + 15 : F0 + 5;
   } else {
     pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, 1.8 - 0.55 * p.crouchK, 0));
     dist = G.ads ? 2.2 : 3.8;
     shoulder = G.ads ? 0.75 : 1.0;
     if (G.ads) wantFov = F0 / currentZoom();
     if (p.moveAmt > 6.5) wantFov = F0 + 6;
+  }
+  // v31: l'altezza del punto guardato cambia con una transizione morbida (paracadute → deltaplano → a terra)
+  if (p.alive && p.mode !== 'bus') {
+    const off = pivot.y - p.pos.y;
+    G.camOffY = G.camOffY === undefined || Math.abs(G.camOffY - off) > 6 ? off : lerp(G.camOffY, off, Math.min(1, dt * (p.mode === 'ground' ? 10 : 4)));
+    pivot.y = p.pos.y + G.camOffY;
   }
   G.fov = lerp(G.fov, wantFov, Math.min(1, dt * 12));
   if (Math.abs(camera.fov - G.fov) > 0.01) { camera.fov = G.fov; camera.updateProjectionMatrix(); }

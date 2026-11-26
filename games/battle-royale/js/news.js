@@ -1,9 +1,23 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v32';
+export const NEWS_VERSION = 'v33';
 
 export const NEWS = [
+  {
+    v: 'v33', title: 'Tutto si rompe: distruzione, gravità e modalità spettatore', color: '#ff3dbb', icon: '💥',
+    items: [
+      'Strutture distruttibili: picconate, proiettili ed esplosioni rompono pareti, pavimenti, solai e mobili a pezzi di poco più di un metro (non tutto in una volta). Auto, massi e oggetti si sgretolano e lasciano materiali. Il terreno, le strade e le piazze non si rompono',
+      'Gravità: se abbatti tutti gli appoggi a terra di una casa (muri esterni e interni), la struttura crolla. I pezzi cadono, si alza la polvere e restano mucchi di materiali da raccogliere. A ogni nuova partita tutto torna in piedi',
+      'Modalità spettatore: quando vieni eliminato la telecamera segue chi ti ha battuto. Con ‹ › (o ← →) guardi gli altri, K torna al tuo eliminatore, trascinando il mouse giri la visuale, Esc apre i risultati e da lì puoi tornare a guardare',
+      'L’inventario non mette più in pausa: con TAB aperto la partita continua e ti muovi con WASD (si cambia slot con le frecce)',
+      'Mappa con zoom fino a 8×: rotellina, pizzico, + e −, trascina per spostarti, ◎ per tornare su di te. Da vicino si vedono le case e i nomi delle località, con la scala in metri',
+      'Armadietto con zoom: rotellina o pizzico verso il punto che vuoi guardare, trascina su e giù per spostarti, tasti per il primo piano sul viso e per la figura intera',
+      'Mirini nuovi da zero per i fucili a pompa: pompa a quattro archi con i pallini (gli archi si ritirano mentre pompi), tattico a parentesi, tamburo con l’anello che ruota a ogni colpo, doppietta con le due canne che si svuotano. Ridisegnati anche gli altri: pistole con l’arco, mitragliette a 120°, raffica a tre chevron, cecchino con i mil-dot, lanciarazzi con le distanze',
+      'Alberi e cespugli: foglie a ciuffi con foglioline e luce che filtra, corteccia con solchi e nodi. Ogni tanto una raffica di vento attraversa l’isola e piega le chiome, e le foglie fremono',
+      'Miniere sistemate: la collina non ha più massi che galleggiano sopra l’ingresso e ora è di roccia vera (prima sembrava legno)',
+    ],
+  },
   {
     v: 'v32', title: 'Armi nella mano destra, camminata vera e un mirino nuovo', color: '#ffd23a', icon: '🎯',
     items: [

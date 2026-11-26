@@ -24,6 +24,29 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: strutture distruttibili, gravità, spettatore, zoom e mirini dei pompa (v33)
+
+- **Distruzione a celle** (`damageAt`, `damageSphere`, `damagePoint` in `js/world.js`): ogni box statico con collisore
+  si divide in celle da ~1,35 m sulle sue due dimensioni maggiori. Colpi e picconate tolgono vita alla cella colpita,
+  le esplosioni a quelle nel raggio. Le celle rimaste si ricompongono in pochi rettangoli con fusione golosa
+  (`rebuildFrags`) e il chunk si ricostruisce subito senza buchi (`flushDirty`). Le lastre a terra (strade, piazze,
+  fondamenta) e il terreno non si rompono.
+- **Gravità** (`checkSupport`, `collapse`): dopo ogni rottura si esplorano i pezzi che si toccano. Se nessuno tocca
+  più il terreno, crollano tutti insieme, con decorazioni, porte e oggetti dentro. In `main.js` le macerie cadono con
+  fisica semplice (`addDebris`, `updateDebris`), si alza la polvere e si spargono mucchi di materiali (`structEffects`).
+  Rocce, auto e oggetti hanno vita propria (le rocce si rimpiccioliscono a tappe). `resetProps` rimette tutto a posto
+  a inizio partita, e in multigiocatore i danni viaggiano col messaggio `sdmg`.
+- **Spettatore** (`deathToSpectate`, `enterSpectate`, `specCycle` in `main.js`): dopo l'eliminazione la telecamera
+  segue chi ti ha battuto (alle spalle, girata come lui; trascinando si orbita). I risultati si calcolano una volta
+  sola (`finishMatch`) e la schermata finale si può chiudere per tornare a guardare.
+- **Inventario**: non mette più in pausa e lascia passare i tasti di movimento (`INV_MOVE_KEYS`).
+- **Mappa** (`BM`, `bmZoomAt`): zoom 1–8× verso il cursore, trascinamento, pizzico, case e nomi delle località da
+  vicino, scala in metri. **Armadietto**: zoom con rotellina e pizzico verso il punto indicato, primo piano e figura intera.
+- **Mirini** (`js/crosshair.js`): nuovi `pump`, `tactical`, `drum` e `double` per i quattro fucili a pompa; ridisegnati
+  tutti gli altri.
+- **Vegetazione** (`addFoliageDetail`, `addWind` in `js/props.js`): foglie e corteccia procedurali, raffiche di vento
+  che attraversano l'isola e fremito delle foglie. **Miniere**: collina ricostruita con il materiale delle rocce.
+
 ### Novità: armi nella mano destra, prese per classe, camminata, cure animate e mirino dinamico (v32)
 
 - **Mano destra** (`js/anim.js`): tutte le pose dell'arma si calcolano come prima e poi si riflettono sul lato destro
@@ -444,7 +467,9 @@ python3 -m http.server 8080
 | E | Raccogli / apri forziere |
 | Q | Modalità costruzione |
 | G | Lascia l'oggetto in mano |
-| M | Mappa |
+| M | Mappa (rotellina / + − per lo zoom, trascina per spostarti) |
+| Tab | Inventario (la partita continua, ci si muove con WASD) |
+| ← → · K (eliminato) | Spettatore: cambia giocatore · torna a chi ti ha eliminato |
 | B / 6–9 | Balletti (emote) |
 | F | Schermo intero (si attiva anche da solo premendo GIOCA, disattivabile nel menu) |
 | Esc | Pausa |

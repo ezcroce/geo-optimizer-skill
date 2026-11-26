@@ -720,8 +720,16 @@ function addWind(mat, from, amount, key) {
           float hh = max(0.0, transformed.y - ${from.toFixed(2)});
           float k = hh * hh * ${amount.toFixed(4)};
           float ph = uWind * 1.35 + ip.x * 0.11 + ip.y * 0.083;
-          transformed.x += (sin(ph) * 0.7 + sin(ph * 2.3 + 1.7) * 0.3) * k;
-          transformed.z += (cos(ph * 0.83 + 0.6) * 0.5) * k;
+          // v33: raffiche. Un fronte d'onda lento attraversa l'isola (da sud-ovest) ogni 20-30 s: in mezzo
+          // la vegetazione quasi ferma, quando passa la raffica si piega, ondeggia forte e le foglie fremono
+          float front = uWind * 0.32 - dot(ip, vec2(0.6, 0.8)) * 0.012;
+          float gust = pow(max(0.0, sin(front) * 0.6 + sin(front * 0.43 + 1.9) * 0.4), 3.0);
+          float amp = 0.35 + gust * 2.4;
+          transformed.x += ((sin(ph) * 0.7 + sin(ph * 2.3 + 1.7) * 0.3) * amp + gust * 1.3) * k;
+          transformed.z += ((cos(ph * 0.83 + 0.6) * 0.5) * amp + gust * 1.0) * k;
+          // fremito delle foglie: piccolo e veloce, diverso per ogni vertice
+          float fl = sin(uWind * 9.0 + position.x * 4.1 + position.z * 3.3 + position.y * 2.7) * min(hh, 1.0) * (0.012 + gust * 0.05) * ${(amount > 0.02 ? 0.6 : 1).toFixed(2)};
+          transformed += normal * fl;
         }`);
     // vicino alla telecamera (terza persona contro un albero) la chioma si dissolve a retino
     // invece di riempire lo schermo con il suo lato in ombra
@@ -736,11 +744,76 @@ function addWind(mat, from, amount, key) {
         }
       }`);
   };
-  mat.customProgramCacheKey = () => 'wind-' + key;
+  mat.customProgramCacheKey = () => 'wind33-' + key;
   return mat;
 }
-export const treeMaterial = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.02, flatShading: true }), 2.2, 0.0045, 'tree');
-export const bushMaterial = addWind(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, flatShading: true }), 0.3, 0.07, 'bush');
+/**
+ * v33: texture procedurali per alberi e cespugli. Foglie: ciuffi chiari/scuri, nervature di piccole foglie,
+ * bordi più luminosi verso il cielo (luce che passa) e ombra interna verso il tronco; corteccia: solchi
+ * verticali ondulati e nodi. Tutto rumore 3D liscio che si spegne con la distanza (niente sfarfallio).
+ */
+function addFoliageDetail(mat, bush) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vFP;\nvarying vec3 vFN;\nvarying float vFH;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          vFP = position + vec3(instanceMatrix[3][0], 0.0, instanceMatrix[3][2]) * 0.37;
+        #else
+          vFP = position;
+        #endif
+        vFN = normal; vFH = position.y;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vFP;
+        varying vec3 vFN;
+        varying float vFH;
+        float folH;
+        ${GLSL_NOISE}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 c = vColor.rgb;
+          float fw = length(fwidth(vFP));
+          float leafy = smoothstep(0.95, 1.25, c.g / max(c.r, 0.001)) + smoothstep(0.55, 0.8, c.r) * smoothstep(0.25, 0.4, c.g) * (1.0 - step(c.r * 1.6, c.g));   // verdi (e foglie autunnali/neve chiara)
+          leafy = clamp(leafy, 0.0, 1.0);
+          float barky = (1.0 - leafy) * step(c.b, c.g) * step(c.g, c.r);
+          // foglie: ciuffi grandi + foglioline piccole (si attenuano da lontano)
+          float clump = rFbm(vFP * ${bush ? '1.6' : '0.9'}, fw * ${bush ? '1.6' : '0.9'});
+          vec3 lp = vFP * ${bush ? '9.0' : '6.0'};
+          float fa = 1.0 - smoothstep(0.25, 0.8, length(fwidth(lp)));
+          float leaf = (rNoise(lp) - 0.5) * fa;
+          float vein = smoothstep(0.42, 0.5, abs(fract(rNoise(lp * 0.5 + 3.1) * 4.0) - 0.5)) * fa;
+          vec3 nn = normalize(vFN);
+          float skyLit = smoothstep(-0.2, 0.9, nn.y);
+          float leafMul = (1.0 + clump * 0.55 + leaf * 0.32 - vein * 0.07) * mix(0.78, 1.1, skyLit);
+          vec3 leafTint = mix(vec3(1.0), vec3(1.06, 1.08, 0.86), smoothstep(0.1, 0.35, clump));   // ciuffi al sole più gialli
+          // corteccia: solchi verticali ondulati e nodi
+          vec3 bq = vFP * vec3(7.0, 1.1, 7.0);
+          float ba = 1.0 - smoothstep(0.3, 0.9, length(fwidth(bq)));
+          float groove = 0.5 + 0.5 * sin((rNoise(bq) * 5.0 + rNoise(vFP * vec3(2.0, 0.35, 2.0)) * 3.0) * 3.14159);
+          float knot = smoothstep(0.78, 0.9, rNoise(vFP * 2.6 + 11.0)) * ba;
+          float barkMul = mix(0.9, mix(0.72, 1.08, smoothstep(0.2, 0.85, groove)), ba) * (1.0 - knot * 0.25) * (1.0 + rFbm(vFP * 1.5, fw * 1.5) * 0.3);
+          vec3 col = diffuseColor.rgb;
+          col = mix(col, col * leafTint * leafMul, leafy);
+          col = mix(col, col * barkMul, barky);
+          // ombra di contatto alla base
+          col *= mix(0.72, 1.0, smoothstep(0.0, ${bush ? '0.35' : '0.9'}, vFH));
+          diffuseColor.rgb = col;
+          folH = leafy * (clump * 0.25 + leaf * 0.18) + barky * (groove * 0.18 * ba + knot * 0.1);
+        }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        {
+          vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
+          float dhx = dFdx(folH), dhy = dFdy(folH);
+          vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
+          float det = dot(dpx, r1);
+          normal = normalize(abs(det) * normal - sign(det) * (dhx * r1 + dhy * r2) * 0.6);
+        }`);
+  };
+  return mat;
+}
+export const treeMaterial = addWind(addFoliageDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.02, flatShading: true }), false), 2.2, 0.0045, 'tree');
+export const bushMaterial = addWind(addFoliageDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, flatShading: true }), true), 0.3, 0.07, 'bush');
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
 const stoneTex = makeStoneTexture();

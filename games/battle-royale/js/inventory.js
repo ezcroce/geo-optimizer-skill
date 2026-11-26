@@ -3,7 +3,7 @@
 //  statistiche dell'arma. Si riordina trascinando (mouse o dito) o con
 //  i tasti 1-5; si può equipaggiare e gettare a terra.
 // ─────────────────────────────────────────────────────────────
-import { WEAPONS, RARITIES, AMMO_TYPES, CONSUMABLES } from './config.js?v=29';
+import { WEAPONS, RARITIES, AMMO_TYPES, CONSUMABLES } from './config.js?v=33';
 
 const STAT_MAX = (() => {
   const m = { dmg: 0, dps: 0, range: 0, mag: 0 };
@@ -220,13 +220,13 @@ export function createInventory(api) {
     drag = null;
   }
 
-  /** tasti mentre l'inventario è aperto: 1-5 sposta l'oggetto selezionato, frecce cambiano selezione, G getta */
+  /** tasti mentre l'inventario è aperto: 1-5 sposta l'oggetto selezionato, frecce cambiano selezione, G getta (WASD muovono il personaggio) */
   function key(code) {
     if (!open) return false;
     const m = /^Digit([1-5])$/.exec(code);
     if (m) { const j = +m[1] - 1; if (sel >= 0 && sel !== j) doSwap(sel, j); else { sel = j; render(); } return true; }
-    if (code === 'ArrowLeft' || code === 'KeyA') { sel = Math.max(0, sel - 1); api.sound('tick'); render(); return true; }
-    if (code === 'ArrowRight' || code === 'KeyD') { sel = Math.min(4, sel + 1); api.sound('tick'); render(); return true; }
+    if (code === 'ArrowLeft') { sel = Math.max(0, sel - 1); api.sound('tick'); render(); return true; }
+    if (code === 'ArrowRight') { sel = Math.min(4, sel + 1); api.sound('tick'); render(); return true; }
     if (code === 'KeyG' || code === 'Delete') { doDrop(sel); return true; }
     if (code === 'Enter' || code === 'KeyE') { if (sel >= 0) { api.equip(sel); render(); } return true; }
     return true;

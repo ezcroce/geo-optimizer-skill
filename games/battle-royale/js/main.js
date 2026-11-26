@@ -5,10 +5,10 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=29';
-import * as PR from './progress.js?v=29';
+} from './config.js?v=33';
+import * as PR from './progress.js?v=33';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=32';
+import { initMenu } from './menu.js?v=33';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';
@@ -17,21 +17,21 @@ import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
-} from './world.js?v=27';
+} from './world.js?v=33';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=32';
-import { weaponIcon } from './weapons.js?v=32';
-import { consIcon, ammoIcon } from './items.js?v=32';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=33';
+import { weaponIcon } from './weapons.js?v=33';
+import { consIcon, ammoIcon } from './items.js?v=33';
 import { buildChestMesh } from './models3d.js?v=19';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
-import { createInventory } from './inventory.js?v=29';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, treeMaterial, bushMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=26';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=33';
+import { createInventory } from './inventory.js?v=33';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, treeMaterial, bushMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=33';
 import { loadRealChars, syncAllReal } from './realchar.js?v=32';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=32';
-import { buildPickaxe, heldConsumable } from './held.js?v=32';
-import { createCrosshair } from './crosshair.js?v=32';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=33';
+import { buildPickaxe, heldConsumable } from './held.js?v=33';
+import { createCrosshair } from './crosshair.js?v=33';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -1199,6 +1199,7 @@ function melee(ch) {
     if (hit.char) { damage(hit.char, 20, ch, false, 'Piccone'); emit(p, '#d02020', 6, 3, 0.4, 0.08); return; }
     if (hit.collider) {
       if (hit.collider.hp) damageWall(hit.collider, 50);
+      if (hit.collider.spec || hit.collider.rock || hit.collider.special) structHit(hit.collider, p, 55, ch);
       if (hit.collider.barrel) damageBarrel(hit.collider.barrel, 20, ch);
       const gain = hit.collider.harvest ?? (hit.collider.tree ? 12 : (hit.collider.type === 'cyl' ? 8 : 0));
       if (gain && ch.isPlayer) {
@@ -1280,6 +1281,12 @@ function teamAssist(victim, attacker) {
   }
 }
 function mateToWatch() { return G.player ? teamOf(G.player).find(c => c.alive && c !== G.player) : null; }
+/** giocatore vivo più vicino a un punto (per lo spettatore) */
+function nearestAlive(at) {
+  let best = null, bd = Infinity;
+  for (const c of G.chars) { if (!c.alive || c === G.player) continue; const d = at ? c.pos.distanceToSquared(at) : 0; if (d < bd) { bd = d; best = c; } }
+  return best;
+}
 
 function kill(t, attacker, how) {
   if (!t.alive) return;
@@ -1336,14 +1343,21 @@ function kill(t, attacker, how) {
       G.spectate = mate;
       showMsg('SEI STATO ELIMINATO', `Ora guardi ${mate.name}: se la tua squadra vince, vinci anche tu!`, 4);
     } else {
-      G.spectate = attacker && attacker.alive ? attacker : null;
-      setTimeout(() => endMatch(false), 1800);
+      // v33: modalità spettatore: dopo un attimo si guarda chi ti ha eliminato
+      G.spectate = attacker && attacker.alive && attacker !== t ? attacker : null;
+      setTimeout(() => deathToSpectate(attacker && attacker !== t ? attacker : null), 1800);
     }
   } else if (G.player && !G.player.alive && t.team === G.player.team) {
-    if (teamDead) { G.placement = place; G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'storm' ? 'la tempesta' : G.killedBy || 'la tempesta'); G.teamWiped = true; setTimeout(() => endMatch(false), 1800); }
+    if (teamDead) { G.placement = place; G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'storm' ? 'la tempesta' : G.killedBy || 'la tempesta'); G.teamWiped = true; setTimeout(() => deathToSpectate(attacker && attacker !== t ? attacker : null), 1800); }
     else if (G.spectate === t || !G.spectate) G.spectate = mateToWatch();
   }
-  if (G.player && G.spectate === t && t !== G.player) G.spectate = mateToWatch() || (attacker && attacker.alive ? attacker : null);
+  if (G.player && G.spectate === t && t !== G.player) {
+    // chi stavi guardando è caduto: passi a chi l'ha eliminato (o a un compagno, o a chi è più vicino)
+    const nx = mateToWatch() || (attacker && attacker.alive && attacker !== t ? attacker : null) || nearestAlive(t.pos);
+    G.spectate = nx;
+    if (G.specOn && nx) showMsg('', `${t.name} è stato eliminato · ora osservi ${nx.name}`, 2.4);
+  }
+  if (G.specOn && G.player && !G.player.alive && aliveTeams() <= 1) setTimeout(() => { if (G.specOn) { const w = G.chars.find(c => c.alive); if (w) showMsg(`${w.name.toUpperCase()} HA VINTO`, '', 3); setTimeout(showEndScreen, 2600); } }, 600);
   if (G.player && teamDead && G.teamSize > 1 && t.team !== G.player.team && attacker && attacker.team === G.player.team) addFeed(`<span style="color:#ffd23a">✔ La tua squadra ha eliminato la squadra di ${esc(t.name)}</span>`, true);
   if (G.player && aliveTeams() <= 1 && teamAlive(G.player.team) && !G.endShown) setTimeout(() => endMatch(true), 1200);
 }
@@ -1418,6 +1432,7 @@ function bulletImpact(b, hit, end, dist) {
       if (!hit.terrain) emit(end, '#ffd27a', 2, 5, 0.12, 0.04, 0.2);   // scintille
     }
     if (hit.collider && hit.collider.hp) damageWall(hit.collider, b.dmg * fall);
+    if (hit.collider && (hit.collider.spec || hit.collider.rock || hit.collider.special)) structHit(hit.collider, end, b.dmg * fall * (b.owner && !b.owner.human ? 0.5 : 1), b.owner);
     if (hit.collider && hit.collider.barrel) damageBarrel(hit.collider.barrel, b.dmg * fall, b.owner);
   }
 }
@@ -1512,6 +1527,96 @@ function explode(at, owner, dmg, radius, how = 'Lanciarazzi') {
     const cx = (w.minX + w.maxX) / 2, cz = (w.minZ + w.maxZ) / 2;
     if (Math.hypot(cx - at.x, cz - at.z) < radius + 1.5) damageWall(w, 400);
   }
+  structBlast(at, radius * 0.75, dmg * 3, owner);
+}
+
+// ─────────────── v33: strutture distruttibili (effetti, macerie, materiali) ───────────────
+const debrisGeo = new THREE.BoxGeometry(1, 1, 1);
+G.debris = [];
+const _dq = new THREE.Quaternion(), _dax = new THREE.Vector3();
+function addDebris(mat, w, h, d, x, y, z, vx, vy, vz, life, slab = false) {
+  if (G.debris.length > 220) { const o = G.debris.shift(); scene.remove(o.m); }
+  const m = new THREE.Mesh(debrisGeo, mat);
+  m.scale.set(w, h, d); m.position.set(x, y, z);
+  m.castShadow = slab && w * h * d > 0.5; m.receiveShadow = true;
+  scene.add(m);
+  G.debris.push({ m, v: new THREE.Vector3(vx, vy, vz), av: new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).multiplyScalar(slab ? 0.8 : 6), life, t: 0, slab, rest: false, hy: Math.min(w, h, d) / 2 });
+}
+function updateDebris(dt) {
+  for (let i = G.debris.length - 1; i >= 0; i--) {
+    const o = G.debris[i], m = o.m;
+    o.t += dt;
+    if (!o.rest) {
+      o.v.y -= 22 * dt;
+      m.position.addScaledVector(o.v, dt);
+      const al = o.av.length();
+      if (al > 0.01) { _dq.setFromAxisAngle(_dax.copy(o.av).divideScalar(al), al * dt); m.quaternion.premultiply(_dq); }
+      const gy = terrainHeight(m.position.x, m.position.z) + o.hy;
+      if (m.position.y < gy) {
+        m.position.y = gy;
+        if (o.v.y < -3 && !o.slab) { o.v.y *= -0.3; o.v.x *= 0.6; o.v.z *= 0.6; o.av.multiplyScalar(0.5); }
+        else { o.rest = true; if (o.slab && o.t < 3 && m.position.distanceToSquared(camera.position) < 60 * 60) emit(m.position, '#a89c8a', 3, 2.5, 0.8, 0.25, -0.05); }
+      }
+    }
+    const left = o.life - o.t;
+    if (left < 1.2) { if (o.slab) m.position.y -= dt * 1.2; else m.scale.multiplyScalar(Math.max(0, 1 - dt * 3)); }
+    if (left <= 0) { scene.remove(m); G.debris.splice(i, 1); }
+  }
+}
+/** effetti degli eventi di rottura restituiti da world.damageAt / damageSphere */
+function structEffects(ev, src, remote = false) {
+  const near = (x, z, r = 140) => (x - camera.position.x) ** 2 + (z - camera.position.z) ** 2 < r * r;
+  if (ev.chipped && !ev.cells.length && src && src.isPlayer) { /* solo scheggiato: le particelle dell'impatto bastano */ }
+  for (const c of ev.cells) {
+    if (!near(c.x, c.z)) continue;
+    const p = new THREE.Vector3(c.x, c.y, c.z);
+    emit(p, c.color, 14, 4.5, 0.7, 0.16);
+    emit(p, '#b8b0a4', 8, 2, 1.1, 0.35, -0.05);
+    if (c.material && !c.rock) {
+      const n = c.thin < 0.06 ? 2 : 4, sz = Math.min(0.5, c.s * 0.32);
+      for (let k = 0; k < n; k++) addDebris(c.material, sz * rand(0.6, 1.1), sz * rand(0.6, 1.1), Math.max(0.05, Math.min(c.thin, sz)), c.x + rand(-0.4, 0.4), c.y + rand(-0.4, 0.4), c.z + rand(-0.4, 0.4), rand(-3, 3), rand(1, 4), rand(-3, 3), 3 + Math.random());
+    }
+    if (src && src.isPlayer) A.playBuild();
+  }
+  for (const o of ev.objects) {
+    const p = new THREE.Vector3(o.x, o.y + o.s * 0.5, o.z);
+    if (near(o.x, o.z)) {
+      emit(p, o.car ? '#3a3a3a' : '#8d8a84', 22, 5, 1.2, 0.3, -0.05);
+      emit(p, o.car ? '#ff9a3a' : '#a09c94', 12, 6, 0.6, 0.18);
+      if (o.car) { A.playExplosion(p.distanceTo(camera.position)); G.shake = Math.max(G.shake, clamp(1 - p.distanceTo(camera.position) / 30, 0, 0.6)); }
+      else A.playBuild();
+    }
+    if (!remote) spawnLoot({ kind: 'mats', count: o.mats }, new THREE.Vector3(o.x, terrainHeight(o.x, o.z) + 0.1, o.z), true);
+  }
+  for (const k of ev.collapses) {
+    const visible = near(k.x, k.z, 220);
+    if (visible) {
+      for (const b of k.boxes) addDebris(b.material, b.w, b.h, b.d, b.x, b.y, b.z, rand(-0.8, 0.8), rand(-1, 0.5), rand(-0.8, 0.8), 5 + Math.random() * 1.5, true);
+      const n = Math.min(14, 4 + Math.round((k.w + k.d) / 2));
+      for (let i = 0; i < n; i++) emit(new THREE.Vector3(k.x + rand(-k.w / 2, k.w / 2), k.y + rand(0, k.h), k.z + rand(-k.d / 2, k.d / 2)), '#b0a698', 10, 3, 1.6, 0.6, -0.04);
+      const d = Math.hypot(k.x - camera.position.x, k.z - camera.position.z);
+      A.playExplosion(d + 15); G.shake = Math.max(G.shake, clamp(1 - d / 50, 0, 0.7));
+      if (src && src.isPlayer) showMsg('', '🏚 Struttura crollata! Materiali a terra', 2.2);
+    }
+    if (!remote) {
+      // materiali sparsi dove è crollata la struttura
+      const piles = Math.min(4, 1 + Math.floor(k.mats / 60));
+      for (let i = 0; i < piles; i++) {
+        const x = k.x + rand(-k.w / 3, k.w / 3), z = k.z + rand(-k.d / 3, k.d / 3);
+        spawnLoot({ kind: 'mats', count: Math.ceil(k.mats / piles) }, new THREE.Vector3(x, groundAt(x, z, terrainHeight(x, z) + 1) + 0.1, z), true);
+      }
+    }
+  }
+}
+function structHit(c, p, amount, src) {
+  const ev = world.damageAt(c, p, amount);
+  structEffects(ev, src);
+  if (G.net && (src === G.player || (NET.role === 'host' && src && !src.remote && !src.human))) netSend({ t: 'sdmg', p: [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)], a: Math.round(amount) });
+}
+function structBlast(at, r, amount, src) {
+  const ev = world.damageSphere(at, r, amount);
+  structEffects(ev, src);
+  if (G.net && (src === G.player || (NET.role === 'host' && src && !src.remote && !src.human))) netSend({ t: 'sdmg', p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)], a: Math.round(amount), r: +r.toFixed(2) });
 }
 
 // ─────────────── Muri costruiti ───────────────
@@ -2125,6 +2230,7 @@ const _bd = new THREE.Vector3();
 const _nav = new THREE.Vector3();
 function houseAt(x, z, y) {
   for (const h of world.houses) {
+    if (h.collapsed) continue;
     if (Math.abs(x - h.cx) < h.w / 2 - 0.15 && Math.abs(z - h.cz) < h.d / 2 - 0.15 && (y === undefined || y < h.roofTop - 0.5)) return h;
   }
   return null;
@@ -2133,7 +2239,7 @@ function houseAt(x, z, y) {
 function navPoint(b, goal) {
   // sul tetto? scendi dal bordo più vicino
   for (const h of world.houses) {
-    if (b.pos.y > h.roofTop - 0.6 && Math.abs(b.pos.x - h.cx) < h.w / 2 + 0.4 && Math.abs(b.pos.z - h.cz) < h.d / 2 + 0.4) {
+    if (!h.collapsed && b.pos.y > h.roofTop - 0.6 && Math.abs(b.pos.x - h.cx) < h.w / 2 + 0.4 && Math.abs(b.pos.z - h.cz) < h.d / 2 + 0.4) {
       const ex = h.w / 2 - Math.abs(b.pos.x - h.cx), ez = h.d / 2 - Math.abs(b.pos.z - h.cz);
       if (ex < ez) return _nav.set(h.cx + Math.sign(b.pos.x - h.cx || 1) * (h.w / 2 + 2), 0, b.pos.z);
       return _nav.set(b.pos.x, 0, h.cz + Math.sign(b.pos.z - h.cz || 1) * (h.d / 2 + 2));
@@ -2308,6 +2414,7 @@ function updateBot(b, dt) {
 // ─────────────── Input ───────────────
 const keys = {};
 const pressed = new Set();
+const INV_MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight', 'KeyC', 'ControlLeft']);
 const mouse = { left: false, right: false, leftPressed: false };
 let pointerLocked = false;
 addEventListener('keydown', e => {
@@ -2316,6 +2423,8 @@ addEventListener('keydown', e => {
   if (e.code === 'Tab' && G.state === 'play') { e.preventDefault(); if (!e.repeat) toggleInventory(); return; }
   if (G.invOpen) {
     e.preventDefault();
+    // v33: il gioco non si ferma: con l'inventario aperto ci si continua a muovere (WASD, salto, scatto, accovacciarsi)
+    if (INV_MOVE_KEYS.has(e.code)) { if (!keys[e.code]) pressed.add(e.code); keys[e.code] = true; return; }
     if (e.code === 'Escape') toggleInventory(false);
     else if (!e.repeat) inventory.key(e.code);
     return;
@@ -2323,7 +2432,7 @@ addEventListener('keydown', e => {
   if (!keys[e.code]) pressed.add(e.code);
   keys[e.code] = true;
   if (['Space', 'Tab'].includes(e.code) && G.state !== 'menu') e.preventDefault();
-  if (e.code === 'Escape' && (G.state === 'play' || G.state === 'bus') && !pointerLocked) togglePause();
+  if (e.code === 'Escape' && (G.state === 'play' || G.state === 'bus') && !pointerLocked && !G.mapOpen) togglePause();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.left = mouse.right = false; });
@@ -2339,6 +2448,11 @@ addEventListener('mouseup', e => { if (e.button === 0) mouse.left = false; if (e
 addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('mousemove', e => {
   if (G.state === 'menu') { if (lobby.drag) lobby.rotV += e.movementX * 0.01; return; }
+  if (G.specOn || (G.player && !G.player.alive && G.spectate)) {
+    if (!(e.buttons & 1) && !(e.buttons & 2) && !pointerLocked) return;
+    G.specOrbit = (G.specOrbit || 0) - e.movementX * 0.005; G.specPitch = clamp((G.specPitch || 0) - e.movementY * 0.004, -0.6, 0.6); G.specIdle = 0;
+    return;
+  }
   if (G.paused || G.state === 'end' || G.invOpen) return;
   if (!pointerLocked && !(e.buttons & 1) && !(e.buttons & 2)) { if (!lockFailed) return; }
   // Chrome a volte invia salti enormi subito dopo il pointer lock: ignorali
@@ -2367,7 +2481,7 @@ document.addEventListener('pointerlockchange', () => {
   const was = pointerLocked;
   pointerLocked = document.pointerLockElement === canvas;
   if (pointerLocked) lockTime = performance.now();
-  if (was && !pointerLocked && (G.state === 'play' || G.state === 'bus') && !G.paused && !G.invOpen) togglePause(true);
+  if (was && !pointerLocked && (G.state === 'play' || G.state === 'bus') && !G.paused && !G.invOpen && !G.mapOpen) togglePause(true);
 });
 document.addEventListener('pointerlockerror', () => { lockFailed = true; });
 
@@ -2422,7 +2536,7 @@ const inventory = createInventory({
   },
   equip(i) { const p = G.player; p.setActive(i); if (G.build.on) toggleBuild(false); },
   onOpen() {
-    for (const k in keys) keys[k] = false;
+    for (const k in keys) if (!INV_MOVE_KEYS.has(k)) keys[k] = false;
     pressed.clear();
     mouse.left = mouse.right = false;
     touch.T.mx = touch.T.my = 0; touch.T.sprint = false;
@@ -2585,7 +2699,7 @@ function toggleStove(st, by, lit = !st.lit, remote = false) {
 }
 function botDoors(b) {
   for (const d of world.doors) {
-    if (d.open || Math.abs(d.x - b.pos.x) > 2.3 || Math.abs(d.z - b.pos.z) > 2.3 || Math.abs(d.y - b.pos.y) > 2) continue;
+    if (d.open || d.broken || Math.abs(d.x - b.pos.x) > 2.3 || Math.abs(d.z - b.pos.z) > 2.3 || Math.abs(d.y - b.pos.y) > 2) continue;
     toggleDoor(d, b, true);
   }
 }
@@ -2609,6 +2723,7 @@ function nearestInteract(p) {
   const st = stoves.nearest(p);
   if (st) { const d = Math.hypot(st.x - p.pos.x, st.z - p.pos.z); if (d - 0.6 < bs) { bs = d - 0.6; best = { stove: st }; } }
   for (const dr of world.doors) {
+    if (dr.broken) continue;
     const dx = dr.x - p.pos.x, dz = dr.z - p.pos.z;
     if (Math.abs(dx) > 2.6 || Math.abs(dz) > 2.6 || Math.abs(dr.y - p.pos.y) > 1.8) continue;
     const d = Math.hypot(dx, dz);
@@ -2667,7 +2782,8 @@ function updatePlayer(dt) {
   } else if (pressed.has('KeyC')) { p.crouch = !p.crouch; if (p.crouch) A.playStep(); }
   let stoodUp = false;
   if (p.crouch && !settings.crouchHold && (pressed.has('Space') || (keys.ShiftLeft || keys.ShiftRight))) { p.crouch = false; stoodUp = pressed.has('Space'); }
-  // slot
+  // slot (con l'inventario aperto i tasti delle azioni servono all'inventario: qui arrivano solo i movimenti)
+  if (G.invOpen) for (const k of [...pressed]) if (!INV_MOVE_KEYS.has(k)) pressed.delete(k);
   for (let i = 0; i < SLOT_COUNT; i++) if (pressed.has('Digit' + (i + 1))) { p.setActive(i); if (G.build.on) toggleBuild(false); }
   if (pressed.has('KeyQ')) toggleBuild();
   if (pressed.has('KeyB')) { const i = ((p._emoteIdx ?? -1) + 1) % EMOTES.length; p._emoteIdx = i; startEmote(p, EMOTES[i].id); }
@@ -2751,7 +2867,7 @@ function toggleBuild(force) {
 }
 
 // ─────────────── Telecamera ───────────────
-const camTarget = new THREE.Vector3();
+const camTarget = new THREE.Vector3(), _specUp = new THREE.Vector3();
 function updateCamera(dt) {
   const p = G.player;
   const F0 = settings.fov;
@@ -2759,8 +2875,20 @@ function updateCamera(dt) {
   let yaw = G.camYaw, pitch = G.camPitch;
   if (!p.alive) {
     const t = G.spectate && G.spectate.alive ? G.spectate : p;
-    pivot = camTarget.copy(t.pos).add(new THREE.Vector3(0, 1.6, 0));
-    G.camYaw += dt * 0.25; yaw = G.camYaw; pitch = -0.35; dist = 7; shoulder = 0;
+    if (t !== p && (G.specOn || G.spectate)) {
+      // v33: spettatore: alle spalle di chi osservi, girato come lui; trascinando il mouse ci si gira attorno
+      G.specIdle = (G.specIdle || 0) + dt;
+      if (G.specIdle > 2.5) G.specOrbit = lerp(G.specOrbit || 0, 0, Math.min(1, dt * 1.5));
+      G.specYaw = angLerp(G.specYaw ?? t.yaw, t.yaw, Math.min(1, dt * 5));
+      const air = t.mode === 'fall' || t.mode === 'glide', bus = t.mode === 'bus';
+      pivot = camTarget.copy(bus ? G.bus.pos : t.pos).add(_specUp.set(0, bus ? 3 : air ? (t.mode === 'glide' ? 3.3 : 1.5) : 1.75 - 0.5 * (t.crouchK || 0), 0));
+      yaw = G.specYaw + (G.specOrbit || 0); G.camYaw = yaw;
+      pitch = bus ? -0.3 : air ? -0.35 : clamp((t.pitch || 0) * 0.7 - 0.1 + (G.specPitch || 0), -1.1, 0.9); G.camPitch = pitch;
+      dist = bus ? 26 : air ? 7 : 3.9; shoulder = bus || air ? 0 : 0.8;
+    } else {
+      pivot = camTarget.copy(t.pos).add(new THREE.Vector3(0, 1.6, 0));
+      G.camYaw += dt * 0.25; yaw = G.camYaw; pitch = -0.35; dist = 7; shoulder = 0;
+    }
   } else if (p.mode === 'bus') {
     pivot = camTarget.copy(G.bus.pos).add(new THREE.Vector3(0, 3, 0));
     dist = 26; shoulder = 0; wantFov = F0 + 5;
@@ -3131,22 +3259,113 @@ function drawPlayerArrow(ctx, x, y, s) {
 }
 const bmCanvas = $('#bigmapCanvas');
 const bmCtx = bmCanvas.getContext('2d');
+// v33: mappa grande con zoom (rotellina, pizzico, tasti + e −) e spostamento trascinando
+const BM = { zoom: 1, cx: 0, cz: 0, follow: true, drag: null, pinch: null };
+const BM_MAX = 8;
+function bigMapOpen() { return !$('#bigmap').classList.contains('hidden'); }
+function toggleBigMap(force) {
+  const open = force !== undefined ? force : !bigMapOpen();
+  $('#bigmap').classList.toggle('hidden', !open);
+  document.body.classList.toggle('map-open', open);
+  G.mapOpen = open;
+  if (open) {
+    BM.follow = true; mouse.left = mouse.right = false; G.ads = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+  } else if (G.state === 'play' && !G.paused && !G.invOpen && G.player && G.player.alive) requestLock();
+}
+function bmView() { return HALF * 2 / BM.zoom; }
+function bmClampCenter() {
+  const v = bmView() / 2, lim = Math.max(0, HALF - v);
+  BM.cx = clamp(BM.cx, -lim, lim); BM.cz = clamp(BM.cz, -lim, lim);
+}
+/** zoom attorno a un punto del canvas (px, py in coordinate del canvas 0..640) */
+function bmZoomAt(f, px = 320, py = 320) {
+  const S = bmCanvas.width, v0 = bmView();
+  const wx = BM.cx + (px / S - 0.5) * v0, wz = BM.cz + (py / S - 0.5) * v0;
+  BM.zoom = clamp(BM.zoom * f, 1, BM_MAX);
+  const v1 = bmView();
+  BM.cx = wx - (px / S - 0.5) * v1; BM.cz = wz - (py / S - 0.5) * v1;
+  BM.follow = false; bmClampCenter();
+  $('#bmZoom').textContent = BM.zoom < 1.05 ? '1×' : BM.zoom.toFixed(1).replace('.', ',') + '×';
+}
+const bmLocal = (e) => { const r = bmCanvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * bmCanvas.width, (e.clientY - r.top) / r.height * bmCanvas.height]; };
+bmCanvas.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = bmLocal(e); bmZoomAt(Math.exp(-e.deltaY * 0.0016), x, y); }, { passive: false });
+const bmPtr = new Map();
+bmCanvas.addEventListener('pointerdown', e => {
+  e.preventDefault(); bmCanvas.setPointerCapture(e.pointerId);
+  bmPtr.set(e.pointerId, bmLocal(e));
+  if (bmPtr.size === 2) { const [a, b] = [...bmPtr.values()]; BM.pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) }; BM.drag = null; }
+  else BM.drag = bmLocal(e);
+});
+bmCanvas.addEventListener('pointermove', e => {
+  if (!bmPtr.has(e.pointerId)) return;
+  const p = bmLocal(e); bmPtr.set(e.pointerId, p);
+  if (bmPtr.size === 2 && BM.pinch) {
+    const [a, b] = [...bmPtr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    if (BM.pinch.d > 10) bmZoomAt(d / BM.pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    BM.pinch.d = d;
+  } else if (BM.drag) {
+    const k = bmView() / bmCanvas.width;
+    BM.cx -= (p[0] - BM.drag[0]) * k; BM.cz -= (p[1] - BM.drag[1]) * k;
+    BM.drag = p; BM.follow = false; bmClampCenter();
+  }
+});
+const bmUp = e => { bmPtr.delete(e.pointerId); if (bmPtr.size < 2) BM.pinch = null; if (!bmPtr.size) BM.drag = null; };
+bmCanvas.addEventListener('pointerup', bmUp); bmCanvas.addEventListener('pointercancel', bmUp);
+$('#bmIn').addEventListener('click', e => { e.stopPropagation(); bmZoomAt(1.5); });
+$('#bmOut').addEventListener('click', e => { e.stopPropagation(); bmZoomAt(1 / 1.5); });
+$('#bmCenter').addEventListener('click', e => { e.stopPropagation(); BM.follow = true; });
+$('#bmClose').addEventListener('click', e => { e.stopPropagation(); toggleBigMap(false); });
+addEventListener('keydown', e => {
+  if (!G.mapOpen || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Equal' || e.code === 'NumpadAdd') bmZoomAt(1.4);
+  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') bmZoomAt(1 / 1.4);
+  else if (e.code === 'Escape') toggleBigMap(false);
+});
 function drawBigMap() {
-  const S = 640, view = HALF * 2;
-  bmCtx.drawImage(world.minimap, 0, 0, S, S);
-  drawStormOn(bmCtx, S, 0, 0, view);
-  events.drawMarkers(bmCtx, S, 0, 0, view, w2m);
-  drawBusLine(bmCtx, S, 0, 0, view);
-  bmCtx.font = 'bold 14px sans-serif'; bmCtx.textAlign = 'center';
+  const S = bmCanvas.width;
+  const p = G.player;
+  const pp = !p ? camera.position : p.mode === 'bus' ? G.bus.pos : p.alive ? p.pos : (G.spectate && G.spectate.alive ? G.spectate.pos : camera.position);
+  if (BM.follow) { BM.cx = pp.x; BM.cz = pp.z; bmClampCenter(); }
+  const view = bmView(), cx = BM.cx, cz = BM.cz;
+  const MM = world.minimap.width, k = MM / (HALF * 2);
+  bmCtx.fillStyle = '#2a78bd'; bmCtx.fillRect(0, 0, S, S);
+  bmCtx.imageSmoothingEnabled = true; bmCtx.imageSmoothingQuality = 'high';
+  bmCtx.drawImage(world.minimap, (cx - view / 2 + HALF) * k, (cz - view / 2 + HALF) * k, view * k, view * k, 0, 0, S, S);
+  // da vicino: case ed edifici ridisegnati netti (la minimappa ha 2 m per pixel)
+  if (BM.zoom > 1.8) {
+    const sc = S / view, a = clamp((BM.zoom - 1.8) / 1.2, 0, 1);
+    bmCtx.globalAlpha = a;
+    for (const h of world.houses) {
+      if (h.collapsed) continue;
+      const x = w2m(h.cx - h.w / 2, cx, view, S), y = w2m(h.cz - h.d / 2, cz, view, S), w = h.w * sc, d = h.d * sc;
+      if (x > S || y > S || x + w < 0 || y + d < 0) continue;
+      bmCtx.fillStyle = h.city === 'capannone' ? '#5a6672' : h.city === 'miniera' ? '#6a4a34' : h.city ? '#7a4a38' : '#6a4632';
+      bmCtx.fillRect(x, y, w, d);
+      bmCtx.strokeStyle = 'rgba(0,0,0,.55)'; bmCtx.lineWidth = 1; bmCtx.strokeRect(x + 0.5, y + 0.5, w - 1, d - 1);
+      if (h.ruined) { bmCtx.strokeStyle = '#ffb43a'; bmCtx.beginPath(); bmCtx.moveTo(x, y); bmCtx.lineTo(x + w, y + d); bmCtx.moveTo(x + w, y); bmCtx.lineTo(x, y + d); bmCtx.stroke(); }
+    }
+    bmCtx.globalAlpha = 1;
+  }
+  drawStormOn(bmCtx, S, cx, cz, view);
+  events.drawMarkers(bmCtx, S, cx, cz, view, w2m);
+  drawBusLine(bmCtx, S, cx, cz, view);
+  bmCtx.font = `bold ${Math.round(13 + Math.min(5, BM.zoom))}px sans-serif`; bmCtx.textAlign = 'center';
   for (const t of TOWNS) {
-    const x = w2m(t.x, 0, view, S), y = w2m(t.z, 0, view, S);
+    const x = w2m(t.x, cx, view, S), y = w2m(t.z, cz, view, S);
+    if (x < -60 || x > S + 60 || y < -20 || y > S + 20) continue;
     bmCtx.fillStyle = 'rgba(0,0,0,.6)'; bmCtx.fillText(t.name, x + 1, y + 1);
     bmCtx.fillStyle = '#fff'; bmCtx.fillText(t.name, x, y);
   }
-  const p = G.player;
-  const pp = p.mode === 'bus' ? G.bus.pos : p.pos;
-  drawMates(bmCtx, S, 0, 0, view, 6);
-  drawPlayerArrow(bmCtx, w2m(pp.x, 0, view, S), w2m(pp.z, 0, view, S), 10);
+  // scala in metri
+  {
+    const mpp = view / S, nice = [10, 25, 50, 100, 200, 400, 800].find(m => m / mpp > 60) || 800, L = nice / mpp;
+    bmCtx.fillStyle = 'rgba(0,0,0,.55)'; bmCtx.fillRect(12, S - 30, L + 16, 20);
+    bmCtx.fillStyle = '#fff'; bmCtx.fillRect(20, S - 18, L, 3); bmCtx.fillRect(20, S - 23, 2, 10); bmCtx.fillRect(20 + L - 2, S - 23, 2, 10);
+    bmCtx.font = 'bold 11px sans-serif'; bmCtx.textAlign = 'center'; bmCtx.fillText(nice + ' m', 20 + L / 2, S - 21);
+  }
+  drawMates(bmCtx, S, cx, cz, view, 6);
+  if (p && (p.alive || p.mode === 'bus')) drawPlayerArrow(bmCtx, w2m(pp.x, cx, view, S), w2m(pp.z, cz, view, S), 10);
 }
 
 // ─────────────── Partita ───────────────
@@ -3163,6 +3382,8 @@ function makeBotNames(n) {
 }
 
 function clearMatch() {
+  for (const o of G.debris) scene.remove(o.m);
+  G.debris.length = 0;
   inventory.close();
   events.reset();
   weather.hide();
@@ -3239,6 +3460,7 @@ async function onNetStart(msg) {
 function clearMatchToMenuSilently() {
   clearMatch(); G.player = null; G.state = 'menu';
   for (const id of ['#end', '#pause', '#bigmap', '#scope']) $(id).classList.add('hidden');
+  document.body.classList.remove('map-open'); G.mapOpen = false;
 }
 
 function setupBot(b) {
@@ -3268,6 +3490,7 @@ function beginMatch(net) {
   G.net = net ? { sendT: 0, snapT: 0, stormT: 0, byPeer: new Map() } : null;
   G.diff = DIFFICULTY[(net && net.diff) || settings.difficulty] || DIFFICULTY.normale;
   G.time = 0; G.endShown = false; G.spectate = null; G.paused = false; G.ads = false;
+  exitSpectate(); G.specKiller = null; G.specPitch = 0;
   G.lootSeq = 0; G.lootPrefix = ''; G.matchStats = { chests: 0, grass: 0, climb: 0, glide: 0, walk: 0, surv: 0 };
   PR.resetMatchMax();
   toggleBuild(false);
@@ -3415,14 +3638,13 @@ function updateMateTags() {
   }
 }
 
-function endMatch(win) {
-  if (win && G.player && G.player.alive && G.player.mode === 'ground') startEmote(G.player, 'tifo');
-  if (G.endShown) return;
+/** risultati della partita (una volta sola): XP, monete, missioni, testo della schermata finale */
+function finishMatch(win) {
+  if (G.endShown) return false;
   G.endShown = true;
   inventory.close();
   G.state = 'end';
   G.ads = false;
-  if (document.pointerLockElement) document.exitPointerLock();
   const p = G.player;
   const place = win ? 1 : G.placement;
   $('#end').classList.toggle('win', win);
@@ -3440,10 +3662,84 @@ function endMatch(win) {
   renderEndXp(res);
   $('#againBtn').classList.toggle('hidden', NET.role === 'client');
   $('#againBtn').textContent = NET.role === 'host' ? 'NUOVA PARTITA PER TUTTI' : 'GIOCA ANCORA';
-  setTimeout(() => $('#end').classList.remove('hidden'), win ? 600 : 0);
+  return true;
+}
+function showEndScreen(delay = 0) {
+  exitSpectate();
+  if (document.pointerLockElement) document.exitPointerLock();
+  // si può tornare a guardare la partita finché c'è qualcuno in piedi
+  const can = G.player && !G.player.alive && G.chars.some(c => c.alive && c !== G.player);
+  $('#specBtn').classList.toggle('hidden', !can);
+  setTimeout(() => { if (!G.specOn && G.state === 'end') $('#end').classList.remove('hidden'); }, delay);
+}
+function endMatch(win) {
+  if (win && G.player && G.player.alive && G.player.mode === 'ground') startEmote(G.player, 'tifo');
+  if (!finishMatch(win)) return;
+  showEndScreen(win ? 600 : 0);
   win ? A.playVictory() : A.playDefeat();
   if (win) showMsg('#1 VITTORIA REALE!', '', 5);
 }
+
+// ─────────────── Spettatore (v33) ───────────────
+/** dopo l'eliminazione: risultati salvati, poi si osserva chi ti ha eliminato (o il più vicino) */
+function deathToSpectate(killer) {
+  if (G.state === 'menu') return;
+  if (!finishMatch(false)) { if (!G.specOn) showEndScreen(); return; }
+  A.playDefeat();
+  const t = killer && killer.alive ? killer : nearestAlive(G.player && G.player.pos);
+  if (!t || aliveTeams() <= 0) { showEndScreen(); return; }
+  enterSpectate(t, killer);
+}
+function enterSpectate(target, killer = G.specKiller) {
+  if (!target) return;
+  G.specOn = true; G.specKiller = killer || G.specKiller || null;
+  G.spectate = target; G.specYaw = target.yaw; G.specOrbit = 0; G.specIdle = 0;
+  $('#end').classList.add('hidden');
+  $('#spectate').classList.remove('hidden');
+  document.body.classList.add('spectating');
+  updateSpectateHud(true);
+}
+function exitSpectate() {
+  if (!G.specOn) return;
+  G.specOn = false;
+  $('#spectate').classList.add('hidden');
+  document.body.classList.remove('spectating');
+}
+function specCycle(dir) {
+  const list = G.chars.filter(c => c.alive && c !== G.player);
+  if (!list.length) return;
+  const i = list.indexOf(G.spectate);
+  G.spectate = list[((i < 0 ? 0 : i + dir) + list.length) % list.length];
+  G.specOrbit = 0; G.specYaw = G.spectate.yaw;
+  A.playUI();
+  updateSpectateHud(true);
+}
+function updateSpectateHud(force) {
+  if (!G.specOn) return;
+  const t = G.spectate;
+  if (!t || !t.alive) { const n = nearestAlive(t && t.pos); if (n) G.spectate = n; else { showEndScreen(); return; } }
+  const c = G.spectate;
+  G.specHudT = (G.specHudT || 0) - 1;
+  if (!force && G.specHudT > 0) return;
+  G.specHudT = 6;
+  const w = c.weapon ? WEAPONS[c.weapon.id] : null;
+  const isKiller = c === G.specKiller;
+  setHTML($('#specName'), 'sn', `${esc(c.name)}${isKiller ? ' <em>TI HA ELIMINATO</em>' : (G.player && c.team === G.player.team && G.teamSize > 1 ? ' <em class="mate">COMPAGNO</em>' : '')}`);
+  setHTML($('#specInfo'), 'si', `<span>💀 ${c.kills}</span><span class="sh">🛡 ${Math.ceil(c.shield)}</span><span class="hp">❤ ${Math.ceil(c.hp)}</span>${w ? `<span>${weaponIconHTML(c.weapon.id, c.weapon.rarity, 'wi')} ${esc(w.name)}</span>` : '<span>⛏ Piccone</span>'}<span>👤 ${G.chars.filter(x => x.alive).length} vivi</span>`);
+}
+$('#specPrev').onclick = e => { e.stopPropagation(); specCycle(-1); };
+$('#specNext').onclick = e => { e.stopPropagation(); specCycle(1); };
+$('#specKill').onclick = e => { e.stopPropagation(); if (G.specKiller && G.specKiller.alive) { G.spectate = G.specKiller; G.specOrbit = 0; updateSpectateHud(true); } };
+$('#specMenu').onclick = e => { e.stopPropagation(); A.playUI(); exitSpectate(); toMenu(); };
+$('#specExit').onclick = e => { e.stopPropagation(); A.playUI(); showEndScreen(); };
+$('#specBtn').onclick = () => { A.playUI(); const t = (G.specKiller && G.specKiller.alive && G.specKiller) || nearestAlive(G.player && G.player.pos); if (t) enterSpectate(t); };
+addEventListener('keydown', e => {
+  if (!G.specOn || e.target.tagName === 'INPUT') return;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'Space') { e.preventDefault(); specCycle(1); }
+  else if (e.code === 'ArrowLeft' || e.code === 'KeyA') specCycle(-1);
+  else if (e.code === 'KeyK') $('#specKill').click();
+  else if (e.code === 'Escape' || e.code === 'Enter') showEndScreen();
+});
 function renderEndXp(r) {
   const rows = r.lines.map(l => `<div class="row"><span>${esc(l.label)}</span><b>+${l.xp} XP</b></div>`).join('');
   const lv = r.tierAfter > r.tierBefore ? `<div class="lvup">⭐ LIVELLO ${r.tierAfter} RAGGIUNTO! Nuove ricompense nel pass</div>` : '';
@@ -3455,6 +3751,7 @@ $('#menuBtn').onclick = () => { A.playUI(); toMenu(); };
 
 function toMenu() {
   if (document.pointerLockElement) document.exitPointerLock();
+  exitSpectate();
   if (G.net && NET.role === 'host') { netSend({ t: 'abort' }); NET.inMatch = false; }
   G.net = null;
   clearMatch();
@@ -3464,7 +3761,7 @@ function toMenu() {
   $('#hud').classList.add('hidden');
   $('#end').classList.add('hidden');
   $('#pause').classList.add('hidden');
-  $('#bigmap').classList.add('hidden');
+  $('#bigmap').classList.add('hidden'); document.body.classList.remove('map-open'); G.mapOpen = false;
   $('#scope').classList.add('hidden');
   $('#stormTint').style.opacity = 0;
   $('#vignette').style.opacity = 0;
@@ -3729,6 +4026,59 @@ canvas.addEventListener('pointerdown', () => { if (G.state === 'menu') lobby.dra
   addEventListener('pointerup', () => { lx = null; });
 }
 addEventListener('pointerup', () => { lobby.drag = false; });
+// v33: zoom nell'armadietto (rotellina verso il punto indicato, pizzico, cursore, tasti testa / figura intera)
+lobby.zoom = 1; lobby.zoomT = 1; lobby.focusY = 0.95; lobby.focusT = 0.95;
+const lobbyCanZoom = () => G.state === 'menu' && menuApi && menuApi.tab() === 'locker';
+function lobbyZoomTo(z, fy) {
+  lobby.zoomT = clamp(z, 1, 4);
+  if (fy !== undefined) lobby.focusT = fy;
+  if (lobby.zoomT < 1.02) lobby.focusT = 0.95;
+  lobby.focusT = clamp(lobby.focusT, 0.35, 1.75);
+  const r = $('#lobbyZoomR'); if (r && document.activeElement !== r) r.value = lobby.zoomT;
+}
+/** altezza (m) sul piano del personaggio sotto un punto dello schermo */
+function lobbyWorldY(clientY) {
+  const cz = lobby.cam.position.z, vh = 2 * cz * Math.tan(THREE.MathUtils.degToRad(lobby.cam.fov / 2));
+  return lobby.cam.position.y + (lobby._ly - lobby.cam.position.y) + (0.5 - clientY / innerHeight) * vh;
+}
+canvas.addEventListener('wheel', e => {
+  if (!lobbyCanZoom()) return;
+  e.preventDefault();
+  const z = lobby.zoomT * Math.exp(-e.deltaY * 0.0018);
+  lobbyZoomTo(z, lerp(lobby.focusT, lobbyWorldY(e.clientY), 0.35));
+}, { passive: false });
+{
+  const pts = new Map(); let pd = 0, py = null;
+  canvas.addEventListener('pointerdown', e => { if (!lobbyCanZoom()) return; pts.set(e.pointerId, [e.clientX, e.clientY]); py = e.clientY; if (pts.size === 2) { const [a, b] = [...pts.values()]; pd = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
+  canvas.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId) || !lobbyCanZoom()) return;
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (pd > 10) lobbyZoomTo(lobby.zoomT * d / pd, lobbyWorldY((a[1] + b[1]) / 2));
+      pd = d;
+    } else if (py !== null && lobby.zoomT > 1.05) {
+      // trascinando in verticale si scorre lungo il personaggio
+      const vh = 2 * lobby.cam.position.z * Math.tan(THREE.MathUtils.degToRad(lobby.cam.fov / 2));
+      lobbyZoomTo(lobby.zoomT, lobby.focusT + (e.clientY - py) / innerHeight * vh);
+      py = e.clientY;
+    }
+  });
+  const up = e => { pts.delete(e.pointerId); if (!pts.size) py = null; };
+  addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  const zb = $('#lobbyZoom');
+  if (zb) {
+    zb.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      const k = b.dataset.z;
+      if (k === 'in') lobbyZoomTo(lobby.zoomT * 1.35, lobby.focusT === 0.95 ? 1.25 : lobby.focusT);
+      else if (k === 'out') lobbyZoomTo(lobby.zoomT / 1.35);
+      else if (k === 'head') lobbyZoomTo(3.6, 1.62);
+      else if (k === 'body') lobbyZoomTo(1, 0.95);
+    });
+    $('#lobbyZoomR').addEventListener('input', e => lobbyZoomTo(+e.target.value, lobby.focusT === 0.95 && +e.target.value > 1.05 ? 1.3 : lobby.focusT));
+  }
+}
 function renderLobby(dt) {
   const c = lobby.char;
   const t = performance.now() / 1000;
@@ -3781,8 +4131,12 @@ function renderLobby(dt) {
   // personaggio centrato nello spazio libero tra i pannelli (metri per pixel alla distanza della camera)
   const tab = menuApi ? menuApi.tab() : 'play';
   // con la squadra la camera si allontana un po' per inquadrare tutti
-  const wantZ = tab === 'play' ? 7.4 + (lobby.squadN || 0) * 1.1 : 7.4;
-  lobby.cam.position.z += (wantZ - lobby.cam.position.z) * Math.min(1, dt * 4);
+  if (tab !== 'locker' && lobby.zoomT !== 1) lobbyZoomTo(1, 0.95);
+  lobby.zoom += (lobby.zoomT - lobby.zoom) * Math.min(1, dt * 8);
+  lobby.focusY += (lobby.focusT - lobby.focusY) * Math.min(1, dt * 8);
+  const zk = (lobby.zoom - 1) / 3;
+  const wantZ = (tab === 'play' ? 7.4 + (lobby.squadN || 0) * 1.1 : 7.4) / lobby.zoom;
+  lobby.cam.position.z += (wantZ - lobby.cam.position.z) * Math.min(1, dt * (lobby.zoom > 1.01 ? 10 : 4));
   const mpp = 2 * lobby.cam.position.z * Math.tan(THREE.MathUtils.degToRad(lobby.cam.fov / 2)) / innerHeight;
   let sx = 0, ly = 0.95;
   if (innerWidth > 900) {
@@ -3791,8 +4145,9 @@ function renderLobby(dt) {
     else sx = (440 + 34) / 2 * mpp;
   }
   lobby.cam.position.x += (sx - lobby.cam.position.x) * Math.min(1, dt * 6);
+  if (tab === 'locker') ly = lerp(ly, lobby.focusY, Math.min(1, zk * 3));
   lobby._ly = (lobby._ly ?? ly) + (ly - (lobby._ly ?? ly)) * Math.min(1, dt * 6);
-  lobby.cam.position.y = 1.25;
+  lobby.cam.position.y = lerp(1.25, lobby._ly + 0.08, Math.min(1, zk * 2));
   lobby.cam.lookAt(lobby.cam.position.x, lobby._ly, 0);
   gfx.render(lobby.scene, lobby.cam);
 }
@@ -3985,6 +4340,11 @@ function onNetMessage(from, m) {
       case 'door': { const d = world.doors[m.k]; if (d) toggleDoor(d, null, !!m.o, true); break; }
       case 'stove': { const st = world.stoves[m.k]; if (st) toggleStove(st, null, !!m.o, true); break; }
       case 'evt': if (NET.role === 'client') events.start(m); break;
+      case 'sdmg': {
+        const at = new THREE.Vector3(m.p[0], m.p[1], m.p[2]);
+        structEffects(m.r ? world.damageSphere(at, m.r, m.a) : world.damagePoint(at, m.a), null, true);
+        break;
+      }
       case 'wall': {
         const g = m.g;
         makeWall({ x: m.x, z: m.z, g, alongX: !!m.ax });
@@ -4047,7 +4407,7 @@ const events = createEvents({
 
 function update(dt) {
   G.time += dt;
-  if (pressed.has('KeyM')) $('#bigmap').classList.toggle('hidden');
+  if (pressed.has('KeyM')) toggleBigMap();
   updateBus(dt);
   updatePlayer(dt);
   netTick(dt);
@@ -4094,6 +4454,7 @@ function update(dt) {
   updateStorm(dt);
   events.update(dt);
   updateParticles(dt);
+  updateDebris(dt);
   updateRipples(dt);
   updateDoors(dt);
   G.warm = stoves.update(dt, camera, G.chars);
@@ -4102,6 +4463,7 @@ function update(dt) {
   updateCamera(dt);
   weather.update(dt, G.time, camera, renderer, true);
   updateHUD(dt);
+  updateSpectateHud();
 }
 
 const _menuStream = new THREE.Vector3(0, 0, 0);
@@ -4154,4 +4516,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, get stoves() { return stoves; } };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, get stoves() { return stoves; } };

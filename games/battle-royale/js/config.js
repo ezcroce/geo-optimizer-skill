@@ -45,7 +45,7 @@ export const WEAPONS = {
   shotgun: {
     name: 'Fucile a pompa', speed: 230, drop: 1.3,  dmg: 12, pellets: 9, rate: 0.95, mag: 5, reload: 2.5,
     spread: 0.1, range: 45, ammo: 'shells', auto: false, zoom: 1.2,
-    botRange: 14, sound: 'shotgun', recoil: 0.05, muzzle: 0.88, role: 'shotgun', cross: 'circle', sight: 'bead',
+    botRange: 14, sound: 'shotgun', recoil: 0.05, muzzle: 0.88, role: 'shotgun', cross: 'pump', sight: 'bead',
     desc: 'Pochi colpi devastanti da vicino.',
     parts: [[0.1, 0.12, 0.5, 0, 0, 0.08, 'm'], [0.07, 0.07, 0.55, 0, 0.02, 0.58, 'm'], [0.11, 0.08, 0.26, 0, -0.07, 0.52, 'w'], [0.09, 0.15, 0.35, 0, -0.05, -0.3, 'w'], [0.105, 0.03, 0.3, 0, 0.065, 0.08, 'r']],
   },
@@ -97,13 +97,13 @@ export const WEAPONS = {
   tactical: {
     name: 'Fucile a pompa tattico', speed: 230, drop: 1.3, dmg: 8, pellets: 8, rate: 0.38, mag: 8, reload: 3.2,
     spread: 0.085, range: 40, ammo: 'shells', auto: false, zoom: 1.2,
-    botRange: 14, sound: 'tactical', recoil: 0.035, muzzle: 0.78, role: 'shotgun', cross: 'circle', sight: 'bead',
+    botRange: 14, sound: 'tactical', recoil: 0.035, muzzle: 0.78, role: 'shotgun', cross: 'tactical', sight: 'bead',
     desc: 'Meno danni del pompa, ma semiautomatico e con 8 colpi.',
   },
   drum: {
     name: 'Fucile a tamburo', speed: 220, drop: 1.35, dmg: 6, pellets: 7, rate: 0.22, mag: 16, reload: 3.8,
     spread: 0.11, range: 30, ammo: 'shells', auto: true, zoom: 1.15,
-    botRange: 12, sound: 'drum', recoil: 0.028, muzzle: 0.665, role: 'shotgun', cross: 'circle2', sight: 'holo',
+    botRange: 12, sound: 'drum', recoil: 0.028, muzzle: 0.665, role: 'shotgun', cross: 'drum', sight: 'holo',
     desc: 'Automatico con caricatore a tamburo: tanti pallini, poca gittata.',
   },
   hunting: {
@@ -128,7 +128,7 @@ export const WEAPONS = {
   doublebarrel: {
     name: 'Doppietta', speed: 220, drop: 1.35, dmg: 11, pellets: 11, rate: 0.26, mag: 2, reload: 2.4,
     spread: 0.12, range: 32, ammo: 'shells', auto: false, zoom: 1.15,
-    botRange: 11, sound: 'doublebarrel', recoil: 0.06, muzzle: 0.87, role: 'shotgun', cross: 'circle2', sight: 'bead',
+    botRange: 11, sound: 'doublebarrel', recoil: 0.06, muzzle: 0.87, role: 'shotgun', cross: 'double', sight: 'bead',
     desc: 'Due colpi uno dietro l\'altro: da vicinissimo non perdona, poi devi ricaricare.',
   },
   handcannon: {

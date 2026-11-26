@@ -9,7 +9,7 @@
 //  Qui ci sono le texture delle strade, gli oggetti instanziati (colori per vertice) e i costruttori.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts } from './props.js?v=26';
+import { mergeParts } from './props.js?v=33';
 import { normalFromHeight, NORMALS, TEXQ, ANISO } from './texgen.js?v=19';
 
 const P = (geo, color, o = {}) => ({ geo, color, o });
@@ -252,26 +252,42 @@ export const TOWN_SPECIALS = {
   },
   /** collinetta rocciosa con la galleria della miniera (ingresso a z = 0 verso +z, galleria verso -z) */
   mineHill: (c = 0) => {
-    const snowy = c === 1, cols = snowy ? ['#7d8086', '#8d9096', '#72767c'] : ['#a5623c', '#b8754a', '#8e5534', '#c08458'];
+    // v33: collina ricostruita. Prima i massi in cima galleggiavano ~0,5 m sopra quelli laterali (e il materiale
+    // degli oggetti li trasformava in legno marrone). Ora i massi poggiano sul soffitto della galleria e si
+    // compenetrano con quelli dei fianchi (anello di raccordo), e la collina usa il materiale della roccia.
+    // Dentro la galleria (|x| < 1,66, y < 3,2) non entra nulla: le pareti di assi coprono il resto.
+    const snowy = c === 1, cols = snowy ? ['#868a90', '#959aa0', '#7a7e84'] : ['#b88a62', '#c49a70', '#a87a56', '#cfa47c'];
     const r = rng(3101 + c), parts = [];
-    const top = snowy ? (nx, ny) => (ny > 0.55 ? '#eef2f6' : null) : null;
-    const rock = (x, y, z, rad, s = [1, 1, 1]) => parts.push(P(rockGeo(rad, r() * 10, ...s), cols[Math.floor(r() * cols.length)], { x, y, z, jit: 0.07, colorFn: top }));
+    const rock = (x, y, z, rad, s = [1, 1, 1]) => parts.push(P(rockGeo(rad, r() * 10, ...s), cols[Math.floor(r() * cols.length)], { x, y, z, jit: 0.05 }));
     const L = 11;
-    for (let z = 0.4; z > -L - 1; z -= 1.8) {
+    for (let z = 0.2; z > -L - 1; z -= 1.7) {
+      const front = z > 0;
       for (const sx of [-1, 1]) {
-        const rad = 2.0 + r() * 0.6;
-        rock(sx * (2.05 + rad * 1.22), rad * 0.55, z + (r() - 0.5) * 0.6, rad, [1, 0.9, 1]);
-        const rad2 = 2.6 + r() * 0.8;
-        rock(sx * (5.6 + r() * 1.4), rad2 * 0.3, z - 0.6, rad2, [1, 0.75, 1]);
+        // fianco basso (poggia a terra), fianco esterno, raccordo tra fianco e cima
+        const rad = 2.0 + r() * 0.5;
+        rock(sx * (2.3 + rad), rad * 0.5, z + (r() - 0.5) * 0.5, rad, [1, 0.95, 1]);
+        const rad2 = 2.6 + r() * 0.7;
+        rock(sx * (5.8 + r() * 1.0), rad2 * 0.35, z - 0.5, rad2, [1, 0.8, 1]);
+        const rm = 1.9 + r() * 0.4;
+        rock(sx * (2.9 + rm * 0.55), 3.2 + rm * 0.35, z - 0.3 + (r() - 0.5) * 0.4, rm, [1, 0.9, 1]);
       }
-      const rt = 1.9 + r() * 0.5;
-      for (const sx of [-1.4, 1.4]) rock(sx + (r() - 0.5) * 0.4, 3.32 + rt * 1.22, z + (r() - 0.5) * 0.5, rt, [1, 0.85, 1]);
+      // cima: appoggiata sul soffitto (fondo del masso ≈ 3,3 m), più indietro all'ingresso per lasciare libera l'insegna
+      const rt = 1.8 + r() * 0.4;
+      for (const sx of [-1.15, 1.15]) rock(sx + (r() - 0.5) * 0.3, 3.4 + rt * 0.85 * 1.12, (front ? -2.0 : z) + (r() - 0.5) * 0.3, rt, [1, 0.85, 1]);
     }
-    rock(0, 1.6, -L - 1.8, 2.9, [1.2, 0.9, 1]);                    // fondo
-    rock(0, 6.4, -5.5, 3.1, [1.3, 0.7, 1.6]); rock(1.5, 5.6, -9.5, 2.6, [1.2, 0.8, 1]);   // cima
-    // massi sparsi davanti all'ingresso
-    for (let i = 0; i < 4; i++) { const sx = r() < 0.5 ? -1 : 1; rock(sx * (2.6 + r() * 2.2), 0.2, 1.4 + r() * 2.5, 0.45 + r() * 0.4); }
-    return mergeParts(parts, 3101 + c);
+    rock(0, 1.8, -L - 3.3, 3.0, [1.3, 1.0, 1]);                    // fondo (dietro la parete di fondo)
+    rock(0, 6.6, -5.5, 3.1, [1.35, 0.72, 1.7]); rock(1.2, 6.2, -9.8, 2.7, [1.25, 0.8, 1]);   // cima
+    rock(-2.6, 5.9, -2.6, 2.2, [1.1, 0.75, 1]); rock(2.8, 5.7, -7.6, 2.3, [1.1, 0.75, 1]);
+    // massi sparsi davanti all'ingresso, mezzi interrati
+    for (let i = 0; i < 4; i++) { const sx = r() < 0.5 ? -1 : 1, rd = 0.45 + r() * 0.4; rock(sx * (2.7 + r() * 2.2), rd * 0.25, 1.6 + r() * 2.4, rd, [1, 0.8, 1]); }
+    const g = mergeParts(parts, 3101 + c);
+    // attributi per rockMaterial: neve (x) sulle facce in alto in montagna, un po' di muschio (y) altrove
+    const n = g.attributes.position.count, sf = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { sf[i * 2] = snowy ? 1 : 0; sf[i * 2 + 1] = snowy ? 0 : 0.18; }
+    g.setAttribute('aSurf', new THREE.BufferAttribute(sf, 2));
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+    g.userData.rock = true;
+    return g;
   },
   /** binario della miniera: 4 m lungo z */
   rails: () => {

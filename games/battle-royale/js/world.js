@@ -4,10 +4,10 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=27';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=33';
 import { carInstances } from './cars.js?v=25';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=26';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=33';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -1383,12 +1383,14 @@ export function buildWorld(scene, opts = {}) {
     chunkAt(x, z).boxes.push(spec);
     if (opts.collide !== false) {
       spec.c = addCollider({ type: 'box', minX: x - w / 2, maxX: x + w / 2, minY: y - h / 2, maxY: y + h / 2, minZ: z - d / 2, maxZ: z + d / 2, noStand: opts.noStand });
+      spec.c.spec = spec;
     }
     return spec;
   }
 
   // ── porte: collisore solo quando sono chiuse; le ante vengono animate dal gioco ──
   function setDoor(dr, open, silent = false) {
+    if (dr.broken) return false;
     if (dr.open === open && !silent) return false;
     dr.open = open;
     if (open && dr.cOn) { removeCollider(dr.c); dr.cOn = false; }
@@ -1903,8 +1905,10 @@ export function buildWorld(scene, opts = {}) {
     return null;
   }
   function special(type, x, z, h, col, extra = {}) {
-    chunkAt(x, z).specials.push({ type, x, z, h, rot: srand() * 6.28, ...extra });
-    if (col) addCollider({ type: 'cyl', x, z, r: col[0], minY: h - 1, maxY: h + col[1], noStand: col[2] });
+    const e = { type, x, z, h, rot: srand() * 6.28, ...extra };
+    chunkAt(x, z).specials.push(e);
+    if (col) { e.c = addCollider({ type: 'cyl', x, z, r: col[0], minY: h - 1, maxY: h + col[1], noStand: col[2] }); e.c.special = e; }
+    return e;
   }
   function townExtras(t) {
     const th = t.theme;
@@ -2104,7 +2108,7 @@ export function buildWorld(scene, opts = {}) {
     const r = { x, z, h, s: sr(0.7, 2.4), e: [srand() * 3, srand() * 3, srand() * 3], k: [sr(0.9, 1.4), sr(0.6, 1), sr(0.9, 1.3)] };
     r.shape = Math.floor(srand() * 5);
     chunkAt(x, z).rocks.push(r); nr++;
-    addCollider({ type: 'cyl', x, z, r: r.s * 0.95, minY: h - 2, maxY: h + r.s * 0.9 });
+    r.c = addCollider({ type: 'cyl', x, z, r: r.s * 0.95, minY: h - 2, maxY: h + r.s * 0.9, rock: r });
     // a volte qualche masso più piccolo accanto (gruppi di rocce)
     if (srand() < 0.35) {
       const nk = 1 + Math.floor(srand() * 3);
@@ -2114,7 +2118,7 @@ export function buildWorld(scene, opts = {}) {
         if (h2 < WATER_LEVEL - 1 || inTown(x2, z2, 3)) continue;
         const r2 = { x: x2, z: z2, h: h2, s: r.s * sr(0.3, 0.55), e: [srand() * 3, srand() * 3, srand() * 3], k: [sr(0.9, 1.4), sr(0.6, 1), sr(0.9, 1.3)], shape: Math.floor(srand() * 5) };
         chunkAt(x2, z2).rocks.push(r2);
-        if (r2.s > 0.45) addCollider({ type: 'cyl', x: x2, z: z2, r: r2.s * 0.95, minY: h2 - 2, maxY: h2 + r2.s * 0.9 });
+        if (r2.s > 0.45) r2.c = addCollider({ type: 'cyl', x: x2, z: z2, r: r2.s * 0.95, minY: h2 - 2, maxY: h2 + r2.s * 0.9, rock: r2 });
       }
     }
     if (srand() < 0.15) lootSpots.push(new THREE.Vector3(x + r.s + 0.8, h, z));
@@ -2789,15 +2793,13 @@ export function buildWorld(scene, opts = {}) {
     return im;
   }
 
-  function buildDetail(ch) {
-    const group = new THREE.Group();
-    const terrain = new THREE.Mesh(terrainGeo(ch, DSEG, 0), terrainMat);
-    terrain.receiveShadow = true;
-    group.add(terrain);
+  /** v33: box statici del chunk in un gruppo a parte (si ricostruisce da solo quando una parete si rompe) */
+  function buildBoxes(ch, group) {
     // box statici uniti per materiale; i tetti restano separati (uno per casa) per poterli nascondere
     const byMat = new Map(), byGeo = new Map();
     const roofGroups = new Map();
     for (const b of ch.boxes) {
+      if (b.dead) continue;   // v33: pezzi distrutti (o sostituiti dai frammenti)
       if (b.roof && b.house) {
         clipMat(b.material);
         let rg = roofGroups.get(b.house);
@@ -2842,7 +2844,14 @@ export function buildWorld(scene, opts = {}) {
       im.computeBoundingSphere();
       group.add(im);
     }
-    for (const dr of ch.doors) buildDoorLeaves(dr, group);
+  }
+  function buildDetail(ch) {
+    const group = new THREE.Group();
+    const terrain = new THREE.Mesh(terrainGeo(ch, DSEG, 0), terrainMat);
+    terrain.receiveShadow = true;
+    group.add(terrain);
+    { const bg = new THREE.Group(); buildBoxes(ch, bg); group.add(bg); ch.boxGroup = bg; }
+    for (const dr of ch.doors) if (!dr.broken) buildDoorLeaves(dr, group);
     // alberi: abete, quercia, betulla (modelli low-poly con colori per vertice)
     if (ch.trees.length) {
       const kinds = {};
@@ -2868,11 +2877,12 @@ export function buildWorld(scene, opts = {}) {
     if (ch.rocks.length) {
       const nm = new THREE.Matrix3();
       let total = 0;
-      for (const r of ch.rocks) total += PROPS.rocks[(r.shape ?? 0) % PROPS.rocks.length].attributes.position.count;
+      for (const r of ch.rocks) if (!r.dead) total += PROPS.rocks[(r.shape ?? 0) % PROPS.rocks.length].attributes.position.count;
       const P = new Float32Array(total * 3), Nn = new Float32Array(total * 3), C = new Float32Array(total * 3), SF = new Float32Array(total * 2);
       let o = 0;
       const v = new THREE.Vector3();
       for (const r of ch.rocks) {
+        if (r.dead) continue;
         const g = PROPS.rocks[(r.shape ?? 0) % PROPS.rocks.length];
         // arenaria rossa nel deserto, roccia fredda e innevata in montagna
         const bw = biomeAt(r.x, r.z), tR = 1 + bw[2] * 0.35 - bw[1] * 0.04, tG = 1 + bw[2] * 0.02, tB = 1 - bw[2] * 0.3 + bw[1] * 0.06;
@@ -2998,6 +3008,7 @@ export function buildWorld(scene, opts = {}) {
     // oggetti speciali (v24: instanziati per tipo, nelle città ce ne sono centinaia)
     const spec = new Map();
     for (const s of ch.specials) {
+      if (s.dead) continue;
       if (SPECIAL_GEO[s.type]) {
         const k = s.type + '|' + (s.c || 0);
         if (!spec.has(k)) spec.set(k, []);
@@ -3020,7 +3031,8 @@ export function buildWorld(scene, opts = {}) {
         continue;
       }
       clipMat(propMaterial);
-      const im = new THREE.InstancedMesh(specialGeo(list[0].type, list[0].c), propMaterial, list.length);
+      const sg = specialGeo(list[0].type, list[0].c);
+      const im = new THREE.InstancedMesh(sg, sg.userData.rock ? rockMaterial : propMaterial, list.length);   // v33: colline di roccia vera
       list.forEach((s, i) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); mat4.compose(p, q, sc); im.setMatrixAt(i, mat4); });
       im.castShadow = im.receiveShadow = true;
       im.computeBoundingSphere();
@@ -3044,6 +3056,275 @@ export function buildWorld(scene, opts = {}) {
     for (const pr of ch.props) { pr.im = null; }
   }
 
+  // ═════════════ v33: strutture distruttibili ═════════════
+  // Ogni box statico (pareti, pavimenti, solai, casse, mobili) si divide in celle da ~1,35 m sulle sue due
+  // dimensioni maggiori: colpi, picconate ed esplosioni tolgono vita alle celle vicine al punto colpito e una
+  // cella distrutta apre un buco (il box viene sostituito da pochi rettangoli che coprono le celle rimaste).
+  // Dopo ogni rottura si controlla la gravità: i pezzi collegati fra loro che non toccano più il terreno
+  // crollano tutti insieme e lasciano materiali. Il terreno, le strade e le lastre a terra non si rompono.
+  const DCELL = 1.35, dirty = new Set(), dirtyB = new Set(), clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  // registro di ciò che è cambiato, per rimettere tutto a posto a inizio partita
+  const REG = { chunks: new Map(), rocks: new Set(), specials: new Set(), doors: new Set(), houses: new Set() };
+  const regChunk = (ch) => { if (ch && !REG.chunks.has(ch)) REG.chunks.set(ch, ch.boxes.slice()); };
+  const offC = (c) => { if (c && !c.off) { removeCollider(c); c.off = true; } };
+  const onC = (c) => { if (c && c.off) { c.off = false; addCollider(c); } };
+  function resetBroken() {
+    for (const [ch, orig] of REG.chunks) {
+      for (const b of ch.boxes) if (b.frag) removeCollider(b.c);
+      ch.boxes = orig;
+      for (const b of orig) { if (b.dead) { b.dead = false; onC(b.c); } delete b.cg; }
+      dirty.add(ch);
+    }
+    for (const r of REG.rocks) {
+      if (r.c && !r.c.off) removeCollider(r.c);
+      r.s = r.s0; r.dead = false; r.hp = undefined;
+      r.c = addCollider({ type: 'cyl', x: r.x, z: r.z, r: r.s * 0.95, minY: r.h - 2, maxY: r.h + r.s * 0.9, rock: r });
+      dirty.add(chunkAt(r.x, r.z));
+    }
+    for (const e of REG.specials) { e.dead = false; e.hp = undefined; onC(e.c); dirty.add(chunkAt(e.x, e.z)); }
+    for (const dr of REG.doors) dr.broken = false;
+    for (const h of REG.houses) h.collapsed = false;
+    for (const k of Object.keys(REG)) REG[k].clear();
+    if (dirty.size) flushDirty();
+  }
+  const terrMaxUnder = (c) => Math.max(terrainHeight((c.minX + c.maxX) / 2, (c.minZ + c.maxZ) / 2), terrainHeight(c.minX + 0.05, c.minZ + 0.05), terrainHeight(c.maxX - 0.05, c.minZ + 0.05), terrainHeight(c.minX + 0.05, c.maxZ - 0.05), terrainHeight(c.maxX - 0.05, c.maxZ - 0.05));
+  function breakable(sp) {
+    if (sp.brk !== undefined) return sp.brk;
+    const c = sp.c, big = Math.max(sp.w, sp.h, sp.d);
+    const tg = terrainHeight(sp.x, sp.z);
+    // lastre a terra (strade, marciapiedi, piazze, fondamenta) = mondo: non si rompono
+    sp.brk = !!c && big < 70 && !(c.minY <= tg + 0.35 && sp.h < 0.75) && !(sp.h < 0.75 && Math.min(sp.w, sp.d) > 14);
+    return sp.brk;
+  }
+  function cellHp(sp) {
+    const m = sp.material;
+    if (m && (m.transparent || m.opacity < 1)) return 12;                // vetri
+    const t = Math.min(sp.w, sp.h, sp.d);
+    return t > 0.55 ? 260 : t > 0.3 ? 180 : 130;                         // muri spessi (pietra) più duri
+  }
+  function initCells(sp) {
+    const dims = [sp.w, sp.h, sp.d];
+    let thin = 0; for (let i = 1; i < 3; i++) if (dims[i] < dims[thin]) thin = i;
+    const ax = [0, 1, 2].filter(i => i !== thin);
+    const n = ax.map(i => Math.max(1, Math.min(28, Math.round(dims[i] / DCELL))));
+    const hp0 = cellHp(sp);
+    sp.cg = { ax, n, hp: new Float32Array(n[0] * n[1]).fill(hp0), hp0, frags: [] };
+  }
+  const _ctr = [0, 0, 0];
+  function cellCenter(sp, i, j, out = _ctr) {
+    const g = sp.cg, base = [sp.x, sp.y, sp.z], dims = [sp.w, sp.h, sp.d];
+    out[0] = base[0]; out[1] = base[1]; out[2] = base[2];
+    out[g.ax[0]] = base[g.ax[0]] - dims[g.ax[0]] / 2 + (i + 0.5) * dims[g.ax[0]] / g.n[0];
+    out[g.ax[1]] = base[g.ax[1]] - dims[g.ax[1]] / 2 + (j + 0.5) * dims[g.ax[1]] / g.n[1];
+    return out;
+  }
+  /** rettangoli che coprono le celle vive (fusione golosa) → nuovi box e collisori */
+  function rebuildFrags(sp) {
+    const g = sp.cg, ch = chunkAt(sp.x, sp.z);
+    regChunk(ch);
+    if (!sp.dead) { sp.dead = true; offC(sp.c); }
+    if (g.frags.length) { const set = new Set(g.frags); ch.boxes = ch.boxes.filter(b => !set.has(b)); for (const f of g.frags) removeCollider(f.c); }
+    g.frags = [];
+    const [na, nb] = g.n, used = new Uint8Array(na * nb), alive = (i, j) => g.hp[j * na + i] > 0 && !used[j * na + i];
+    const dims = [sp.w, sp.h, sp.d], base = [sp.x, sp.y, sp.z];
+    for (let j = 0; j < nb; j++) for (let i = 0; i < na; i++) {
+      if (!alive(i, j)) continue;
+      let i1 = i; while (i1 + 1 < na && alive(i1 + 1, j)) i1++;
+      let j1 = j; for (;;) { if (j1 + 1 >= nb) break; let ok = true; for (let k = i; k <= i1; k++) if (!alive(k, j1 + 1)) { ok = false; break; } if (!ok) break; j1++; }
+      for (let jj = j; jj <= j1; jj++) for (let k = i; k <= i1; k++) used[jj * na + k] = 1;
+      const d = dims.slice(), c = base.slice(), A = g.ax[0], B = g.ax[1], ca = dims[A] / na, cb = dims[B] / nb;
+      d[A] = (i1 - i + 1) * ca; c[A] = base[A] - dims[A] / 2 + (i + (i1 - i + 1) / 2) * ca;
+      d[B] = (j1 - j + 1) * cb; c[B] = base[B] - dims[B] / 2 + (j + (j1 - j + 1) / 2) * cb;
+      const f = { w: d[0], h: d[1], d: d[2], x: c[0], y: c[1], z: c[2], material: sp.material, cast: sp.cast, house: sp.house, roof: sp.roof, mesh: null, frag: sp };
+      f.c = addCollider({ type: 'box', minX: c[0] - d[0] / 2, maxX: c[0] + d[0] / 2, minY: c[1] - d[1] / 2, maxY: c[1] + d[1] / 2, minZ: c[2] - d[2] / 2, maxZ: c[2] + d[2] / 2, noStand: sp.c && sp.c.noStand });
+      f.c.spec = sp; f.c.fragOf = f;
+      ch.boxes.push(f); g.frags.push(f);
+    }
+    dirtyB.add(ch);
+  }
+  function specColor(sp) {
+    const m = sp.material;
+    if (sp.lodColor) return sp.lodColor;
+    if (m && m.color) { const c = m.color; const k = m.map ? 0.75 : 1; return '#' + new THREE.Color(c.r * k, c.g * k, c.b * k).getHexString(); }
+    return '#b0a090';
+  }
+  /** danno a un box nel punto p (raggio r: 0 = solo la cella colpita). Restituisce gli eventi per il gioco */
+  function damageSpec(sp, p, amount, r, ev) {
+    if (sp.dead && !sp.cg) return;
+    if (!breakable(sp)) return;
+    if (!sp.cg) initCells(sp);
+    const g = sp.cg, [na, nb] = g.n, dims = [sp.w, sp.h, sp.d], base = [sp.x, sp.y, sp.z], P = [p.x, p.y, p.z];
+    const A = g.ax[0], B = g.ax[1], ca = dims[A] / na, cb = dims[B] / nb;
+    const fi = Math.floor((P[A] - (base[A] - dims[A] / 2)) / ca), fj = Math.floor((P[B] - (base[B] - dims[B] / 2)) / cb);
+    let broke = 0;
+    const hitCell = (i, j, dmg) => {
+      if (i < 0 || j < 0 || i >= na || j >= nb) return;
+      const k = j * na + i; if (g.hp[k] <= 0) return;
+      g.hp[k] -= dmg;
+      if (g.hp[k] <= 0) { broke++; const cc = cellCenter(sp, i, j); ev.cells.push({ x: cc[0], y: cc[1], z: cc[2], s: Math.max(ca, cb), color: specColor(sp), material: sp.material, thin: Math.min(...dims) }); }
+    };
+    if (r <= 0) hitCell(clamp(fi, 0, na - 1), clamp(fj, 0, nb - 1), amount);
+    else {
+      const ri = Math.ceil(r / ca) + 1, rj = Math.ceil(r / cb) + 1;
+      for (let j = fj - rj; j <= fj + rj; j++) for (let i = fi - ri; i <= fi + ri; i++) {
+        if (i < 0 || j < 0 || i >= na || j >= nb) continue;
+        const cc = cellCenter(sp, i, j), dd = Math.hypot(cc[0] - p.x, cc[1] - p.y, cc[2] - p.z);
+        if (dd < r + Math.max(ca, cb) * 0.5) hitCell(i, j, amount * (1 - Math.min(1, dd / (r + 0.5)) * 0.6));
+      }
+    }
+    if (!broke) { ev.chipped = specColor(sp); return; }
+    rebuildFrags(sp);
+    ev.touched.add(sp);
+  }
+  // ── gravità: i pezzi collegati che non toccano più terra crollano ──
+  const touching = (a, b, e = 0.06) => a.minX <= b.maxX + e && a.maxX >= b.minX - e && a.minY <= b.maxY + e && a.maxY >= b.minY - e && a.minZ <= b.maxZ + e && a.maxZ >= b.minZ - e;
+  function structural(c) { return c && c.type === 'box' && c.spec && !(c.spec.dead && !c.spec.cg); }
+  function grounded(c) { return c.minY <= terrMaxUnder(c) + 0.35; }
+  function checkSupport(seeds, ev) {
+    const seen = new Set();
+    for (const s0 of seeds) {
+      if (seen.has(s0) || !structural(s0) || colliders.indexOf(s0) < 0) continue;
+      const comp = [], stack = [s0]; seen.add(s0);
+      let ok = false;
+      while (stack.length) {
+        const c = stack.pop(); comp.push(c);
+        if (grounded(c)) { ok = true; break; }
+        if (comp.length > 700) { ok = true; break; }       // troppo grande: di sicuro appoggia da qualche parte
+        const cx = (c.minX + c.maxX) / 2, cz = (c.minZ + c.maxZ) / 2, rr = Math.max(c.maxX - c.minX, c.maxZ - c.minZ) / 2 + 0.2;
+        for (const n of queryColliders(cx, cz, rr)) if (!seen.has(n) && structural(n) && touching(c, n)) { seen.add(n); stack.push(n); }
+      }
+      if (!ok) collapse(comp, ev);
+    }
+  }
+  function collapse(comp, ev) {
+    const bb = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    const parents = new Set();
+    for (const c of comp) { parents.add(c.spec); for (const k of ['minX', 'minY', 'minZ']) bb[k] = Math.min(bb[k], c[k]); for (const k of ['maxX', 'maxY', 'maxZ']) bb[k] = Math.max(bb[k], c[k]); }
+    const falling = [];
+    let vol = 0;
+    const chs = new Set();
+    for (let x = Math.floor(bb.minX / CHUNK) * CHUNK; x <= bb.maxX; x += CHUNK) for (let z = Math.floor(bb.minZ / CHUNK) * CHUNK; z <= bb.maxZ; z += CHUNK) { const ch = chunkAt(x + 1, z + 1); if (ch) chs.add(ch); }
+    for (const sp of parents) { const c = chunkAt(sp.x, sp.z); if (c) chs.add(c); }
+    const inBB = (x, y, z, up = 0) => x >= bb.minX - 0.2 && x <= bb.maxX + 0.2 && z >= bb.minZ - 0.2 && z <= bb.maxZ + 0.2 && y >= bb.minY - 0.3 && y <= bb.maxY + up;
+    for (const ch of chs) {
+      regChunk(ch);
+      const keep = [];
+      for (const b of ch.boxes) {
+        const isParent = parents.has(b), mine = isParent || (b.frag && parents.has(b.frag)) || (!b.c && !b.frag && !b.dead && inBB(b.x, b.y, b.z, 5));
+        if (!mine) { keep.push(b); continue; }
+        if (isParent && b.dead) continue;                  // già sostituito dai frammenti
+        if (b.frag) removeCollider(b.c); else offC(b.c);
+        b.dead = true;
+        if (!b.geo && b.w * b.h * b.d > 0.004) { vol += b.w * b.h * b.d; falling.push(b); }
+      }
+      ch.boxes = keep;
+      for (const sp of ch.specials) if (!sp.dead && inBB(sp.x, sp.h + 0.2, sp.z, 1)) { sp.dead = true; offC(sp.c); REG.specials.add(sp); }
+      for (const dr of ch.doors) if (!dr.broken && inBB(dr.x, dr.y + 1, dr.z, 1)) { if (dr.cOn) { removeCollider(dr.c); dr.cOn = false; } dr.broken = true; REG.doors.add(dr); }
+      dirty.add(ch);
+    }
+    for (const sp of parents) { offC(sp.c); sp.dead = true; if (sp.cg) sp.cg.frags = []; }
+    for (const h of houses) if (!h.collapsed && h.cx >= bb.minX && h.cx <= bb.maxX && h.cz >= bb.minZ && h.cz <= bb.maxZ) { h.collapsed = true; h.roofMesh = null; REG.houses.add(h); }
+    falling.sort((a, b) => b.w * b.h * b.d - a.w * a.h * a.d);
+    ev.collapses.push({ x: (bb.minX + bb.maxX) / 2, y: bb.minY, z: (bb.minZ + bb.maxZ) / 2, w: bb.maxX - bb.minX, h: bb.maxY - bb.minY, d: bb.maxZ - bb.minZ, boxes: falling.slice(0, 70), mats: Math.round(clamp(vol * 3, 12, 240)) });
+  }
+  // ── rocce, auto e oggetti: vita propria, si rimpiccioliscono a tappe e poi spariscono ──
+  function damageObj(c, amount, ev) {
+    if (c.rock) {
+      const r = c.rock;
+      if (r.dead) return;
+      if (r.hp === undefined) { if (r.s0 === undefined) r.s0 = r.s; r.hp0 = r.hp = Math.round(90 + r.s * 140); r.stage = 0; REG.rocks.add(r); }
+      r.hp -= amount;
+      const st = r.hp <= 0 ? 3 : r.hp < r.hp0 / 3 ? 2 : r.hp < r.hp0 * 2 / 3 ? 1 : 0;
+      if (st === r.stage) { ev.chipped = '#8d8a84'; return; }
+      const ch = chunkAt(r.x, r.z);
+      removeCollider(r.c);
+      ev.cells.push({ x: r.x, y: r.h + r.s * 0.5, z: r.z, s: r.s, color: '#8d8a84', rock: true });
+      if (st >= 3) { r.dead = true; ev.objects.push({ kind: 'rock', x: r.x, y: r.h, z: r.z, s: r.s, mats: Math.round(8 + r.s * 14) }); }
+      else { for (let k = r.stage; k < st; k++) r.s *= 0.78; r.c = addCollider({ type: 'cyl', x: r.x, z: r.z, r: r.s * 0.95, minY: r.h - 2, maxY: r.h + r.s * 0.9, rock: r }); }
+      r.stage = st; dirty.add(ch);
+      return;
+    }
+    if (c.special) {
+      const e = c.special;
+      if (e.dead) return;
+      const big = e.type === 'car' || e.type === 'truck' || e.type === 'waterTower';
+      if (e.hp === undefined) e.hp = big ? 420 : 140;
+      e.hp -= amount;
+      if (e.hp > 0) { ev.chipped = big ? '#6a6e74' : '#9a8a74'; return; }
+      e.dead = true; offC(e.c); REG.specials.add(e);
+      ev.objects.push({ kind: e.type, x: e.x, y: e.h, z: e.z, s: big ? 2.2 : 0.9, mats: big ? 45 : 12, car: e.type === 'car' });
+      dirty.add(chunkAt(e.x, e.z));
+    }
+  }
+  const newEv = () => ({ cells: [], collapses: [], objects: [], touched: new Set(), chipped: null });
+  function finishEv(ev) {
+    if (ev.touched.size) {
+      const seeds = [];
+      for (const sp of ev.touched) {
+        const q = { minX: sp.x - sp.w / 2, maxX: sp.x + sp.w / 2, minY: sp.y - sp.h / 2, maxY: sp.y + sp.h / 2, minZ: sp.z - sp.d / 2, maxZ: sp.z + sp.d / 2 };
+        for (const n of queryColliders(sp.x, sp.z, Math.max(sp.w, sp.d) / 2 + 0.3)) if (structural(n) && touching(q, n, 0.1)) seeds.push(n);
+      }
+      checkSupport(seeds, ev);
+    }
+    delete ev.touched;
+    return ev;
+  }
+  /** colpo (proiettile o piccone) su un collisore nel punto p */
+  function damageAt(c, p, amount) {
+    const ev = newEv();
+    if (!c) return ev;
+    if (c.spec) damageSpec(c.spec, p, amount, 0, ev);
+    else if (c.rock || c.special) damageObj(c, amount, ev);
+    return finishEv(ev);
+  }
+  /** colpo arrivato dalla rete: si cerca il collisore che contiene il punto */
+  function damagePoint(p, amount) {
+    let best = null, bs = Infinity;
+    const inside = (c, e) => c.type === 'box' ? (p.x >= c.minX - e && p.x <= c.maxX + e && p.y >= c.minY - e && p.y <= c.maxY + e && p.z >= c.minZ - e && p.z <= c.maxZ + e) : (Math.hypot(p.x - c.x, p.z - c.z) <= c.r + e && p.y >= c.minY && p.y <= c.maxY + e);
+    for (const c of queryColliders(p.x, p.z, 0.3)) {
+      if (!(c.spec || c.rock || c.special) || !inside(c, 0.12)) continue;
+      // prima chi contiene davvero il punto, poi chi si può rompere
+      const sc = (inside(c, 0.001) ? 0 : 1) + (c.spec && !breakable(c.spec) ? 2 : 0);
+      if (sc < bs) { bs = sc; best = c; }
+    }
+    return damageAt(best, p, amount);
+  }
+  /** esplosione: celle e oggetti entro il raggio */
+  function damageSphere(p, radius, amount) {
+    const ev = newEv(), done = new Set();
+    for (const c of queryColliders(p.x, p.z, radius + 1)) {
+      const dx = Math.max(c.minX - p.x, 0, p.x - c.maxX), dy = Math.max(c.minY - p.y, 0, p.y - c.maxY), dz = Math.max(c.minZ - p.z, 0, p.z - c.maxZ);
+      if (Math.hypot(dx, dy, dz) > radius) continue;
+      if (c.spec) { if (!done.has(c.spec)) { done.add(c.spec); damageSpec(c.spec, p, amount, radius, ev); } }
+      else if (c.rock || c.special) damageObj(c, amount * 0.8, ev);
+    }
+    return finishEv(ev);
+  }
+  /** ricostruisce subito i chunk cambiati (prima il nuovo, poi via il vecchio: niente buchi per un frame) */
+  function flushDirty() {
+    for (const ch of dirtyB) {
+      if (dirty.has(ch) || !ch.detail || !ch.boxGroup) { dirty.add(ch); continue; }
+      const old = ch.boxGroup;
+      for (const h of ch.houses) h.roofMesh = null;
+      const bg = new THREE.Group(); buildBoxes(ch, bg); ch.detail.add(bg); ch.boxGroup = bg;
+      ch.detail.remove(old);
+      old.traverse(o => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); if (o.isInstancedMesh) o.dispose(); });
+    }
+    dirtyB.clear();
+    for (const ch of dirty) {
+      if (!ch.detail) continue;
+      const old = ch.detail;
+      ch.detail = null;
+      for (const b of ch.boxes) b.mesh = null;
+      for (const h of ch.houses) h.roofMesh = null;
+      for (const dr of ch.doors) dr.leaves = null;
+      for (const pr of ch.props) pr.im = null;
+      buildDetail(ch);
+      disposeGroup(old);
+    }
+    dirty.clear();
+  }
+
   // ── barili esplosivi ──
   const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
   function destroyBarrel(pr) {
@@ -3054,6 +3335,7 @@ export function buildWorld(scene, opts = {}) {
   }
   /** a inizio partita rimette a posto i barili esplosi */
   function resetProps() {
+    resetBroken();
     for (const dr of doors) { setDoor(dr, dr.open0, true); poseDoor(dr); }
     for (const pr of barrels) {
       if (pr.explosive) pr.hp = pr.maxHp;
@@ -3074,6 +3356,7 @@ export function buildWorld(scene, opts = {}) {
 
   function update(camPos, budgetMs = 6) {
     { const t = performance.now() * 0.001; waterNormal.offset.set(t * 0.012, t * 0.007); WIND.value = t % 1800; }
+    if (dirty.size || dirtyB.size) flushDirty();
     const t0 = performance.now();
     const ccx = Math.floor(camPos.x / 25), ccz = Math.floor(camPos.z / 25);
     const key = ccx + ',' + ccz;
@@ -3195,5 +3478,5 @@ export function buildWorld(scene, opts = {}) {
   }
 
   Object.assign(stats, { city: cityStats });
-  return { doors, stoves, setDoor, poseDoor, lootSpots, chestSpots, houses, barrels, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks, destroyBarrel, resetProps, dispose, seed: MAP.seed, random: MAP.random };
+  return { doors, stoves, setDoor, poseDoor, lootSpots, chestSpots, houses, barrels, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks, destroyBarrel, resetProps, damageAt, damageSphere, damagePoint, dispose, seed: MAP.seed, random: MAP.random };
 }

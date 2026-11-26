@@ -12,7 +12,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=32" />
+<link rel="stylesheet" href="style.css?v=33" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -134,6 +134,10 @@
       </div>
       <div id="skins" class="skins"></div>
     </div>
+    <div class="lobby-zoom" id="lobbyZoom" title="Rotellina o pizzico per lo zoom, trascina in su e in giù per spostarti">
+      <button data-z="in" aria-label="Ingrandisci">+</button><input type="range" id="lobbyZoomR" min="1" max="4" step="0.01" value="1" aria-label="Zoom" /><button data-z="out" aria-label="Rimpicciolisci">−</button>
+      <button data-z="head" title="Testa">🎩</button><button data-z="body" title="Figura intera">🧍</button>
+    </div>
   </div>
 
   <!-- PASS BATTAGLIA -->
@@ -207,12 +211,28 @@
   <div id="toasts"></div>
   <div id="netInfo" class="hidden"></div>
 </div>
+<div id="spectate" class="hidden">
+  <div class="spec-tag">👁 MODALITÀ SPETTATORE</div>
+  <div class="spec-bar">
+    <button id="specPrev" title="Giocatore precedente (← / A)">‹</button>
+    <div class="spec-mid"><div id="specName"></div><div id="specInfo"></div></div>
+    <button id="specNext" title="Giocatore successivo (→ / D / Spazio)">›</button>
+  </div>
+  <div class="spec-btns">
+    <button id="specKill" class="ghost">🎯 Chi mi ha eliminato <kbd>K</kbd></button>
+    <button id="specExit" class="ghost">📊 Risultati <kbd>Esc</kbd></button>
+    <button id="specMenu" class="ghost">🏠 Lobby</button>
+  </div>
+  <div class="spec-hint">Trascina il mouse per girare la visuale · ← → cambia giocatore</div>
+</div>
 <div id="vignette"></div>
 <div id="stormTint"></div>
 <div id="scope" class="hidden" data-s="scope"><div class="ring"><div class="ret"></div></div><div class="mag"></div></div>
 
 <div id="bigmap" class="screen hidden">
-  <div class="bigmap-box"><canvas id="bigmapCanvas" width="640" height="640"></canvas><div class="hint">M per chiudere</div></div>
+  <div class="bigmap-box"><canvas id="bigmapCanvas" width="640" height="640"></canvas>
+    <div class="bm-tools"><button id="bmIn" title="Ingrandisci (+)">+</button><span id="bmZoom">1×</span><button id="bmOut" title="Rimpicciolisci (−)">−</button><button id="bmCenter" title="Centra su di me">◎</button><button id="bmClose" title="Chiudi (M)">✕</button></div>
+    <div class="hint">Rotellina o <kbd>+</kbd> <kbd>−</kbd>: zoom · trascina per spostarti · <kbd>M</kbd> chiudi</div></div>
 </div>
 
 <div id="inventory" class="screen hidden">
@@ -220,7 +240,7 @@
     <div class="invhead">
       <h2>INVENTARIO</h2>
       <div id="invBars"></div>
-      <span class="invhint"><kbd>TAB</kbd> / <kbd>Esc</kbd> chiudi</span>
+      <span class="invhint"><kbd>WASD</kbd> muoviti · <kbd>TAB</kbd> / <kbd>Esc</kbd> chiudi</span>
       <button class="ghost tiny" data-a="close" aria-label="Chiudi">✕</button>
     </div>
     <div class="invmain">
@@ -264,6 +284,7 @@
     <div class="stats" id="endStats"></div>
     <div id="endXp" class="endxp"></div>
     <button id="againBtn" class="play small">GIOCA ANCORA</button>
+    <button id="specBtn" class="ghost hidden">👁 Continua a guardare</button>
     <button id="menuBtn" class="ghost">Torna alla lobby</button>
   </div>
 </div>
@@ -272,7 +293,7 @@
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
 
-<script type="module" src="js/main.js?v=32"></script>
+<script type="module" src="js/main.js?v=33"></script>
 <script src="js/transition.js?v=19"></script>
 </body>
 </html>

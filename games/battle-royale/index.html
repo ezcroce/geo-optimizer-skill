@@ -7,7 +7,7 @@
 <meta name="description" content="Arena Royale 3D: battle royale gratuito nel browser. Salta dal bus, raccogli armi, costruisci, abbassati, arrampicati e resta l'ultimo in piedi." />
 <meta name="theme-color" content="#0b1020" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 4l24 10v16c0 15-10 26-24 30C18 56 8 45 8 30V14z' fill='%23ffc21a'/%3E%3Cpath d='M32 14l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z' fill='%231a2a7a'/%3E%3C/svg%3E" />
-<link rel="stylesheet" href="site.css?v=19" />
+<link rel="stylesheet" href="site.css?v=33" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -20,6 +20,7 @@
 <header id="nav">
   <a href="#top" class="brand">ARENA<span>ROYALE</span><small>3D</small></a>
   <nav>
+    <a href="#novita">Novità</a>
     <a href="#caratteristiche">Caratteristiche</a>
     <a href="#movimento">Movimento</a>
     <a href="#armi">Armi</a>
@@ -43,12 +44,12 @@
       Novantanove avversari, una tempesta che si stringe e una sola Vittoria Reale.</p>
     <div class="cta reveal" style="--d:.65s">
       <a href="gioco.html" class="btn btn-play" data-transition><span>▶ GIOCA ORA</span></a>
-      <a href="#movimento" class="btn btn-ghost">Scopri le novità</a>
+      <a href="#novita" class="btn btn-ghost">Scopri le novità</a>
     </div>
     <div class="stats reveal" style="--d:.8s">
       <div><b data-count="100">0</b><span>giocatori</span></div>
       <div><b data-count="21">0</b><span>armi</span></div>
-      <div><b data-count="13">0</b><span>skin</span></div>
+      <div><b data-count="24">0</b><span>skin</span></div>
       <div><b data-count="18">0</b><span>città</span></div>
     </div>
   </div>
@@ -67,6 +68,29 @@
 <!-- ───────── TICKER ───────── -->
 <div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
 
+<!-- ───────── NOVITÀ v33 ───────── -->
+<section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v33</span>
+    <h2 class="h2 reveal">Spara, picchia,<br /><em>fai crollare tutto.</em></h2>
+    <p class="lead33 reveal">Pareti, pavimenti, auto e rocce ora si rompono davvero, un pezzo alla volta. Se abbatti tutta la base di una casa,
+      la gravità fa il resto: crolla e ti lascia i materiali. Il terreno no, quello resta dov'è.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">💥</div><h3>Distruzione a pezzi</h3><p>Picconate, proiettili ed esplosioni aprono buchi grandi poco più di un metro in muri, solai e pavimenti. Auto e massi si sgretolano e saltano via.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🏚️</div><h3>Gravità</h3><p>Rompi tutti gli appoggi a terra e la struttura viene giù: le macerie cadono, si alza la polvere e restano mucchi di materiali da raccogliere.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">👁️</div><h3>Modalità spettatore</h3><p>Eliminato? Guarda chi ti ha battuto, segui gli altri giocatori con <kbd>←</kbd> <kbd>→</kbd> e torna ai risultati quando vuoi.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🎒</div><h3>Inventario in movimento</h3><p>Con l'inventario aperto la partita non si ferma: continui a correre con <kbd>WASD</kbd> mentre sistemi gli oggetti.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">🔍</div><h3>Zoom su mappa e armadietto</h3><p>Rotellina, pizzico o <kbd>+</kbd>/<kbd>−</kbd> per ingrandire la mappa fino a 8× (con i nomi delle località) e per guardare da vicino la tua skin.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">🌳</div><h3>Natura viva</h3><p>Foglie e cortecce con più dettagli e raffiche di vento che ogni tanto attraversano l'isola e piegano alberi e cespugli.</p></article>
+    </div>
+    <div class="xh33 reveal">
+      <h3>Mirini nuovi per i fucili a pompa</h3>
+      <div class="xh-row" id="xhDemos"></div>
+      <p class="xh-note">Disegnati da zero, uno per ogni pompa. Si aprono con la dispersione dei pallini e si muovono a ogni colpo. Anche gli altri mirini sono stati ridisegnati.</p>
+    </div>
+  </div>
+</section>
+
 <!-- ───────── CARATTERISTICHE ───────── -->
 <section id="caratteristiche" class="section">
   <div class="wrap">
@@ -74,7 +98,7 @@
     <div class="cards">
       <article class="card tilt reveal" style="--d:0s"><div class="ico">🚌</div><h3>Il Bus della Battaglia</h3><p>Scegli il momento giusto, salta e apri il deltaplano sopra la città che preferisci.</p></article>
       <article class="card tilt reveal" style="--d:.08s"><div class="ico">🔫</div><h3>21 armi, 5 rarità</h3><p>Balestra, lanciagranate, doppietta, minigun, pompa tattico… ognuna con il suo mirino e la sua ottica. Più è rara, più fa male.</p></article>
-      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🧱</div><h3>Costruisci</h3><p>Premi <kbd>Q</kbd> e alza muri al volo per ripararti o bloccare un nemico.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🧱</div><h3>Costruisci e distruggi</h3><p>Premi <kbd>Q</kbd> e alza muri al volo per ripararti. Col piccone sfondi le pareti e raccogli materiali.</p></article>
       <article class="card tilt reveal" style="--d:.24s"><div class="ico">🏝️</div><h3>Isola gigante</h3><p>1,2 km per lato, 18 località, montagne e laghi, caricati a blocchi mentre ti muovi. La tempesta si stringe lentamente in sei fasi.</p></article>
       <article class="card tilt reveal" style="--d:.32s"><div class="ico">🤖</div><h3>Bot intelligenti</h3><p>Raccolgono il bottino, aprono forzieri, ti inseguono, si abbassano e scavalcano gli ostacoli.</p></article>
       <article class="card tilt reveal" style="--d:.40s"><div class="ico">✨</div><h3>Forzieri e cure</h3><p>Bende, kit medici e pozioni scudo. I forzieri dorati luccicano: seguili!</p></article>
@@ -156,7 +180,9 @@
       <div class="key reveal"><kbd>E</kbd><span>Raccogli · apri</span></div>
       <div class="key reveal"><kbd>Q</kbd><span>Costruisci</span></div>
       <div class="key reveal"><kbd>G</kbd><span>Lascia oggetto</span></div>
-      <div class="key reveal"><kbd>M</kbd><span>Mappa</span></div>
+      <div class="key reveal"><kbd>Tab</kbd><span>Inventario (puoi muoverti)</span></div>
+      <div class="key reveal hl"><kbd>M</kbd>+<kbd>Rotellina</kbd><span>Mappa con zoom</span></div>
+      <div class="key reveal hl"><kbd>←</kbd><kbd>→</kbd><span>Spettatore: cambia giocatore</span></div>
       <div class="key reveal"><kbd>Esc</kbd><span>Pausa</span></div>
     </div>
     <h3 class="h3touch reveal">📱 Su telefono e tablet</h3>
@@ -186,7 +212,7 @@
 
 <div id="toast"></div>
 
-<script type="module" src="js/site.js?v=32"></script>
+<script type="module" src="js/site.js?v=33"></script>
 <script src="js/transition.js?v=19"></script>
 </body>
 </html>

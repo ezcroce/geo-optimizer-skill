@@ -1,10 +1,11 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
-import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=29';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=32';
+import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=33';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=33';
+import { createCrosshair } from './crosshair.js?v=33';
 // rarità più frequente di ogni arma (colore della scheda e dell'anteprima)
 const WEAPON_RAR = Object.fromEntries(WEAPON_POOL.map(e => [e.id, e.rar.indexOf(Math.max(...e.rar))]));
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=32';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=33';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -93,7 +94,7 @@ for (const c of $$('.tilt')) {
 {
   const wn = Object.values(WEAPONS).map(w => w.name);
   const names = SKINS.map(s => s.name);
-  const extra = ['🌪️ La tempesta si sta restringendo!', '🧗 Nuovo: arrampicati sui tetti', '⬇️ Nuovo: abbassati con C', '👑 Vittoria Reale!', '🎁 Forziere leggendario trovato'];
+  const extra = ['💥 Nuovo: pareti, auto e rocce si rompono', '🏚️ Una casa è crollata! Materiali a terra', '👁️ Nuovo: modalità spettatore', '🌪️ La tempesta si sta restringendo!', '👑 Vittoria Reale!', '🔍 Nuovo: zoom sulla mappa'];
   const items = [];
   for (let i = 0; i < 14; i++) {
     if (i % 3 === 2) items.push(`<span>${extra[i % extra.length]}</span>`);
@@ -558,3 +559,29 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 window.__site = { hero, demo, thumbs };
+
+// ═════════ v33: anteprima animata dei nuovi mirini dei pompa ═════════
+{
+  const row = $('#xhDemos');
+  if (row) {
+    const list = [['pump', 'Fucile a pompa', 'cono a 4 archi'], ['tactical', 'Pompa tattico', 'parentesi e rombo'], ['drum', 'Pompa a tamburo', 'anello che ruota'], ['double', 'Doppietta', 'canne cariche']];
+    const demos = list.map(([style, name, sub]) => {
+      const card = document.createElement('div'); card.className = 'xh-card';
+      card.innerHTML = `<div class="xh"></div><b>${name}</b><span>${sub}</span>`;
+      row.appendChild(card);
+      return { style, xh: createCrosshair(card.querySelector('.xh')), t: Math.random() * 2, mag: 1, shot: 0 };
+    });
+    let last = performance.now();
+    const loop = (now) => {
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      for (const d of demos) {
+        d.t += dt; d.shot -= dt;
+        if (d.shot <= 0) { d.shot = d.style === 'drum' ? 0.45 : 1.3; d.xh.fire(1); d.mag = d.style === 'double' ? (d.mag <= 0 ? 1 : d.mag - 0.5) : 1; }
+        const rate = d.style === 'drum' ? 0.45 : 1.3, ready = d.style === 'pump' ? clamp(1 - d.shot / rate * 1.4 + 0.4, 0, 1) : -1;
+        d.xh.update(dt, { show: true, style: d.style, spreadPx: 14 + 10 * (0.5 + 0.5 * Math.sin(d.t * 0.9)), color: '#ffffff', size: 2.1, enemy: Math.sin(d.t * 0.6) > 0.75, outRange: false, sprint: false, reload: -1, ready, mag: d.style === 'double' ? d.mag : 1, use: -1 });
+      }
+    };
+    requestAnimationFrame(loop);
+  }
+}

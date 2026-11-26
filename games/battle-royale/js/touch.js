@@ -173,8 +173,8 @@ export function createTouch(api) {
     const i = [...hotbar.children].indexOf(s);
     if (i >= 0) api.onSlot(i);
   });
-  // mappa grande: un tocco la chiude; la minimappa la apre
-  document.getElementById('bigmap').addEventListener('pointerdown', () => { if (T.on) document.getElementById('bigmap').classList.add('hidden'); });
+  // la minimappa apre la mappa grande
+  // v33: la mappa grande si chiude col pulsante ✕ (pizzico = zoom, trascinare = spostarsi)
   document.getElementById('minimapWrap').addEventListener('pointerdown', e => { if (T.on) { e.preventDefault(); press('KeyM'); setTimeout(() => release('KeyM'), 50); } });
 
   function enable(on) {

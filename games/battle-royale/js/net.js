@@ -7,7 +7,8 @@
 
 export const MAX_PLAYERS = 8;
 const PREFIX = 'arenaroyale3d-';
-const VERSION = 10;
+const VERSION = 11;
+export const GAME_VERSION = 'v36';
 
 // v34: PeerJS (canale JSON) rifiuta i messaggi oltre ~16 KB ("Message too big for JSON channel"):
 // l'avvio della partita (100 bot) e le istantanee affollate superavano il limite e facevano cadere il collegamento.
@@ -59,6 +60,7 @@ export const NET = {
   onLobby: null,        // () → aggiornare l'interfaccia della lobby
   onChat: null,         // (name, text)
   onClose: null,        // (motivo)
+  onStatus: null,       // v36: (testo) avanzamento del collegamento
   local: new URLSearchParams(location.search).get('net') === 'local',
 };
 
@@ -84,20 +86,45 @@ function loadPeerJS() {
   return peerLib;
 }
 
+// ── v36: server STUN/TURN ──
+// Senza un server TURN che faccia da ponte, due giocatori dietro NAT "difficili" (CGNAT dei gestori, reti mobili,
+// alcune reti di scuola/ufficio) non riescono a collegarsi direttamente e l'ingresso nella lobby restava appeso.
+// Più server, anche su TCP/443 (passa quasi ovunque). Si può aggiungere il proprio: ?turn=turn:host:porta|utente|password
+const ICE_SERVERS = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:freestun.net:3478', username: 'free', credential: 'free' },
+];
+{
+  const extra = new URLSearchParams(location.search).get('turn');
+  if (extra) { const [urls, username, credential] = extra.split('|'); if (/^turns?:/.test(urls || '')) ICE_SERVERS.unshift({ urls, username, credential }); }
+}
+function peerOptions(relayOnly = false) {
+  return { debug: 1, config: { iceServers: ICE_SERVERS, sdpSemantics: 'unified-plan', iceTransportPolicy: relayOnly ? 'relay' : 'all' } };
+}
+
 // ── trasporto WebRTC (PeerJS) ──
 class PeerTransport {
   constructor() { this.conns = new Map(); this.peer = null; this.re = new Reassembler(); }
   async host(code, onConn, onData, onDrop) {
     const { Peer } = await loadPeerJS();
     return new Promise((res, rej) => {
-      const peer = new Peer(PREFIX + code, { debug: 0 });
+      const peer = new Peer(PREFIX + code, peerOptions());
       this.peer = peer;
+      let opened = false;
       const to = setTimeout(() => rej(new Error('Il server di collegamento non risponde')), 15000);
-      peer.on('open', id => { clearTimeout(to); res(id); });
-      peer.on('error', e => { clearTimeout(to); if (e.type === 'unavailable-id') rej(new Error('Codice già in uso, riprova')); else rej(new Error(errText(e))); });
+      peer.on('open', id => { clearTimeout(to); opened = true; res(id); });
+      peer.on('error', e => {
+        console.warn('rete (host):', e && e.type, e && e.message);
+        if (!opened) { clearTimeout(to); if (e.type === 'unavailable-id') rej(new Error('Codice già in uso, riprova')); else rej(new Error(errText(e))); return; }
+        // dopo l'apertura: se si perde il server di collegamento, ci si riaggancia (altrimenti nessuno può più entrare)
+        if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(e.type)) setTimeout(() => { if (this.peer === peer && peer.disconnected && !peer.destroyed) try { peer.reconnect(); } catch { /* */ } }, 2000);
+      });
       peer.on('connection', conn => {
         conn.on('open', () => { this.conns.set(conn.peer, conn); onConn(conn.peer); });
-        conn.on('data', d => { const m = this.re.take(conn.peer, d); if (m) onData(conn.peer, m); });
+        // (il primo messaggio può arrivare insieme all'apertura: il canale va registrato subito, o la risposta si perde)
+        conn.on('data', d => { if (conn.open && !this.conns.has(conn.peer)) this.conns.set(conn.peer, conn); const m = this.re.take(conn.peer, d); if (m) onData(conn.peer, m); });
         conn.on('close', () => { if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); onDrop(conn.peer); } });
         // un errore sul canale (es. messaggio rifiutato) non significa che il giocatore se n'è andato
         conn.on('error', e => { console.warn('rete:', e && (e.type || e.message)); if (!conn.open && this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); onDrop(conn.peer); } });
@@ -105,19 +132,44 @@ class PeerTransport {
       peer.on('disconnected', () => { try { peer.reconnect(); } catch { /* ignora */ } });
     });
   }
-  async join(code, onData, onDrop) {
+  /**
+   * v36: ingresso in tre tentativi (il terzo forzando il ponte TURN), con lo stato passo per passo.
+   * Prima un collegamento diretto fallito restava appeso 20 s e finiva con un fuorviante "lobby non trovata".
+   */
+  async join(code, onData, onDrop, onStatus = () => {}) {
     const { Peer } = await loadPeerJS();
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const relay = attempt === 2;
+      if (attempt) onStatus(relay ? 'Collegamento diretto non riuscito: provo attraverso un server ponte…' : 'Nuovo tentativo di collegamento…');
+      try { return await this._joinOnce(Peer, PREFIX + code, onData, onDrop, onStatus, relay, relay ? 25000 : 15000, attempt === 0); }
+      catch (e) { lastErr = e; this.close(); if (e.fatal) break; }
+    }
+    throw lastErr || new Error('Collegamento non riuscito');
+  }
+  _joinOnce(Peer, target, onData, onDrop, onStatus, relay, ms, first) {
     return new Promise((res, rej) => {
-      const peer = new Peer({ debug: 0 });
+      if (first) onStatus('Contatto il server di collegamento…');
+      const peer = new Peer(peerOptions(relay));
       this.peer = peer;
-      const to = setTimeout(() => rej(new Error('Lobby non trovata o host non raggiungibile')), 20000);
-      peer.on('error', e => { clearTimeout(to); rej(new Error(e.type === 'peer-unavailable' ? 'Nessuna lobby con questo codice' : errText(e))); });
+      let done = false, stage = 'server';
+      const fail = (msg, fatal = false) => { if (done) return; done = true; clearTimeout(to); const e = new Error(msg); e.fatal = fatal; rej(e); };
+      const to = setTimeout(() => fail(stage === 'server' ? 'Il server di collegamento non risponde: controlla la connessione'
+        : 'Lobby trovata, ma il collegamento con l’host non riesce (rete o firewall). Provate un’altra rete, ad esempio l’hotspot del telefono'), ms);
+      peer.on('error', e => {
+        console.warn('rete (client):', e && e.type, e && e.message);
+        if (e.type === 'peer-unavailable') fail('Nessuna lobby con questo codice: controlla il codice e che l’host tenga aperta la scheda del gioco', true);
+        else if (e.type === 'browser-incompatible') fail(errText(e), true);
+        else fail(errText(e));
+      });
       peer.on('open', id => {
-        const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
-        conn.on('open', () => { clearTimeout(to); this.conns.set(conn.peer, conn); res({ myId: id, hostId: conn.peer }); });
+        stage = 'ice';
+        if (first || relay) onStatus(relay ? 'Lobby trovata, collegamento attraverso il server ponte…' : 'Lobby trovata, collegamento con l’host…');
+        const conn = peer.connect(target, { reliable: true, serialization: 'json' });
+        conn.on('open', () => { if (done) return; done = true; clearTimeout(to); this.conns.set(conn.peer, conn); res({ myId: id, hostId: conn.peer }); });
         conn.on('data', d => { const m = this.re.take(conn.peer, d); if (m) onData(conn.peer, m); });
-        conn.on('close', () => onDrop(conn.peer));
-        conn.on('error', e => { console.warn('rete:', e && (e.type || e.message)); if (!conn.open) onDrop(conn.peer); });
+        conn.on('close', () => { if (!done) fail('Collegamento con l’host interrotto'); else if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); onDrop(conn.peer); } });
+        conn.on('error', e => { console.warn('rete:', e && (e.type || e.message)); if (!conn.open) fail('Collegamento con l’host non riuscito (rete o firewall)'); });
       });
     });
   }
@@ -180,7 +232,7 @@ function hostBroadcastLobby() { broadcast(lobbyMsg()); NET.onLobby && NET.onLobb
 function hostOnData(from, msg) {
   if (!msg || typeof msg !== 'object') return;
   if (msg.t === 'hello') {
-    if (msg.ver !== VERSION) { NET.transport.send(from, { t: 'kick', why: 'Versione del gioco diversa: ricarica la pagina' }); return; }
+    if (msg.ver !== VERSION) { NET.transport.send(from, { t: 'kick', why: `Versione del gioco diversa (host ${GAME_VERSION}, tu ${msg.gv || 'più vecchia'}): aprite tutti lo stesso link del gioco (il pulsante 🔗 dell’host lo copia)` }); return; }
     if (NET.inMatch) { NET.transport.send(from, { t: 'kick', why: 'La partita è già iniziata' }); return; }
     if (NET.players.length >= MAX_PLAYERS) { NET.transport.send(from, { t: 'kick', why: 'Lobby piena' }); return; }
     const p = NET.players.find(x => x.id === from) || { id: from };
@@ -253,10 +305,10 @@ export async function joinLobby(code, info) {
   NET.transport = NET.local ? new LocalTransport() : new PeerTransport();
   NET.status = 'Collegamento alla lobby…';
   try {
-    const { myId, hostId } = await NET.transport.join(code, clientOnData, clientOnDrop);
+    const { myId, hostId } = await NET.transport.join(code, clientOnData, clientOnDrop, (t) => { NET.status = t; NET.onStatus && NET.onStatus(t); });
     NET.role = 'client'; NET.code = code; NET.myId = myId; NET.hostId = hostId;
     NET.status = '';
-    NET.transport.send(hostId, { t: 'hello', ver: VERSION, ...info });
+    NET.transport.send(hostId, { t: 'hello', ver: VERSION, gv: GAME_VERSION, ...info });
     return code;
   } catch (e) {
     if (NET.transport) NET.transport.close();
@@ -275,7 +327,7 @@ export function leaveLobby(silent = false) {
 export function updateMe(info) {
   me = Object.assign(me || {}, info);
   if (NET.role === 'host') { Object.assign(NET.players[0], info); hostBroadcastLobby(); }
-  else if (NET.role === 'client') NET.transport.send(NET.hostId, { t: 'hello', ver: VERSION, ...me });
+  else if (NET.role === 'client') NET.transport.send(NET.hostId, { t: 'hello', ver: VERSION, gv: GAME_VERSION, ...me });
 }
 export function setMode(mode) { NET.mode = mode; if (NET.role === 'host') hostBroadcastLobby(); }
 /** v23: dimensione squadre e Squadra/Versus (solo l'host) */

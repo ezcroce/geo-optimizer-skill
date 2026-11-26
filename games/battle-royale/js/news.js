@@ -1,9 +1,20 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v35';
+export const NEWS_VERSION = 'v36';
 
 export const NEWS = [
+  {
+    v: 'v36', title: 'Borghi medievali, salici e deserto di dune', color: '#ffb84d', icon: '🏡',
+    items: [
+      'Ingresso nelle lobby degli amici riparato: prima il collegamento usava un solo server ponte che molte reti (fibra con CGNAT, 4G/5G, Wi-Fi di scuola) bloccavano. Ora ci sono più server STUN/TURN, anche sulla porta 443, e tre tentativi, l’ultimo forzando il ponte',
+      'Mentre entri vedi a che punto è il collegamento (server, lobby trovata, ponte) e gli errori dicono cosa fare. Se l’host ha una versione diversa del gioco te lo dice chiaramente',
+      'Le casette sparse per l’isola sono diventate case da borgo medievale: zoccolo in pietra, tavole consumate, travi a vista, scuri con la croce e tetto spesso di ardesia azzurra',
+      'Salici piangenti con la corteccia arancione e le lunghe chiome che scendono fino a terra, soprattutto vicino all’acqua',
+      'Cactus saguaro rifatti: fusto costolato, bracci a gomito e spine chiare',
+      'Prati punteggiati di fiorellini viola e chiazze più gialle; deserto con dune più alte dalla cresta morbida, sabbia color crema e increspature del vento',
+    ],
+  },
   {
     v: 'v35', title: 'Mirini al neon e boschi rifatti', color: '#7dff5a', icon: '🌳',
     items: [

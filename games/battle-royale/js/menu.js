@@ -2,10 +2,10 @@
 //  Menu principale: Gioca · Armadietto · Pass battaglia · Negozio · Missioni
 //  + lobby online (codice stanza, chat, compagni)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS, diffLabel } from './config.js?v=35';
-import { NEWS, NEWS_VERSION } from './news.js?v=35';
-import * as PR from './progress.js?v=35';
-import * as N from './net.js?v=34';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS, diffLabel } from './config.js?v=36';
+import { NEWS, NEWS_VERSION } from './news.js?v=36';
+import * as PR from './progress.js?v=36';
+import * as N from './net.js?v=36';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -435,6 +435,7 @@ function renderOnline() {
   NET.onMessage = (from, msg) => api.netMessage(from, msg);
   NET.onClose = why => { renderOnline(); api.netClosed(why); addChat('', why || 'Connessione chiusa'); };
   const status = (t, err = false) => { const el = $('#netStatus'); el.textContent = t; el.classList.toggle('err', err); };
+  NET.onStatus = (t) => status(t);   // v36: avanzamento del collegamento passo per passo
   $('#hostBtn').onclick = async () => {
     api.ui();
     status('Creazione della lobby…');
@@ -444,7 +445,7 @@ function renderOnline() {
       N.setMode(S.mode); N.setTeam(S.team, !!S.vs);
       chatLog.innerHTML = '';
       addChat('', `Lobby creata! Dai il codice ${NET.code} ai tuoi amici.`);
-      status('Fino a 8 giocatori: gli altri posti sono riempiti dai bot.');
+      status('Fino a 8 giocatori: gli altri posti sono riempiti dai bot. Tieni aperta questa scheda finché gli amici non sono entrati.');
       renderOnline();
     } catch (e) { status(e.message || 'Errore', true); }
   };

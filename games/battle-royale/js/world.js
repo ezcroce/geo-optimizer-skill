@@ -4,10 +4,10 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=35';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=36';
 import { carInstances } from './cars.js?v=25';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial } from './props.js?v=35';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial } from './props.js?v=36';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -182,7 +182,9 @@ function rawHeight(x, z, bw) {
   if (wS > 0) h += wS * 7 * calm;
   if (wD > 0) {
     // dune e mese a gradoni (canyon nel deserto)
-    const dune = 1.7 * (1 - Math.abs(N.dune(x * 0.016 + 0.35 * N.warp(x * 0.004, z * 0.004), z * 0.0065)));
+    // v36: dune più alte e dalla cresta affilata (si spianano vicino alle città)
+    const dr = 1 - Math.abs(N.dune(x * 0.013 + 0.35 * N.warp(x * 0.004, z * 0.004), z * 0.0058));
+    const dune = (1.7 + 3.4 * calm) * dr * dr * (3 - 2 * dr) * 1.15;
     const mm = fbm(N.mesa, x * 0.0052, z * 0.0052, 3);
     const mesa = (smoothstep(0.16, 0.22, mm) * 13 + smoothstep(0.38, 0.43, mm) * 9) * calm;
     h = h + ((h * 0.45 + 2.2 + dune + mesa) - h) * wD;
@@ -974,13 +976,13 @@ function inTown(x, z, pad = 0) {
 
 // colore del terreno in un punto (usato sia dai chunk dettagliati sia da quelli lontani)
 const _gc = {
-  grass1: new THREE.Color('#4f9a3a'), grass2: new THREE.Color('#82c04e'), meadow: new THREE.Color('#3f8436'),
-  dry: new THREE.Color('#b5b65a'), flower: new THREE.Color('#9fc95a'), sand: new THREE.Color('#e3cf92'), wetSand: new THREE.Color('#a8956a'),
+  grass1: new THREE.Color('#5c9a36'), grass2: new THREE.Color('#a4c248'), meadow: new THREE.Color('#47883a'),   // v36: prati più dorati
+  dry: new THREE.Color('#c4b858'), flower: new THREE.Color('#c2c652'), sand: new THREE.Color('#e3cf92'), wetSand: new THREE.Color('#a8956a'),
   rock: new THREE.Color('#878274'), rockDark: new THREE.Color('#6a665c'), dirt: new THREE.Color('#a8865a'), dirtEdge: new THREE.Color('#7f8a48'),
   snow: new THREE.Color('#dfe6ee'), town: new THREE.Color('#9aa36b'),
   // biomi
   snowA: new THREE.Color('#dce4ee'), snowB: new THREE.Color('#c6d3e3'), frost: new THREE.Color('#a9b9a4'), iceRock: new THREE.Color('#6f7682'),
-  sandA: new THREE.Color('#e2c387'), sandB: new THREE.Color('#d1a866'), redRock: new THREE.Color('#b8693a'), redRock2: new THREE.Color('#d39a5c'), dryBush: new THREE.Color('#a39a58'),
+  sandA: new THREE.Color('#efd0a2'), sandB: new THREE.Color('#dcae7c'), redRock: new THREE.Color('#b8693a'), redRock2: new THREE.Color('#d39a5c'), dryBush: new THREE.Color('#a39a58'),
   autA: new THREE.Color('#b48a3a'), autB: new THREE.Color('#9a6a2c'), leaves: new THREE.Color('#c25a26'), autGreen: new THREE.Color('#7f8c3a'),
   tropA: new THREE.Color('#3fb04a'), tropB: new THREE.Color('#5cc44e'), whiteSand: new THREE.Color('#f3e7c4'),
   asphalt: new THREE.Color('#505256'), road: new THREE.Color('#66676a'), walk: new THREE.Color('#b3aea4'), cobble: new THREE.Color('#8a8276'),
@@ -1096,7 +1098,7 @@ function makeGroundDetail() {
 
 /** aggiunge la texture di dettaglio (coordinate mondo, due scale) a un materiale del terreno.
  *  Usa lo slot `map` integrato (binding affidabile) ma sostituisce il campionamento. */
-function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = false) {
+function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = false, flora = false) {
   mat.map = tex;
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
@@ -1116,6 +1118,35 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
           d *= 0.72 + 0.5 * blot;
           diffuseColor.rgb *= mix(1.0, d, ${amount.toFixed(2)});
         }`)
+      .replace('#include <color_fragment>', flora ? `#include <color_fragment>
+        {
+          // v36: prato con i fiorellini viola e increspature del vento sulla sabbia
+          vec3 vc = vColor.rgb;
+          float dist = length(vWPos - cameraPosition);
+          float greenK = smoothstep(0.93, 1.12, vc.g / max(vc.r, 0.01)) * smoothstep(0.5, 0.9, vc.g / max(vc.b, 0.01) * 0.35);
+          vec2 fc = vWPos.xz * 2.4;
+          vec2 ci = floor(fc), cf = fract(fc);
+          float h1 = fract(sin(dot(ci, vec2(127.1, 311.7))) * 43758.5453), h2 = fract(sin(dot(ci, vec2(269.5, 183.3))) * 43758.5453);
+          float patchF = texture2D(map, vWPos.xz * 0.011 + vec2(0.53, 0.21)).g;
+          float rr = length(cf - (vec2(h1, h2) * 0.6 + 0.2));
+          float fw = fwidth(fc.x);
+          float flw = (1.0 - smoothstep(0.1 - fw * 0.5, 0.125 + fw, rr)) * step(h1 * 0.8 + h2 * 0.2, smoothstep(0.38, 0.7, patchF) * 0.7);
+          flw *= greenK * (1.0 - smoothstep(0.12, 0.3, fw)) * (1.0 - smoothstep(28.0, 48.0, dist));
+          vec3 fcol = mix(vec3(0.34, 0.14, 0.56), vec3(0.55, 0.32, 0.8), h2);
+          diffuseColor.rgb = mix(diffuseColor.rgb, fcol, flw);
+          // macchie un po' più gialle tra l'erba (erba secca e fiorita, come nel riferimento)
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(1.1, 1.04, 0.72), greenK * smoothstep(0.55, 0.85, patchF) * 0.35);
+          // sabbia: increspature parallele, deformate e più marcate sui fianchi delle dune
+          float sandK = smoothstep(0.45, 0.6, vc.r) * smoothstep(0.88, 0.75, vc.g / max(vc.r, 0.01)) * smoothstep(0.5, 0.36, vc.b / max(vc.r, 0.01));
+          if (sandK > 0.01) {
+            float warp = texture2D(map, vWPos.xz * 0.023).r * 6.0 + texture2D(map, vWPos.xz * 0.09).g * 1.5;
+            float ph = dot(vWPos.xz, vec2(0.82, 0.57)) * 7.5 + warp * 3.0;
+            float fwr = fwidth(ph);
+            float rip = sin(ph) * (1.0 - smoothstep(0.8, 2.5, fwr));
+            float rip2 = sin(dot(vWPos.xz, vec2(0.6, -0.8)) * 1.9 + warp) * (1.0 - smoothstep(0.8, 2.5, fwidth(dot(vWPos.xz, vec2(0.6, -0.8)) * 1.9)));
+            diffuseColor.rgb *= 1.0 + sandK * (0.07 * rip + 0.05 * rip2);
+          }
+        }` : '#include <color_fragment>')
       .replace('#include <normal_fragment_maps>', bump ? `#include <normal_fragment_maps>
         {
           // micro-rilievo del terreno: pendenza della texture di dettaglio → normale inclinata
@@ -1126,7 +1157,7 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
           normal = normalize(normal + (viewMatrix * vec4(b, 0.0)).xyz);
         }` : '#include <normal_fragment_maps>');
   };
-  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount + (bump ? 'b' : '');
+  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount + (bump ? 'b' : '') + (flora ? 'f36' : '');
 }
 
 /** normal map affiancabile per l'acqua (somma di onde con frequenze intere) */
@@ -1354,7 +1385,7 @@ export function buildWorld(scene, opts = {}) {
   const fenceMat = m('fence', '#a37a4a');
   const groundDetail = makeGroundDetail();
   const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-  addGroundDetail(terrainMat, groundDetail, 70, 260, 1, NORMALS);
+  addGroundDetail(terrainMat, groundDetail, 70, 260, 1, NORMALS, true);
   const lodMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
   addGroundDetail(lodMat, groundDetail, 0, 1, 0.7);
   const blockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
@@ -2063,6 +2094,7 @@ export function buildWorld(scene, opts = {}) {
     else if (wS > pick && wS > 0.2) t.k = r < 0.93 ? 'snowPine' : 'deadTree';
     else if (wT > pick && wT > 0.2) t.k = r < 0.62 ? 'palm' : (r < 0.85 ? 'oak' : 'birch');
     else if (wA > pick && wA > 0.2) t.k = r < 0.5 ? 'autumnOak' : (r < 0.78 ? 'autumnBirch' : (r < 0.95 ? 'pine' : 'deadTree'));
+    else if (t.rot > 1.7 && t.rot < (h < WATER_LEVEL + 4.5 ? 3.6 : 2.05)) t.k = 'willow';   // v36: salici piangenti, soprattutto vicino all'acqua
     else t.k = r < (h > 12 ? 0.8 : 0.5) ? 'pine' : (t.rot > 4.4 ? 'birch' : (t.rot < 0.55 ? 'autumnOak' : (t.rot < 0.9 ? 'autumnBirch' : 'oak')));
     if (h > 34 && t.k !== 'cactus') t.k = h > 42 || wS > 0.3 ? 'snowPine' : 'pine';
     t.pine = t.k === 'pine' || t.k === 'snowPine';
@@ -2425,7 +2457,7 @@ export function buildWorld(scene, opts = {}) {
     return geo;
   }
 
-  const LOD_TREE = { pine: ['#2b5c30', 2.6, 6, 4], oak: ['#417f30', 2.8, 6, 4.7], birch: ['#82b23a', 2.2, 5, 5.5], snowPine: ['#9fb3ad', 2.5, 6, 4], autumnOak: ['#b2321f', 2.8, 5, 4.7], autumnBirch: ['#d8722a', 2.4, 5, 5.2], palm: ['#4a9a40', 3.2, 1.2, 6.2], cactus: ['#4f8a3a', 0.8, 4, 2], deadTree: ['#6b5a4a', 0.6, 3.5, 1.8] };
+  const LOD_TREE = { pine: ['#2b5c30', 2.6, 6, 4], oak: ['#417f30', 2.8, 6, 4.7], birch: ['#82b23a', 2.2, 5, 5.5], snowPine: ['#9fb3ad', 2.5, 6, 4], autumnOak: ['#b2321f', 2.8, 5, 4.7], autumnBirch: ['#d8722a', 2.4, 5, 5.2], palm: ['#4a9a40', 3.2, 1.2, 6.2], cactus: ['#4a9a38', 0.9, 5, 2.4], deadTree: ['#6b5a4a', 0.6, 3.5, 1.8], willow: ['#9cb836', 3.2, 5, 4.9] };
   function buildLod(ch) {
     const group = new THREE.Group();
     const t = new THREE.Mesh(terrainGeo(ch, LSEG, 0.35), lodMat);
@@ -2443,7 +2475,7 @@ export function buildWorld(scene, opts = {}) {
     for (const b of ch.boxes) if (b.lodColor) blocks.push({ w: b.w, h: b.h, d: b.d, x: b.x, y: b.y, z: b.z, color: b.lodColor });
     for (const pr of ch.props) if (pr.type === 'shed') {
       const D = PROP_DIMS.shed, q90 = Math.round(pr.rot / (Math.PI / 2)) % 2 !== 0;
-      blocks.push({ w: q90 ? D.d - 0.6 : D.w - 0.6, h: D.h * 0.8, d: q90 ? D.w - 0.6 : D.d - 0.6, x: pr.x, y: pr.y + D.h * 0.4, z: pr.z, color: '#a8763f', top: '#8a3326' });
+      blocks.push({ w: q90 ? D.d - 0.6 : D.w - 0.6, h: D.h * 0.8, d: q90 ? D.w - 0.6 : D.d - 0.6, x: pr.x, y: pr.y + D.h * 0.4, z: pr.z, color: '#8e959c', top: '#4f6274' });
     }
     // alberi lontani: un cono semplice ogni 3 alberi
     for (let i = 0; i < ch.trees.length; i += 2) {
@@ -2616,7 +2648,7 @@ export function buildWorld(scene, opts = {}) {
   function buildGrassCell(gx, gz) {
     const rnd = mulberry32((gx * 92837111) ^ (gz * 689287499) ^ 0x5bd1e995);
     const x0 = gx * GCELL, z0 = gz * GCELL;
-    const NT = Math.max(1, Math.round(GCELL * GCELL * QUALITY.grassDens)), NF = Math.round(70 * Math.min(1, QUALITY.grassDens / 0.8)), NP = 16;
+    const NT = Math.max(1, Math.round(GCELL * GCELL * QUALITY.grassDens)), NF = Math.round(110 * Math.min(1, QUALITY.grassDens / 0.8)), NP = 16;
     const grp = new THREE.Group();
     const gm = new THREE.InstancedMesh(tuftGeo, grassNearMat, NT);
     const fm = new THREE.InstancedMesh(flowerGeo, flowerMat, NF);
@@ -2652,7 +2684,7 @@ export function buildWorld(scene, opts = {}) {
       }
     }
     let n = 0, nf = 0, np = 0;
-    const flowerCols = ['#ffffff', '#ffe14d', '#ff7eb6', '#b48cff', '#ff6a4d'];
+    const flowerCols = ['#b48cff', '#9a6ad8', '#c49aff', '#ffffff', '#b48cff', '#ffe14d', '#8a5cd0', '#ff7eb6'];   // v36: prati fioriti di viola
     const fpatch = patch(x0 + 16, z0 + 16, 0.05, 3.3);      // alcune zone più fiorite
     for (let i = 0; i < NT + NF + NP; i++) {
       const x = x0 + rnd() * GCELL, z = z0 + rnd() * GCELL;
@@ -2866,7 +2898,7 @@ export function buildWorld(scene, opts = {}) {
           im.setColorAt(i, col.setRGB(v * (1 + hs * 0.6), v, v * (1 - hs * 0.4)));
         };
         for (const low of [false, true]) {
-          const im = instanced(PROPS[low ? k + 'Low' : k], treeMaterial, list, placeTree);
+          const im = instanced(PROPS[low ? k + 'Low' : k], (!low && TREE_MATS[k]) || treeMaterial, list, placeTree);
           if (!im) continue;
           if (low) { im.castShadow = false; im.visible = false; }
           group.add(im);
@@ -2925,7 +2957,7 @@ export function buildWorld(scene, opts = {}) {
         byType.get(pr.type).push(pr);
       }
       for (const [type, list] of byType) {
-        const matl = type === 'barrelBlue' || type === 'barrelRed' ? metalPropMaterial : type === 'logs' ? logMaterial : propMaterial;
+        const matl = type === 'barrelBlue' || type === 'barrelRed' ? metalPropMaterial : type === 'logs' ? logMaterial : type === 'shed' && PROPS.shed.attributes.aTile ? shedMaterial : propMaterial;
         const im = instanced(PROPS[type], matl, list, (pr, i, im) => {
           q.setFromAxisAngle(up, pr.rot); sc.set(1, 1, 1); p.set(pr.x, pr.y, pr.z);
           mat4.compose(p, q, sc);

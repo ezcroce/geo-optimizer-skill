@@ -350,6 +350,57 @@ const P = {
     g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.2;
     for (let i = 0; i < 6; i++) { const x = rnd() * S, y = rnd() * S; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 8, y + 6 + rnd() * 8); g.lineTo(x + (rnd() - 0.5) * 10, y + 14 + rnd() * 6); g.stroke(); }
   }, (g, S, rnd) => { dots(g, S, rnd, 900, '#a8a8a8', '#585858'); }, 0.9, 2),
+  /** v30: legno con venature (chitarra, scudo) */
+  wood: (c) => make('wood' + c, 128, (g, S, rnd) => {
+    g.fillStyle = c; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 46; i++) {
+      const y0 = rnd() * S, a = 1 + rnd() * 3, ph = rnd() * 6, k = rnd();
+      g.strokeStyle = k < 0.55 ? `rgba(40,20,5,${0.1 + rnd() * 0.16})` : `rgba(255,230,190,${0.06 + rnd() * 0.08})`;
+      g.lineWidth = 0.6 + rnd() * 1.6;
+      g.beginPath();
+      for (let x = 0; x <= S; x += 4) { const y = y0 + Math.sin(x / S * Math.PI * 2 + ph) * a + Math.sin(x / S * Math.PI * 6 + ph * 2) * a * 0.3; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke();
+    }
+    for (let i = 0; i < 3; i++) { const x = rnd() * S, y = rnd() * S; const gr = g.createRadialGradient(x, y, 0.5, x, y, 7); gr.addColorStop(0, 'rgba(40,18,4,0.45)'); gr.addColorStop(1, 'rgba(40,18,4,0)'); g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, 9, 3.5, 0, 0, 7); g.fill(); }
+  }, (g, S, rnd) => { for (let i = 0; i < 40; i++) { const y = rnd() * S; g.fillStyle = rnd() < 0.5 ? '#767676' : '#8c8c8c'; g.fillRect(0, y, S, 1 + rnd() * 1.5); } }, 0.6, 1),
+  /** v30: piume sovrapposte con rachide e barbe (ali d'angelo) */
+  feather: (c) => make('feather' + c, 128, (g, S, rnd) => {
+    g.fillStyle = shade(c, 0.86); g.fillRect(0, 0, S, S);
+    const rows = 4, cols = 4, fw = S / cols, fh = S / rows;
+    for (let r = -1; r <= rows; r++) for (let k = -1; k <= cols; k++) {
+      const x = k * fw + (r % 2 ? fw / 2 : 0), y = r * fh;
+      wrap(S, x + fw / 2, y + fh, fh * 1.4, (px, py) => {
+        const gr = g.createLinearGradient(px - fw / 2, 0, px + fw / 2, 0);
+        gr.addColorStop(0, shade(c, 0.8)); gr.addColorStop(0.5, mix(c, '#ffffff', 0.25)); gr.addColorStop(1, shade(c, 0.78));
+        g.fillStyle = gr;
+        g.beginPath(); g.moveTo(px - fw * 0.5, py - fh); g.quadraticCurveTo(px - fw * 0.55, py - fh * 0.1, px, py + fh * 0.32); g.quadraticCurveTo(px + fw * 0.55, py - fh * 0.1, px + fw * 0.5, py - fh); g.closePath(); g.fill();
+        g.strokeStyle = 'rgba(0,0,0,0.13)'; g.lineWidth = 0.6;
+        for (let b = 0; b < 9; b++) { const yy = py - fh + b * fh * 0.14; g.beginPath(); g.moveTo(px, yy); g.lineTo(px - fw * 0.42, yy - fh * 0.08); g.moveTo(px, yy); g.lineTo(px + fw * 0.42, yy - fh * 0.08); g.stroke(); }
+        g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(px, py - fh); g.lineTo(px, py + fh * 0.28); g.stroke();
+        g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(px - fw * 0.5, py - fh * 0.2); g.quadraticCurveTo(px - fw * 0.4, py + fh * 0.1, px, py + fh * 0.32); g.quadraticCurveTo(px + fw * 0.4, py + fh * 0.1, px + fw * 0.5, py - fh * 0.2); g.stroke();
+      });
+    }
+  }, (g, S) => {
+    const rows = 4, cols = 4, fw = S / cols, fh = S / rows;
+    for (let r = -1; r <= rows; r++) for (let k = -1; k <= cols; k++) {
+      const x = k * fw + (r % 2 ? fw / 2 : 0) + fw / 2, y = r * fh + fh;
+      const gr = g.createLinearGradient(0, y - fh, 0, y + fh * 0.3); gr.addColorStop(0, '#606060'); gr.addColorStop(1, '#b0b0b0');
+      g.fillStyle = gr; g.beginPath(); g.moveTo(x - fw * 0.5, y - fh); g.quadraticCurveTo(x - fw * 0.55, y - fh * 0.1, x, y + fh * 0.32); g.quadraticCurveTo(x + fw * 0.55, y - fh * 0.1, x + fw * 0.5, y - fh); g.closePath(); g.fill();
+    }
+  }, 1.4, 1),
+  /** v30: membrana venata (ali di drago) */
+  membrane: (c) => make('memb' + c, 128, (g, S, rnd) => {
+    g.fillStyle = c; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 9; i++) { g.fillStyle = `rgba(0,0,0,${0.06 + rnd() * 0.08})`; const x = rnd() * S, y = rnd() * S; wrap(S, x, y, 30, (px, py) => blob(g, px, py, 14 + rnd() * 10, mulberry(i * 13), 1.3)); }
+    const vein = (x, y, a, l, w, d) => {
+      if (d > 4 || l < 4) return;
+      const x2 = x + Math.cos(a) * l, y2 = y + Math.sin(a) * l;
+      wrap(S, x, y, l + 2, (px, py) => { g.strokeStyle = shade(c, 0.45); g.lineWidth = w; g.beginPath(); g.moveTo(px, py); g.quadraticCurveTo(px + (x2 - x) * 0.5 + 3, py + (y2 - y) * 0.5 - 2, px + x2 - x, py + y2 - y); g.stroke(); });
+      vein(x2, y2, a + 0.5 + rnd() * 0.3, l * 0.65, w * 0.7, d + 1); vein(x2, y2, a - 0.5 - rnd() * 0.3, l * 0.65, w * 0.7, d + 1);
+    };
+    for (let i = 0; i < 5; i++) vein(rnd() * S, rnd() * S, rnd() * 6.28, 22, 2, 0);
+    dots(g, S, rnd, 500, 'rgba(255,200,150,0.08)', 'rgba(0,0,0,0.08)', 1.5);
+  }, (g, S, rnd) => { dots(g, S, rnd, 900, '#9a9a9a', '#666666', 1.5); }, 1.0, 1),
 };
 
 /** tipi di tessuto che hanno un colore proprio (il materiale resta bianco) */
@@ -371,6 +422,7 @@ export const CLOTH_LOOK = {
   camo: { rough: 0.85, sheen: 0.35 }, plaid: { rough: 0.85, sheen: 0.5 }, gingham: { rough: 0.85, sheen: 0.5 },
   hex: { rough: 0.38, sheen: 0, coat: 0.6 }, scales: { rough: 0.45, sheen: 0, coat: 0.45 }, frost: { rough: 0.35, sheen: 0.6, coat: 0.3 },
   stains: { rough: 0.95, sheen: 0.3 },
+  wood: { rough: 0.42, sheen: 0, coat: 0.55 }, feather: { rough: 0.9, sheen: 0.8, sheenRough: 0.5 }, membrane: { rough: 0.6, sheen: 0.25 },
   rubber: { rough: 0.85, sheen: 0 }, straw: { rough: 0.9, sheen: 0.2 }, cordura: { rough: 0.7, sheen: 0.35 }, webbing: { rough: 0.75, sheen: 0.4 },
 };
 
@@ -383,3 +435,114 @@ export const SKIN_CLOTH = {
   scienziata: ['cotton', 'denim'], vichingo: ['knit', 'leather'], samurai: ['silk', 'linen'], spettro: ['frost', 'frost'],
   giardiniera: ['gingham', 'denim'], rapper: ['knit', 'denim'],
 };
+
+
+/**
+ * v30: vela del deltaplano (non ripetuta): u = apertura (0 sinistra → 1 destra), v = corda (0 bordo d'attacco → 1 d'uscita).
+ * Tela ripstop con cuciture dei pannelli, tasca del bordo d'attacco e un disegno diverso per ogni deltaplano.
+ */
+const GL_CACHE = new Map();
+export function gliderTexture(id, color, accent) {
+  const key = id + color + accent;
+  if (GL_CACHE.has(key)) return GL_CACHE.get(key);
+  const W = 512, H = 256;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'), rnd = mulberry(hash(key));
+  const X = (u) => u * W, Y = (v) => v * H;
+  const sym = (fn) => { fn(1); g.save(); g.translate(W, 0); g.scale(-1, 1); fn(-1); g.restore(); };   // disegno simmetrico
+  g.fillStyle = color; g.fillRect(0, 0, W, H);
+  switch (id) {
+    case 'fiamma': {
+      for (const [col, k] of [[mix(color, '#ff9a1a', 0.6), 1], [accent, 0.72], ['#fff4c0', 0.38]]) {
+        g.fillStyle = col;
+        for (let i = 0; i < 18; i++) {
+          const u = (i + 0.5) / 18, len = (0.35 + 0.35 * Math.abs(Math.sin(i * 2.3))) * k, w = 0.03 * (0.6 + k * 0.6);
+          g.beginPath(); g.moveTo(X(u - w), 0);
+          g.bezierCurveTo(X(u - w * 1.2), Y(len * 0.4), X(u + w * 1.5), Y(len * 0.6), X(u + Math.sin(i) * 0.02), Y(len));
+          g.bezierCurveTo(X(u - w * 0.4), Y(len * 0.65), X(u + w * 1.2), Y(len * 0.35), X(u + w), 0); g.fill();
+        }
+      }
+      break;
+    }
+    case 'notte': {
+      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, shade(color, 0.6)); gr.addColorStop(1, mix(color, accent, 0.25));
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 220; i++) { g.fillStyle = rnd() < 0.7 ? 'rgba(255,255,255,0.85)' : accent; const r = rnd() < 0.9 ? 0.8 : 1.8; g.beginPath(); g.arc(rnd() * W, rnd() * H, r, 0, 7); g.fill(); }
+      sym(() => { g.fillStyle = '#f4ecff'; g.beginPath(); g.arc(X(0.22), Y(0.45), 26, 0, 7); g.fill(); g.fillStyle = shade(color, 0.8); g.beginPath(); g.arc(X(0.22) + 11, Y(0.45) - 6, 23, 0, 7); g.fill(); });
+      g.strokeStyle = accent; g.lineWidth = 3; g.shadowColor = accent; g.shadowBlur = 8;
+      for (const v of [0.14, 0.88]) { g.beginPath(); g.moveTo(0, Y(v)); g.lineTo(W, Y(v)); g.stroke(); }
+      g.shadowBlur = 0;
+      break;
+    }
+    case 'smeraldo': {
+      g.strokeStyle = mix(color, accent, 0.35); g.lineWidth = 2;
+      for (let k = -12; k < 24; k++) { g.beginPath(); g.moveTo(k * 32, 0); g.lineTo(k * 32 + H, H); g.stroke(); g.beginPath(); g.moveTo(k * 32, 0); g.lineTo(k * 32 - H, H); g.stroke(); }
+      g.fillStyle = accent; g.globalAlpha = 0.85;
+      sym(() => { g.beginPath(); g.moveTo(X(0.5), Y(0.08)); g.lineTo(X(0.3), Y(0.5)); g.lineTo(X(0.5), Y(0.34)); g.closePath(); g.fill(); });
+      g.globalAlpha = 1;
+      break;
+    }
+    case 'arcobaleno': {
+      const RB = ['#ff3a3a', '#ff9a1a', '#ffe02a', '#3ad04a', '#2ab0ff', '#4a5aff', '#b04aff'];
+      for (let i = 0; i < 14; i++) { g.fillStyle = RB[Math.abs(Math.round(i < 7 ? 6 - i : i - 7))]; g.fillRect(X(i / 14), 0, W / 14 + 1, H); }
+      g.fillStyle = 'rgba(255,255,255,0.85)'; g.fillRect(0, 0, W, Y(0.08));
+      break;
+    }
+    case 'oro': {
+      const gr = g.createLinearGradient(0, 0, W, 0);
+      for (let i = 0; i <= 8; i++) gr.addColorStop(i / 8, i % 2 ? mix(color, '#fff6d0', 0.45) : shade(color, 0.78));
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      g.strokeStyle = 'rgba(120,70,0,0.45)'; g.lineWidth = 2;
+      for (let i = 0; i < 24; i++) { const a = (i / 23 - 0.5) * 2.6; g.beginPath(); g.moveTo(X(0.5), 0); g.lineTo(X(0.5) + Math.sin(a) * W, Math.cos(a) * H * 1.4); g.stroke(); }
+      g.strokeStyle = accent; g.lineWidth = 2.5;
+      for (const r of [40, 70, 100]) { g.beginPath(); g.arc(X(0.5), 0, r, 0, Math.PI); g.stroke(); }
+      sym(() => { g.strokeStyle = 'rgba(140,80,0,0.6)'; g.lineWidth = 1.5; for (let k = 0; k < 6; k++) { g.beginPath(); g.arc(X(0.12 + k * 0.05), Y(0.75), 10, 0, 7); g.stroke(); } });
+      break;
+    }
+    case 'tigre': {
+      g.fillStyle = mix(color, '#ffe0a0', 0.25); g.fillRect(0, 0, W, Y(0.12));
+      g.fillStyle = accent;
+      sym(() => {
+        for (let i = 0; i < 9; i++) {
+          const u = 0.04 + i * 0.052 + rnd() * 0.01, len = 0.45 + rnd() * 0.4, w = 0.012 + rnd() * 0.01;
+          g.beginPath(); g.moveTo(X(u - w), H);
+          g.bezierCurveTo(X(u - w * 2), Y(1 - len * 0.4), X(u + w * 2.5), Y(1 - len * 0.7), X(u + 0.02), Y(1 - len));
+          g.bezierCurveTo(X(u + w * 0.5), Y(1 - len * 0.6), X(u + w * 1.4), Y(1 - len * 0.3), X(u + w), H); g.fill();
+        }
+      });
+      break;
+    }
+    default: {   // classico: due fasce parallele al bordo d'attacco e un sole al centro
+      g.fillStyle = accent; g.fillRect(0, Y(0.2), W, Y(0.07)); g.fillRect(0, Y(0.31), W, Y(0.025));
+      g.fillStyle = mix(color, '#000000', 0.25); g.fillRect(0, Y(0.9), W, Y(0.1));
+      g.fillStyle = accent; g.beginPath(); g.arc(X(0.5), Y(0.58), 22, 0, 7); g.fill();
+      g.fillStyle = color; g.beginPath(); g.arc(X(0.5), Y(0.58), 13, 0, 7); g.fill();
+    }
+  }
+  // ombreggiatura verso il bordo d'uscita, tasca del bordo d'attacco (mylar) e orlo
+  const sh = g.createLinearGradient(0, 0, 0, H); sh.addColorStop(0, 'rgba(255,255,255,0.08)'); sh.addColorStop(1, 'rgba(0,0,0,0.16)');
+  g.fillStyle = sh; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, W, Y(0.05));
+  g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, Y(0.975), W, Y(0.025));
+  // trama ripstop e cuciture dei pannelli
+  g.strokeStyle = 'rgba(0,0,0,0.07)'; g.lineWidth = 1;
+  for (let x = 0; x < W; x += 6) { g.beginPath(); g.moveTo(x + 0.5, 0); g.lineTo(x + 0.5, H); g.stroke(); }
+  for (let y = 0; y < H; y += 6) { g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke(); }
+  g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 1.5;
+  for (let k = 1; k < 12; k++) { g.beginPath(); g.moveTo(X(k / 12), Y(0.05)); g.lineTo(X(k / 12), H); g.stroke(); }
+  g.beginPath(); g.moveTo(0, Y(0.05)); g.lineTo(W, Y(0.05)); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,0.2)'; for (let k = 1; k < 12; k++) g.fillRect(X(k / 12) + 1.5, Y(0.05), 1, H);
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.flipY = false; map.anisotropy = 4;
+  let normalMap = null;
+  if (NORMALS) {
+    const hc = document.createElement('canvas'); hc.width = W / 2; hc.height = H / 2;
+    const hg = hc.getContext('2d'); hg.fillStyle = '#808080'; hg.fillRect(0, 0, W / 2, H / 2);
+    hg.fillStyle = '#9a9a9a'; for (let x = 0; x < W / 2; x += 3) hg.fillRect(x, 0, 1, H / 2);
+    hg.fillStyle = '#585858'; for (let k = 1; k < 12; k++) hg.fillRect(k / 12 * W / 2 - 1, H / 40, 2, H / 2);
+    hg.fillRect(0, H / 40 - 1, W / 2, 2);
+    normalMap = normalFromHeight(hc, 1.2); normalMap.flipY = false; normalMap.wrapS = normalMap.wrapT = THREE.ClampToEdgeWrapping;
+  }
+  const r = { map, normalMap };
+  GL_CACHE.set(key, r);
+  return r;
+}

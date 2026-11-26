@@ -1,7 +1,7 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
 import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=29';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=29';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=30';
 // rarità più frequente di ogni arma (colore della scheda e dell'anteprima)
 const WEAPON_RAR = Object.fromEntries(WEAPON_POOL.map(e => [e.id, e.rar.indexOf(Math.max(...e.rar))]));
 import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=29';

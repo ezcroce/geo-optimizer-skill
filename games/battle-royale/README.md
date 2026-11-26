@@ -24,6 +24,27 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: accessori su misura, deltaplani rifatti e lobby nel bosco (v30)
+
+- **Cappelli e zaini calzano davvero** (`js/realchar.js`): al caricamento di ogni personaggio si misurano la
+  testa (vertici guidati dall'osso della testa, capelli compresi: cima, centro, larghezza e profondità alla fronte)
+  e la sezione del busto all'altezza del petto (schiena, petto, mezza larghezza). Cappelli e zaini, disegnati per
+  lo scheletro procedurale, vengono scalati e appoggiati su queste misure: niente cappelli che fluttuano o
+  capelli che bucano la calotta, zaini a contatto con la schiena anche sopra armature e tute.
+- **Cappelli rifatti** (`js/character.js`): profili a rotazione e tese deformate al posto dei cilindri
+  (cowboy con piega e tesa rialzata, paglietta intrecciata con nastro e fiocco, cilindro in feltro con tesa
+  arrotolata, cappello da mago floscio con stelle, corona d'oro a punte con gemme, elmo vichingo a spicchi con
+  corna ricurve, cuffie con archetto, padiglioni in similpelle e microfono).
+- **Zaini rifatti**: chitarra acustica sagomata in legno, spada nel fodero di cuoio, jetpack con serbatoi, ali
+  d'angelo fatte di piume, ali di drago con dita e membrana venata; nuove trame in `js/chartex.js` (legno, piume,
+  membrana).
+- **Deltaplani nuovi**: vela bombata a doppia superficie con stecche, bordo d'uscita a festoni e tasca del bordo
+  d'attacco, chiglia, traversa, king post con i cavi, trapezio con manopole, imbrago e alette. Ogni vela ha una
+  texture disegnata (`gliderTexture` in `js/chartex.js`): fiamme, tigre, notte stellata, arcobaleno, raggi d'oro…
+- **Lobby nel bosco** (`js/main.js`): il personaggio sta su un piedistallo di pietra in un angolo della mappa,
+  con prato e sentiero, staccionata, boschetto, capanno con la legna, rocce, fiori e lucciole, colline e
+  montagne nella foschia, nuvole e il bus della battaglia che attraversa il cielo.
+
 ### Novità: animazioni, armi che non trapassano il corpo e 6 armi nuove (v29)
 
 - **Niente più armi dentro il personaggio** (`js/anim.js`): ogni arma ha un'impugnatura descritta in

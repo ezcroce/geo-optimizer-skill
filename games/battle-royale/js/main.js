@@ -16,18 +16,18 @@ import * as A from './audio.js?v=29';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
-  biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP,
+  biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
 } from './world.js?v=27';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=29';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=30';
 import { weaponIcon } from './weapons.js?v=29';
 import { consIcon, ammoIcon } from './items.js?v=29';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
 import { createInventory } from './inventory.js?v=29';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=26';
-import { loadRealChars, syncAllReal } from './realchar.js?v=28';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, treeMaterial, bushMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=26';
+import { loadRealChars, syncAllReal } from './realchar.js?v=30';
 import { createStoves } from './stove.js?v=26';
 import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=29';
 
@@ -3398,21 +3398,169 @@ function toMenu() {
 const lobby = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100), char: null, rot: 0.4, rotV: 0, drag: false, ring: null };
 lobby.scene.onBeforeRender = syncAllReal;
 {
+  // v30: la lobby è un angolo della mappa: prato con il sentiero, boschetto, capanno con la legna, rocce e fiori,
+  // colline e montagne nella foschia, nuvole e il bus della battaglia che passa in cielo
   const L = lobby.scene;
-  L.add(new THREE.Mesh(new THREE.SphereGeometry(50, 24, 16), gradientMaterial('#1d2f8a', '#0a0f2e')));
-  L.add(new THREE.HemisphereLight('#bcd4ff', '#20203a', 1.2));
-  const key = new THREE.DirectionalLight('#ffffff', 2.4); key.position.set(3, 5, 4); key.castShadow = true; L.add(key);
-  const rim = new THREE.DirectionalLight('#6fd3ff', 2.2); rim.position.set(-4, 3, -4); L.add(rim);
-  const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.35, 0.3, 32), new THREE.MeshStandardMaterial({ color: '#222a55', metalness: 0.5, roughness: 0.4 }));
-  ped.position.y = -0.15; ped.receiveShadow = true; L.add(ped);
-  lobby.ring = new THREE.Mesh(new THREE.TorusGeometry(1.28, 0.03, 8, 64), new THREE.MeshBasicMaterial({ color: '#ffcf2e' }));
-  lobby.ring.rotation.x = Math.PI / 2; lobby.ring.position.y = 0.01; L.add(lobby.ring);
-  // particelle decorative
+  lobby.cam.far = 260; lobby.cam.updateProjectionMatrix();
+  L.fog = new THREE.Fog('#d4e3ef', 34, 175);
+  L.add(new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), gradientMaterial('#3d86dc', '#ffe3bd')));
+  L.add(new THREE.HemisphereLight('#dcecff', '#56663a', 1.15));
+  const key = new THREE.DirectionalLight('#fff0d8', 2.7); key.position.set(4, 8, 5); key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 0.5, far: 30 }); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.02;
+  L.add(key);
+  const rim = new THREE.DirectionalLight('#a8d8ff', 1.5); rim.position.set(-4, 3, -4); L.add(rim);
+  // riflessi per metalli e vetri (come nella partita)
+  {
+    const env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), gradientMaterial('#3d86dc', '#ffe3bd')));
+    const gr = new THREE.Mesh(new THREE.CircleGeometry(100, 24), new THREE.MeshBasicMaterial({ color: '#56653a' })); gr.rotation.x = -Math.PI / 2; gr.position.y = -8; env.add(gr);
+    const pm = new THREE.PMREMGenerator(renderer);
+    L.environment = pm.fromScene(env, 0.02, 0.1, 400).texture; L.environmentIntensity = 0.35;
+    pm.dispose();
+  }
+  const G = -0.08;   // quota del prato intorno al piedistallo
+  const rnd = mulberry32(7331);
+  const pathX = (z) => 3.4 + 1.4 * Math.sin(z * 0.28) - Math.max(0, -z - 6) * 0.35;
+  const hAt = (x, z) => {
+    const back = Math.max(0, -z - 10) / 22, side = Math.max(0, Math.abs(x) - 9) / 16;
+    let h = G + 0.05 * Math.sin(x * 1.3 + z * 0.7) * Math.sin(z * 1.1 - x * 0.4) * Math.min(1, Math.hypot(x, z) / 3);
+    h += (7 * Math.pow(back, 1.4) + 3.5 * side * side) * (0.65 + 0.35 * Math.sin(x * 0.09 + 1.3) * Math.cos(z * 0.07));
+    h += (back + side) * 0.6 * Math.sin(x * 0.4) * Math.sin(z * 0.33);
+    return h;
+  };
+  // prato: colori per vertice (erba, sentiero in terra battuta, roccia sui pendii) e trama fine
+  {
+    const geo = new THREE.PlaneGeometry(150, 110, 150, 110); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, -38);
+    const q = geo.attributes.position, cols = new Float32Array(q.count * 3), c = new THREE.Color();
+    const gA = new THREE.Color('#5d8a3a'), gB = new THREE.Color('#7da447'), gC = new THREE.Color('#4a7a34'), dirt = new THREE.Color('#a08158'), rock = new THREE.Color('#8c8a80');
+    for (let i = 0; i < q.count; i++) {
+      const x = q.getX(i), z = q.getZ(i), h = hAt(x, z);
+      q.setY(i, h);
+      const n = 0.5 + 0.5 * Math.sin(x * 0.7 + Math.sin(z * 0.5) * 2) * Math.cos(z * 0.6 - x * 0.2);
+      c.copy(gA).lerp(gB, n).lerp(gC, Math.max(0, Math.sin(x * 0.23 + z * 0.31)) * 0.5);
+      const dp = Math.abs(x - pathX(z));
+      if (z > -26 && z < 12 && dp < 1.1) c.lerp(dirt, Math.min(1, (1.1 - dp) / 0.45) * 0.9);
+      const sl = Math.abs(hAt(x + 0.5, z) - h) + Math.abs(hAt(x, z + 0.5) - h);
+      if (sl > 0.55) c.lerp(rock, Math.min(1, (sl - 0.55) * 2));
+      cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    geo.computeVertexNormals();
+    const tc = document.createElement('canvas'); tc.width = tc.height = 128;
+    const tg = tc.getContext('2d'); tg.fillStyle = '#d8d8d8'; tg.fillRect(0, 0, 128, 128);
+    for (let k = 0; k < 2600; k++) { const v = 150 + Math.floor(rnd() * 105); tg.fillStyle = `rgb(${v},${v},${v})`; tg.fillRect(rnd() * 128, rnd() * 128, 1, 2 + rnd() * 3); }
+    const gt = new THREE.CanvasTexture(tc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(60, 44); gt.colorSpace = THREE.SRGBColorSpace; gt.anisotropy = 8;
+    const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: gt, roughness: 0.95, metalness: 0 }));
+    ground.receiveShadow = true; L.add(ground);
+  }
+  // ciuffi d'erba e fiori (instanziati, si muovono col vento)
+  {
+    const pos = [], col = [];
+    for (let b = 0; b < 5; b++) {
+      const a = b / 5 * Math.PI, h = 0.18 + (b % 2) * 0.08, dx = Math.cos(a) * 0.05, dz = Math.sin(a) * 0.05, lean = (b - 2) * 0.03;
+      pos.push(-dx, 0, -dz, dx, 0, dz, lean, h, lean * 0.5);
+      for (const k of [0.55, 0.55, 1.0]) col.push(0.32 * k, 0.55 * k, 0.2 * k);
+    }
+    const tuft = new THREE.BufferGeometry();
+    tuft.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); tuft.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); tuft.computeVertexNormals();
+    const tm = bushMaterial.clone(); tm.side = THREE.DoubleSide; tm.onBeforeCompile = bushMaterial.onBeforeCompile; tm.customProgramCacheKey = bushMaterial.customProgramCacheKey;
+    const N = 1400, im = new THREE.InstancedMesh(tuft, tm, N), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), cc = new THREE.Color();
+    let n = 0;
+    while (n < N) {
+      const a = rnd() * Math.PI * 2, r = 1.5 + Math.pow(rnd(), 0.7) * 16, x = Math.cos(a) * r, z = Math.sin(a) * r - 4;
+      if (Math.abs(x - pathX(z)) < 0.8 || Math.hypot(x, z) < 1.45) continue;
+      const flower = rnd() < 0.06;
+      m4.compose(new THREE.Vector3(x, hAt(x, z) - 0.01, z), qq.setFromAxisAngle(up, rnd() * 6.3), new THREE.Vector3(1, flower ? 1.3 : 0.7 + rnd() * 0.8, 1));
+      im.setMatrixAt(n, m4);
+      im.setColorAt(n, flower ? cc.set(['#ffffff', '#ffe04a', '#ff7ab0', '#b08aff'][Math.floor(rnd() * 4)]).multiplyScalar(2.2) : cc.setRGB(0.85 + rnd() * 0.4, 0.9 + rnd() * 0.3, 0.8 + rnd() * 0.3));
+      n++;
+    }
+    im.receiveShadow = true; L.add(im);
+  }
+  // alberi, rocce, cespugli, capanno con la legna, ceppi, funghi, barili
+  const inst = (geo, matl, list, cast = true) => {
+    const im = new THREE.InstancedMesh(geo, matl, list.length), m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    list.forEach((o, k) => { m4.compose(new THREE.Vector3(o.x, o.y ?? hAt(o.x, o.z) - 0.1, o.z), qq.setFromAxisAngle(up, o.r ?? rnd() * 6.3), new THREE.Vector3(o.s ?? 1, (o.s ?? 1) * (o.sy ?? 1), o.s ?? 1)); im.setMatrixAt(k, m4); });
+    im.castShadow = cast; im.receiveShadow = true; L.add(im); return im;
+  };
+  const free = (x, z) => !(Math.abs(x) < 6.2 && z > -13) && Math.abs(x - pathX(z)) > 1.8 && !(Math.abs(x + 7.5) < 3.5 && Math.abs(z + 11) < 3);
+  const trees = { pine: [], oak: [], birch: [] };
+  for (let k = 0, tries = 0; k < 46 && tries < 900; tries++) {
+    const x = (rnd() - 0.5) * 70, z = 4 - rnd() * 52;
+    if (!free(x, z) || (z > -6 && Math.abs(x) < 9)) continue;
+    const kind = Math.abs(x) > 12 || z < -22 ? (rnd() < 0.65 ? 'pine' : 'oak') : (rnd() < 0.5 ? 'birch' : 'oak');
+    trees[kind].push({ x, z, s: 0.75 + rnd() * 0.5, sy: 0.9 + rnd() * 0.25 }); k++;
+  }
+  for (const [kind, list] of Object.entries(trees)) if (list.length) inst(PROPS[kind], treeMaterial, list);
+  const rocks = [[-4.2, -3.5, 0.5], [5.8, -6, 0.8], [-9, -4, 1.1], [8.5, 1.5, 0.7], [-6.5, 0.8, 0.45], [2.6, -14, 1.3], [-12, -16, 1.6], [11, -12, 1.4]];
+  rocks.forEach(([x, z, s], k) => inst(PROPS.rocks[k % PROPS.rocks.length], rockMaterial, [{ x, z, s, y: hAt(x, z) - 0.15 * s }]));
+  const bushes = [[-5.2, -2.2], [5.1, -2.8], [-7.6, -7.4], [6.8, -9], [-3.6, -9.5], [9.2, -4.5], [-10, -1.5], [2.2, -11.5]];
+  bushes.forEach(([x, z], k) => inst(PROPS.bushes[k % PROPS.bushes.length], bushMaterial, [{ x, z, s: 0.9 + (k % 3) * 0.2 }]));
+  inst(PROPS.shed, propMaterial, [{ x: -7.6, z: -11.2, r: 0.55 }]);
+  inst(PROPS.logs, logMaterial, [{ x: -4.6, z: -10.4, r: 1.9, s: 0.8 }]);
+  inst(PROPS.stumps[0], propMaterial, [{ x: 4.6, z: -4.6 }, { x: -8.4, z: -5.8, s: 1.2 }]);
+  inst(PROPS.mushrooms[1], propMaterial, [{ x: 4.9, z: -4.1 }, { x: -6.0, z: -1.6 }]);
+  inst(PROPS.barrelWood, propMaterial, [{ x: -5.6, z: -12.4 }]);
+  inst(PROPS.fern, bushMaterial, [{ x: -4.9, z: -5.2 }, { x: 6.2, z: -3.2 }, { x: -2.8, z: -7.2 }]);
+  // staccionata lungo il sentiero
+  {
+    const wood = new THREE.MeshStandardMaterial({ color: '#8a6440', roughness: 0.9 });
+    const posts = [];
+    for (let k = 0; k < 9; k++) { const z = -1.5 - k * 1.4, x = pathX(z) + 1.25; posts.push([x, z]); }
+    const pg = new THREE.BoxGeometry(0.12, 0.9, 0.12), m4 = new THREE.Matrix4();
+    const pim = new THREE.InstancedMesh(pg, wood, posts.length);
+    posts.forEach(([x, z], k) => { m4.makeTranslation(x, hAt(x, z) + 0.4, z); pim.setMatrixAt(k, m4); });
+    pim.castShadow = true; L.add(pim);
+    for (let k = 0; k < posts.length - 1; k++) for (const hh of [0.3, 0.65]) {
+      const [x0, z0] = posts[k], [x1, z1] = posts[k + 1], len = Math.hypot(x1 - x0, z1 - z0);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, len + 0.1), wood);
+      rail.position.set((x0 + x1) / 2, (hAt(x0, z0) + hAt(x1, z1)) / 2 + hh, (z0 + z1) / 2); rail.rotation.y = Math.atan2(x1 - x0, z1 - z0); rail.castShadow = true; L.add(rail);
+    }
+  }
+  // montagne lontane (si sciolgono nella foschia)
+  {
+    const mm = new THREE.MeshLambertMaterial({ color: '#7e93a8', flatShading: true }), sm = new THREE.MeshLambertMaterial({ color: '#f2f6fa', flatShading: true });
+    for (let k = 0; k < 11; k++) {
+      const a = -Math.PI / 2 + (k / 10 - 0.5) * 2.4, R = 110 + rnd() * 30, h = 26 + rnd() * 26, r = 22 + rnd() * 16;
+      const mo = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), mm); mo.position.set(Math.cos(a) * R, h / 2 - 2, Math.sin(a) * R); mo.rotation.y = rnd() * 6; L.add(mo);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.28, h * 0.28, 7), sm); cap.position.set(mo.position.x, h - 2 - h * 0.14 + 0.05, mo.position.z); cap.rotation.y = mo.rotation.y; L.add(cap);
+    }
+  }
+  // nuvole morbide
+  {
+    const cc = document.createElement('canvas'); cc.width = 256; cc.height = 128;
+    const cg = cc.getContext('2d');
+    for (let k = 0; k < 14; k++) {
+      const x = 40 + rnd() * 176, y = 50 + rnd() * 40, r = 22 + rnd() * 30;
+      const gr = cg.createRadialGradient(x, y, 2, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      cg.fillStyle = gr; cg.beginPath(); cg.arc(x, y, r, 0, 7); cg.fill();
+    }
+    const ct = new THREE.CanvasTexture(cc); ct.colorSpace = THREE.SRGBColorSpace;
+    lobby.clouds = [];
+    for (let k = 0; k < 9; k++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ct, transparent: true, depthWrite: false, fog: false, opacity: 0.85, color: '#fff6ec' }));
+      sp.position.set((rnd() - 0.5) * 220, 24 + rnd() * 26, -90 - rnd() * 60); sp.scale.set(40 + rnd() * 30, 16 + rnd() * 10, 1);
+      L.add(sp); lobby.clouds.push(sp);
+    }
+  }
+  // il bus della battaglia che attraversa il cielo
+  lobby.bus = buildBus(); lobby.bus.scale.setScalar(0.9); lobby.bus.traverse(o => { if (o.isMesh) o.castShadow = false; });
+  L.add(lobby.bus);
+  // piedistallo in pietra con l'anello del colore della rarità
+  const stoneC = document.createElement('canvas'); stoneC.width = stoneC.height = 128;
+  { const sg = stoneC.getContext('2d'); sg.fillStyle = '#b8b8b8'; sg.fillRect(0, 0, 128, 128); for (let k = 0; k < 1800; k++) { const v = 120 + Math.floor(rnd() * 110); sg.fillStyle = `rgba(${v},${v},${v},0.5)`; sg.beginPath(); sg.arc(rnd() * 128, rnd() * 128, 0.5 + rnd() * 2.2, 0, 7); sg.fill(); } }
+  const st = new THREE.CanvasTexture(stoneC); st.wrapS = st.wrapT = THREE.RepeatWrapping; st.repeat.set(4, 1); st.colorSpace = THREE.SRGBColorSpace;
+  const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.3, 0.26, 40), new THREE.MeshStandardMaterial({ color: '#9a9488', map: st, roughness: 0.85, metalness: 0.02 }));
+  ped.position.y = -0.13; ped.receiveShadow = true; ped.castShadow = true; L.add(ped);
+  lobby.ring = new THREE.Mesh(new THREE.TorusGeometry(1.215, 0.028, 8, 64), new THREE.MeshBasicMaterial({ color: '#ffcf2e' }));
+  lobby.ring.rotation.x = Math.PI / 2; lobby.ring.position.y = -0.005; L.add(lobby.ring);
+  lobby.groundY = G;
+  // polline e lucciole che fluttuano nell'aria
   const pg = new THREE.BufferGeometry();
-  const arr = new Float32Array(300 * 3);
-  for (let i = 0; i < 300; i++) { arr[i * 3] = rand(-8, 8); arr[i * 3 + 1] = rand(-1, 6); arr[i * 3 + 2] = rand(-8, 2); }
+  const arr = new Float32Array(220 * 3);
+  for (let i = 0; i < 220; i++) { arr[i * 3] = (rnd() - 0.5) * 18; arr[i * 3 + 1] = 0.2 + rnd() * 4.5; arr[i * 3 + 2] = 2 - rnd() * 14; }
   pg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-  lobby.stars = new THREE.Points(pg, new THREE.PointsMaterial({ color: '#9fc8ff', size: 0.04 }));
+  lobby.stars = new THREE.Points(pg, new THREE.PointsMaterial({ color: '#fff4c0', size: 0.045, transparent: true, opacity: 0.85, depthWrite: false }));
   L.add(lobby.stars);
   lobby.cam.position.set(0, 1.25, 7.4);
   lobby.cam.lookAt(0, 0.95, 0);
@@ -3478,7 +3626,7 @@ function refreshLobbyMates() {
   const FAR = [[2.3, -3.6], [-2.3, -3.6], [1.1, -4.6], [-1.1, -4.6], [3.0, -5.6], [-3.0, -5.6]];   // dentro lo spazio libero tra i pannelli
   const add = (o, spot, tag, color, bg) => {
     const c = buildCharacter(SKINS.find(s => s.id === o.skin) || SKINS[0], { hat: o.hat, back: o.back });
-    c.root.position.set(spot[0], 0, spot[1]);
+    c.root.position.set(spot[0], lobby.groundY ?? 0, spot[1]);
     c.root.rotation.y = -Math.sign(spot[0]) * 0.35;
     c.root.traverse(q => { if (q.isMesh) q.castShadow = true; });
     c.root.add(nameSprite(tag, color, bg));
@@ -3542,6 +3690,15 @@ function renderLobby(dt) {
     setLeg(m, 0, -0.04, 0.08, 0.04); setLeg(m, 1, 0.06, 0.12, -0.06);
   }
   lobby.stars.rotation.y = t * 0.02;
+  lobby.stars.position.y = Math.sin(t * 0.4) * 0.15;
+  WIND.value = t % 1800;
+  // v30: il bus attraversa il cielo dietro il personaggio, le nuvole scorrono piano
+  if (lobby.bus) {
+    const k = ((t * 0.018) % 1), x = -150 + k * 300;
+    lobby.bus.position.set(x, 30 + Math.sin(t * 0.5) * 0.8, -95);
+    lobby.bus.rotation.set(0, Math.PI / 2, Math.sin(t * 0.7) * 0.03);
+  }
+  if (lobby.clouds) for (const cl of lobby.clouds) { cl.position.x += dt * 0.8; if (cl.position.x > 130) cl.position.x = -130; }
   // personaggio centrato nello spazio libero tra i pannelli (metri per pixel alla distanza della camera)
   const tab = menuApi ? menuApi.tab() : 'play';
   // con la squadra la camera si allontana un po' per inquadrare tutti

@@ -187,8 +187,72 @@ function prepare(kind, gltf) {
   // cima della testa (per appoggiare i cappelli): dal corpo nudo, senza capelli
   let headTop = HEAD_Y + 0.2;
   scene.traverse(o => { if (o.isSkinnedMesh && o.name === 'body') { const bb = new THREE.Box3().setFromObject(o, true); headTop = bb.max.y; } });
+  const headFit = measureHead(scene, bones, rg), torsoFit = measureTorso(scene, bones, rg);
   scene.removeFromParent();
-  return { kind, own, scene, s, oy: rg.position.y, list, idx, parent, restWQ, baseQ, baseInv, baseM, hipsRest, unit, headPos, spinePos, mats, matCache: new Map(), fingerAxis, headTop };
+  return { kind, own, scene, s, oy: rg.position.y, list, idx, parent, restWQ, baseQ, baseInv, baseM, hipsRest, unit, headPos, spinePos, mats, matCache: new Map(), fingerAxis, headTop, headFit, torsoFit };
+}
+
+/** v30: forma vera della testa (capelli compresi) nello spazio del corpo, per far calzare i cappelli:
+ *  vertici guidati soprattutto dall'osso della testa (o dai suoi figli), sopra l'attaccatura del collo */
+function measureHead(scene, bones, rg) {
+  if (!bones.Head) return null;
+  rg.updateMatrixWorld(true);
+  const headSet = new Set(); bones.Head.traverse(b => { if (b.isBone) headSet.add(b); });
+  const jy = bones.Head.getWorldPosition(new THREE.Vector3()).y;
+  const P = [], v = new THREE.Vector3();
+  scene.traverse(o => {
+    if (!o.isSkinnedMesh || !o.visible) return;
+    const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, bs = o.skeleton.bones;
+    if (!si || !sw) return;
+    const n = o.geometry.attributes.position.count, step = Math.max(1, Math.floor(n / 20000));
+    for (let i = 0; i < n; i += step) {
+      let best = -1, bw = 0;
+      for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+      if (best < 0 || !headSet.has(bs[best])) continue;
+      o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
+      if (v.y > jy - 0.02) P.push(v.x, v.y, v.z);
+    }
+  });
+  if (P.length < 60) return null;
+  const pick = (arr, q) => { arr.sort((a, b) => a - b); return arr[Math.min(arr.length - 1, Math.floor(arr.length * q))]; };
+  const ys = [];
+  for (let i = 1; i < P.length; i += 3) ys.push(P[i]);
+  const top = pick(ys.slice(), 0.9995);
+  // larghezza e profondità nella fascia della fronte (dove poggia il cappello), senza le orecchie
+  const band = (y) => y > top - 0.13 && y < top - 0.035;
+  const xs = [], zs = [];
+  for (let i = 0; i < P.length; i += 3) if (band(P[i + 1])) { xs.push(P[i]); zs.push(P[i + 2]); }
+  if (xs.length < 20) return null;
+  const x0 = pick(xs.slice(), 0.004), x1 = pick(xs.slice(), 0.996), z0 = pick(zs.slice(), 0.004), z1 = pick(zs.slice(), 0.996);
+  let rx = (x1 - x0) / 2; const rz = (z1 - z0) / 2;
+  if (rx > rz * 1.25) rx = rz * 0.9;   // capelli voluminosi ai lati: conta la forma del cranio
+  return { top, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, rx, rz };
+}
+
+/** v30: sezione vera del busto all'altezza del petto (schiena, petto, mezza larghezza), per appoggiare gli zaini */
+function measureTorso(scene, bones, rg) {
+  const spine = new Set(['Spine', 'Spine1', 'Spine2'].map(n => bones[n]).filter(Boolean));
+  if (!spine.size) return null;
+  rg.updateMatrixWorld(true);
+  const Y = 1.26, xs = [], back = [], front = [], v = new THREE.Vector3();
+  scene.traverse(o => {
+    if (!o.isSkinnedMesh || !o.visible) return;
+    const si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, bs = o.skeleton.bones;
+    if (!si || !sw) return;
+    const n = o.geometry.attributes.position.count, step = Math.max(1, Math.floor(n / 25000));
+    for (let i = 0; i < n; i += step) {
+      let best = -1, bw = 0;
+      for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+      if (best < 0 || !spine.has(bs[best])) continue;
+      o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld);
+      if (Math.abs(v.y - Y) > 0.07) continue;
+      xs.push(Math.abs(v.x));
+      if (Math.abs(v.x) < 0.08) (v.z < 0 ? back : front).push(v.z);
+    }
+  });
+  if (xs.length < 40 || back.length < 8 || front.length < 8) return null;
+  const pick = (arr, q) => { arr.sort((a, b) => a - b); return arr[Math.min(arr.length - 1, Math.floor(arr.length * q))]; };
+  return { y: Y, halfW: pick(xs, 0.97), back: Math.max(-0.32, pick(back, 0.03)), front: Math.min(0.32, pick(front, 0.97)) };
 }
 
 // ── ricolori: la texture originale resta (pieghe, sporco, cuciture) ma le zone cambiano colore con la skin ──
@@ -334,13 +398,32 @@ export function attachReal(m, skin, keep = {}) {
     return a;
   };
   if (keep.hat && keep.hat.length && bones.Head) {
-    const hy = base.own ? base.headTop - 0.4 : HEAD_Y + (base.kind === 'woman' ? -0.12 : 0.04);
-    const a = anchor(bones.Head, new THREE.Vector3(0, hy, base.own ? -0.01 : base.kind === 'woman' ? 0.0 : 0.01));
+    // v30: il cappello calza sulla testa vera: scalato sulla sua larghezza (capelli compresi) e appoggiato sulla cima
+    // (i cappelli sono disegnati per la testa procedurale: ellissoide 0.2 × 0.225 × 0.205 con la cima a 0.45)
+    const f = base.own && base.headFit;
+    let a;
+    if (f) {
+      // un filo più largo e più alto della testa: la calotta copre anche i capelli
+      const k = THREE.MathUtils.clamp((f.rx / 0.2 + f.rz / 0.205) / 2 * 1.12, 0.36, 0.95), ky = k * 1.15;
+      a = anchor(bones.Head, new THREE.Vector3(f.cx, f.top - 0.452 * ky + 0.008, f.cz - 0.004));
+      a.scale.multiply(_v.set(k, ky, k));
+    } else {
+      const hy = base.own ? base.headTop - 0.4 : HEAD_Y + (base.kind === 'woman' ? -0.12 : 0.04);
+      a = anchor(bones.Head, new THREE.Vector3(0, hy, base.own ? -0.01 : base.kind === 'woman' ? 0.0 : 0.01));
+    }
     for (const o of keep.hat) a.add(o);
   }
   const back = [...(keep.back || []), ...(keep.cape ? [keep.cape] : [])];
   if (back.length && bones.Spine) {
-    const a = anchor(bones.Spine, new THREE.Vector3(0, 0.9, base.kind === 'soldier' ? -0.035 : -0.01));
+    // v30: zaini appoggiati sulla schiena vera: il busto procedurale (a 0.36 sopra il bacino: schiena -0.146,
+    // petto +0.146, mezza larghezza 0.228) viene portato sulla sezione misurata del modello
+    const f = base.own && base.torsoFit;
+    let a;
+    if (f) {
+      const sx = THREE.MathUtils.clamp(f.halfW / 0.228, 0.68, 1.15), sz = THREE.MathUtils.clamp((f.front - f.back) / 0.292, 0.6, 1.35);
+      a = anchor(bones.Spine, new THREE.Vector3(0, f.y - 0.36 * sx, (f.front + f.back) / 2));
+      a.scale.multiply(_v.set(sx, sx, sz));
+    } else a = anchor(bones.Spine, new THREE.Vector3(0, 0.9, base.kind === 'soldier' ? -0.035 : -0.01));
     for (const o of back) a.add(o);
   }
   m.body.add(rg);

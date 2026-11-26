@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v29';
+export const NEWS_VERSION = 'v30';
 
 export const NEWS = [
+  {
+    v: 'v30', title: 'Accessori su misura, deltaplani nuovi e una lobby nel bosco', color: '#7ad04a', icon: '🪂',
+    items: [
+      'Cappelli e zaini calzano davvero: si misurano testa e schiena di ogni personaggio, così niente più cappelli che fluttuano o capelli che bucano la calotta, e gli zaini aderiscono alla schiena (anche sopra armature e tute)',
+      'Cappelli rifatti: cowboy con la piega e la tesa in cuoio rialzata, paglietta intrecciata con nastro e fiocco, cilindro in feltro, cappello da mago floscio con stelle, corona d’oro con gemme, elmo vichingo rivettato con corna ricurve, cuffie con archetto, padiglioni e microfono',
+      'Zaini rifatti: chitarra acustica in legno vero (rosetta, tasti, meccaniche), spada nel fodero di cuoio, jetpack con serbatoi e spie, ali d’angelo di piume vere, ali di drago con dita e membrana venata, scudo e tavola in legno',
+      'Deltaplani nuovi: vela bombata a doppia superficie con stecche e bordo a festoni, chiglia, king post con i cavi, trapezio con le manopole, imbrago e alette; ogni vela ha il suo disegno (fiamme, tigre, notte stellata, arcobaleno, raggi d’oro…)',
+      'La lobby ora è un angolo della mappa: prato col sentiero e la staccionata, boschetto, capanno con la legna, rocce, fiori e lucciole, colline e montagne nella foschia, nuvole e il bus della battaglia che passa in cielo',
+    ],
+  },
   {
     v: 'v29', title: 'Animazioni nuove e 6 armi in più', color: '#4ad0ff', icon: '🏃',
     items: [

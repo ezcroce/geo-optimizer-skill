@@ -4,7 +4,7 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=25';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=27';
 import { carInstances } from './cars.js?v=25';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
 import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=26';
@@ -964,7 +964,11 @@ function roadDist(x, z) {
 }
 
 function inTown(x, z, pad = 0) {
-  for (const t of TOWNS) if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return t;
+  for (const t of TOWNS) {
+    if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return t;
+    // v27: le città murate occupano tutto il quadrato delle mura
+    if (t.wallS && Math.abs(x - t.x) < t.wallS + pad && Math.abs(z - t.z) < t.wallS + pad) return t;
+  }
   return null;
 }
 
@@ -980,10 +984,14 @@ const _gc = {
   autA: new THREE.Color('#b48a3a'), autB: new THREE.Color('#9a6a2c'), leaves: new THREE.Color('#c25a26'), autGreen: new THREE.Color('#7f8c3a'),
   tropA: new THREE.Color('#3fb04a'), tropB: new THREE.Color('#5cc44e'), whiteSand: new THREE.Color('#f3e7c4'),
   asphalt: new THREE.Color('#505256'), road: new THREE.Color('#66676a'), walk: new THREE.Color('#b3aea4'), cobble: new THREE.Color('#8a8276'),
-  townSnow: new THREE.Color('#e4e9ef'), townSand: new THREE.Color('#d8b98a'), townStone: new THREE.Color('#b9b1a0'), townDirt: new THREE.Color('#a8865a'),
+  townSnow: new THREE.Color('#e4e9ef'), townSand: new THREE.Color('#d8b98a'), townStone: new THREE.Color('#b9b1a0'), townDirt: new THREE.Color('#a8865a'), townBeach: new THREE.Color('#e2cc9a'),
+  // v27: strade delle città a tema
+  dirtRoad: new THREE.Color('#9b7b53'), snowRoad: new THREE.Color('#d2d9e2'), sandRoad: new THREE.Color('#d9c18c'), plank: new THREE.Color('#8a6a44'), snowCobble: new THREE.Color('#c9d0d8'),
 };
+const TOWN_GROUND_K = { alpine: 0.8, western: 0.7, coastal: 0.72, farm: 0.6 };
+const SURF_GC = { asphalt: 'asphalt', cobble: 'cobble', dirt: 'dirtRoad', snow: 'snowRoad', sand: 'sandRoad' };
 const _bc = new THREE.Color();
-const TOWN_GROUND = { alpine: 'townSnow', western: 'townSand', coastal: 'townStone', castle: 'townStone', farm: 'townDirt', industrial: 'townStone', port: 'townStone' };
+const TOWN_GROUND = { alpine: 'townSnow', western: 'townSand', coastal: 'townBeach', castle: 'townStone', farm: 'townDirt', industrial: 'townStone', port: 'townStone' };
 // rumore liscio economico (somma di seni sfasati, deterministico)
 function patch(x, z, f, o) {
   return 0.5 + 0.25 * Math.sin(x * f + Math.sin(z * f * 0.7 + o) * 1.7) + 0.25 * Math.sin(z * f * 1.13 - Math.cos(x * f * 0.6 - o) * 1.9);
@@ -1014,10 +1022,11 @@ function groundColor(x, z, h, out, slope = null) {
     out.lerp(_bc, smoothstep(0.05, 0.6, wS));
   }
   const tw = inTown(x, z, 4);
-  if (tw) out.lerp(TOWN_GROUND[tw.theme] ? _gc[TOWN_GROUND[tw.theme]] : _gc.town, 0.45);
+  // v27: il suolo racconta il tema (neve fitta, sabbia, aia di terra battuta) e sfuma verso il bordo
+  if (tw) out.lerp(TOWN_GROUND[tw.theme] ? _gc[TOWN_GROUND[tw.theme]] : _gc.town, (TOWN_GROUND_K[tw.theme] || 0.45) * (1 - smoothstep(tw.r - 4, tw.r + 4, Math.hypot(x - tw.x, z - tw.z)) * 0.5));
   // v24: dentro le città il reticolo di strade (si vede anche da lontano sul terreno semplificato)
   const st = tw ? streetAt(tw, x, z) : 0;
-  if (st) out.copy(st === 2 ? _gc.asphalt : st === 3 ? _gc.cobble : _gc.walk);
+  if (st) { const pl = tw.plan; out.copy(st === 2 ? _gc[SURF_GC[pl.surf] || 'asphalt'] : st === 3 ? (tw.theme === 'alpine' ? _gc.snowCobble : _gc.cobble) : (pl.walk === 'plank' ? _gc.plank : _gc.walk)); }
   else if (!tw || Math.hypot(x - tw.x, z - tw.z) > tw.r - 3) {
     // strade tra le città: asfalto (sterrato nel deserto) con bordo erboso più scuro
     const rd = roadDist(x, z);
@@ -1902,15 +1911,36 @@ export function buildWorld(scene, opts = {}) {
     if (th === 'alpine') {
       for (let i = 0; i < 3; i++) { const s = townSpot(t, 0.8); if (s) special('snowman', s[0], s[1], t.h, [0.55, 1.7, true]); }
       for (let i = 0; i < 5; i++) { const s = townSpot(t, 1.2, t.r * 0.6, t.r + 4); if (s) extraTrees.push({ x: s[0], z: s[1], k: 'snowPine' }); }
+      // v27: cumuli di neve, slitte e un falò per scaldarsi
+      for (let i = 0; i < 6; i++) { const s = townSpot(t, 1.0); if (s) special('snowPile', s[0], s[1], t.h, null); }
+      for (let i = 0; i < 2; i++) { const s = townSpot(t, 1.0); if (s) special('sled', s[0], s[1], t.h, null); }
+      { const s = townSpot(t, 1.6); if (s) special('campfire', s[0], s[1], t.h, [0.8, 0.4, false]); }
     } else if (th === 'western') {
       { const s = townSpot(t, 2.4); if (s) { special('waterTower', s[0], s[1], t.h, [1.9, 8.2, false]); lootSpots.push(new THREE.Vector3(s[0] + 2.6, t.h + 0.2, s[1])); } }
       for (let i = 0; i < 6; i++) { const s = townSpot(t, 1, t.r * 0.5, t.r + 6); if (s) extraTrees.push({ x: s[0], z: s[1], k: 'cactus' }); }
       for (let i = 0; i < 3; i++) { const s = townSpot(t, 0.9); if (s) addBox(1.6, 1.0, 1.0, s[0], t.h + 0.5, s[1], hayMat, { lodColor: '#e2c25a' }); }
+      // v27: falò dell'accampamento con tronchi per sedersi, carrelli da miniera abbandonati
+      for (let i = 0; i < 2; i++) { const s = townSpot(t, 1.8); if (s) special('campfire', s[0], s[1], t.h, [0.8, 0.4, false]); }
+      { const s = townSpot(t, 1.4); if (s) special('orePile', s[0], s[1], t.h, [1.1, 0.9, false]); }
     } else if (th === 'coastal') {
       for (let i = 0; i < 7; i++) { const s = townSpot(t, 1.2, 4, t.r + 6); if (s) extraTrees.push({ x: s[0], z: s[1], k: 'palm' }); }
       for (let i = 0; i < 4; i++) { const s = townSpot(t, 1.3); if (s) special('umbrella', s[0], s[1], t.h, [0.12, 2.4, true], { c: i }); }
+      // v27: cabine a righe, torretta del bagnino (con bottino in cima), surf e barche in secca
+      for (let i = 0; i < 4; i++) { const s = townSpot(t, 1.5); if (s) special('beachHut', s[0], s[1], t.h, [1.1, 3.2, false], { c: i }); }
+      { const s = townSpot(t, 1.6, t.r * 0.4, t.r + 4); if (s) { special('lifeguard', s[0], s[1], t.h, null, { rot: 0 }); addCollider({ type: 'box', minX: s[0] - 1, maxX: s[0] + 1, minY: t.h + 2.1, maxY: t.h + 2.25, minZ: s[1] - 1, maxZ: s[1] + 1 }); lootSpots.push(new THREE.Vector3(s[0], t.h + 2.27, s[1])); } }
+      for (let i = 0; i < 2; i++) { const s = townSpot(t, 1.2); if (s) special('surfRack', s[0], s[1], t.h, [0.9, 1.3, true]); }
+      for (let i = 0; i < 3; i++) { const s = townSpot(t, 2.3, t.r * 0.55, t.r + 6); if (s) special('boat', s[0], s[1], t.h, [1.2, 1.0, false], { c: i }); }
+      { const s = townSpot(t, 1.6); if (s) special('campfire', s[0], s[1], t.h, [0.8, 0.4, false]); }
+    } else if (th === 'castle') {
+      for (let i = 0; i < 4; i++) { const s = townSpot(t, 0.6); if (s) special('barrel', s[0], s[1], t.h, [0.38, 0.9, false]); }
+      for (let i = 0; i < 2; i++) { const s = townSpot(t, 1.0); if (s) special('woodpile', s[0], s[1], t.h, [0.9, 1.0, false]); }
+      { const s = townSpot(t, 1.6); if (s) special('campfire', s[0], s[1], t.h, [0.8, 0.4, false]); }
     } else if (th === 'farm') {
       { const s = townSpot(t, 2.3); if (s) { special('silo', s[0], s[1], t.h, [2.1, 10.5, false]); lootSpots.push(new THREE.Vector3(s[0] + 2.8, t.h + 0.2, s[1])); } }
+      // v27: trattori, rotoballe e spaventapasseri
+      for (let i = 0; i < 2; i++) { const s = townSpot(t, 2.0); if (s) special('tractor', s[0], s[1], t.h, [1.3, 2.8, false], { c: i }); }
+      for (let i = 0; i < 6; i++) { const s = townSpot(t, 0.9); if (s) special('roundBale', s[0], s[1], t.h, [0.8, 1.5, false]); }
+      for (let i = 0; i < 3; i++) { const s = townSpot(t, 0.9); if (s) special('scarecrow', s[0], s[1], t.h, [0.12, 2.4, true]); }
       for (let i = 0; i < 6; i++) { const s = townSpot(t, 0.9); if (s) { addBox(1.5, 1.2, 1.2, s[0], t.h + 0.6, s[1], hayMat, { lodColor: '#e2c25a' }); if (srand() < 0.4) addBox(1.5, 1.2, 1.2, s[0] + 0.1, t.h + 1.8, s[1], hayMat); } }
       // staccionate (decorative: ci si passa attraverso)
       for (let i = 0; i < 4; i++) {
@@ -1937,13 +1967,13 @@ export function buildWorld(scene, opts = {}) {
   }
   const cityStats = buildCity({
     TOWNS, addBox, addGeo, addCollider, special, houses, lootSpots, chestSpots, extraTrees, makeDoor, furnish, placeHouse, cgeo, chunkAt, addCrate,
-    rnd: () => srand(), gableRoofGeo, gableEndGeo, ridgeGeo, roofMatFor,
-    M: { floorMat, trimMat, stoneMat, capMat, brickMat, crateMat, counterTopMat, blackMat, darkWoodMat, steelMat, potMat, leafMat, cabinetMats, sofaMats, blanketMats, furnWoodMats, screenMat, bookMats, snowMat },
+    rnd: () => srand(), gableRoofGeo, gableEndGeo, ridgeGeo, roofMatFor, terrainHeight, roadDist,
+    M: { floorMat, trimMat, stoneMat, capMat, brickMat, crateMat, counterTopMat, blackMat, darkWoodMat, steelMat, potMat, leafMat, cabinetMats, sofaMats, blanketMats, furnWoodMats, screenMat, bookMats, snowMat, hayMat },
   });
   const freeOfCity = (t, x, z, w, d) => !overlapsHouse(x, z, w, d) && !onStreet(t, x, z, Math.max(w, d) / 2 + 0.5);
   for (const t of TOWNS) {
     townExtras(t);
-    if (t.towers) {
+    if (t.towers && !t.wallS) {
       for (let i = 0; i < 4; i++) {
         let a = i * Math.PI / 2 + 0.4, rr = t.r - 6, ok = false;
         for (let k = 0; k < 30 && !ok; k++) {
@@ -3132,14 +3162,12 @@ export function buildWorld(scene, opts = {}) {
   // v24: reticolo stradale delle città e piazze
   for (const t of TOWNS) {
     const pl = t.plan; if (!pl) continue;
-    const cw = (STREET.RW + STREET.SW) * 2 * k;
-    g.fillStyle = 'rgb(118,116,112)';
-    for (const o of pl.offs) {
-      const L = Math.sqrt(Math.max(0, pl.R * pl.R - o * o));
-      g.fillRect((t.x + o + HALF) * k - cw / 2, (t.z - L + HALF) * k, cw, 2 * L * k);
-      g.fillRect((t.x - L + HALF) * k, (t.z + o + HALF) * k - cw / 2, 2 * L * k, cw);
-    }
-    if (pl.offs.length >= 2) { const hp = (pl.P / 2) * k; g.fillStyle = 'rgb(160,150,135)'; g.fillRect((t.x + HALF) * k - hp + cw / 2, (t.z + HALF) * k - hp + cw / 2, 2 * hp - cw, 2 * hp - cw); }
+    const cw = (pl.ch || (STREET.RW + STREET.SW)) * 2 * k;
+    g.fillStyle = { dirt: 'rgb(150,120,82)', snow: 'rgb(214,220,228)', sand: 'rgb(214,192,140)', cobble: 'rgb(130,124,114)' }[pl.surf] || 'rgb(118,116,112)';
+    for (const o of pl.ox) { const L = Math.sqrt(Math.max(0, pl.R * pl.R - o * o)); g.fillRect((t.x + o + HALF) * k - cw / 2, (t.z - L + HALF) * k, cw, 2 * L * k); }
+    for (const o of pl.oz) { const L = Math.sqrt(Math.max(0, pl.R * pl.R - o * o)); g.fillRect((t.x - L + HALF) * k, (t.z + o + HALF) * k - cw / 2, 2 * L * k, cw); }
+    if (pl.hp) { const hp = pl.hp * k; g.fillStyle = 'rgb(160,150,135)'; g.fillRect((t.x + HALF) * k - hp, (t.z + HALF) * k - hp, 2 * hp, 2 * hp); }
+    if (t.wallS) { g.strokeStyle = 'rgb(120,112,100)'; g.lineWidth = Math.max(1.5, 2.4 * k); const ws = (t.wallS - 1.2) * k; g.strokeRect((t.x + HALF) * k - ws, (t.z + HALF) * k - ws, 2 * ws, 2 * ws); }
   }
   g.fillStyle = 'rgba(30,80,30,0.5)';
   for (const t of trees) g.fillRect((t.x + HALF) * k - 0.75, (t.z + HALF) * k - 0.75, 1.5, 1.5);

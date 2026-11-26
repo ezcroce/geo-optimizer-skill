@@ -1,9 +1,18 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v26';
+export const NEWS_VERSION = 'v27';
 
 export const NEWS = [
+  {
+    v: 'v27', title: 'Ogni città ha il suo tema', color: '#e8b05a', icon: '🏘️',
+    items: [
+      'Città tutte diverse: villaggio alpino innevato con chalet e campanile, paese del deserto fatto di camion abitabili con piccole miniere, borgo di mare su palafitte, fattoria con fienili e campi, castello cinto da mura',
+      'Strade a tema: sterrato e passerelle di legno nel far west, neve battuta in montagna, sabbia al mare, ciottoli nel castello',
+      'Danni da caduta: oltre i 4 metri circa ti fai male (in acqua e col deltaplano no)',
+      'Munizioni con texture: cassette militari con fascia colorata e scritte, scatola di cartucce, cassa di razzi',
+    ],
+  },
   {
     v: 'v26', title: 'Ogni skin è una persona diversa', color: '#ffb35a', icon: '🧑',
     items: [

@@ -12,45 +12,69 @@ import {
   concreteTexture, corrugatedTexture, railTexture, awningTexture, AWNING_COLORS, signAtlas, signGeometry, SHOPS,
   productsTexture, booksTexture,
 } from './citytex.js?v=24';
+import { TOWN_SPECIALS, townBuilders } from './townkit.js?v=27';
 
 // ── reticolo stradale ──
 export const STREET = { RW: 3.3, SW: 2.0 };          // mezza carreggiata, marciapiede
 const CH = STREET.RW + STREET.SW;                    // mezzo corridoio (strada + marciapiede)
 
-/** reticolo della città: linee (offset dal centro) parallele a x e a z, piazza nel blocco centrale */
+/** v27: ogni tema ha la sua pianta e il suo tipo di strada (asfalto, sampietrini, sterrato, neve, sabbia) */
+const STREET_STYLE = {
+  classic: { surf: 'asphalt', walk: 'sidewalk', rw: 3.3, sw: 2.0 },
+  industrial: { surf: 'asphalt', walk: 'sidewalk', rw: 3.3, sw: 2.0 },
+  port: { surf: 'asphalt', walk: 'sidewalk', rw: 3.3, sw: 2.0 },
+  castle: { surf: 'cobble', walk: 'sidewalk', rw: 3.0, sw: 1.6 },
+  alpine: { surf: 'snow', walk: null, rw: 2.6, sw: 0 },
+  western: { surf: 'dirt', walk: 'plank', rw: 4.2, sw: 1.8 },
+  coastal: { surf: 'sand', walk: 'plank', rw: 2.8, sw: 1.6 },
+  farm: { surf: 'dirt', walk: null, rw: 2.5, sw: 0 },
+};
+/**
+ * Pianta della città: linee parallele a z (ox = offset in x) e parallele a x (oz), piazza quadrata di mezzo lato hp.
+ *  grid  → reticolo con la piazza nel blocco centrale (paese, zona industriale, porto, castello dentro le mura)
+ *  main  → una sola via principale larga (western)
+ *  lanes → due vicoli paralleli con la piazzetta in mezzo (alpino)
+ *  cross → due stradine che si incrociano nella piazzetta (borgo marinaro)
+ *  track → una carrareccia fra i campi (fattoria)
+ */
 export function planTown(t) {
-  const ind = t.theme === 'industrial' || t.theme === 'port';
-  const P = ind && t.r >= 66 ? 44 : 36;
-  const offs = [];
-  for (let k = -4; k <= 3; k++) { const o = (k + 0.5) * P; if (Math.abs(o) < t.r - 13) offs.push(o); }
-  t.plan = { P, R: t.r - 3, offs };
+  const th = t.theme || 'classic', st = STREET_STYLE[th] || STREET_STYLE.classic;
+  const pl = { R: t.r - 3, ...st, ch: st.rw + st.sw, ox: [], oz: [], hp: 0, P: 36, layout: 'grid', wallS: 0, box: 0 };
+  t.wallS = 0;
+  if (th === 'western') { pl.layout = 'main'; pl.oz = [0]; }
+  else if (th === 'alpine') { pl.layout = 'lanes'; if (16 < t.r - 13) { pl.ox = [-16, 16]; pl.hp = 16 - pl.ch - 0.8; } }
+  else if (th === 'coastal') { pl.layout = 'cross'; pl.ox = [0]; pl.oz = [0]; pl.hp = 7.5; }
+  else if (th === 'farm') { pl.layout = 'track'; pl.ox = [0]; }
+  else {
+    const ind = th === 'industrial' || th === 'port';
+    const P = ind && t.r >= 66 ? 44 : 36, offs = [];
+    for (let k = -4; k <= 3; k++) { const o = (k + 0.5) * P; if (Math.abs(o) < t.r - 13) offs.push(o); }
+    pl.P = P; pl.ox = offs; pl.oz = offs.slice();
+    if (offs.length >= 2) pl.hp = P / 2 - pl.ch;
+    if (th === 'castle') { pl.wallS = t.r + 1; pl.box = pl.wallS - 3.2; t.wallS = pl.wallS + 2.4; }
+  }
+  pl.offs = pl.ox;
+  t.plan = pl;
 }
 const lineLen = (pl, o) => Math.sqrt(Math.max(0, pl.R * pl.R - o * o));
-/** 0 = niente, 1 = marciapiede, 2 = carreggiata, 3 = piazza */
+/** 0 = niente, 1 = marciapiede/passerella, 2 = carreggiata, 3 = piazza */
 export function streetAt(t, x, z) {
   const pl = t.plan; if (!pl) return 0;
   const lx = x - t.x, lz = z - t.z;
   if (lx * lx + lz * lz > (pl.R + 1) * (pl.R + 1)) return 0;
+  if (pl.hp && Math.abs(lx) < pl.hp && Math.abs(lz) < pl.hp) return 3;
   let best = 0;
-  for (const o of pl.offs) {
-    const L = lineLen(pl, o);
-    const dx = Math.abs(lx - o), dz = Math.abs(lz - o);
-    if (dx < CH && Math.abs(lz) < L) best = Math.max(best, dx < STREET.RW ? 2 : 1);
-    if (dz < CH && Math.abs(lx) < L) best = Math.max(best, dz < STREET.RW ? 2 : 1);
-  }
-  if (!best && pl.offs.length >= 2) { const hp = pl.P / 2 - CH; if (Math.abs(lx) < hp && Math.abs(lz) < hp) best = 3; }
+  for (const o of pl.ox) { const d = Math.abs(lx - o); if (d < pl.ch && Math.abs(lz) < lineLen(pl, o)) best = Math.max(best, d < pl.rw ? 2 : 1); }
+  for (const o of pl.oz) { const d = Math.abs(lz - o); if (d < pl.ch && Math.abs(lx) < lineLen(pl, o)) best = Math.max(best, d < pl.rw ? 2 : 1); }
   return best;
 }
 /** il cerchio (x,z,r) tocca una strada o un marciapiede? */
 export function onStreet(t, x, z, r = 0) {
   const pl = t.plan; if (!pl) return false;
   const lx = x - t.x, lz = z - t.z;
-  for (const o of pl.offs) {
-    const L = lineLen(pl, o) + r;
-    if (Math.abs(lx - o) < CH + r && Math.abs(lz) < L) return true;
-    if (Math.abs(lz - o) < CH + r && Math.abs(lx) < L) return true;
-  }
-  if (pl.offs.length >= 2) { const hp = pl.P / 2 - CH + r; if (Math.abs(lx) < hp && Math.abs(lz) < hp) return true; }
+  for (const o of pl.ox) if (Math.abs(lx - o) < pl.ch + r && Math.abs(lz) < lineLen(pl, o) + r) return true;
+  for (const o of pl.oz) if (Math.abs(lz - o) < pl.ch + r && Math.abs(lx) < lineLen(pl, o) + r) return true;
+  if (pl.hp) { const hp = pl.hp + r; if (Math.abs(lx) < hp && Math.abs(lz) < hp) return true; }
   return false;
 }
 
@@ -205,6 +229,8 @@ export const CITY_SPECIALS = {
   },
 };
 
+Object.assign(CITY_SPECIALS, TOWN_SPECIALS);
+
 // ── materiali (condivisi tra le mappe) ──
 const MC = new Map();
 const mc = (k, f) => { if (!MC.has(k)) MC.set(k, f()); return MC.get(k); };
@@ -266,6 +292,10 @@ export function buildCity(C) {
   const { addBox, addGeo, addCollider, special, houses, lootSpots, chestSpots, extraTrees, cgeo, M } = C;
   const rnd = C.rnd, sr = (a, b) => a + rnd() * (b - a), pick = (a) => a[Math.floor(rnd() * a.length)];
   const stats = { palazzi: 0, negozi: 0, case: 0, capannoni: 0, auto: 0, lampioni: 0 };
+  // v27: costruttori delle città a tema (camion, miniere, palafitte, campi, mura)
+  const K = { C, frame: (...a) => frame(...a), special, MAT, rnd, sr, pick, stats, mc, texMat, solid, corrMat, corrTex: corrugatedTexture, roadMat: (pl) => roadMat(pl) };
+  const TB = townBuilders(K);
+  const roadMat = (pl) => ({ asphalt: MAT.asphalt, cobble: MAT.cobble, dirt: TB.mats.dirt, snow: TB.mats.snow, sand: TB.mats.sand })[pl.surf] || MAT.asphalt;
 
   /** sistema di riferimento locale di un edificio: u lungo la facciata, v verso l'interno (0 = facciata) */
   function frame(cx, cz, w, d, face) {
@@ -621,10 +651,10 @@ export function buildCity(C) {
   function warehouse(o) {
     const T = 0.3, { w, d, y, face } = o, hw = w / 2, Hh = 7;
     const F = frame(o.cx, o.cz, w, d, face);
-    const house = { cx: o.cx, cz: o.cz, w: F.W, d: F.D, baseY: y, roofMesh: null, roofTop: y + Hh + 0.25, doors: [], wallColor: o.color, roofColor: '#7a7c80', theme: o.theme, furn: [], floors: 2, lodH: Hh + 0.6, city: 'capannone' };
+    const house = { cx: o.cx, cz: o.cz, w: F.W, d: F.D, baseY: y, roofMesh: null, roofTop: y + Hh + 0.25, doors: [], wallColor: o.color, roofColor: o.barn ? '#4a4f5a' : '#7a7c80', theme: o.theme, furn: [], floors: 2, lodH: Hh + 0.6, city: o.barn ? 'fienile' : 'capannone' };
     house.clip = [o.cx - F.W / 2 - 1.1, o.cz - F.D / 2 - 1.1, o.cx + F.W / 2 + 1.1, o.cz + F.D / 2 + 1.1];
     const H = { house }, nc = { house, collide: false, cast: false };
-    const wm = corrMat(o.color);
+    const wm = o.barn ? plainMat('wood', o.color) : corrMat(o.color);
     const piece = (alongU, fixed, a, b, ya, hy, mat = wm) => { if (b - a < 0.02 || hy < 0.02) return; if (alongU) F.box((a + b) / 2, fixed, ya + hy / 2, b - a, hy, T, mat, H); else F.box(fixed, (a + b) / 2, ya + hy / 2, T, hy, b - a, mat, H); };
     const su = o.stairSide || 1;
     const bigU = -su * hw / 2, dU = su * (hw - 2.2);
@@ -636,9 +666,22 @@ export function buildCity(C) {
     C.makeDoor(F.x(dU, T / 2), F.z(dU, T / 2), y, !F.sw, F.N[0], F.N[1], house);
     F.box(bigU, -0.05, y + 4.95, 5.1, 0.3, 0.12, MAT.gate, nc);                             // architrave del portone
     F.box(bigU, -0.02, y + 0.04, 5.0, 0.08, 1.4, MAT.concrete, nc);                        // rampa
-    for (const s of [-1, 1]) F.box(bigU + s * 2.5, -0.06, y + 2.4, 0.14, 4.8, 0.12, MAT.paintY, nc);
+    for (const s of [-1, 1]) F.box(bigU + s * 2.5, -0.06, y + 2.4, 0.14, 4.8, 0.12, o.barn ? M.trimMat : MAT.paintY, nc);
     // retro e fianchi con una fascia di finestre alte
     const band = (alongU, fixed, a0, a1) => {
+      if (o.barn) {
+        // fienile: tavole piene con qualche finestrella quadrata del fienile (niente nastro di vetro industriale)
+        piece(alongU, fixed, a0, a1, y, 5.0); piece(alongU, fixed, a0, a1, y + 6.0, Hh - 6.0);
+        let c0 = a0;
+        for (let c = a0 + 2.2; c < a1 - 1.2; c += 3.4) {
+          piece(alongU, fixed, c0, c - 0.45, y + 5.0, 1.0);
+          if (alongU) F.box(c, fixed, y + 5.5, 0.9, 0.9, 0.06, MAT.glass, { house, cast: false }); else F.box(fixed, c, y + 5.5, 0.06, 0.9, 0.9, MAT.glass, { house, cast: false });
+          piece(alongU, fixed, c - 0.45, c + 0.45, y + 5.0, 0.05); piece(alongU, fixed, c - 0.45, c + 0.45, y + 5.95, 0.05);
+          c0 = c + 0.45;
+        }
+        piece(alongU, fixed, c0, a1, y + 5.0, 1.0);
+        return;
+      }
       piece(alongU, fixed, a0, a1, y, 5.0); piece(alongU, fixed, a0, a1, y + 6.0, 1.0);
       const c = (a0 + a1) / 2, len = a1 - a0;
       if (alongU) F.box(c, fixed, y + 5.5, len, 1.0, 0.06, MAT.glass, { house, cast: false }); else F.box(fixed, c, y + 5.5, 0.06, 1.0, len, MAT.glass, { house, cast: false });
@@ -648,8 +691,30 @@ export function buildCity(C) {
     // tetto piano con fascia colorata e parapetto basso
     F.box(0, d / 2, y + Hh + 0.12, w, 0.24, d, MAT.inner, H);
     F.box(0, d / 2, y + Hh + 0.25, w, 0.02, d, MAT.roof, nc);
-    F.box(0, -0.06, y + Hh - 0.35, w + 0.12, 0.7, 0.12, MAT.board, nc);
-    for (const [u, v, lu, lv] of [[0, T / 2, w, T], [0, d - T / 2, w, T], [-hw + T / 2, d / 2, T, d - 2 * T], [hw - T / 2, d / 2, T, d - 2 * T]]) F.box(u, v, y + Hh + 0.5, lu, 0.5, lv, MAT.concrete, H);
+    if (!o.barn) {
+      F.box(0, -0.06, y + Hh - 0.35, w + 0.12, 0.7, 0.12, MAT.board, nc);
+      for (const [u, v, lu, lv] of [[0, T / 2, w, T], [0, d - T / 2, w, T], [-hw + T / 2, d / 2, T, d - 2 * T], [hw - T / 2, d / 2, T, d - 2 * T]]) F.box(u, v, y + Hh + 0.5, lu, 0.5, lv, MAT.concrete, H);
+    } else {
+      // v27: fienile con tetto a due falde (calpestabile) e timpani di legno
+      const alongX = F.W >= F.D, span = alongX ? F.D : F.W, rlen = alongX ? F.W : F.D;
+      const half = span / 2 + 0.5, rise = 0.6 * half, thick = 0.2, rot = alongX ? 0 : Math.PI / 2, roofY = y + Hh + 0.24;
+      addGeo(C.gableRoofGeo(rlen + 0.8, half, rise, thick), o.cx, roofY, o.cz, C.roofMatFor('#4a4f5a'), { house, rotY: rot, roof: true });
+      addGeo(C.ridgeGeo(rlen + 0.9), o.cx, roofY + rise + thick, o.cz, M.capMat, { house, rotY: rot, roof: true });
+      const eg = C.gableEndGeo(span / 2, half, rise, T);
+      for (const e of [-1, 1]) {
+        if (alongX) addGeo(eg, o.cx + e * (F.W / 2 - T / 2), roofY, o.cz, wm, { house, roof: true });
+        else addGeo(eg, o.cx, roofY, o.cz + e * (F.D / 2 - T / 2), wm, { house, roof: true, rotY: Math.PI / 2 });
+      }
+      for (const sd of [-1, 1]) for (let k = 0; k < 5; k++) {
+        const a = half * k / 5, b2 = half * (k + 1) / 5, ym = rise * (1 - (a + b2) / 2 / half) + thick;
+        const lo = sd > 0 ? a : -b2, hi = sd > 0 ? b2 : -a;
+        if (alongX) addCollider({ type: 'box', minX: o.cx - rlen / 2 - 0.4, maxX: o.cx + rlen / 2 + 0.4, minY: roofY, maxY: roofY + ym, minZ: o.cz + lo, maxZ: o.cz + hi });
+        else addCollider({ type: 'box', minX: o.cx + lo, maxX: o.cx + hi, minY: roofY, maxY: roofY + ym, minZ: o.cz - rlen / 2 - 0.4, maxZ: o.cz + rlen / 2 + 0.4 });
+      }
+      house.pitch = { alongX, rise }; house.lodH = Hh + 0.24; house.roofTop = roofY + rise + thick;
+      // balle di fieno nel soppalco
+      for (let i = 0; i < 3; i++) { const u = -su * (1.2 + i * 1.7), v = d - T - 0.55; if (Math.abs(u) > hw - 1) break; addBox(1.4, 0.8, 0.9, F.x(u, v), y + 3.2 + 0.4, F.z(u, v), M.hayMat || M.crateMat, { house }); }
+    }
     // pavimento
     F.box(0, d / 2, y + 0.1, w - 2 * T, 0.2, d - 2 * T, MAT.concrete, { house, cast: false });
     // soppalco sul retro (5 m) con scala lungo il fianco "su"
@@ -668,96 +733,149 @@ export function buildCity(C) {
     }
     for (let i = 0; i < 3; i++) { const u = sr(-hw / 3, hw / 3), v = sr(2.5, vm - 1.5), s = sr(1.0, 1.4); C.addCrate(s, s, s, F.x(u, v), y + 0.2 + s / 2, F.z(u, v), H); }
     for (let i = 0; i < 2; i++) { const u = sr(-hw + 2, hw - 2), v = sr(vm + 1, d - T - 1), s = 1.1; C.addCrate(s, s, s, F.x(u, v), y + 3.2 + s / 2, F.z(u, v), H); }
-    // insegna
-    const si = SHOPS.findIndex(s => s.n === (o.theme === 'port' ? 'MAGAZZINO' : pick(['OFFICINA', 'MAGAZZINO'])));
-    addGeo(cgeo('sign' + si + '_4.8', () => signGeometry(si, 4.8, 1.2)), F.x(-bigU, -0.14), y + 5.6, F.z(-bigU, -0.14), MAT.sign, { house, rotY: F.rot, cast: false });
-    F.box(-bigU, -0.07, y + 5.6, 5.0, 1.4, 0.1, MAT.board, nc);
+    // insegna (non sui fienili)
+    if (!o.barn) {
+      const si = SHOPS.findIndex(s => s.n === (o.theme === 'port' ? 'MAGAZZINO' : pick(['OFFICINA', 'MAGAZZINO'])));
+      addGeo(cgeo('sign' + si + '_4.8', () => signGeometry(si, 4.8, 1.2)), F.x(-bigU, -0.14), y + 5.6, F.z(-bigU, -0.14), MAT.sign, { house, rotY: F.rot, cast: false });
+      F.box(-bigU, -0.07, y + 5.6, 5.0, 1.4, 0.1, MAT.board, nc);
+    }
     // bottino
     { const u = sr(-hw / 2, hw / 2), v = sr(2, vm - 2); lootSpots.push(new THREE.Vector3(F.x(u, v), y + 0.2, F.z(u, v))); }
     lootSpots.push(new THREE.Vector3(F.x(0, vm + 2.5), y + 3.2, F.z(0, vm + 2.5)));
     if (rnd() < 0.6) chestSpots.push({ pos: new THREE.Vector3(F.x(-su * (hw - 2), vm + 2.5), y + 3.2, F.z(-su * (hw - 2), vm + 2.5)), rot: F.rot });
     houses.push(house);
     C.chunkAt(o.cx, o.cz).houses.push(house);
-    stats.capannoni++;
+    if (o.barn) stats.fienili = (stats.fienili || 0) + 1; else stats.capannoni++;
     return house;
   }
 
   // ═════════ strade, marciapiedi, piazza ═════════
   function streets(t) {
-    const pl = t.plan, y = t.h, { RW, SW } = STREET, offs = pl.offs;
+    const pl = t.plan, y = t.h, RW = pl.rw, SW = pl.sw;
     const segs = (a, b, cuts) => { const out = []; let cur = a; for (const [c0, c1] of cuts.sort((p, q) => p[0] - q[0])) { if (c1 <= cur || c0 >= b) continue; if (c0 > cur) out.push([cur, c0]); cur = Math.max(cur, c1); } if (cur < b) out.push([cur, b]); return out; };
     const sideItems = [];   // posti per lampioni/auto lungo i marciapiedi
-    for (const vert of [true, false]) for (const o of offs) {
+    const asph = pl.surf === 'asphalt', rm = roadMat(pl), plank = pl.walk === 'plank';
+    const nc = { collide: false, cast: false };
+    for (const vert of [true, false]) for (const o of (vert ? pl.ox : pl.oz)) {
       const L = lineLen(pl, o);
-      const crosses = offs.filter(c => Math.abs(c) < L - RW && Math.abs(o) < lineLen(pl, c) - RW);
+      const crosses = (vert ? pl.oz : pl.ox).filter(c => Math.abs(c) < L - RW && Math.abs(o) < lineLen(pl, c) - RW);
+      const pz = pl.hp && Math.abs(o) < pl.hp ? [[-pl.hp, pl.hp]] : [];          // la strada entra nella piazzetta
       // carreggiata: le strade lungo z si interrompono agli incroci (l'incrocio appartiene a quelle lungo x)
-      const road = vert ? segs(-L, L, crosses.map(c => [c - RW, c + RW])) : [[-L, L]];
+      const road = segs(-L, L, (vert ? crosses.map(c => [c - RW, c + RW]) : []).concat(pz));
       const B = (a0, a1, off, hgt, yc, wid, mat, opt) => {
         const len = a1 - a0, c = (a0 + a1) / 2;
         if (vert) addBox(wid, hgt, len, t.x + o + off, yc, t.z + c, mat, opt); else addBox(len, hgt, wid, t.x + c, yc, t.z + o + off, mat, opt);
       };
       for (const [a, b] of road) {
-        B(a, b, 0, 0.08, y, 2 * RW, MAT.asphalt, { collide: false, cast: false });
+        B(a, b, 0, 0.08, y, 2 * RW, rm, nc);
         // linea di mezzeria tratteggiata (lontano dagli incroci)
-        for (let s = a + 4.5; s < b - 4.5; s += 6) B(s, s + 2.6, 0, 0.012, y + 0.045, 0.14, MAT.paint, { collide: false, cast: false });
+        if (asph) for (let s = a + 4.5; s < b - 4.5; s += 6) B(s, s + 2.6, 0, 0.012, y + 0.045, 0.14, MAT.paint, nc);
       }
       // strisce pedonali ai lati di ogni incrocio
-      for (const c of crosses) for (const sd of [-1, 1]) {
+      if (asph) for (const c of crosses) for (const sd of [-1, 1]) {
         const zc = c + sd * (RW + SW / 2);
         if (Math.abs(zc) > L - 1) continue;
-        for (let k = -2.5; k <= 2.5; k += 1) B(zc - 0.9, zc + 0.9, k * 1.1, 0.012, y + 0.046, 0.55, MAT.paint, { collide: false, cast: false });
+        for (let k = -2.5; k <= 2.5; k += 1) B(zc - 0.9, zc + 0.9, k * 1.1, 0.012, y + 0.046, 0.55, MAT.paint, nc);
       }
-      // marciapiedi (con cordolo) interrotti agli incroci
-      const walk = segs(-L, L, crosses.map(c => [c - RW - SW, c + RW + SW]));
-      for (const sd of [-1, 1]) for (const [a, b] of walk) {
-        if (b - a < 0.3) continue;
-        B(a, b, sd * (RW + SW / 2), 0.22, y + 0.05, SW, MAT.sidewalk, { cast: false });
-        B(a, b, sd * (RW + 0.09), 0.24, y + 0.05, 0.18, MAT.curb, { collide: false, cast: false });
-        sideItems.push({ vert, o, sd, a, b });
+      if (SW > 0) {
+        // marciapiedi (con cordolo) o passerelle di legno rialzate, interrotti agli incroci
+        const walk = segs(-L, L, crosses.map(c => [c - RW - SW, c + RW + SW]).concat(pz));
+        for (const sd of [-1, 1]) for (const [a, b] of walk) {
+          if (b - a < 0.3) continue;
+          if (plank) {
+            B(a, b, sd * (RW + SW / 2), 0.3, y + 0.075, SW, TB.mats.plank, { cast: false });
+            B(a, b, sd * (RW + 0.07), 0.34, y + 0.06, 0.14, TB.mats.timber, nc);
+          } else {
+            B(a, b, sd * (RW + SW / 2), 0.22, y + 0.05, SW, MAT.sidewalk, { cast: false });
+            B(a, b, sd * (RW + 0.09), 0.24, y + 0.05, 0.18, MAT.curb, nc);
+          }
+          sideItems.push({ vert, o, sd, a, b });
+        }
+      } else {
+        // niente marciapiedi: lampioni sul bordo; nei vicoli alpini cumuli di neve spalata lungo i lati
+        const edge = segs(-L, L, crosses.map(c => [c - RW - 1.5, c + RW + 1.5]).concat(pz));
+        for (const sd of [-1, 1]) for (const [a, b] of edge) {
+          if (b - a < 2) continue;
+          sideItems.push({ vert, o, sd, a, b });
+          if (pl.surf === 'snow') for (let q = a + 1 + rnd() * 2; q < b - 2; ) {
+            const e = Math.min(b - 1, q + sr(2.5, 6));
+            B(q, e, sd * (RW - 0.45), 0.4, y + 0.2, 0.8, TB.mats.bank, { cast: false });
+            q = e + sr(2, 5);
+          }
+        }
       }
     }
     // quadratini d'angolo dei marciapiedi agli incroci
-    for (const ox of offs) for (const oz of offs) {
+    if (SW > 0) for (const ox of pl.ox) for (const oz of pl.oz) {
       if (Math.abs(oz) > lineLen(pl, ox) - RW || Math.abs(ox) > lineLen(pl, oz) - RW) continue;
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) addBox(SW, 0.22, SW, t.x + ox + sx * (RW + SW / 2), y + 0.05, t.z + oz + sz * (RW + SW / 2), MAT.sidewalk, { cast: false });
-      if (t.r >= 70) for (const s of [-1, 1]) special('semaforo', t.x + ox + s * (RW + 0.4), t.z + oz + s * (RW + 0.4), y + 0.16, [0.1, 3.4, true], { rot: s > 0 ? 0 : Math.PI });
+      if (pl.hp && Math.abs(ox) < pl.hp && Math.abs(oz) < pl.hp) continue;
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) addBox(SW, plank ? 0.3 : 0.22, SW, t.x + ox + sx * (RW + SW / 2), y + (plank ? 0.075 : 0.05), t.z + oz + sz * (RW + SW / 2), plank ? TB.mats.plank : MAT.sidewalk, { cast: false });
+      if (asph && t.r >= 70) for (const s of [-1, 1]) special('semaforo', t.x + ox + s * (RW + 0.4), t.z + oz + s * (RW + 0.4), y + 0.16, [0.1, 3.4, true], { rot: s > 0 ? 0 : Math.PI });
     }
     return sideItems;
   }
 
   function piazza(t) {
-    const pl = t.plan, y = t.h;
-    if (pl.offs.length < 2) return;
-    const hp = pl.P / 2 - CH;
-    addBox(hp * 2, 0.22, hp * 2, t.x, y + 0.05, t.z, MAT.cobble, { cast: false });
-    const th = t.theme;
-    const mon = th === 'castle' || th === 'industrial' || th === 'alpine' ? 'statue' : th === 'western' || th === 'farm' ? 'well' : 'fountain2';
+    const pl = t.plan, y = t.h, hp = pl.hp;
+    if (!hp) return;
+    const th = t.theme, cross = pl.layout === 'cross';
+    addBox(hp * 2, 0.22, hp * 2, t.x, y + 0.05, t.z, th === 'alpine' ? TB.mats.snowCobble : MAT.cobble, { cast: false });
+    const mon = th === 'castle' || th === 'industrial' ? 'statue' : th === 'alpine' ? 'xmasTree' : th === 'western' || th === 'farm' ? 'well' : 'fountain2';
     if (mon === 'fountain2') { special('fountain2', t.x, t.z, y + 0.16, null, { rot: 0 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 3.55, minY: y - 1, maxY: y + 0.9 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.75, minY: y, maxY: y + 3.5, noStand: true }); lootSpots.push(new THREE.Vector3(t.x, y + 0.92, t.z + 2.0)); }
     else if (mon === 'statue') { special('statue', t.x, t.z, y + 0.16, null, { rot: rnd() * 6.28 }); addCollider({ type: 'box', minX: t.x - 1.1, maxX: t.x + 1.1, minY: y, maxY: y + 2.2, minZ: t.z - 1.1, maxZ: t.z + 1.1 }); lootSpots.push(new THREE.Vector3(t.x + 2.2, y + 0.16, t.z)); }
+    else if (mon === 'xmasTree') {
+      // v27: abete addobbato al centro e campanile sul lato della piazzetta
+      special('xmasTree', t.x, t.z, y + 0.16, [0.45, 8, true], { rot: 0 });
+      lootSpots.push(new THREE.Vector3(t.x + 3.2, y + 0.16, t.z));
+      const bz = t.z - hp + 2.4;
+      special('bellTower', t.x, bz, y + 0.16, null, { rot: 0 });
+      addCollider({ type: 'box', minX: t.x - 1.6, maxX: t.x + 1.6, minY: y, maxY: y + 8.2, minZ: bz - 1.6, maxZ: bz + 1.6 });
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) addCollider({ type: 'box', minX: t.x + sx * 1.4 - 0.23, maxX: t.x + sx * 1.4 + 0.23, minY: y + 8.2, maxY: y + 10.5, minZ: bz + sz * 1.4 - 0.23, maxZ: bz + sz * 1.4 + 0.23, noStand: true });
+      lootSpots.push(new THREE.Vector3(t.x, y + 8.36, bz));
+    }
     else { special('well', t.x, t.z, y + 0.16, null, { rot: rnd() * 6.28 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 1.1, minY: y - 1, maxY: y + 1.0 }); lootSpots.push(new THREE.Vector3(t.x + 1.8, y + 0.16, t.z)); }
     const trees = TREE_FOR[th] || TREE_FOR.classic;
-    const k = hp - 3.2;
+    const k = hp - 3.2, lampT = pl.surf === 'asphalt' ? 'lamp' : 'lantern';
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      special('planter', t.x + sx * k, t.z + sz * k, y + 0.16, [1.0, 0.75, false], { rot: 0 });
-      extraTrees.push({ x: t.x + sx * k, z: t.z + sz * k, k: pick(trees), y: y + 0.76 });
-      special('lamp', t.x + sx * (hp - 0.6), t.z + sz * (hp - 0.6), y + 0.16, [0.15, 5, true], { rot: Math.atan2(-sx, -sz) });
+      if (!cross) {
+        special('planter', t.x + sx * k, t.z + sz * k, y + 0.16, [1.0, 0.75, false], { rot: 0 });
+        extraTrees.push({ x: t.x + sx * k, z: t.z + sz * k, k: pick(trees), y: y + 0.76 });
+      }
+      special(lampT, t.x + sx * (hp - 0.6), t.z + sz * (hp - 0.6), y + 0.16, [0.15, 5, true], { rot: Math.atan2(-sx, -sz) });
       stats.lampioni++;
+    }
+    if (th === 'alpine') {
+      // slitte, rastrelliera degli sci, legnaia, cumuli di neve
+      special('skiRack', t.x + hp - 1.2, t.z + 3.5, y + 0.16, [0.3, 1.3, true], { rot: -Math.PI / 2 });
+      special('sled', t.x - hp + 1.6, t.z + 2.5, y + 0.16, null, { rot: 0.4 });
+      special('woodpile', t.x - hp + 1.0, t.z - 4.5, y + 0.16, null, { rot: Math.PI / 2 });
+      addCollider({ type: 'box', minX: t.x - hp + 0.4, maxX: t.x - hp + 1.6, minY: y, maxY: y + 1.0, minZ: t.z - 5.9, maxZ: t.z - 3.1 });
+      special('snowPile', t.x + hp - 2, t.z - hp + 5, y + 0.16, null);
+    }
+    if (th === 'castle') {
+      // mercato: bancarelle su un lato della piazza
+      for (let i = 0; i < 3; i++) {
+        const sx = t.x - hp + 3 + i * 3.6, sz = t.z + hp - 1.6;
+        if (sx > t.x + hp - 2) break;
+        special('stall', sx, sz, y + 0.16, null, { rot: Math.PI, c: i });
+        addCollider({ type: 'box', minX: sx - 1.35, maxX: sx + 1.35, minY: y, maxY: y + 1.0, minZ: sz - 0.7, maxZ: sz + 0.7 });
+      }
     }
     // panchine rivolte verso il monumento, cestini
     for (let i = 0; i < 4; i++) {
-      const a = i * Math.PI / 2 + Math.PI / 4 * 0, r = 6.2;
-      for (const off of [-1.4, 1.4]) {
+      const a = i * Math.PI / 2 + (cross ? Math.PI / 4 : 0), r = cross ? 5.6 : 6.2;
+      for (const off of (cross ? [0] : [-1.4, 1.4])) {
         const bx = t.x + Math.cos(a) * r - Math.sin(a) * off, bz = t.z + Math.sin(a) * r + Math.cos(a) * off;
         special('bench', bx, bz, y + 0.16, null, { rot: Math.atan2(-Math.cos(a), -Math.sin(a)) });
         addCollider({ type: 'cyl', x: bx, z: bz, r: 0.55, minY: y, maxY: y + 0.6 });
       }
-      special('bin', t.x + Math.cos(a) * r - Math.sin(a) * 3.0, t.z + Math.sin(a) * r + Math.cos(a) * 3.0, y + 0.16, [0.28, 0.9, false]);
+      if (!cross) special('bin', t.x + Math.cos(a) * r - Math.sin(a) * 3.0, t.z + Math.sin(a) * r + Math.cos(a) * 3.0, y + 0.16, [0.28, 0.9, false]);
     }
     // edicola, tavolini del bar
-    if (th === 'classic' || th === 'coastal' || th === 'port' || th === 'castle') {
+    if (th === 'classic' || th === 'port' || th === 'castle') {
       special('kiosk', t.x + hp - 2.2, t.z - hp + 2.0, y + 0.16, null, { rot: Math.PI / 2 * Math.round(rnd() * 3) });
       addCollider({ type: 'box', minX: t.x + hp - 3.6, maxX: t.x + hp - 0.8, minY: y, maxY: y + 2.5, minZ: t.z - hp + 0.6, maxZ: t.z - hp + 3.4 });
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < (th === 'castle' ? 0 : 3); i++) {
         const cx = t.x - hp + 2.0 + i * 2.6, cz = t.z + hp - 2.4;
         special('cafeSet', cx, cz, y + 0.16, [0.45, 0.78, false], { rot: 0 });
         if (i !== 1) special('umbrella', cx, cz + 0.01, y + 0.16, null, { c: i, rot: 0 });
@@ -767,20 +885,23 @@ export function buildCity(C) {
 
   /** lampioni, auto parcheggiate, cestini e fermate lungo le strade */
   function streetLife(t, items) {
-    const y = t.h, { RW, SW } = STREET;
-    let busDone = t.r < 40;
+    const pl = t.plan, y = t.h, RW = pl.rw, SW = pl.sw, asph = pl.surf === 'asphalt', th = t.theme;
+    const lampT = asph ? 'lamp' : 'lantern', lampOff = SW > 0 ? RW + 0.5 : RW - 0.3;
+    const ly = y + (pl.walk === 'plank' ? 0.225 : SW > 0 ? 0.16 : 0.04);
+    let busDone = t.r < 40 || !asph;
     for (const it of items) {
       const pos = (s, off) => it.vert ? [t.x + it.o + off, t.z + s] : [t.x + s, t.z + it.o + off];
       const len = it.b - it.a;
-      // lampioni alternati (uno ogni ~22 m)
-      for (let s = it.a + 4 + ((it.sd > 0) ? 0 : 11); s < it.b - 3; s += 22) {
-        const [x, z] = pos(s, it.sd * (RW + 0.5));
+      // lampioni alternati (uno ogni ~22 m; lanterne di legno fuori dalle città asfaltate)
+      const step = asph ? 22 : 18;
+      for (let s = it.a + 4 + ((it.sd > 0) ? 0 : step / 2); s < it.b - 3; s += step) {
+        const [x, z] = pos(s, it.sd * lampOff);
         const rot = it.vert ? (it.sd > 0 ? -Math.PI / 2 : Math.PI / 2) : (it.sd > 0 ? Math.PI : 0);
-        special('lamp', x, z, y + 0.16, [0.15, 5, true], { rot });
+        special(lampT, x, z, ly, [0.15, 5, true], { rot });
         stats.lampioni++;
-        if (rnd() < 0.25) { const [bx, bz] = pos(s + 1.2, it.sd * (RW + 0.5)); special('bin', bx, bz, y + 0.16, [0.28, 0.9, false]); }
+        if (asph && rnd() < 0.25) { const [bx, bz] = pos(s + 1.2, it.sd * (RW + 0.5)); special('bin', bx, bz, y + 0.16, [0.28, 0.9, false]); }
       }
-      if (rnd() < 0.15) { const [hx, hz] = pos(it.a + len * rnd(), it.sd * (RW + 0.35)); special('hydrant', hx, hz, y + 0.16, [0.16, 0.7, true]); }
+      if (asph && rnd() < 0.15) { const [hx, hz] = pos(it.a + len * rnd(), it.sd * (RW + 0.35)); special('hydrant', hx, hz, y + 0.16, [0.16, 0.7, true]); }
       if (!busDone && len > 14 && rnd() < 0.3) {
         busDone = true;
         const s = (it.a + it.b) / 2, [x, z] = pos(s, it.sd * (RW + SW - 0.75));
@@ -788,8 +909,16 @@ export function buildCity(C) {
         special('busStop', x, z, y + 0.16, null, { rot });
         addCollider({ type: 'box', minX: x - (it.vert ? 0.75 : 1.7), maxX: x + (it.vert ? 0.75 : 1.7), minY: y + 2.4, maxY: y + 2.6, minZ: z - (it.vert ? 1.7 : 0.75), maxZ: z + (it.vert ? 1.7 : 0.75) });
       }
-      // auto parcheggiate lungo il cordolo
-      if (t.theme === 'western') continue;
+      if (th === 'western') {
+        // staccionate per i cavalli lungo la via, botti sulle passerelle, qualche carro
+        for (let s = it.a + 7; s < it.b - 7; s += 13) {
+          if (rnd() < 0.45) { const [x, z] = pos(s, it.sd * (RW - 0.4)); special('hitchRail', x, z, y + 0.04, null, { rot: (it.vert ? Math.PI / 2 : 0) + (it.sd > 0 ? Math.PI : 0) }); }
+          if (rnd() < 0.35) { const [x, z] = pos(s + 4, it.sd * (RW + SW - 0.45)); special('barrel', x, z, ly, [0.38, 0.9, false]); }
+        }
+        if (len > 30 && rnd() < 0.5) { const [x, z] = pos(it.a + len * sr(0.3, 0.7), it.sd * (RW - 1.4)); special('wagon', x, z, y + 0.04, null, { rot: it.vert ? 0 : Math.PI / 2 }); addCollider({ type: 'box', minX: x - (it.vert ? 0.8 : 1.6), maxX: x + (it.vert ? 0.8 : 1.6), minY: y, maxY: y + 1.3, minZ: z - (it.vert ? 1.6 : 0.8), maxZ: z + (it.vert ? 1.6 : 0.8) }); }
+      }
+      // auto parcheggiate lungo il cordolo (solo nelle città asfaltate)
+      if (!asph) continue;
       for (let s = it.a + 5; s < it.b - 5; s += 6.5) {
         if (rnd() > 0.32) continue;
         const [x, z] = pos(s + sr(-0.6, 0.6), it.sd * (RW - 1.15));
@@ -806,9 +935,11 @@ export function buildCity(C) {
 
   // ═════════ lotti: edifici lungo i lati dei blocchi ═════════
   function blocks(t) {
-    const pl = t.plan, y = t.h, th = t.theme, offs = pl.offs;
+    const pl = t.plan, y = t.h, th = t.theme, CHp = pl.ch;
     const big = t.r >= 70;
-    const placed = [];
+    const placed = [...(t.reserve || [])];
+    // v27: nelle piante non a reticolo la piazzetta è un'area libera (non un blocco intero)
+    if (pl.hp && pl.layout !== 'grid') placed.push([t.x - pl.hp - 1, t.x + pl.hp + 1, t.z - pl.hp - 1, t.z + pl.hp + 1]);
     const used = new Set();
     const tag = THEME_TAG[th] || 'u';
     const shopPick = () => {
@@ -817,7 +948,10 @@ export function buildCity(C) {
       const i = pick(pool); used.add(i); return i;
     };
     const fits = (x0, x1, z0, z1, gap) => {
-      for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) if (Math.hypot(px - t.x, pz - t.z) > t.r + 2) return false;
+      for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) {
+        if (Math.hypot(px - t.x, pz - t.z) > t.r + 2) return false;
+        if (pl.box && (Math.abs(px - t.x) > pl.box || Math.abs(pz - t.z) > pl.box)) return false;   // dentro le mura
+      }
       for (const r of placed) if (x0 < r[1] + gap && x1 > r[0] - gap && z0 < r[3] + gap && z1 > r[2] - gap) return false;
       return true;
     };
@@ -826,17 +960,20 @@ export function buildCity(C) {
       const res = (n0, n1) => n0 + Math.floor(rnd() * (n1 - n0 + 1));
       const ws = [9, 12, 12, 15];
       const s = { kind: 'palazzo', w: pick(ws), d: Math.min(maxD, Math.round(sr(9, 12))), sb: 0 };
+      // v27: nel deserto si vive dentro i camion; solo il centro della via ha saloon ed empori
+      if (th === 'western' && (rho > 0.42 || s.d < 8.5 || rnd() < 0.25)) return { kind: 'truck', w: 9, d: 2.5, sb: 2.9 };
       if (s.d < 8.5) return { kind: 'house', w: 9, d: Math.max(7, maxD), sb: 0 };
       const house = () => ({ kind: 'house', w: Math.round(sr(8, 11)), d: Math.min(maxD - 3.5, Math.round(sr(8, 10))), sb: 3.5 });
       switch (th) {
         case 'western':
-          if (rho > 0.8 && rnd() < 0.6) return house();
           return { ...s, w: pick([9, 12]), n: res(1, 2), style: 'wood', color: pick(PALETTE.wood), roof: 'flat', falseFront: true, porch: true, shop: rnd() < 0.75 ? shopPick() : -1 };
         case 'alpine':
-          if (rho > 0.65 && rnd() < 0.6) return house();
+          if (rho > 0.5 && rnd() < 0.65) return house();
           return { ...s, n: res(2, 3), style: 'wood', color: pick(PALETTE.wood), gStyle: rnd() < 0.5 ? 'stone' : 'plaster', gColor: rnd() < 0.5 ? '#b9ae98' : '#efe6d6', roof: 'gable', roofColor: pick(['#5a3a24', '#4a4f5a']), snow: true, balconies: 0.5, shop: rnd() < 0.45 ? shopPick() : -1 };
         case 'farm':
-          if (rho > 0.5 || rnd() < 0.5) return house();
+          // fienili rossi con il tetto a falde e case coloniche
+          if (maxD >= 12 && rnd() < 0.45) return { kind: 'warehouse', barn: true, w: pick([12, 15]), d: Math.min(maxD, 13), sb: 0, color: pick(['#9a2f24', '#a8352a', '#8a2a20']) };
+          if (rho > 0.3 || rnd() < 0.5) return house();
           return { ...s, n: res(1, 2), style: pick(['plaster', 'brick']), color: pick(PALETTE.plaster), roof: 'gable', roofColor: pick(['#a33b2a', '#6a3a2a']), shop: rnd() < 0.7 ? shopPick() : -1 };
         case 'industrial': case 'port':
           if (maxD >= 13 && rnd() < (th === 'industrial' ? 0.6 : 0.45)) return { kind: 'warehouse', w: pick([15, 18, 21]), d: Math.min(maxD, Math.round(sr(13, 17))), sb: 0, color: pick(WAREHOUSE_COLORS) };
@@ -846,7 +983,8 @@ export function buildCity(C) {
           if (rho > 0.8 && rnd() < 0.5) return house();
           return { ...s, n: res(2, 3), style: 'stone', color: pick(PALETTE.stone), roof: rnd() < 0.5 ? 'gable' : 'flat', roofColor: pick(['#4a4f5a', '#3b3f48']), merlons: true, flag: rnd() < 0.3, shop: rnd() < 0.35 ? shopPick() : -1 };
         case 'coastal':
-          if (rho > 0.8 && rnd() < 0.5) return house();
+          // palafitte (case su pali con scala e terrazzino) lontano dal centro
+          if (rho > 0.4 && maxD >= 10.5) return { kind: 'stilt', w: Math.round(sr(8, 10)), d: Math.min(maxD - 3.5, Math.round(sr(7, 9))), sb: 3.5 };
           return { ...s, n: res(2, 3), style: 'pastel', color: pick(PALETTE.pastel), roof: 'flat', balconies: 0.45, awnings: true, shop: rho < 0.7 && rnd() < 0.6 ? shopPick() : -1 };
         default: {
           if (rho > 0.82 && rnd() < 0.7) return house();
@@ -860,6 +998,13 @@ export function buildCity(C) {
       }
     }
     const placeLot = (sp, face, cx, cz, x0, x1, z0, z1) => {
+      if (sp.kind === 'truck') return TB.truckHome(cx, cz, face, y, th);
+      if (sp.kind === 'stilt') {
+        const hs = TB.stiltHouse(cx, cz, sp.w, sp.d, face, y, th);
+        if (rnd() < 0.7) { const F = frame(cx, cz, sp.w, sp.d, face), tu = sg1() * (sp.w / 2 + 0.6); extraTrees.push({ x: F.x(tu, -2.2), z: F.z(tu, -2.2), k: 'palm' }); }
+        stats.case++;
+        return hs;
+      }
       if (sp.kind === 'house') {
         const sw = face >= 2;
         const hs = C.placeHouse(cx, cz, sw ? sp.d : sp.w, sw ? sp.w : sp.d, y, false, th, face);
@@ -870,6 +1015,13 @@ export function buildCity(C) {
           F.box(0, -sp.sb / 2, y + 0.03, 1.3, 0.06, sp.sb, MAT.concrete, { collide: false, cast: false });
           if (rnd() < 0.6) { const tu = sg1() * (half - 1.2); extraTrees.push({ x: F.x(tu, -sp.sb + 1.4), z: F.z(tu, -sp.sb + 1.4), k: pick(TREE_FOR[th] || TREE_FOR.classic) }); }
         }
+        // chalet: catasta di legna addossata a un fianco
+        if (th === 'alpine' && rnd() < 0.75) {
+          const F = frame(cx, cz, sp.w, sp.d, face), sd = sg1();
+          special('woodpile', F.x(sd * (sp.w / 2 + 0.55), sp.d / 2), F.z(sd * (sp.w / 2 + 0.55), sp.d / 2), y, null, { rot: F.rot + sd * Math.PI / 2 });
+          const [a0, a1, b0, b1] = F.rect(sd * (sp.w / 2 + 0.05), sd * (sp.w / 2 + 1.05), sp.d / 2 - 1.4, sp.d / 2 + 1.4);
+          addCollider({ type: 'box', minX: a0, maxX: a1, minY: y, maxY: y + 1.0, minZ: b0, maxZ: b1 });
+        }
         stats.case++;
         return hs;
       }
@@ -879,14 +1031,54 @@ export function buildCity(C) {
       return palazzo({ ...sp, color, cx, cz, y, face, theme: th, stairSide: rnd() < 0.5 ? 1 : -1, backDoor: rnd() < 0.5 });
     };
     const sg1 = () => (rnd() < 0.5 ? -1 : 1);
+    /** porta verso il centro della città (o verso la via principale) */
+    const faceTo = (cx, cz) => {
+      if (pl.layout === 'main') return cz < t.z ? 1 : 0;
+      if (pl.layout === 'track') return cx < t.x ? 3 : 2;
+      const dx = t.x - cx, dz = t.z - cz; return Math.abs(dx) > Math.abs(dz) ? (dx < 0 ? 2 : 3) : (dz < 0 ? 0 : 1);
+    };
+    function fill(r) {
+      const tries = th === 'western' ? 14 : th === 'farm' ? 24 : 6;
+      for (let k = 0; k < tries; k++) {
+        if (th === 'farm' && rnd() < 0.7) {
+          // campo coltivato con staccionata
+          const w = Math.round(sr(8, 18) / 4) * 4, d = Math.round(sr(8, 14) / 4) * 4;
+          const cx = t.x + sr(r.x0 + w / 2 + 1, r.x1 - w / 2 - 1), cz = t.z + sr(r.z0 + d / 2 + 1, r.z1 - d / 2 - 1);
+          if (!fits(cx - w / 2 - 1, cx + w / 2 + 1, cz - d / 2 - 1, cz + d / 2 + 1, 1.0)) continue;
+          placed.push([cx - w / 2 - 1, cx + w / 2 + 1, cz - d / 2 - 1, cz + d / 2 + 1]);
+          TB.field(cx, cz, w, d, y, Math.floor(rnd() * 3));
+          continue;
+        }
+        if (th === 'western') {
+          // camion parcheggiati in file, rivolti verso la via principale
+          const cx = t.x + sr(r.x0 + 6, r.x1 - 6), cz = t.z + sr(r.z0 + 5, r.z1 - 5), face = faceTo(cx, cz);
+          const sw = face >= 2, W = sw ? 2.5 + 2.9 : 9, D = sw ? 9 : 2.5 + 2.9;
+          const ox = sw ? (face === 2 ? -1.45 : 1.45) : 0, oz = sw ? 0 : (face === 0 ? -1.45 : 1.45);   // il lotto comprende il tendalino davanti
+          if (!fits(cx + ox - W / 2 - 1, cx + ox + W / 2 + 1, cz + oz - D / 2 - 1, cz + oz + D / 2 + 1, 1.2)) continue;
+          placed.push([cx + ox - W / 2 - 1, cx + ox + W / 2 + 1, cz + oz - D / 2 - 1, cz + oz + D / 2 + 1]);
+          TB.truckHome(cx, cz, face, y, th);
+          continue;
+        }
+        const w = Math.round(sr(8, 11)), d = Math.round(sr(8, 10));
+        const stilt = th === 'coastal', m = stilt ? 4 : 1.5;
+        const cx = t.x + sr(r.x0 + w / 2 + m, r.x1 - w / 2 - m), cz = t.z + sr(r.z0 + d / 2 + m, r.z1 - d / 2 - m);
+        if (!fits(cx - w / 2 - m, cx + w / 2 + m, cz - d / 2 - m, cz + d / 2 + m, 1.5)) continue;
+        placed.push([cx - w / 2 - m, cx + w / 2 + m, cz - d / 2 - m, cz + d / 2 + m]);
+        const face = faceTo(cx, cz);
+        if (stilt) { const sw = face >= 2; TB.stiltHouse(cx, cz, sw ? d : w, sw ? w : d, face, y, th); }
+        else C.placeHouse(cx, cz, w, d, y, false, th, face);
+        if (rnd() < 0.5) extraTrees.push({ x: cx + sg1() * (w / 2 + 2), z: cz + sg1() * (d / 2 + 2), k: pick(TREE_FOR[th] || TREE_FOR.classic) });
+        stats.case++;
+      }
+    }
     // bordi dei blocchi
-    const edges = [-Infinity, ...offs, Infinity];
+    const ex = [-Infinity, ...[...pl.ox].sort((p, q) => p - q), Infinity], ez = [-Infinity, ...[...pl.oz].sort((p, q) => p - q), Infinity];
     const rects = [];
-    for (let i = 0; i + 1 < edges.length; i++) for (let j = 0; j + 1 < edges.length; j++) {
-      const xa = edges[i], xb = edges[i + 1], za = edges[j], zb = edges[j + 1];
-      const x0 = isFinite(xa) ? xa + CH : -pl.R, x1 = isFinite(xb) ? xb - CH : pl.R;
-      const z0 = isFinite(za) ? za + CH : -pl.R, z1 = isFinite(zb) ? zb - CH : pl.R;
-      if (x0 <= 0 && x1 >= 0 && z0 <= 0 && z1 >= 0 && offs.length >= 2) continue;          // piazza
+    for (let i = 0; i + 1 < ex.length; i++) for (let j = 0; j + 1 < ez.length; j++) {
+      const xa = ex[i], xb = ex[i + 1], za = ez[j], zb = ez[j + 1];
+      const x0 = isFinite(xa) ? xa + CHp : -pl.R, x1 = isFinite(xb) ? xb - CHp : pl.R;
+      const z0 = isFinite(za) ? za + CHp : -pl.R, z1 = isFinite(zb) ? zb - CHp : pl.R;
+      if (pl.layout === 'grid' && pl.hp && x0 <= 0 && x1 >= 0 && z0 <= 0 && z1 >= 0) continue;          // piazza
       rects.push({ x0, x1, z0, z1, sides: [isFinite(za), isFinite(zb), isFinite(xa), isFinite(xb)] });
     }
     // prima i lotti affacciati sulle strade (dal centro verso fuori)
@@ -925,28 +1117,44 @@ export function buildCity(C) {
           } else u += 1.5;
         }
       }
-      // riempimento: case con giardino nelle zone esterne dei blocchi senza strada
-      if (!r.sides.every(Boolean) && th !== 'industrial') {
-        for (let k = 0; k < 6; k++) {
-          const w = Math.round(sr(8, 11)), d = Math.round(sr(8, 10));
-          const cx = t.x + sr(r.x0 + w / 2 + 1, r.x1 - w / 2 - 1), cz = t.z + sr(r.z0 + d / 2 + 1, r.z1 - d / 2 - 1);
-          if (!fits(cx - w / 2 - 1.5, cx + w / 2 + 1.5, cz - d / 2 - 1.5, cz + d / 2 + 1.5, 1.5)) continue;
-          placed.push([cx - w / 2 - 1.5, cx + w / 2 + 1.5, cz - d / 2 - 1.5, cz + d / 2 + 1.5]);
-          // porta verso il centro della città
-          const dx = t.x - cx, dz = t.z - cz, face = Math.abs(dx) > Math.abs(dz) ? (dx < 0 ? 2 : 3) : (dz < 0 ? 0 : 1);
-          C.placeHouse(cx, cz, w, d, y, false, th, face);
-          if (rnd() < 0.5) extraTrees.push({ x: cx + sg1() * (w / 2 + 2), z: cz + sg1() * (d / 2 + 2), k: pick(TREE_FOR[th] || TREE_FOR.classic) });
-          stats.case++;
-        }
-      }
+      // riempimento delle zone senza strada: case con giardino, file di camion, palafitte o campi coltivati
+      if (!r.sides.every(Boolean) && th !== 'industrial') fill(r);
     }
     return placed;
+  }
+
+  /** v27: strutture speciali del tema che occupano spazio prima dei lotti (mura, miniere) */
+  function themed(t) {
+    t.reserve = [];
+    const pl = t.plan;
+    if (t.theme === 'castle' && pl.wallS) TB.castleWalls(t);
+    const wantMine = t.theme === 'western' ? 2 : (t.theme === 'alpine' && (/^Miniera/.test(t.name || '') || rnd() < 0.4)) ? 1 : 0;
+    if (!wantMine) return;
+    // direzioni libere da strade: perpendicolari alla via principale (western) o oltre i vicoli (alpino)
+    const dirs = t.theme === 'western' ? [[0, -1], [0, 1]] : [[1, 0], [-1, 0], [0, -1], [0, 1]];
+    let made = 0;
+    for (const N of dirs) {
+      if (made >= wantMine) break;
+      for (let k = 0; k < 8; k++) {
+        const off = sr(-12, 12);
+        const [x0, x1, z0, z1] = TB.mineRect(t, N, off);
+        const pts = [[x0, z0], [x1, z0], [x0, z1], [x1, z1], [(x0 + x1) / 2, (z0 + z1) / 2]];
+        if (pts.some(([x, z]) => streetAt(t, x, z))) continue;
+        if ([[x0, z0], [x1, z0], [x0, z1], [x1, z1]].some(([x, z]) => C.roadDist(x, z) < 6)) continue;
+        if (t.reserve.some(r => x0 < r[1] && x1 > r[0] && z0 < r[3] && z1 > r[2])) continue;
+        t.reserve.push([x0, x1, z0, z1]);
+        TB.mine(t, N, off, t.theme === 'alpine');
+        made++;
+        break;
+      }
+    }
   }
 
   for (const t of C.TOWNS) {
     if (!t.plan) planTown(t);
     const items = streets(t);
     piazza(t);
+    themed(t);
     t.lots = blocks(t);
     streetLife(t, items);
   }

@@ -24,6 +24,29 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: città a tema, danni da caduta e munizioni con texture (v27)
+
+- **Ogni città ha un tema che la rende diversa dalle altre** (`js/townkit.js`, `js/city.js`), con pianta,
+  strade, edifici e oggetti propri:
+  - **alpina** (in montagna): tutto innevato, strade di neve battuta, vicoli invece del reticolo, chalet di legno
+    con catasta, piazza di ciottoli con campanile scalabile, albero di Natale, slitte e rastrelliere da sci;
+    alcune hanno una miniera scavata nella roccia innevata;
+  - **western** (nel deserto): una sola via principale sterrata con passerelle di legno, saloon ed empori al
+    centro, e intorno si vive **dentro i camion** (cassone con porta, letto, cucinino, tendalino e pannelli
+    solari); due **piccole miniere** con binari, carrelli e mucchi di minerale, staccionate, botti e carri;
+  - **costiera**: strade di sabbia a croce, **palafitte** con scala e terrazzino, cabine da spiaggia,
+    torretta del bagnino (con bottino in cima), surf e barche in secca;
+  - **fattoria**: una strada sterrata, **fienili rossi** con tetto a falde e fieno nel soppalco, **campi
+    coltivati** (grano, mais, ortaggi) con staccionata, trattori, rotoballe e spaventapasseri;
+  - **castello**: **mura merlate** con porte sulle strade, strade di ciottoli e bancarelle del mercato;
+  - classiche, industriali e portuali restano a reticolo asfaltato.
+  Anche il colore del terreno e della minimappa segue il tema e le strade.
+- **Danni da caduta**: oltre ~4 m di caduta libera (velocità > 13 m/s) si perdono PV in proporzione
+  (6 m ≈ 15, 10 m ≈ 37, 25 m ≈ 90; ignorano lo scudo). In acqua e atterrando col deltaplano niente danni.
+- **Munizioni con texture** (`buildAmmoMesh` in `js/items.js`): cassette di metallo verniciato con fascia del
+  colore del tipo, calibro a stampino, maniglia e cartucce sparse; cartucce rosse in una scatola di cartone;
+  razzi in una cassa di legno. Hanno anche l'icona nel messaggio di raccolta.
+
 ### Novità: un personaggio per ogni skin e casette abitabili (v26)
 
 - **24 personaggi diversi**: ogni skin ha il suo modello (`models/chars/<id>.glb`), non più un ricolore dello

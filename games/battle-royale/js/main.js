@@ -17,19 +17,19 @@ import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP,
-} from './world.js?v=26';
+} from './world.js?v=27';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=26';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=27';
 import { weaponIcon } from './weapons.js?v=19';
-import { consIcon } from './items.js?v=19';
+import { consIcon, ammoIcon } from './items.js?v=27';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
 import { createInventory } from './inventory.js?v=19';
 import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=26';
 import { loadRealChars, syncAllReal } from './realchar.js?v=26';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=26';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=27';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -584,6 +584,8 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   }
   if (ch.pos.y <= g) {
     if (!ch.onGround && ch.vel.y < -7 && !ch.inWater) landFx(ch, ch.vel.y);
+    // v27: danni da caduta (oltre ~4 m; in acqua o col deltaplano non ci si fa male)
+    if (!ch.onGround && !ch.inWater && ch.vel.y < -FALL_SAFE_VY && ch.alive) fallDamage(ch, -ch.vel.y);
     ch.pos.y = g; ch.vel.y = 0; ch.onGround = true;
   }
   else if (ch.onGround && ch.vel.y <= 0 && ch.pos.y - g < 0.7) { ch.pos.y = g; ch.vel.y = 0; }
@@ -640,6 +642,18 @@ function swimFx(ch, dt) {
   }
 }
 
+const FALL_SAFE_VY = 13;          // ≈ 3,8 m di caduta libera (g = 22)
+function fallDamage(ch, vy) {
+  const amt = Math.round((vy - FALL_SAFE_VY) * 4.5);   // 6 m ≈ 15, 10 m ≈ 37, 25 m ≈ 90
+  if (amt < 1) return;
+  ch.landT = 0.35;
+  if (ch.isPlayer) {
+    A.playHurt();
+    G.shake = Math.max(G.shake || 0, Math.min(0.6, amt / 60));
+    if (ch.hp - amt > 0) showMsg('', `Caduta: -${amt} PV`, 1.2);
+  }
+  damage(ch, amt, null, false, 'fall', true);
+}
 function landFx(ch, vy) {
   ch.landT = Math.min(0.3, -vy * 0.02);
   if (ch.pos.distanceToSquared(camera.position) < 60 * 60) {
@@ -1251,6 +1265,7 @@ function kill(t, attacker, how) {
     const wr = wk && attacker.weapon && attacker.weapon.id === wk ? attacker.weapon.rarity : 1;
     text = `<b>${esc(attacker.name)}</b> ${wk ? weaponIconHTML(wk, wr, 'wi kfi') : `<span style="opacity:.7">[${esc(how)}]</span>`} ${esc(t.name)}`;
   } else if (how === 'storm') text = `${esc(t.name)} è stato consumato dalla tempesta ⛈`;
+  else if (how === 'fall') text = `${esc(t.name)} è caduto da troppo in alto 🪂`;
   else text = `${esc(t.name)} si è eliminato da solo 💥`;
   addFeed(text, attacker === G.player || t === G.player);
   if (attacker === G.player && t !== G.player) {
@@ -1267,7 +1282,7 @@ function kill(t, attacker, how) {
   }
   if (t === G.player) {
     G.placement = place;
-    G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'storm' ? 'la tempesta' : 'te stesso');
+    G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'storm' ? 'la tempesta' : how === 'fall' ? 'una brutta caduta' : 'te stesso');
     G.ads = false;
     const mate = mateToWatch();
     if (mate) {
@@ -2778,6 +2793,10 @@ function weaponIconHTML(id, rarity, cls = 'wi') {
   return url ? `<img class="${cls}" src="${url}" alt="" draggable="false">` : weaponSVG(id, rarity);
 }
 /** icona del consumabile: foto del modello 3D (o emoji se WebGL non riesce a farla) */
+function ammoIconHTML(id, cls = 'ci') {
+  const url = ammoIcon(id);
+  return url ? `<img class="${cls}" src="${url}" alt="">` : '';
+}
 function consIconHTML(id, cls = 'ci') {
   const url = consIcon(id);
   return url ? `<img class="${cls}" src="${url}" alt="" draggable="false">` : CONSUMABLES[id].icon;
@@ -2883,7 +2902,7 @@ function updateHUD(dt) {
     if (G.interact.loot) {
       const it = G.interact.loot.item;
       const col = it.kind === 'weapon' ? RARITIES[it.rarity].color : '#fff';
-      pr = `<span style="border-color:${col}"><kbd class="kbE">E</kbd> Raccogli ${it.kind === 'weapon' ? weaponIconHTML(it.id, it.rarity, 'wi pi') : it.kind === 'cons' ? consIconHTML(it.id, 'ci pi') : ''}${it.kind === 'cons' ? `${CONSUMABLES[it.id].name} x${it.count}` : itemLabel(it)}</span>`;
+      pr = `<span style="border-color:${col}"><kbd class="kbE">E</kbd> Raccogli ${it.kind === 'weapon' ? weaponIconHTML(it.id, it.rarity, 'wi pi') : it.kind === 'cons' ? consIconHTML(it.id, 'ci pi') : it.kind === 'ammo' ? ammoIconHTML(it.id, 'ci pi') : ''}${it.kind === 'cons' ? `${CONSUMABLES[it.id].name} x${it.count}` : itemLabel(it)}</span>`;
       hud.prompt.style.borderLeftColor = col;
     } else if (G.interact.door) {
       const o = G.interact.door.open;
@@ -3895,4 +3914,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, get stoves() { return stoves; } };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, get stoves() { return stoves; } };

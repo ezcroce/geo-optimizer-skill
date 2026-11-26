@@ -1526,7 +1526,7 @@ function lodGeometry(skin, cos = {}) {
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
 export { buildWeaponMesh } from './weapons.js?v=19';
-import { buildConsumableMesh } from './items.js?v=19';
+import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=27';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
@@ -1536,6 +1536,8 @@ export function buildItemMesh(kind, id) {
     const c = buildConsumableMesh(id);
     if (c) return c;
   } else if (kind === 'ammo') {
+    const a = buildAmmoMesh(id);   // v27: cassette di munizioni con texture
+    if (a) return a;
     box(0.4, 0.22, 0.26, mat('#3e4a2c'), 0, 0, 0, g);
     box(0.41, 0.07, 0.27, mat(idColor(id)), 0, 0.04, 0, g);
   } else if (kind === 'mats') {

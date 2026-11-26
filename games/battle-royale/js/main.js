@@ -4,12 +4,12 @@
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
-  DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=33';
-import * as PR from './progress.js?v=33';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=33';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
+  DIFFICULTY, scaledDifficulty, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
+} from './config.js?v=34';
+import * as PR from './progress.js?v=34';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=34';
+import { initMenu } from './menu.js?v=34';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=34';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';
 import * as A from './audio.js?v=29';
@@ -20,17 +20,17 @@ import {
 } from './world.js?v=33';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=33';
-import { weaponIcon } from './weapons.js?v=33';
-import { consIcon, ammoIcon } from './items.js?v=33';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=34';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=34';
+import { consIcon, ammoIcon } from './items.js?v=34';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=33';
-import { createInventory } from './inventory.js?v=33';
+import { createInventory } from './inventory.js?v=34';
 import { loadModelOverrides, MODEL_SOURCE, PROPS, treeMaterial, bushMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=33';
-import { loadRealChars, syncAllReal } from './realchar.js?v=32';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=34';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=33';
-import { buildPickaxe, heldConsumable } from './held.js?v=33';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=34';
+import { buildPickaxe, heldConsumable } from './held.js?v=34';
 import { createCrosshair } from './crosshair.js?v=33';
 
 const $ = s => document.querySelector(s);
@@ -315,7 +315,7 @@ function updateEffects(dt) {
 const G = {
   state: 'menu', paused: false, time: 0,
   chars: [], player: null, loot: [], chests: [], projectiles: [], bullets: [], walls: [],
-  storm: null, bus: null, diff: DIFFICULTY.normale,
+  storm: null, bus: null, diff: scaledDifficulty('normale'),
   camYaw: 0, camPitch: 0, camDist: 4.2, fov: 70, shake: 0,
   ads: false, build: { on: false }, spectate: null, endShown: false,
   dmgNums: [], killfeed: [], msgT: 0, hitT: 0, hurtT: 0, placement: 0,
@@ -1165,7 +1165,7 @@ function fireWeapon(ch, aimFn, again = null) {
   ch.emote = null;
   ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : def.spin ? 0.35 : 0.7;
   if (ch.isPlayer) XH.fire(def.pellets > 1 || def.projectile ? 1.4 : def.rate > 0.5 ? 1.1 : def.spin ? 0.25 : 0.6);
-  const mult = RARITIES[s.rarity].mult * (ch.isPlayer ? 1 : G.diff.dmgMult);
+  const mult = RARITIES[s.rarity].mult * (ch.isPlayer ? 1 : botDiff(ch).dmgMult);
   const muzzle = muzzlePos(ch);
   A.playGun(def.sound, ch.isPlayer ? 0 : muzzle.distanceTo(camera.position));
   if (muzzle.distanceTo(camera.position) < 140) muzzleFlash(muzzle, def.pellets > 1 || def.projectile);
@@ -1259,6 +1259,8 @@ function aliveCount() { let n = 0; for (const c of G.chars) if (c.alive) n++; re
 function aliveTeams() { const s = new Set(); for (const c of G.chars) if (c.alive) s.add(c.team); return s.size; }
 const teamOf = (c) => (G.teams && G.teams.get(c.team)) || [c];
 const teamAlive = (team) => G.chars.some(c => c.alive && c.team === team);
+/** v34: difficoltà del singolo bot (i compagni dei giocatori veri usano quella base) */
+function botDiff(b) { return G.humanTeams && G.diffAlly && b && G.humanTeams.has(b.team) ? G.diffAlly : G.diff; }
 const isMate = (a, b) => a !== b && G.teamSize > 1 && a.team === b.team;
 /** il capogruppo che il bot segue: il primo compagno vivo (gli umani hanno la precedenza) */
 function leaderOf(b) {
@@ -1315,7 +1317,7 @@ function kill(t, attacker, how) {
     attacker.kills++;
     const wk = Object.keys(WEAPONS).find(k => WEAPONS[k].name === how);
     const wr = wk && attacker.weapon && attacker.weapon.id === wk ? attacker.weapon.rarity : 1;
-    text = `<b>${esc(attacker.name)}</b> ${wk ? weaponIconHTML(wk, wr, 'wi kfi') : `<span style="opacity:.7">[${esc(how)}]</span>`} ${esc(t.name)}`;
+    text = `<b>${esc(attacker.name)}</b> ${wk ? weaponIconHTML(wk, wr, 'wi kfi', true) : `<span style="opacity:.7">[${esc(how)}]</span>`} ${esc(t.name)}`;
   } else if (how === 'storm') text = `${esc(t.name)} è stato consumato dalla tempesta ⛈`;
   else if (how === 'fall') text = `${esc(t.name)} è caduto da troppo in alto 🪂`;
   else text = `${esc(t.name)} si è eliminato da solo 💥`;
@@ -1858,6 +1860,120 @@ function updateLoot(dt) {
   }
 }
 
+// ─────────────── v34: pre-riscaldamento (shader, texture, icone) ───────────────
+// Le prime partite scattavano perché ogni materiale nuovo (armi, oggetti, forzieri, deltaplani…) veniva
+// compilato la prima volta che compariva sullo schermo, e le icone delle armi venivano disegnate a richiesta
+// (con un contesto WebGL a parte) proprio durante il combattimento. Ora tutto si prepara in anticipo.
+let warmProto = null, warmWallMat = null;
+function warmGroup() {
+  if (warmProto) return warmProto;
+  const g = new THREE.Group(); g.name = 'warmup';
+  let i = 0;
+  const add = o => { if (!o) return; o.position.set((i % 12) * 1.6, -400, Math.floor(i / 12) * 1.6); i++; g.add(o); };
+  const tryAdd = f => { try { add(f()); } catch (e) { console.warn('warmup', e && e.message); } };
+  for (const id of Object.keys(WEAPONS)) for (const r of [0, 1, 2, 3, 4]) tryAdd(() => buildWeaponMesh(id, r));
+  tryAdd(() => buildPickaxe());
+  for (const id of Object.keys(CONSUMABLES)) { tryAdd(() => buildItemMesh('cons', id)); tryAdd(() => heldConsumable(id)); }
+  for (const id of Object.keys(AMMO_TYPES)) tryAdd(() => buildItemMesh('ammo', id));
+  tryAdd(() => buildItemMesh('mats', 'wood'));
+  tryAdd(() => buildChestMesh().g);
+  for (const gd of GLIDERS) tryAdd(() => buildGlider(gd));
+  for (const lm of lootMats) { add(new THREE.Mesh(ringGeo, lm.ring)); add(new THREE.Mesh(beamGeo, lm.beam)); }
+  add(new THREE.Mesh(wallGeoX, ghostMat));
+  g.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+  warmProto = g;
+  return g;
+}
+/** compile() sceglie la variante dello shader in base a dove si disegna: con il post-processing la scena va in
+ *  un render target (uscita lineare), senza va sullo schermo (sRGB). Si compila con la stessa destinazione. */
+function compileFor(obj, target = null) {
+  const prev = renderer.getRenderTarget();
+  try { renderer.setRenderTarget(gfx.target || null); return renderer.compileAsync(obj, camera, target || undefined).catch(() => null); }
+  finally { renderer.setRenderTarget(prev); }
+}
+function warmTextures(root) {
+  const seen = new Set();
+  root.traverse(o => {
+    const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for (const m of ms) for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap', 'aoMap', 'bumpMap']) {
+      const t = m[k];
+      if (t && t.isTexture && !seen.has(t) && t.image) { seen.add(t); try { renderer.initTexture(t); } catch { /* immagine non pronta */ } }
+    }
+  });
+}
+/** compila in parallelo tutti i materiali della scena + gli oggetti che compariranno più avanti */
+function warmUp() {
+  const t0 = performance.now();
+  const g = warmGroup();
+  // un muro costruito usa il legno dell'isola corrente
+  const wm = warmWallMat || (warmWallMat = new THREE.MeshStandardMaterial({ roughness: 0.85, color: '#ffffff' }));
+  wm.map = world.woodTex || null; wm.normalMap = world.woodTex && world.woodTex.userData.normal || null; wm.needsUpdate = true;
+  const wall = new THREE.Mesh(wallGeoX, wm);
+  wall.castShadow = wall.receiveShadow = true; wall.position.y = -400; wall.frustumCulled = false;
+  g.add(wall);
+  scene.add(g);
+  let p;
+  try {
+    scene.updateMatrixWorld();
+    p = compileFor(scene);
+    warmTextures(scene);
+  } catch (e) { console.warn('warmup', e && e.message); p = Promise.resolve(); }
+  scene.remove(g); g.remove(wall);
+  G.warmMs = Math.round(performance.now() - t0);
+  return p;
+}
+/** v34: scarica in sottofondo i personaggi di tutte le skin (prima arrivavano durante la partita, uno per ogni skin
+ *  vista per la prima volta) e prepara subito shader e texture di ciascuno */
+const skinWarmed = new Set();
+function warmSkin(id) {
+  if (skinWarmed.has(id)) return;
+  const skin = SKINS.find(k => k.id === id);
+  if (!skin) return;
+  skinWarmed.add(id);
+  try {
+    const o = realWarmObject(skin);
+    if (!o) return;
+    o.updateMatrixWorld(true);
+    compileFor(o, scene);
+    warmTextures(o);
+  } catch (e) { console.warn('warm skin', id, e && e.message); }
+}
+function preloadSkins(first = []) {
+  const ids = [...new Set([...first, ...ALL_SKIN_MODELS()])];
+  for (const id of ids) loadSkinModel(id).then(b => { if (b) warmSkin(id); });
+  if (first.length) prioritizeSkins(first);
+}
+/** v34: alla prima partita aspetta (al massimo maxMs) che i personaggi siano pronti, invece di scaricarli giocando */
+async function skinsReady(maxMs = 25000) {
+  let st = skinLoadStatus();
+  if (st.done >= st.total) return;
+  preloadSkins([settings.skin]);
+  const ld = $('#loading'), p = ld.querySelector('p');
+  ld.classList.remove('hidden');
+  const t0 = performance.now();
+  while (st.done < st.total && performance.now() - t0 < maxMs) {
+    p.textContent = `Preparazione dei personaggi… ${st.done}/${st.total}`;
+    await new Promise(r => setTimeout(r, 120));
+    st = skinLoadStatus();
+  }
+  ld.classList.add('hidden');
+}
+function preloadIcons() {
+  const jobs = [];
+  for (const id of Object.keys(WEAPONS)) for (let r = 0; r < RARITIES.length; r++) jobs.push(() => weaponIcon(id, r));
+  for (const id of Object.keys(CONSUMABLES)) jobs.push(() => consIcon(id));
+  for (const id of Object.keys(AMMO_TYPES)) jobs.push(() => ammoIcon(id));
+  const step = () => {
+    // si lavora nel menu, nel bus e a fine partita; durante il gioco vero si aspetta
+    if (G.state === 'play' && !G.spectate) { setTimeout(step, 500); return; }
+    const t0 = performance.now();
+    while (jobs.length && performance.now() - t0 < 12) { try { jobs.shift()(); } catch { /* icona non disponibile */ } }
+    G.iconJobs = jobs.length;
+    if (jobs.length) setTimeout(step, 30);
+  };
+  setTimeout(step, 1200);
+}
+
 // Forzieri: modello 3D in models3d.js
 for (const cs of world.chestSpots) G.chests.push({ pos: cs.pos.clone(), rot: cs.rot, mesh: null, lid: null, opened: false, t: 0 });
 function ensureChestMesh(c) {
@@ -2073,10 +2189,10 @@ function botThink(b) {
   // scegli il bersaglio
   let tgt = ai.target && ai.target.alive && ai.target.mode !== 'bus' && !isMate(b, ai.target) ? ai.target : null;
   if (tgt && tgt.pos.distanceTo(b.pos) > 130) tgt = null;
-  if (!tgt || Math.random() < 0.15) {
+  if (!tgt || Math.random() < (botDiff(b).aggro || 0.15)) {
     let best = null, bd = Infinity;
     // v21: vista più corta e campo visivo più stretto → incontri più rari, partite più lunghe
-    const range = b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].role === 'sniper') ? 85 : 55;
+    const range = (b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].role === 'sniper') ? 85 : 55) * (botDiff(b).sight || 1);
     for (const c of G.chars) {
       if (c === b || !c.alive || c.mode === 'bus' || c.mode === 'fall') continue;
       if (isMate(b, c)) continue;
@@ -2334,7 +2450,8 @@ function updateBot(b, dt) {
     const l = Math.hypot(mx, mz); if (l > 0) { mx /= l; mz /= l; }
     speed = 4.6;
     // fuoco
-    if (w && ai.seenT > G.diff.reaction && Math.abs(angDiff(b.yaw, wantYaw)) < 0.25) {
+    const D = botDiff(b);
+    if (w && ai.seenT > D.reaction && Math.abs(angDiff(b.yaw, wantYaw)) < 0.25) {
       const def = WEAPONS[w.id];
       if (ai.pauseT > 0) ai.pauseT -= dt;
       else if (dist < def.range * 0.9 && G.time - ai.lastSeen < 0.6) {
@@ -2343,13 +2460,13 @@ function updateBot(b, dt) {
         // il proiettile impiega tempo ad arrivare: il bot mira dove sarà il bersaglio e un po' più in alto
         const d3 = Math.hypot(tgt.pos.x - origin.x, aimY - origin.y, tgt.pos.z - origin.z);
         const tFly = d3 / (def.speed || 300);
-        const lead = G.diff.lead * rand(0.7, 1.15);
-        const comp = 0.5 * BULLET_G * (def.drop ?? 1) * tFly * tFly * G.diff.lead * rand(0.85, 1.1);
+        const lead = D.lead * rand(0.7, 1.15);
+        const comp = 0.5 * BULLET_G * (def.drop ?? 1) * tFly * tFly * D.lead * rand(0.85, 1.1);
         const dir = new THREE.Vector3(tgt.pos.x + tgt.vel.x * tFly * lead, aimY + tgt.vel.y * tFly * lead * 0.4 + comp, tgt.pos.z + tgt.vel.z * tFly * lead).sub(origin).normalize();
-        const err = G.diff.aimError * (1 + tgt.moveAmt * 0.07) * (b.moveAmt > 1 ? 1.25 : 1) + def.spread * 0.6;
+        const err = D.aimError * (1 + tgt.moveAmt * 0.07) * (b.moveAmt > 1 ? 1.25 : 1) + def.spread * 0.6;
         if (fireWeapon(b, () => ({ origin, dir: spreadDir(dir, err), max: def.range }))) {
           if (!def.auto) ai.pauseT = rand(0.1, 0.5);
-          else if (++ai.burst > rand(4, 9)) { ai.burst = 0; ai.pauseT = rand(0.3, 0.8); }
+          else if (++ai.burst > rand(4, 9) * D.burst) { ai.burst = 0; ai.pauseT = rand(0.3, 0.8) / D.burst; }
         }
       }
     } else if (!w && dist < 2.5) {
@@ -2979,8 +3096,9 @@ const cache = {};
 function setHTML(el, key, html) { if (cache[key] !== html) { cache[key] = html; el.innerHTML = html; } }
 
 /** icona dell'arma: foto del modello 3D (o sagoma SVG se WebGL non riesce a farla) */
-function weaponIconHTML(id, rarity, cls = 'wi') {
-  const url = weaponIcon(id, rarity);
+function weaponIconHTML(id, rarity, cls = 'wi', lazy = false) {
+  // lazy (registro delle eliminazioni): se l'icona non è ancora pronta si usa quella vettoriale, senza fermare il gioco
+  const url = lazy ? cachedWeaponIcon(id, rarity) : weaponIcon(id, rarity);
   return url ? `<img class="${cls}" src="${url}" alt="" draggable="false">` : weaponSVG(id, rarity);
 }
 /** icona del consumabile: foto del modello 3D (o emoji se WebGL non riesce a farla) */
@@ -3427,6 +3545,7 @@ async function startMatch() {
     const mode = NET.role === 'host' ? NET.mode : settings.mode;
     const random = mode === 'random';
     const seed = random ? 1 + Math.floor(Math.random() * 2e9) : 1337;
+    await skinsReady();
     await prepareWorld(seed, random);
     if (NET.role === 'host') {
       // la lista dei partecipanti e dei bot la decide l'host
@@ -3446,7 +3565,24 @@ async function startMatch() {
       const st = newStorm();
       const start = { t: 'start', seed, random, mode, team: NET.team, vs: !!NET.vs, lootSeed: Math.floor(Math.random() * 2e9), players, bots, bus: [busAng, busOff], storm: stormState(st), diff: settings.difficulty };
       NET.inMatch = true;
+      // v34: si parte quando tutti hanno caricato l'isola (o dopo 45 s), così nessuno perde il bus o i primi messaggi
+      const wait = new Set(NET.players.filter(p => !p.host).map(p => p.id));
+      G.netReady = wait;
       netSend(start);
+      if (wait.size) {
+        const ld = $('#loading');
+        ld.querySelector('p').textContent = 'In attesa degli altri giocatori…';
+        ld.classList.remove('hidden');
+        const t0 = performance.now();
+        while (wait.size && performance.now() - t0 < 45000 && NET.role === 'host') {
+          wait.forEach(id => { if (!NET.players.some(p => p.id === id)) wait.delete(id); });
+          await new Promise(r => setTimeout(r, 100));
+        }
+        ld.classList.add('hidden');
+      }
+      G.netReady = null;
+      if (NET.role !== 'host') return;
+      netSend({ t: 'go' });
       beginMatch(start);
     } else beginMatch(null);
   } finally { G.starting = false; }
@@ -3454,8 +3590,25 @@ async function startMatch() {
 /** client: l'host ha avviato la partita */
 async function onNetStart(msg) {
   if (G.state !== 'menu') clearMatchToMenuSilently();
-  await prepareWorld(msg.seed, msg.random);
+  // v34: i messaggi che arrivano mentre l'isola si carica vengono messi da parte (prima andavano persi)
+  G.netQueue = []; G.netGo = false; G.netAborted = false;
+  try {
+    await skinsReady(20000);
+    await prepareWorld(msg.seed, msg.random);
+  } catch (e) { G.netQueue = null; $('#loading').classList.add('hidden'); throw e; }
+  netSend({ t: 'ready', relay: false });
+  if (!G.netGo) {
+    const ld = $('#loading');
+    ld.querySelector('p').textContent = 'In attesa degli altri giocatori…';
+    ld.classList.remove('hidden');
+    const t0 = performance.now();
+    while (!G.netGo && performance.now() - t0 < 30000 && NET.role === 'client') await new Promise(r => setTimeout(r, 50));
+    ld.classList.add('hidden');
+  }
+  if (NET.role !== 'client' || G.netAborted) { G.netQueue = null; if (G.netAborted) menuApi.toast("L'host ha annullato la partita"); return; }
+  const q = G.netQueue; G.netQueue = null;
   beginMatch(msg);
+  for (const [f, m] of q) onNetMessage(f, m);
 }
 function clearMatchToMenuSilently() {
   clearMatch(); G.player = null; G.state = 'menu';
@@ -3488,7 +3641,7 @@ function beginMatch(net) {
   G.teamSize = teamSize(G.team);
   G.teamWiped = false; G.killedBy = '';
   G.net = net ? { sendT: 0, snapT: 0, stormT: 0, byPeer: new Map() } : null;
-  G.diff = DIFFICULTY[(net && net.diff) || settings.difficulty] || DIFFICULTY.normale;
+  G.diff = scaledDifficulty((net && net.diff) || settings.difficulty, G.team, net ? (net.players || []).length : 1);
   G.time = 0; G.endShown = false; G.spectate = null; G.paused = false; G.ads = false;
   exitSpectate(); G.specKiller = null; G.specPitch = 0;
   G.lootSeq = 0; G.lootPrefix = ''; G.matchStats = { chests: 0, grass: 0, climb: 0, glide: 0, walk: 0, surv: 0 };
@@ -3556,6 +3709,9 @@ function beginMatch(net) {
   }
   G.chars.forEach((c, i) => { c.idx = i; });
   buildTeams();
+  // v34: i bot compagni di squadra dei giocatori veri restano al livello base, il potenziamento vale per i nemici
+  G.humanTeams = G.teamSize > 1 ? new Set(G.chars.filter(c => c.human).map(c => c.team)) : null;
+  G.diffAlly = scaledDifficulty(G.diff.key, 'solo', 1);
   const player = G.player;
   for (const c of G.chars) c.pos.copy(G.bus.pos);
   G.camYaw = Math.atan2(G.bus.b.x - G.bus.a.x, G.bus.b.z - G.bus.a.z) + Math.PI * 0.5;
@@ -3567,6 +3723,9 @@ function beginMatch(net) {
   scene.fog.far = 560;
   showMsg('BENVENUTO NEL BATTLE BUS!', (G.mode === 'random' ? '🎲 Random Map: isola nuova! · ' : '') + tk('Premi SPAZIO per lanciarti · muovi il mouse per guardarti intorno', 'Tocca LANCIATI quando vuoi · trascina per guardarti intorno'), 6);
   $('#netInfo').classList.toggle('hidden', !G.net);
+  // personaggi delle skin in questa partita per primi
+  preloadSkins([...new Set(G.chars.map(c => c.skin && c.skin.id).filter(Boolean))]);
+  window.__warm = warmUp();
   if (G.net) $('#netInfo').textContent = `🌐 Online · stanza ${NET.code} · ${NET.players.length} giocatori + bot`;
   cache.hot = null;
   if (settings.fs !== false && !isFullscreen()) toggleFullscreen(true);
@@ -4278,13 +4437,18 @@ function netTick(dt) {
   // host: istantanee per ogni giocatore remoto (solo i personaggi vicini, per risparmiare banda)
   if (now - N.snapT > 100) {
     N.snapT = now;
+    // v34: chi è lontano (oltre 120 m) viene aggiornato una volta su tre: dimezza la banda dell'host senza differenze visibili
+    N.snapN = (N.snapN || 0) + 1;
+    const all = N.snapN % 3 === 0;
     for (const rc of G.chars) {
       if (!rc.remote || !rc.human || !rc.netId) continue;
       const list = [];
-      const far = rc.mode === 'bus' || rc.mode === 'fall' ? 1200 : 800;
+      const air = rc.mode === 'bus' || rc.mode === 'fall';
+      const far = air ? 1200 : 800, near = air ? 1200 : 120;
       for (const c of G.chars) {
         if (c === rc || !c.alive || c.mode === 'bus') continue;
-        if (c.human || c.pos.distanceToSquared(rc.pos) < far * far) list.push(encodeChar(c));
+        const d2 = c.pos.distanceToSquared(rc.pos);
+        if (c.human || d2 < near * near || (all && d2 < far * far)) list.push(encodeChar(c));
       }
       netSendTo(rc.netId, { t: 'snap', c: list, bt: r2(G.bus ? G.bus.t : 0), gt: r2(G.time) });
     }
@@ -4294,7 +4458,10 @@ function netTick(dt) {
 const _nv = new THREE.Vector3();
 function onNetMessage(from, m) {
   if (m.t === 'start') { onNetStart(m); return; }
-  if (m.t === 'abort') { if (G.state !== 'menu') { toMenu(); menuApi.toast("L'host ha terminato la partita"); } return; }
+  if (m.t === 'abort') { if (G.netQueue) { G.netAborted = true; G.netGo = true; } if (G.state !== 'menu') { toMenu(); menuApi.toast("L'host ha terminato la partita"); } return; }
+  if (m.t === 'ready') { if (G.netReady) G.netReady.delete(from); return; }
+  if (m.t === 'go') { G.netGo = true; return; }
+  if (G.netQueue) { if (m.t !== 'snap' && m.t !== 'storm' && G.netQueue.length < 3000) G.netQueue.push([from, m]); return; }
   if (!G.net || G.state === 'menu') return;
   const C = G.chars;
   const sender = NET.role === 'host' ? G.net.byPeer.get(from) : null;
@@ -4516,4 +4683,6 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, get stoves() { return stoves; } };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, get stoves() { return stoves; } };
+preloadIcons();
+setTimeout(() => preloadSkins([settings.skin]), 300);

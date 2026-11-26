@@ -293,6 +293,26 @@ export const DIFFICULTY = {
   difficile: { name: 'Difficile', aimError: 0.035, reaction: 0.3, dmgMult: 1.0, lead: 0.95 },
 };
 
+// v34: la difficoltà cresce con la modalità a squadre (in squadra hai compagni, rianimazioni e più potenza di fuoco)
+// e online (gli amici veri coordinano meglio dei bot). Livello: singolo 0 · duo 1 · trio 2 · squad 3, +1 online con altri.
+export const TEAM_DIFF_LEVEL = { solo: 0, duo: 1, trio: 2, squad: 3 };
+export function scaledDifficulty(key, team = 'solo', humans = 1) {
+  const b = DIFFICULTY[key] || DIFFICULTY.normale;
+  const lv = (TEAM_DIFF_LEVEL[team] || 0) + (humans > 1 ? 1 : 0) + (humans > 4 ? 0.5 : 0);
+  return {
+    ...b, key: key in DIFFICULTY ? key : 'normale', level: lv,
+    aimError: b.aimError * Math.pow(0.86, lv),          // mira più precisa
+    reaction: b.reaction * Math.pow(0.84, lv),          // reagiscono prima
+    dmgMult: b.dmgMult * (1 + 0.09 * lv),               // colpiscono più forte
+    lead: Math.min(1, b.lead + 0.04 * lv),              // anticipano meglio chi si muove
+    sight: 1 + 0.1 * lv,                                // vedono più lontano
+    aggro: Math.min(0.9, 0.15 + 0.06 * lv),             // cercano bersagli più spesso
+    burst: 1 + 0.12 * lv,                               // raffiche più lunghe
+  };
+}
+/** etichetta breve per menu/HUD: "Normale +2" */
+export const diffLabel = (key, team, humans = 1) => { const d = scaledDifficulty(key, team, humans); return d.name + (d.level ? ` +${d.level}` : ''); };
+
 // Fasi della tempesta: attesa, durata restringimento, raggio finale, danno/sec
 // Tempesta: raggi per la mappa grande (1200 m) e tempi più lunghi (partita di circa 21 minuti)
 export const STORM_PHASES = [

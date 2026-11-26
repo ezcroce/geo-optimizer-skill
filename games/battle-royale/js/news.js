@@ -1,9 +1,20 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v33';
+export const NEWS_VERSION = 'v34';
 
 export const NEWS = [
+  {
+    v: 'v34', title: 'Online sistemato, bot più forti a squadre e niente più scatti', color: '#3ad6ff', icon: '🌐',
+    items: [
+      'Partite online con gli amici riparate: l’avvio della partita (con 100 giocatori) superava il limite dei messaggi del collegamento e faceva cadere chi entrava. Ora i messaggi grandi si spezzano in pezzi e si ricompongono',
+      'L’host aspetta che tutti abbiano caricato l’isola prima di far partire il bus (al massimo 45 secondi), e niente di quello che succede nel frattempo va perso',
+      'Un errore momentaneo sul canale non butta più fuori un giocatore dalla lobby: si esce solo se il collegamento si chiude davvero',
+      'Difficoltà che cresce con la modalità: in duo, trio e squad i bot nemici mirano meglio, reagiscono prima, vedono più lontano e sparano raffiche più lunghe; online con gli amici ancora un po’ di più. I bot tuoi compagni restano al livello base',
+      'Nel riepilogo del menu vedi il livello effettivo (es. “normale +3” in squad)',
+      'Prime partite senza scatti: shader di armi, oggetti, forzieri, deltaplani e personaggi vengono preparati prima del lancio dal bus, le icone si disegnano nel menu e i personaggi di tutte le skin si scaricano in anticipo (alla prima partita una breve schermata di caricamento)',
+    ],
+  },
   {
     v: 'v33', title: 'Tutto si rompe: distruzione, gravità e modalità spettatore', color: '#ff3dbb', icon: '💥',
     items: [

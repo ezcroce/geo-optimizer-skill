@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { WEAPONS, RARITIES } from './config.js?v=33';
+import { WEAPONS, RARITIES } from './config.js?v=34';
 import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=19';
 
 /** quante volte la texture si ripete in un metro di superficie */
@@ -1028,6 +1028,8 @@ function iconTeardown() {
   try { iconR.forceContextLoss(); } catch { /* già perso */ }
   iconR = null; iconScene = null;
 }
+/** v34: l'icona solo se è già pronta (undefined = non ancora disegnata), senza mai disegnarla adesso */
+export function cachedWeaponIcon(id, rarity = 0) { return ICONS.get(id + '|' + rarity); }
 /** immagine (data URL) dell'arma vista di lato, oppure null se WebGL non è disponibile */
 export function weaponIcon(id, rarity = 0) {
   if (!MODELS[id]) return null;

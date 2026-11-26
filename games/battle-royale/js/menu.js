@@ -2,10 +2,10 @@
 //  Menu principale: Gioca · Armadietto · Pass battaglia · Negozio · Missioni
 //  + lobby online (codice stanza, chat, compagni)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS } from './config.js?v=33';
-import { NEWS, NEWS_VERSION } from './news.js?v=33';
-import * as PR from './progress.js?v=33';
-import * as N from './net.js?v=19';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS, diffLabel } from './config.js?v=34';
+import { NEWS, NEWS_VERSION } from './news.js?v=34';
+import * as PR from './progress.js?v=34';
+import * as N from './net.js?v=34';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -187,7 +187,9 @@ export function initMenu(api) {
   function renderSummary() {
     const tm = TEAM_MODES.find(t => t.id === curTeam()) || TEAM_MODES[0];
     const mp = MODES.find(m => m.id === (N.NET.role === 'off' ? S.mode : N.NET.mode)) || MODES[0];
-    const extra = N.NET.role === 'off' ? `${S.players} giocatori · ${{ facile: 'facile', normale: 'normale', difficile: 'difficile' }[S.difficulty] || ''}` : (tm.size > 1 ? (curVs() ? 'Versus' : 'Squadra con gli amici') : 'Online · 100 giocatori');
+    const humans = N.NET.role === 'off' ? 1 : Math.max(1, N.NET.players.length);
+    const dl = diffLabel(S.difficulty, curTeam(), humans).toLowerCase();
+    const extra = N.NET.role === 'off' ? `${S.players} giocatori · ${dl}` : (tm.size > 1 ? (curVs() ? 'Versus' : 'Squadra con gli amici') : 'Online · 100 giocatori') + ` · ${dl}`;
     $('#playSummary').innerHTML = `<b>${esc(tm.name.toUpperCase())}</b><i>·</i>${mp.icon} ${esc(mp.name)}<i>·</i><span>${esc(extra)}</span>`;
     $('#optsSum').textContent = `${S.players} · ${S.difficulty}`;
   }

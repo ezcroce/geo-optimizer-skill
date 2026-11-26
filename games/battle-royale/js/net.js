@@ -7,7 +7,41 @@
 
 export const MAX_PLAYERS = 8;
 const PREFIX = 'arenaroyale3d-';
-const VERSION = 9;
+const VERSION = 10;
+
+// v34: PeerJS (canale JSON) rifiuta i messaggi oltre ~16 KB ("Message too big for JSON channel"):
+// l'avvio della partita (100 bot) e le istantanee affollate superavano il limite e facevano cadere il collegamento.
+// Ora i messaggi grandi vengono spezzati in pezzi e ricomposti all'arrivo.
+const FRAME_MAX = 5000;    // caratteri: sotto questa soglia il messaggio parte intero
+const CHUNK = 3500;        // caratteri per pezzo (anche con escape/UTF-8 resta ben sotto i 16 KB)
+const WIRE_LIMIT = 16000;  // byte: limite del canale (controllato nel trasporto locale per i test)
+let chunkSeq = 0;
+function frames(msg) {
+  const s = JSON.stringify(msg);
+  if (s.length <= FRAME_MAX) return [msg];
+  const n = Math.ceil(s.length / CHUNK), k = (chunkSeq = (chunkSeq + 1) % 1e9);
+  const out = [];
+  for (let i = 0; i < n; i++) out.push({ t: '_c', k, i, n, d: s.slice(i * CHUNK, (i + 1) * CHUNK) });
+  return out;
+}
+class Reassembler {
+  constructor() { this.m = new Map(); }
+  take(from, msg) {
+    if (!msg || msg.t !== '_c') return msg;
+    const key = from + ':' + msg.k, now = Date.now();
+    let e = this.m.get(key);
+    if (!e) {
+      for (const [kk, v] of this.m) if (now - v.t > 30000) this.m.delete(kk);
+      e = { p: new Array(msg.n), c: 0, t: now };
+      this.m.set(key, e);
+    }
+    if (e.p[msg.i] === undefined) { e.p[msg.i] = msg.d; e.c++; }
+    if (e.c < msg.n) return null;
+    this.m.delete(key);
+    try { return JSON.parse(e.p.join('')); } catch { return null; }
+  }
+  clear() { this.m.clear(); }
+}
 
 export const NET = {
   role: 'off',          // 'off' | 'host' | 'client'
@@ -52,7 +86,7 @@ function loadPeerJS() {
 
 // ── trasporto WebRTC (PeerJS) ──
 class PeerTransport {
-  constructor() { this.conns = new Map(); this.peer = null; }
+  constructor() { this.conns = new Map(); this.peer = null; this.re = new Reassembler(); }
   async host(code, onConn, onData, onDrop) {
     const { Peer } = await loadPeerJS();
     return new Promise((res, rej) => {
@@ -63,9 +97,10 @@ class PeerTransport {
       peer.on('error', e => { clearTimeout(to); if (e.type === 'unavailable-id') rej(new Error('Codice già in uso, riprova')); else rej(new Error(errText(e))); });
       peer.on('connection', conn => {
         conn.on('open', () => { this.conns.set(conn.peer, conn); onConn(conn.peer); });
-        conn.on('data', d => onData(conn.peer, d));
-        conn.on('close', () => { this.conns.delete(conn.peer); onDrop(conn.peer); });
-        conn.on('error', () => { this.conns.delete(conn.peer); onDrop(conn.peer); });
+        conn.on('data', d => { const m = this.re.take(conn.peer, d); if (m) onData(conn.peer, m); });
+        conn.on('close', () => { if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); onDrop(conn.peer); } });
+        // un errore sul canale (es. messaggio rifiutato) non significa che il giocatore se n'è andato
+        conn.on('error', e => { console.warn('rete:', e && (e.type || e.message)); if (!conn.open && this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); onDrop(conn.peer); } });
       });
       peer.on('disconnected', () => { try { peer.reconnect(); } catch { /* ignora */ } });
     });
@@ -80,14 +115,14 @@ class PeerTransport {
       peer.on('open', id => {
         const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
         conn.on('open', () => { clearTimeout(to); this.conns.set(conn.peer, conn); res({ myId: id, hostId: conn.peer }); });
-        conn.on('data', d => onData(conn.peer, d));
+        conn.on('data', d => { const m = this.re.take(conn.peer, d); if (m) onData(conn.peer, m); });
         conn.on('close', () => onDrop(conn.peer));
-        conn.on('error', () => onDrop(conn.peer));
+        conn.on('error', e => { console.warn('rete:', e && (e.type || e.message)); if (!conn.open) onDrop(conn.peer); });
       });
     });
   }
-  send(id, msg) { const c = this.conns.get(id); if (c && c.open) try { c.send(msg); } catch { /* canale chiuso */ } }
-  close() { for (const c of this.conns.values()) try { c.close(); } catch { /* */ } this.conns.clear(); if (this.peer) try { this.peer.destroy(); } catch { /* */ } this.peer = null; }
+  send(id, msg) { const c = this.conns.get(id); if (c && c.open) try { for (const f of frames(msg)) c.send(f); } catch { /* canale chiuso */ } }
+  close() { for (const c of this.conns.values()) try { c.close(); } catch { /* */ } this.conns.clear(); this.re.clear(); if (this.peer) try { this.peer.destroy(); } catch { /* */ } this.peer = null; }
 }
 function errText(e) {
   const t = e && e.type;
@@ -98,14 +133,14 @@ function errText(e) {
 
 // ── trasporto locale (BroadcastChannel tra schede dello stesso browser, per i test) ──
 class LocalTransport {
-  constructor() { this.ch = null; this.id = 'L' + Math.random().toString(36).slice(2, 9); this.conns = new Set(); }
+  constructor() { this.ch = null; this.id = 'L' + Math.random().toString(36).slice(2, 9); this.conns = new Set(); this.re = new Reassembler(); }
   async host(code, onConn, onData, onDrop) {
     this.ch = new BroadcastChannel(PREFIX + code);
     this.ch.onmessage = ({ data: m }) => {
       if (m.to !== this.id) return;
       if (m.kind === 'connect') { this.conns.add(m.from); this.ch.postMessage({ kind: 'accept', from: this.id, to: m.from }); onConn(m.from); }
       else if (m.kind === 'bye') { this.conns.delete(m.from); onDrop(m.from); }
-      else if (this.conns.has(m.from)) onData(m.from, m.data);
+      else if (this.conns.has(m.from)) { const d = this.re.take(m.from, m.data); if (d) onData(m.from, d); }
     };
     // annuncia l'host a chi lo cerca
     this.ch.addEventListener('message', ({ data: m }) => { if (m.kind === 'find') this.ch.postMessage({ kind: 'here', from: this.id, to: m.from }); });
@@ -120,12 +155,20 @@ class LocalTransport {
         if (m.kind === 'here') this.ch.postMessage({ kind: 'connect', from: this.id, to: m.from });
         else if (m.kind === 'accept') { clearTimeout(to); this.host_ = m.from; this.conns.add(m.from); res({ myId: this.id, hostId: m.from }); }
         else if (m.kind === 'bye') onDrop(m.from);
-        else onData(m.from, m.data);
+        else { const d = this.re.take(m.from, m.data); if (d) onData(m.from, d); }
       };
       this.ch.postMessage({ kind: 'find', from: this.id });
     });
   }
-  send(id, msg) { if (this.ch) this.ch.postMessage({ from: this.id, to: id, data: msg }); }
+  send(id, msg) {
+    if (!this.ch) return;
+    for (const f of frames(msg)) {
+      // stesso limite del canale WebRTC, così i test in locale scoprono i messaggi troppo grandi
+      const b = new TextEncoder().encode(JSON.stringify(f)).length;
+      if (b >= WIRE_LIMIT) { console.error('rete: messaggio troppo grande', b, f.t); continue; }
+      this.ch.postMessage({ from: this.id, to: id, data: f });
+    }
+  }
   close() { if (this.ch) { for (const c of this.conns) this.ch.postMessage({ kind: 'bye', from: this.id, to: c }); this.ch.close(); } this.ch = null; this.conns.clear(); }
 }
 

@@ -121,5 +121,7 @@ export function createGfx(renderer, scene, camera, sun) {
     get opts() { return opts; },
     get maxAniso() { return maxAniso; },
     get usePost() { return usePost; },
+    /** v34: dove viene disegnata la scena (serve a pre-compilare gli shader nella variante giusta) */
+    get target() { return composer && usePost ? composer.renderTarget1 : null; },
   };
 }

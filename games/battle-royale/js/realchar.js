@@ -57,6 +57,32 @@ export function loadSkinModel(id) {
   pump();
   return p;
 }
+/** v34: mette in testa alla coda le skin indicate (es. quelle della partita appena iniziata) */
+export function prioritizeSkins(ids) {
+  for (const id of [...ids].reverse()) {
+    if (!SKIN_MODELS.has(id)) continue;
+    if (!LOADING.has(id)) { loadSkinModel(id); }
+    const i = QUEUE.findIndex(q => q[0] === id);
+    if (i > 0) QUEUE.unshift(QUEUE.splice(i, 1)[0]);
+  }
+}
+export const ALL_SKIN_MODELS = () => [...SKIN_MODELS];
+/** v34: quanti personaggi delle skin sono già pronti (o falliti) */
+export function skinLoadStatus() { let done = 0; for (const id of SKIN_MODELS) if (REAL.bases[id] !== undefined) done++; return { done, total: SKIN_MODELS.size }; }
+/** v34: copia "finta" del personaggio di una skin (stessi materiali delle istanze vere), solo per pre-compilare shader e texture */
+export function realWarmObject(skin) {
+  const id = skinModel(skin), base = id && REAL.bases[id];
+  if (!base) return null;
+  const inst = cloneSkinned(base.scene);
+  inst.traverse(o => {
+    if (o.isMesh) {
+      o.material = base.own ? ownMat(base, base.mats[o.name] || o.material, skin, o.name) : recolorMat(base, base.mats[o.name] || o.material, skin, o.name);
+      o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+    }
+  });
+  const rg = new THREE.Group(); rg.scale.setScalar(base.s); rg.position.y = base.oy; rg.add(inst);
+  return rg;
+}
 function pump() {
   while (busy < 2 && QUEUE.length) {
     const [id, res] = QUEUE.shift();

@@ -8,7 +8,7 @@ import {
 } from './config.js?v=29';
 import * as PR from './progress.js?v=29';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=29';
+import { initMenu } from './menu.js?v=32';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';

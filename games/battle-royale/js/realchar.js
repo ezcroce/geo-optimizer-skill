@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { dressUp, HAS_COSTUME } from './costume.js?v=28';
 
 export const REAL = { ready: false, bases: {}, promise: null, prefix: 'models/chars/' };
 const FILES = { soldier: 'soldato.glb', woman: 'donna.glb' };
@@ -24,7 +25,7 @@ export const SKIN_MODELS = new Set(['recluta', 'esploratrice', 'zombie', 'agente
   'cyber', 'astro', 'banana', 'cavaliere', 'drago', 'leo', 'tamsin', 'oren', 'cowboy', 'scienziata', 'vichingo', 'samurai',
   'robot', 'spettro', 'giardiniera', 'rapper']);
 // questi personaggi hanno già un copricapo (casco, cappello, cappuccio, corna): niente cappello cosmetico sopra
-const OWN_HAT = new Set(['ninja', 'tattico', 'pirata', 'cavaliere', 'drago', 'cowboy', 'spettro']);
+const OWN_HAT = new Set(['ninja', 'tattico', 'pirata', 'cavaliere', 'drago', 'cowboy', 'spettro', 'samurai', 'astro', 'vichingo', 'robot', 'banana']);
 // tinte dei vestiti (parte del nome della mesh → colore): la trama del tessuto resta, cambia solo il colore
 const TINTS = {
   recluta: { 't-shirt': '#76845a', cargo: '#3e4630' },
@@ -138,6 +139,12 @@ function prepare(kind, gltf) {
     align(side + 'Leg', side + 'Foot', new THREE.Vector3(0, -1, -0.02));
   }
   rg.updateMatrixWorld(true);
+  // v28: il costume che rende riconoscibile la skin (ali e coda del drago, cappuccio del ninja, armature…)
+  if (HAS_COSTUME.has(kind)) {
+    const meshes = {};
+    scene.traverse(o => { if (o.isMesh && !meshes[o.name]) meshes[o.name] = o; });
+    if (dressUp(kind, { meshes, bones, norm })) rg.updateMatrixWorld(true);
+  }
   // tabella delle ossa principali: genitore, rotazione a riposo nello spazio del corpo
   const list = MAIN.filter(n => bones[n]);
   const idx = Object.fromEntries(list.map((n, i) => [n, i]));
@@ -266,6 +273,7 @@ function tintMat(base, src, hex, name) {
   return m;
 }
 function ownMat(base, src, skin, name) {
+  if (src.name && src.name.startsWith('cos-')) return src;   // materiali dei costumi: già definitivi
   const t = TINTS[skin.id];
   if (t) for (const k in t) if (name.includes(k)) return tintMat(base, src, t[k], name);
   return src;

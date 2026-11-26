@@ -8,7 +8,7 @@ import {
 } from './config.js?v=19';
 import * as PR from './progress.js?v=19';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=26';
+import { initMenu } from './menu.js?v=28';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';
@@ -20,16 +20,16 @@ import {
 } from './world.js?v=27';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=27';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=28';
 import { weaponIcon } from './weapons.js?v=19';
 import { consIcon, ammoIcon } from './items.js?v=27';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
 import { createInventory } from './inventory.js?v=19';
 import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=26';
-import { loadRealChars, syncAllReal } from './realchar.js?v=26';
+import { loadRealChars, syncAllReal } from './realchar.js?v=28';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=27';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=28';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);

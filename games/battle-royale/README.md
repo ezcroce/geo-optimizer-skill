@@ -24,6 +24,31 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: skin riconoscibili (v28)
+
+- **Costumi veri sopra i personaggi realistici** (`js/costume.js`): i modelli MakeHuman delle skin erano persone
+  "normali" e un drago o un ninja sembravano solo un ragazzo vestito di rosso o di nero. Ora ogni skin a tema ha
+  i pezzi che la rendono riconoscibile:
+  - **Drago Rosso**: pelle a scaglie (rilievo procedurale) con ventre a piastre, muso allungato, occhi gialli a
+    fessura, corna all'indietro, cresta di spine dalla nuca al bacino, **ali** con ossa e membrana venata e **coda**
+    con punta a freccia;
+  - **Ninja**: cappuccio con fessura per gli occhi, maschera sul viso, nodo dietro la testa, fascia rossa in vita,
+    fasce su avambracci e polpacci, **katana** a tracolla;
+  - **Samurai**: kimono e hakama, corazza a lamelle laccate cremisi legate da cordoncini, falde, spallacci,
+    parabraccia e schinieri, **kabuto** con mezzaluna d'oro e paranuca, maschera mempo, due spade;
+  - **Cavaliere**: armatura d'oro a piastre con giunture (dove si vede la cotta di maglia), **elmo chiuso** con
+    fessura e fori, pennacchio, mantello e spada;
+  - **Astronauta** (casco con visiera dorata, zaino, tubi), **Pirata** (tricorno, benda, giacca coi bottoni d'oro,
+    fusciacca, sciabola), **Vichingo** (elmo cornuto col nasale, pelliccia, scudo tondo, ascia), **Robot** (corpo di
+    metallo con giunture, occhi rossi, antenna, nucleo luminoso), **Spettro** di ghiaccio traslucido, **Banana**
+    (costume intero), **Zombie** (pelle marcia, vestiti strappati e insanguinati), **Cowboy** (cappello vero),
+    **Scienziata Pazza** (camice e occhialoni).
+- Come funziona: i pezzi che seguono il corpo sono **gusci** (copie del corpo + vestiti, gonfiate e con gli stessi
+  pesi delle ossa), quindi si piegano con tutte le animazioni; i bordi sono tagliati nello shader per avere linee
+  pulite. Elmi e muso hanno forma e normali proprie. I pezzi rigidi (ali, corna, spade, scudi) sono legati a un
+  osso e uniti per materiale ai gusci per contenere le draw call. Nessuna texture da scaricare: scaglie, lamelle,
+  maglia, pelo e tessuti sono procedurali.
+
 ### Novità: città a tema, danni da caduta e munizioni con texture (v27)
 
 - **Ogni città ha un tema che la rende diversa dalle altre** (`js/townkit.js`, `js/city.js`), con pianta,

@@ -1,6 +1,6 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { REAL, attachReal, realKind } from './realchar.js?v=26';
+import { REAL, attachReal, realKind } from './realchar.js?v=28';
 import { normalFromHeight, NORMALS } from './texgen.js?v=19';
 import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=19';
 /** normal map ricavata dalla trama (cache per texture) */

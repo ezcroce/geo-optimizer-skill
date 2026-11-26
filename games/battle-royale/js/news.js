@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v27';
+export const NEWS_VERSION = 'v28';
 
 export const NEWS = [
+  {
+    v: 'v28', title: 'Le skin si riconoscono!', color: '#ff5a4a', icon: '🐉',
+    items: [
+      'Drago Rosso: pelle a scaglie con ventre a piastre, muso, corna, occhi da rettile, cresta di spine, ali membranose e coda',
+      'Ninja: cappuccio con fessura per gli occhi, maschera, fascia rossa, fasce su braccia e gambe e katana sulla schiena',
+      'Samurai con armatura laccata, elmo con mezzaluna d’oro e maschera · Cavaliere in armatura d’oro con elmo chiuso, pennacchio, mantello e spada',
+      'Astronauta con casco e zaino · Pirata con tricorno, benda e giacca · Vichingo con elmo cornuto, pelliccia e scudo · Robot di metallo · Spettro di ghiaccio · Banana vera · Scienziata col camice',
+      'Tutto si muove con le animazioni (corsa, mira, salti) e non servono download in più',
+    ],
+  },
   {
     v: 'v27', title: 'Ogni città ha il suo tema', color: '#e8b05a', icon: '🏘️',
     items: [

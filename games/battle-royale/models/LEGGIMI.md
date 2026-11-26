@@ -20,12 +20,23 @@ Note:
 - `04_personaggi_3_varianti.glb` non viene caricato direttamente: le tre varianti sono state ricreate
   come skin (**Soldato Tattico**, **Esploratrice**, **Meccanico**).
 
+## Un personaggio per skin (v26) — `chars/<id-skin>.glb`
+
+Ogni skin ha un suo file, per esempio `chars/recluta.glb`, `chars/vichingo.glb` o `chars/robot.glb` (24 in tutto).
+- **Origine:** persone realistiche create con [VRM Avatar Maker](https://github.com/ffunch/vrm-avatar-maker)
+  (codice MIT). Gli asset sono **CC0** di MakeHuman e della sua comunità.
+- **Ottimizzazione:** sono esportati in GLB e alleggeriti: circa 15k triangoli, texture fino a 768 px, niente
+  morph, vertici quantizzati.
+- **Sostituzione:** si può usare qualunque glb umanoide con scheletro in stile Unreal (`pelvis`, `spine_01`,
+  `upperarm_l`, `thumb_01_l`…) oppure Mixamo, con lo stesso nome file.
+- **Se un file manca:** quella skin usa il modello base qui sotto.
+
 ## Personaggi realistici (v25) — cartella `chars/`
 
 | File | Uso |
 |---|---|
-| `chars/soldato.glb` | corpo di quasi tutte le skin (armatura ricolorata secondo la skin) |
-| `chars/donna.glb` | Esploratrice, Tamsin, Scienziata, Giardiniera |
+| `chars/soldato.glb` | modello base (mentre si scarica il personaggio della skin, o se manca il file) |
+| `chars/donna.glb` | modello base per Esploratrice, Tamsin, Scienziata, Giardiniera |
 
 Sono modelli con scheletro standard Mixamo (`mixamorig:Hips`, `Spine`, `LeftArm`…): si possono sostituire
 con qualunque personaggio esportato da Mixamo/Blender in .glb con lo stesso scheletro e lo stesso nome file.

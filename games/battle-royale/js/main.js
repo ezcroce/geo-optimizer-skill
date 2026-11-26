@@ -8,7 +8,7 @@ import {
 } from './config.js?v=19';
 import * as PR from './progress.js?v=19';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=25';
+import { initMenu } from './menu.js?v=26';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';
@@ -17,18 +17,19 @@ import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP,
-} from './world.js?v=25';
+} from './world.js?v=26';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=25';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=26';
 import { weaponIcon } from './weapons.js?v=19';
 import { consIcon } from './items.js?v=19';
 import { buildChestMesh } from './models3d.js?v=19';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=19';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
 import { createInventory } from './inventory.js?v=19';
-import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=19';
-import { loadRealChars, syncAllReal } from './realchar.js?v=25';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=25';
+import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=26';
+import { loadRealChars, syncAllReal } from './realchar.js?v=26';
+import { createStoves } from './stove.js?v=26';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=26';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -178,9 +179,10 @@ const clouds = [];
 
 // Mondo
 // se in models/ ci sono i file .glb originali vengono caricati prima di costruire il mondo
-const [loadedModels] = await Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/')]);   // v25: personaggi realistici
+const [loadedModels] = await Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/', [settings.skin])]);   // v25/v26: personaggi realistici (quello del giocatore subito)
 if (loadedModels.length) console.info('Modelli GLB caricati:', loadedModels.join(', '));
 let world = buildWorld(scene, { seed: 1337, random: false });
+let stoves = createStoves(scene, world);   // v26: stufe a legna delle casette
 /** ricostruisce l'isola (Random Map: un seme nuovo a ogni partita) */
 async function prepareWorld(seed, random) {
   if (world.seed === seed && world.random === random) return;
@@ -191,7 +193,9 @@ async function prepareWorld(seed, random) {
   for (const c of G.chests) if (c.mesh) scene.remove(c.mesh);
   G.chests = [];
   world.dispose();
+  stoves.dispose();
   world = buildWorld(scene, { seed, random });
+  stoves = createStoves(scene, world);
   for (const cs of world.chestSpots) G.chests.push({ pos: cs.pos.clone(), rot: cs.rot, mesh: null, lid: null, opened: false, t: 0 });
   window.__game && (window.__game.world = world);
   ld.classList.add('hidden');
@@ -2499,6 +2503,17 @@ function toggleDoor(d, by, open = !d.open, remote = false) {
   if (dd < 45) A.playDoor(open, by && by.isPlayer ? 1 : Math.max(0.05, 1 - dd / 45) * 0.7);
   if (G.net && !remote) netSend({ t: 'door', k: d.i, o: open ? 1 : 0 });
 }
+// v26: stufa a legna delle casette (E per accendere/spegnere)
+function toggleStove(st, by, lit = !st.lit, remote = false) {
+  if (!stoves.setLit(st, lit) && !lit) return;
+  const dd = Math.hypot(st.x - camera.position.x, st.z - camera.position.z);
+  if (dd < 30) {
+    if (lit) { A.playPickup(); for (let i = 0; i < 3; i++) emit(_p.set(st.x, st.y, st.z), '#ffb040', 4, 1.2, 0.35, 0.03, 0.4); }
+    else A.playDoor(false, 0.4);
+  }
+  if (by && by.isPlayer && lit) showMsg('', '🔥 Stufa accesa: resta dentro al calduccio per recuperare salute', 3);
+  if (G.net && !remote) netSend({ t: 'stove', k: st.i, o: lit ? 1 : 0 });
+}
 function botDoors(b) {
   for (const d of world.doors) {
     if (d.open || Math.abs(d.x - b.pos.x) > 2.3 || Math.abs(d.z - b.pos.z) > 2.3 || Math.abs(d.y - b.pos.y) > 2) continue;
@@ -2522,6 +2537,8 @@ function nearestInteract(p) {
     const d = Math.hypot(c.pos.x - p.pos.x, c.pos.z - p.pos.z);
     if (d < 2.6 && Math.abs(c.pos.y - p.pos.y) < 1.8 && d - 1 < bs) { bs = d - 1; best = { chest: c }; }
   }
+  const st = stoves.nearest(p);
+  if (st) { const d = Math.hypot(st.x - p.pos.x, st.z - p.pos.z); if (d - 0.6 < bs) { bs = d - 0.6; best = { stove: st }; } }
   for (const dr of world.doors) {
     const dx = dr.x - p.pos.x, dz = dr.z - p.pos.z;
     if (Math.abs(dx) > 2.6 || Math.abs(dz) > 2.6 || Math.abs(dr.y - p.pos.y) > 1.8) continue;
@@ -2593,6 +2610,7 @@ function updatePlayer(dt) {
     if (inter.loot) { if (pickupLoot(p, inter.loot, true)) A.playPickup(); }
     else if (inter.chest) openChest(p, inter.chest);
     else if (inter.door) toggleDoor(inter.door, p);
+    else if (inter.stove) toggleStove(inter.stove, p);
   }
   G.interact = inter;
   G.ads = mouse.right && !G.build.on && !!p.weapon && p.reloading <= 0 && !p.inWater;
@@ -2870,7 +2888,13 @@ function updateHUD(dt) {
     } else if (G.interact.door) {
       const o = G.interact.door.open;
       pr = tk(`<kbd>E</kbd> ${o ? 'Chiudi' : 'Apri'} la porta 🚪`, `Porta 🚪 tocca <b>${o ? 'CHIUDI' : 'APRI'}</b>`); hud.prompt.style.borderLeftColor = '#c8a070';
+    } else if (G.interact.stove) {
+      const st = G.interact.stove;
+      pr = st.lit ? tk(`<kbd>E</kbd> Spegni la stufa 🔥 <small>(${Math.ceil(st.t)} s di legna)</small>`, 'Stufa 🔥 tocca <b>SPEGNI</b>')
+        : tk('<kbd>E</kbd> Accendi la stufa 🔥', 'Stufa 🔥 tocca <b>ACCENDI</b>');
+      hud.prompt.style.borderLeftColor = '#ff8a3a';
     } else { pr = tk('<kbd>E</kbd> Apri il forziere ✨', 'Forziere ✨ tocca <b>APRI</b>'); hud.prompt.style.borderLeftColor = '#ffd24a'; }
+  } else if (G.warm && p.alive && p.hp < 100) { pr = `🔥 Al calduccio: +2 PS/s <small>(${Math.ceil(G.warm.t)} s)</small>`; hud.prompt.style.borderLeftColor = '#ff8a3a';
   } else if (G.climbHint && p.alive && p.mode === 'ground') { pr = tk('🧗 <kbd>W</kbd> + <kbd>Spazio</kbd> per arrampicarti', '🧗 Spingi avanti + <b>SALTA</b> per arrampicarti'); hud.prompt.style.borderLeftColor = '#7fe07a'; }
   setHTML(hud.prompt, 'prompt', pr);
   hud.prompt.style.display = pr ? 'block' : 'none';
@@ -3041,6 +3065,7 @@ function clearMatch() {
   events.reset();
   weather.hide();
   world.resetProps();
+  stoves.reset();
   for (const c of G.chars) scene.remove(c.m.root);
   G.chars = [];
   for (const L of G.loot) if (L.mesh) scene.remove(L.mesh);
@@ -3699,6 +3724,7 @@ function onNetMessage(from, m) {
       case 'pick': { const L = G.loot.find(x => x.id === m.id); if (L) removeLoot(L, true); break; }
       case 'chest': { const c = G.chests[m.k]; if (c && !c.opened) openChest(null, c); break; }
       case 'door': { const d = world.doors[m.k]; if (d) toggleDoor(d, null, !!m.o, true); break; }
+      case 'stove': { const st = world.stoves[m.k]; if (st) toggleStove(st, null, !!m.o, true); break; }
       case 'evt': if (NET.role === 'client') events.start(m); break;
       case 'wall': {
         const g = m.g;
@@ -3811,6 +3837,7 @@ function update(dt) {
   updateParticles(dt);
   updateRipples(dt);
   updateDoors(dt);
+  G.warm = stoves.update(dt, camera, G.chars);
   updateEffects(dt);
   for (const cl of clouds) { cl.position.x += dt * 2; if (cl.position.x > 450) cl.position.x = -450; }
   updateCamera(dt);
@@ -3868,4 +3895,4 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, get stoves() { return stoves; } };

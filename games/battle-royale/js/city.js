@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { CAR_VARIANTS, CAR_DIMS, CAR_PAINTS } from './cars.js?v=25';
-import { mergeParts } from './props.js?v=19';
+import { mergeParts } from './props.js?v=26';
 import {
   facadeTexture, plainTexture, asphaltTexture, sidewalkTexture, cobbleTexture, roofFlatTexture, tileTexture,
   concreteTexture, corrugatedTexture, railTexture, awningTexture, AWNING_COLORS, signAtlas, signGeometry, SHOPS,

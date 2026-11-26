@@ -24,6 +24,47 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: un personaggio per ogni skin e casette abitabili (v26)
+
+- **24 personaggi diversi**: ogni skin ha il suo modello (`models/chars/<id>.glb`), non più un ricolore dello
+  stesso corpo. Sono persone realistiche con corpo, età, viso, carnagione, capelli, barba, occhiali e vestiti
+  propri, ad esempio:
+  - la Recluta in maglietta e cargo;
+  - l'Agente in completo e occhiali;
+  - il Vichingo con barba e tunica;
+  - il Samurai in kimono cremisi;
+  - il Robot X-9 in armatura cyborg con visore;
+  - lo Spettro in tunica stellata con cappuccio;
+  - il Drago Rosso con le corna;
+  - il Meccanico in salopette;
+  - l'Astronauta in tuta spaziale;
+  - il Cowboy con il cappello.
+
+  Sono costruiti con *VRM Avatar Maker* dagli asset CC0 di MakeHuman e alleggeriti per il gioco: circa 15 mila
+  triangoli e 0,6 MB l'uno, senza morph, con vertici quantizzati.
+  - Si scaricano **solo quando servono**, cioè quando un personaggio con quella skin si vede da vicino. Nel
+    frattempo si vede il modello base, poi il cambio è automatico. La skin del giocatore si carica subito.
+  - Lo scheletro in stile Unreal (`pelvis`, `spine_01`, `upperarm_l`…) viene mappato sui nomi usati dal
+    retargeting.
+  - Le dita si piegano su assi calcolati nel mondo.
+  - Alcuni vestiti sono **tinti** secondo la skin, ad esempio la maglia oliva del Soldato tattico e la tonaca
+    rossa di Tamsin.
+  - Sui personaggi che hanno già un copricapo il cappello cosmetico non si mette.
+- **Casette di legno abitabili** (le ~48 casette sparse per la campagna, `js/props.js` → `SHED`):
+  - **porta vera** a un'anta che si apre e chiude con **E**, anche per i bot e online;
+  - pareti con collisioni vere e pavimento a tavole;
+  - letto con coperta a quadri, tavolo con sgabelli e lanterna, mensole con barattoli e libri, tappeto, catene
+    del tetto e una seconda finestra;
+  - il **bottino è dentro**, sul tappeto, e spesso c'è un **forziere** ai piedi del letto.
+- **Stufa a legna** (`js/stove.js`). Premendo **E** davanti alla stufa si accende:
+  - fiamme vive dietro il vetro;
+  - un bagliore caldo che illumina la stanza (una sola luce riutilizzata, nessuna ricompilazione degli shader);
+  - il **fumo** che esce dal comignolo e piega col vento.
+  - Chi resta **al calduccio** dentro la casetta recupera **+2 PS al secondo** fino a 100. Vale anche per i bot.
+  - La legna dura 60 secondi, poi il fuoco cala e si spegne. Online l'accensione è sincronizzata.
+- Crediti: personaggi creati con [VRM Avatar Maker](https://github.com/ffunch/vrm-avatar-maker) (codice MIT)
+  da asset **CC0** di MakeHuman e della comunità MakeHuman (vedi `ASSETS.md` del progetto).
+
 ### Novità: grafica realistica (v25)
 
 - **Personaggi veri** (`js/realchar.js`): al posto dei pupazzi fatti di cubi, sfere e cilindri ci sono modelli
@@ -298,6 +339,7 @@ js/world.js     terreno, biomi, città tematiche, chunk (dettaglio + LOD), colli
 js/city.js      generatore delle città: strade, piazze, palazzi a più piani, negozi, capannoni, arredo urbano
 js/citytex.js   texture procedurali delle città: facciate, asfalto, marciapiedi, insegne, prodotti
 js/realchar.js  personaggi realistici: caricamento dei modelli .glb, ricolori delle skin, retargeting della posa e IK delle braccia
+js/stove.js     stufe a legna delle casette: fuoco, fumo dal comignolo, luce calda, calduccio che cura
 js/cars.js      auto realistiche: carrozzeria, vernice metallizzata, vetri, ruote, fari e targhe
 js/weather.js   nebbia d'altezza, montagne all'orizzonte, neve / foglie / polvere locali
 js/events.js    eventi della partita (rifornimento, meteoriti, nebbia, bufera, ora d'oro, bassa gravità)

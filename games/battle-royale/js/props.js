@@ -542,62 +542,130 @@ function makeBarrel(kind) {
 }
 
 // ═════════════ 05 · CASETTA ═════════════
+/** v26: la casetta di legno è abitabile: porta vera (anta a parte, in world.js), pavimento a tavole,
+ *  letto, tavolo con sgabelli, mensole, tappeto e una stufa a legna con il tubo che esce dal tetto */
+export const SHED = {
+  W: 4.2, D: 3.6, WH: 2.5, RH: 1.35, floor: 0.3,
+  door: { x: -0.525, w: 1.05, top: 2.7 },          // vano della porta sul lato +Z
+  stove: { x: -1.55, z: -1.25, fireY: 0.62, fireZ: -0.97, pipeTop: 4.15 },
+};
 function makeShed() {
   const parts = [];
-  const W = 4.2, D = 3.6, WH = 2.5, RH = 1.35;  // larghezza, profondità, altezza muri, altezza tetto
+  const { W, D, WH, RH } = SHED, F = SHED.floor;
   const rnd = mulberry32(55);
   // basamento in pietra
   parts.push(part(new THREE.BoxGeometry(W + 0.2, 0.3, D + 0.2), '#8f8a80', { y: 0.15, jit: 0.1 }));
-  // pareti a tavole verticali
+  // pavimento a tavole
+  const floorC = ['#7a5434', '#6e4b2e', '#83593a'];
+  for (let i = 0; i < 9; i++) {
+    const z = -D / 2 + 0.2 + (i + 0.5) * (D - 0.4) / 9;
+    parts.push(part(new THREE.BoxGeometry(W - 0.2, 0.03, (D - 0.4) / 9 - 0.015), floorC[i % 3], { y: F + 0.015, z, jit: 0.05 }));
+  }
+  // pareti a tavole verticali (sul davanti si lascia il vano della porta)
   const plank = 0.35;
   const woodC = ['#a8763f', '#9c6c38', '#b07f46', '#946535'];
+  const dx0 = SHED.door.x - SHED.door.w / 2, dx1 = SHED.door.x + SHED.door.w / 2;
   for (const sz of [-1, 1]) for (let i = 0; i < Math.round(W / plank); i++) {
     const x = -W / 2 + plank / 2 + i * plank;
-    parts.push(part(new THREE.BoxGeometry(plank - 0.02, WH, 0.1), woodC[Math.floor(rnd() * 4)], { x, y: 0.3 + WH / 2, z: sz * (D / 2 - 0.05), jit: 0.06 }));
+    if (sz > 0 && x > dx0 && x < dx1) continue;
+    parts.push(part(new THREE.BoxGeometry(plank - 0.02, WH, 0.1), woodC[Math.floor(rnd() * 4)], { x, y: F + WH / 2, z: sz * (D / 2 - 0.05), jit: 0.06 }));
   }
   for (const sx of [-1, 1]) for (let i = 0; i < Math.round(D / plank); i++) {
     const z = -D / 2 + plank / 2 + i * plank;
-    parts.push(part(new THREE.BoxGeometry(0.1, WH, plank - 0.02), woodC[Math.floor(rnd() * 4)], { x: sx * (W / 2 - 0.05), y: 0.3 + WH / 2, z, jit: 0.06 }));
+    parts.push(part(new THREE.BoxGeometry(0.1, WH, plank - 0.02), woodC[Math.floor(rnd() * 4)], { x: sx * (W / 2 - 0.05), y: F + WH / 2, z, jit: 0.06 }));
   }
+  // stipiti e architrave della porta
+  for (const x of [dx0 - 0.05, dx1 + 0.05]) parts.push(part(new THREE.BoxGeometry(0.1, SHED.door.top - F, 0.16), '#5e3f22', { x, y: (SHED.door.top + F) / 2, z: D / 2 - 0.05, jit: 0.04 }));
+  parts.push(part(new THREE.BoxGeometry(SHED.door.w + 0.3, F + WH - SHED.door.top + 0.02, 0.16), '#5e3f22', { x: SHED.door.x, y: (SHED.door.top + F + WH) / 2, z: D / 2 - 0.05, jit: 0.04 }));
+  parts.push(part(new THREE.BoxGeometry(SHED.door.w + 0.2, 0.06, 0.4), '#7a7368', { x: SHED.door.x, y: F + 0.02, z: D / 2 + 0.15 }));   // soglia
   // timpani triangolari
   for (const sz of [-1, 1]) {
     const shape = new THREE.Shape();
     shape.moveTo(-W / 2, 0); shape.lineTo(W / 2, 0); shape.lineTo(0, RH); shape.lineTo(-W / 2, 0);
     const g = new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
-    parts.push(part(g, '#9a6a36', { y: 0.3 + WH, z: sz * (D / 2) - (sz > 0 ? 0.1 : 0), jit: 0.06 }));
+    parts.push(part(g, '#9a6a36', { y: F + WH, z: sz * (D / 2) - (sz > 0 ? 0.1 : 0), jit: 0.06 }));
   }
-  // travi angolari
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push(part(new THREE.BoxGeometry(0.16, WH, 0.16), '#5e3f22', { x: sx * (W / 2 - 0.04), y: 0.3 + WH / 2, z: sz * (D / 2 - 0.04), jit: 0.05 }));
+  // travi angolari e trave di colmo interna
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push(part(new THREE.BoxGeometry(0.16, WH, 0.16), '#5e3f22', { x: sx * (W / 2 - 0.04), y: F + WH / 2, z: sz * (D / 2 - 0.04), jit: 0.05 }));
+  parts.push(part(new THREE.BoxGeometry(0.14, 0.16, D - 0.1), '#5e3f22', { y: F + WH + RH - 0.25 }));
   // tetto a due falde (tegole a file)
   const slope = Math.atan2(RH, W / 2 + 0.3), sl = Math.hypot(W / 2 + 0.3, RH) + 0.1;
   const roofC = ['#8a3326', '#9a3a2b', '#7d2e22'];
   for (const sx of [-1, 1]) {
     for (let r = 0; r < 5; r++) {
       const t = (r + 0.5) / 5;
-      const cx = sx * (W / 2 + 0.3) * (1 - t) + 0, cy = 0.3 + WH + RH * t - 0.12 + 0.08;
+      const cx = sx * (W / 2 + 0.3) * (1 - t) + 0, cy = F + WH + RH * t - 0.12 + 0.08;
       parts.push(part(new THREE.BoxGeometry(sl / 5 + 0.06, 0.09, D + 0.6), roofC[r % 3], { x: cx, y: cy, rz: -sx * slope, jit: 0.07 }));
     }
+    // assito sotto le tegole (si vede da dentro)
+    parts.push(part(new THREE.BoxGeometry(sl, 0.03, D - 0.1), '#8a6440', { x: sx * (W / 4 + 0.05), y: F + WH + RH / 2 - 0.1, rz: -sx * slope, jit: 0.05 }));
   }
-  parts.push(part(new THREE.BoxGeometry(0.2, 0.18, D + 0.7), '#5e2a20', { y: 0.3 + WH + RH + 0.02 }));
-  // porta, maniglia e finestra
-  parts.push(part(new THREE.BoxGeometry(1.0, 1.95, 0.06), '#5a3a20', { x: -0.7, y: 0.3 + 0.975, z: D / 2 + 0.03, jit: 0.05 }));
-  parts.push(part(new THREE.BoxGeometry(0.08, 0.08, 0.08), '#d8b040', { x: -0.32, y: 1.25, z: D / 2 + 0.08 }));
-  parts.push(part(new THREE.BoxGeometry(1.1, 0.9, 0.05), '#f0ece0', { x: 1.0, y: 1.75, z: D / 2 + 0.03 }));
-  parts.push(part(new THREE.BoxGeometry(0.9, 0.7, 0.06), '#7fb6d8', { x: 1.0, y: 1.75, z: D / 2 + 0.05, jit: 0.02 }));
-  parts.push(part(new THREE.BoxGeometry(0.06, 0.7, 0.07), '#f0ece0', { x: 1.0, y: 1.75, z: D / 2 + 0.06 }));
-  parts.push(part(new THREE.BoxGeometry(1.2, 0.08, 0.2), '#f0ece0', { x: 1.0, y: 1.28, z: D / 2 + 0.1 }));
+  parts.push(part(new THREE.BoxGeometry(0.2, 0.18, D + 0.7), '#5e2a20', { y: F + WH + RH + 0.02 }));
+  // finestra sul davanti e una sul fianco
+  const win = (x, y, z, ry) => {
+    parts.push(part(new THREE.BoxGeometry(1.1, 0.9, 0.05), '#f0ece0', { x, y, z, ry }));
+    parts.push(part(new THREE.BoxGeometry(0.9, 0.7, 0.14), '#5f8fae', { x, y, z, ry, jit: 0.02 }));
+    parts.push(part(new THREE.BoxGeometry(0.06, 0.7, 0.16), '#f0ece0', { x, y, z, ry }));
+    parts.push(part(new THREE.BoxGeometry(0.9, 0.06, 0.16), '#f0ece0', { x, y, z, ry }));
+  };
+  win(1.05, 1.75, D / 2 - 0.04, 0);
+  win(W / 2 - 0.04, 1.75, 0.3, Math.PI / 2);
+  parts.push(part(new THREE.BoxGeometry(1.2, 0.08, 0.2), '#f0ece0', { x: 1.05, y: 1.28, z: D / 2 + 0.1 }));
   // fioriera sotto la finestra
-  parts.push(part(new THREE.BoxGeometry(1.0, 0.22, 0.25), '#7a4a2a', { x: 1.0, y: 1.1, z: D / 2 + 0.17 }));
-  for (let i = 0; i < 4; i++) parts.push(part(new THREE.IcosahedronGeometry(0.11, 0), ['#e04a6a', '#f2c230', '#e86a3a', '#c04dff'][i], { x: 0.65 + i * 0.23, y: 1.27, z: D / 2 + 0.17, jit: 0.1 }));
-  // comignolo
-  parts.push(part(new THREE.BoxGeometry(0.5, 1.1, 0.5), '#9a4a3a', { x: 1.1, y: 0.3 + WH + RH * 0.55 + 0.4, z: -0.6, jit: 0.1 }));
-  parts.push(part(new THREE.BoxGeometry(0.62, 0.1, 0.62), '#5a5a5a', { x: 1.1, y: 0.3 + WH + RH * 0.55 + 0.98, z: -0.6 }));
-  // legna accatastata accanto
+  parts.push(part(new THREE.BoxGeometry(1.0, 0.22, 0.25), '#7a4a2a', { x: 1.05, y: 1.1, z: D / 2 + 0.17 }));
+  for (let i = 0; i < 4; i++) parts.push(part(new THREE.IcosahedronGeometry(0.11, 1), ['#e04a6a', '#f2c230', '#e86a3a', '#c04dff'][i], { x: 0.7 + i * 0.23, y: 1.27, z: D / 2 + 0.17, jit: 0.1 }));
+  // ── interno ──
+  const iron = '#2b2a28';
+  const S = SHED.stove;
+  // stufa a legna in ghisa con il vetro, i piedini e il tubo fino sopra il tetto
+  parts.push(part(new THREE.BoxGeometry(0.62, 0.62, 0.52), iron, { x: S.x, y: F + 0.12 + 0.31, z: S.z, jit: 0.04 }));
+  parts.push(part(new THREE.BoxGeometry(0.68, 0.05, 0.58), '#3a3936', { x: S.x, y: F + 0.76, z: S.z }));
+  for (const lx of [-0.24, 0.24]) for (const lz of [-0.19, 0.19]) parts.push(part(new THREE.CylinderGeometry(0.03, 0.035, 0.12, 6), iron, { x: S.x + lx, y: F + 0.06, z: S.z + lz }));
+  parts.push(part(new THREE.BoxGeometry(0.36, 0.26, 0.02), '#1a1210', { x: S.x, y: F + S.fireY - F + 0.02, z: S.z + 0.265 }));
+  parts.push(part(new THREE.BoxGeometry(0.05, 0.05, 0.05), '#b0a080', { x: S.x + 0.22, y: F + 0.47, z: S.z + 0.29 }));
+  parts.push(part(new THREE.CylinderGeometry(0.075, 0.075, S.pipeTop - F - 0.78, 10), '#3a3936', { x: S.x, y: (S.pipeTop + F + 0.78) / 2, z: S.z }));
+  parts.push(part(new THREE.CylinderGeometry(0.16, 0.12, 0.12, 10), '#3a3936', { x: S.x, y: S.pipeTop + 0.05, z: S.z }));
+  parts.push(part(new THREE.BoxGeometry(0.9, 0.02, 0.8), '#6a6560', { x: S.x + 0.05, y: F + 0.04, z: S.z + 0.1 }));   // lastra di pietra sotto
+  // legna accanto alla stufa
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) parts.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.45, 7), '#6e4a2a', { x: S.x + 0.6 + j * 0.13 + i * 0.06, y: F + 0.07 + i * 0.11, z: S.z - 0.05, rx: Math.PI / 2, jit: 0.12, colorFn: (nx, ny, nz) => Math.abs(nz) > 0.9 ? '#c99a5b' : null }));
+  // letto con testiera, materasso, coperta a quadri e cuscino
+  const bx = 1.45, bz = -0.75;
+  parts.push(part(new THREE.BoxGeometry(1.0, 0.3, 1.95), '#6b4527', { x: bx, y: F + 0.15 + 0.05, z: bz, jit: 0.05 }));
+  parts.push(part(new THREE.BoxGeometry(1.0, 0.75, 0.07), '#5a3a20', { x: bx, y: F + 0.42, z: bz - 0.96, jit: 0.05 }));
+  parts.push(part(new THREE.BoxGeometry(0.92, 0.14, 1.86), '#e8e0cc', { x: bx, y: F + 0.47, z: bz }));
+  parts.push(part(new THREE.BoxGeometry(0.98, 0.07, 1.25), '#9a2f2a', { x: bx, y: F + 0.56, z: bz + 0.32, jit: 0.12 }));
+  parts.push(part(new THREE.BoxGeometry(0.98, 0.075, 0.12), '#2f4a6a', { x: bx, y: F + 0.565, z: bz - 0.18 }));
+  parts.push(part(new THREE.BoxGeometry(0.6, 0.12, 0.34), '#f4f0e6', { x: bx, y: F + 0.6, z: bz - 0.72 }));
+  // tavolo con due sgabelli e una lanterna
+  const tx = -1.3, tz = 0.0;
+  parts.push(part(new THREE.BoxGeometry(0.8, 0.05, 0.6), '#8a5a32', { x: tx, y: F + 0.74, z: tz, jit: 0.05 }));
+  for (const lx of [-0.34, 0.34]) for (const lz of [-0.24, 0.24]) parts.push(part(new THREE.BoxGeometry(0.05, 0.72, 0.05), '#6b4527', { x: tx + lx, y: F + 0.36, z: tz + lz }));
+  for (const [sx, sz] of [[0.0, 0.52], [0.62, -0.05]]) {
+    parts.push(part(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 10), '#8a5a32', { x: tx + sx, y: F + 0.45, z: tz + sz }));
+    for (let k = 0; k < 3; k++) { const a = k * 2.094; parts.push(part(new THREE.CylinderGeometry(0.02, 0.025, 0.44, 5), '#6b4527', { x: tx + sx + Math.cos(a) * 0.11, y: F + 0.22, z: tz + sz + Math.sin(a) * 0.11 })); }
+  }
+  parts.push(part(new THREE.CylinderGeometry(0.06, 0.07, 0.03, 8), '#3a3936', { x: tx + 0.15, y: F + 0.78, z: tz - 0.1 }));
+  parts.push(part(new THREE.CylinderGeometry(0.055, 0.055, 0.14, 8), '#ffd890', { x: tx + 0.15, y: F + 0.86, z: tz - 0.1 }));
+  parts.push(part(new THREE.CylinderGeometry(0.02, 0.06, 0.05, 8), '#3a3936', { x: tx + 0.15, y: F + 0.955, z: tz - 0.1 }));
+  parts.push(part(new THREE.CylinderGeometry(0.08, 0.06, 0.07, 9), '#c8c0b0', { x: tx - 0.2, y: F + 0.8, z: tz + 0.1 }));   // ciotola
+  // mensole sulla parete sinistra con barattoli e libri
+  for (const y of [1.25, 1.75]) {
+    parts.push(part(new THREE.BoxGeometry(0.28, 0.04, 1.0), '#7a5434', { x: -W / 2 + 0.24, y: F + y, z: 1.0 }));
+    for (let k = 0; k < 4; k++) {
+      const z = 0.62 + k * 0.24;
+      if (rnd() < 0.5) parts.push(part(new THREE.CylinderGeometry(0.06, 0.06, 0.16, 8), ['#c8a050', '#8ab070', '#d8d0c0', '#b05a3a'][k], { x: -W / 2 + 0.24, y: F + y + 0.1, z }));
+      else parts.push(part(new THREE.BoxGeometry(0.18, 0.22, 0.06), ['#7a2a2a', '#2a4a7a', '#4a6a3a', '#8a6a2a'][k], { x: -W / 2 + 0.24, y: F + y + 0.13, z, jit: 0.1 }));
+    }
+  }
+  // tappeto
+  parts.push(part(new THREE.BoxGeometry(1.3, 0.015, 0.95), '#8a3a2a', { x: 0.2, y: F + 0.04, z: 0.55 }));
+  parts.push(part(new THREE.BoxGeometry(1.1, 0.017, 0.75), '#c89a4a', { x: 0.2, y: F + 0.041, z: 0.55 }));
+  // legna accatastata fuori
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3 - i; j++) {
     parts.push(part(new THREE.CylinderGeometry(0.12, 0.12, 1.0, 7), '#6e4a2a', { x: -W / 2 - 0.25 - i * 0.0, y: 0.42 + i * 0.21, z: -0.6 + j * 0.25 + i * 0.12, rx: Math.PI / 2, jit: 0.12, colorFn: (nx, ny, nz) => Math.abs(nz) > 0.9 ? '#c99a5b' : null }));
   }
   const geo = mergeParts(parts, 56);
-  geo.userData.dims = { w: W + 0.6, d: D + 0.6, wallH: 0.3 + WH, h: 0.3 + WH + RH };
+  geo.userData.dims = { w: W + 0.6, d: D + 0.6, wallH: F + WH, h: F + WH + RH };
   return geo;
 }
 

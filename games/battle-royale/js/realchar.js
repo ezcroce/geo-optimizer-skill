@@ -5,33 +5,96 @@
 //  (corsa, mira, arrampicata, nuoto, deltaplano, emote…): ogni fotogramma la posa viene trasferita
 //  alle ossa del modello vero (retargeting). Con l'arma in mano le braccia usano la cinematica inversa
 //  così le mani restano esattamente sull'impugnatura.
+//  v26: ogni skin ha il SUO personaggio (models/chars/<id>.glb, persone realistiche create con
+//  VRM Avatar Maker dagli asset CC0 di MakeHuman): corpo, viso, capelli e vestiti diversi.
+//  Si caricano solo quando servono; nel frattempo si vede il modello base, poi il cambio è automatico.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
-export const REAL = { ready: false, bases: {}, promise: null };
+export const REAL = { ready: false, bases: {}, promise: null, prefix: 'models/chars/' };
 const FILES = { soldier: 'soldato.glb', woman: 'donna.glb' };
 // skin con il corpo femminile (le altre usano il soldato con l'armatura ricolorata)
 const WOMAN = new Set(['esploratrice', 'tamsin', 'scienziata', 'giardiniera']);
 export const realKind = (skin) => (WOMAN.has(skin.id) ? 'woman' : 'soldier');
 
+// ── v26: un personaggio diverso per ogni skin ──
+export const SKIN_MODELS = new Set(['recluta', 'esploratrice', 'zombie', 'agente', 'ninja', 'tattico', 'pirata', 'meccanico',
+  'cyber', 'astro', 'banana', 'cavaliere', 'drago', 'leo', 'tamsin', 'oren', 'cowboy', 'scienziata', 'vichingo', 'samurai',
+  'robot', 'spettro', 'giardiniera', 'rapper']);
+// questi personaggi hanno già un copricapo (casco, cappello, cappuccio, corna): niente cappello cosmetico sopra
+const OWN_HAT = new Set(['ninja', 'tattico', 'pirata', 'cavaliere', 'drago', 'cowboy', 'spettro']);
+// tinte dei vestiti (parte del nome della mesh → colore): la trama del tessuto resta, cambia solo il colore
+const TINTS = {
+  recluta: { 't-shirt': '#76845a', cargo: '#3e4630' },
+  esploratrice: { tank: '#c8743c' },
+  zombie: { 't-shirt': '#6e7c8a', wool: '#3a3f4a' },
+  tattico: { sweater: '#59613f', cargo: '#4a4f3a' },
+  banana: { 't-shirt': '#ffd83a' },
+  cavaliere: { uniform: '#e0b440', boots: '#6b5212' },
+  astro: { boots: '#d8d8e0' },
+  leo: { polo: '#6f7d48' },
+  tamsin: { robe: '#ad2738' },
+  oren: { hero_suit: '#585866', boots: '#4c4c55' },
+  cowboy: { polo: '#b0643a', wool: '#3b4a6b' },
+  samurai: { kimono: '#9a1a24' },
+  giardiniera: { casualsuit: '#5f8c40' },
+  rapper: { 't-shirt': '#262626', cargo: '#3a5a9a' },
+};
+const skinModel = (skin) => (SKIN_MODELS.has(skin.id) ? skin.id : null);
+const LOADING = new Map();   // id → promise
+let loader = null, busy = 0;
+const QUEUE = [];
+/** carica (una volta sola) il personaggio di una skin; al massimo due download alla volta */
+export function loadSkinModel(id) {
+  if (!SKIN_MODELS.has(id)) return Promise.resolve(null);
+  if (LOADING.has(id)) return LOADING.get(id);
+  loader = loader || new GLTFLoader();
+  const p = new Promise(res => QUEUE.push([id, res]));
+  LOADING.set(id, p);
+  pump();
+  return p;
+}
+function pump() {
+  while (busy < 2 && QUEUE.length) {
+    const [id, res] = QUEUE.shift();
+    busy++;
+    loader.loadAsync(REAL.prefix + id + '.glb')
+      .then(g => (REAL.bases[id] = prepare(id, g)))
+      .catch(e => { console.warn('Personaggio non caricato:', id, e); REAL.bases[id] = null; return null; })
+      .then(r => { busy--; res(r); pump(); });
+  }
+}
+
 const MAIN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head',
   'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand',
   'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot'];
-const norm = (n) => n.replace(/^mixamorig:?/, '');
+// ossa in stile Unreal/MakeHuman (pelvis, spine_01, upperarm_l…) → nomi Mixamo usati qui sotto
+const UE = { pelvis: 'Hips', spine_01: 'Spine', spine_02: 'Spine1', spine_03: 'Spine2', neck_01: 'Neck', head: 'Head',
+  clavicle: 'Shoulder', upperarm: 'Arm', lowerarm: 'ForeArm', hand: 'Hand', thigh: 'UpLeg', calf: 'Leg', foot: 'Foot', ball: 'ToeBase',
+  thumb: 'HandThumb', index: 'HandIndex', middle: 'HandMiddle', ring: 'HandRing', pinky: 'HandPinky' };
+const norm = (n) => {
+  n = n.replace(/^mixamorig:?/, '');
+  if (UE[n]) return UE[n];
+  const m = /^([a-z]+)(?:_0(\d))?_([lr])$/.exec(n);
+  if (m && UE[m[1]]) return (m[3] === 'l' ? 'Left' : 'Right') + UE[m[1]] + (m[2] || '');
+  return n;
+};
 const HEAD_Y = 1.6;            // altezza dell'articolazione della testa nello scheletro procedurale (RIG.hip + RIG.headY)
 const ARM_SPLAY = 0.1;         // a riposo le braccia sono leggermente staccate dai fianchi
 const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 
-export function loadRealChars(prefix = 'models/chars/') {
+/** modelli base (sempre) + i personaggi delle skin indicate (es. quella del giocatore), prima di iniziare */
+export function loadRealChars(prefix = 'models/chars/', skins = []) {
   if (REAL.promise) return REAL.promise;
-  const loader = new GLTFLoader();
-  REAL.promise = Promise.all(Object.entries(FILES).map(async ([k, f]) => {
+  REAL.prefix = prefix;
+  loader = loader || new GLTFLoader();
+  REAL.promise = Promise.all([...Object.entries(FILES).map(async ([k, f]) => {
     try { REAL.bases[k] = prepare(k, await loader.loadAsync(prefix + f)); }
     catch (e) { console.warn('Modello realistico non caricato:', f, e); }
-  })).then(() => { REAL.ready = !!(REAL.bases.soldier || REAL.bases.woman); return REAL.ready; });
+  }), ...skins.map(loadSkinModel)]).then(() => { REAL.ready = !!(REAL.bases.soldier || REAL.bases.woman); return REAL.ready; });
   return REAL.promise;
 }
 
@@ -91,8 +154,34 @@ function prepare(kind, gltf) {
   // materiali originali (per i ricolori)
   const mats = {};
   scene.traverse(o => { if (o.isMesh) mats[o.name] = o.material; });
+  // personaggi per skin: asse di piegatura di ogni falange (gli assi locali delle ossa non sono quelli di Mixamo)
+  const own = kind !== 'soldier' && kind !== 'woman';
+  let fingerAxis = null;
+  if (own) {
+    fingerAxis = {};
+    for (const side of ['Left', 'Right']) {
+      const palm = new THREE.Vector3(side === 'Left' ? -1 : 1, 0, 0);   // braccia giù: il palmo guarda il fianco
+      for (const f of ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']) for (let k = 1; k <= 3; k++) {
+        const b = bones[side + 'Hand' + f + k]; if (!b) continue;
+        const nb = bones[side + 'Hand' + f + (k + 1)];
+        const dir = nb ? wp(nb).sub(wp(b)) : wp(b).sub(wp(b.parent));
+        const ax = dir.normalize().cross(f === 'Thumb' ? new THREE.Vector3(0, 0, -1) : palm).normalize();
+        fingerAxis[side + f + k] = ax.applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion()).invert());
+      }
+    }
+  }
+  if (own) scene.traverse(o => {
+    // luminanza media (per le tinte) letta adesso; dopo il caricamento sulla GPU l'immagine viene liberata
+    const t = o.isMesh && o.material.map;
+    if (!t || t.userData.lum !== undefined) return;
+    t.userData.lum = avgLum(t);
+    t.onUpdate = () => { if (t.image && t.image.close) { t.image.close(); } };
+  });
+  // cima della testa (per appoggiare i cappelli): dal corpo nudo, senza capelli
+  let headTop = HEAD_Y + 0.2;
+  scene.traverse(o => { if (o.isSkinnedMesh && o.name === 'body') { const bb = new THREE.Box3().setFromObject(o, true); headTop = bb.max.y; } });
   scene.removeFromParent();
-  return { kind, scene, s, oy: rg.position.y, list, idx, parent, restWQ, baseQ, baseInv, baseM, hipsRest, unit, headPos, spinePos, mats, matCache: new Map() };
+  return { kind, own, scene, s, oy: rg.position.y, list, idx, parent, restWQ, baseQ, baseInv, baseM, hipsRest, unit, headPos, spinePos, mats, matCache: new Map(), fingerAxis, headTop };
 }
 
 // ── ricolori: la texture originale resta (pieghe, sporco, cuciture) ma le zone cambiano colore con la skin ──
@@ -144,6 +233,44 @@ function recolorMat(base, src, skin, part) {
   return m;
 }
 
+// ── v26: tinta dei vestiti dei personaggi per skin (luminanza della texture × colore) ──
+function avgLum(tex) {
+  const img = tex && tex.image; if (!img || !img.width) return 0.5;
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, 32, 32);
+    const d = g.getImageData(0, 0, 32, 32).data; let sum = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 128) continue;
+      const lv = (x) => Math.pow(x / 255, 2.2);
+      sum += 0.2126 * lv(d[i]) + 0.7152 * lv(d[i + 1]) + 0.0722 * lv(d[i + 2]); n++;
+    }
+    return n ? Math.max(0.02, sum / n) : 0.5;
+  } catch (e) { return 0.5; }
+}
+function tintMat(base, src, hex, name) {
+  const key = name + '|' + hex;
+  if (base.matCache.has(key)) return base.matCache.get(key);
+  const m = src.clone();
+  const U = { uT: { value: lin(hex) }, uL: { value: src.map ? src.map.userData.lum ?? 0.5 : 0.5 } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uT; uniform float uL;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+      { float l = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+        diffuseColor.rgb = uT * clamp(l / uL, 0.0, 1.8); }`);
+  };
+  m.customProgramCacheKey = () => 'real-tint';
+  base.matCache.set(key, m);
+  return m;
+}
+function ownMat(base, src, skin, name) {
+  const t = TINTS[skin.id];
+  if (t) for (const k in t) if (name.includes(k)) return tintMat(base, src, t[k], name);
+  return src;
+}
+
 // ── personaggi attivi (riferimenti deboli: quelli eliminati vengono raccolti dal garbage collector) ──
 const ACTIVE = [];
 
@@ -153,8 +280,22 @@ const ACTIVE = [];
  */
 export function attachReal(m, skin, keep = {}) {
   if (!REAL.ready) return false;
-  const base = REAL.bases[realKind(skin)] || REAL.bases.soldier || REAL.bases.woman;
+  const id = skinModel(skin);
+  let base = id && REAL.bases[id];
+  let want = null;
+  if (!base) {
+    base = REAL.bases[realKind(skin)] || REAL.bases.soldier || REAL.bases.woman;
+    // il personaggio della skin arriva dopo (si scarica quando il personaggio si vede da vicino):
+    // intanto il modello base, poi il cambio automatico
+    if (id && REAL.bases[id] !== null) want = id;
+  }
   if (!base) return false;
+  const first = !m.real;
+  if (m.real) { m.real.rg.removeFromParent(); m.real = null; }
+  // il cappello cosmetico: solo dove non c'è già un copricapo (elmetto del soldato o copricapo del personaggio)
+  // (sui personaggi per skin solo il cappello scelto dal giocatore: il loro look ha già il suo stile)
+  const hats = base.own ? (OWN_HAT.has(skin.id) || !keep.chosenHat ? [] : keep.hats || []) : (base.kind === 'woman' ? keep.hats || [] : []);
+  keep = { ...keep, hat: hats, cape: base.own ? null : keep.cape };   // i personaggi per skin hanno già i loro vestiti: niente mantello piatto
   const inst = cloneSkinned(base.scene);
   const rg = new THREE.Group();
   rg.name = 'real';
@@ -164,14 +305,15 @@ export function attachReal(m, skin, keep = {}) {
   inst.traverse(o => {
     if (o.isBone) bones[norm(o.name)] = o;
     if (o.isMesh) {
-      o.material = recolorMat(base, base.mats[o.name] || o.material, skin, o.name);
+      o.material = base.own ? ownMat(base, base.mats[o.name] || o.material, skin, o.name)
+        : recolorMat(base, base.mats[o.name] || o.material, skin, o.name);
       o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
     }
   });
   const B = base.list.map(n => bones[n]);
   // nasconde le mesh procedurali (restano gruppi/articolazioni per le animazioni)
   const keepSet = new Set([m.gunPivot, m.lod, ...(keep.hat || []), ...(keep.back || []), keep.cape].filter(Boolean));
-  const hide = (o) => { if (keepSet.has(o)) return; if (o.isMesh) o.visible = false; for (const c of o.children) hide(c); };
+  const hide = (o) => { if (keepSet.has(o)) { o.visible = true; return; } if (o.isMesh) o.visible = false; for (const c of o.children) hide(c); };
   hide(m.body);
   // agganci: cappelli sulla testa vera, zaino e mantello sulla schiena vera
   rg.updateMatrixWorld(true);
@@ -184,7 +326,8 @@ export function attachReal(m, skin, keep = {}) {
     return a;
   };
   if (keep.hat && keep.hat.length && bones.Head) {
-    const a = anchor(bones.Head, new THREE.Vector3(0, HEAD_Y + (base.kind === "woman" ? -0.12 : 0.04), base.kind === 'woman' ? 0.0 : 0.01));
+    const hy = base.own ? base.headTop - 0.4 : HEAD_Y + (base.kind === 'woman' ? -0.12 : 0.04);
+    const a = anchor(bones.Head, new THREE.Vector3(0, hy, base.own ? -0.01 : base.kind === 'woman' ? 0.0 : 0.01));
     for (const o of keep.hat) a.add(o);
   }
   const back = [...(keep.back || []), ...(keep.cape ? [keep.cape] : [])];
@@ -198,11 +341,12 @@ export function attachReal(m, skin, keep = {}) {
   const fingers = [];
   for (const side of ['Left', 'Right']) for (const f of ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']) for (let k = 1; k <= 3; k++) {
     const b = bones[side + 'Hand' + f + k];
-    if (b) fingers.push({ b, q0: b.quaternion.clone(), thumb: f === 'Thumb', trigger: side === 'Right' && f === 'Index', k });
+    if (b) fingers.push({ b, q0: b.quaternion.clone(), thumb: f === 'Thumb', trigger: side === 'Right' && f === 'Index', k,
+      ax: (base.fingerAxis && base.fingerAxis[side + f + k]) || new THREE.Vector3(1, 0, 0) });
   }
-  m.real = { rg, B, base, Q: B.map(() => new THREE.Quaternion()), P: B.map(() => new THREE.Vector3()), fingers, grip: -1 };
+  m.real = { rg, B, base, Q: B.map(() => new THREE.Quaternion()), P: B.map(() => new THREE.Vector3()), fingers, grip: -1, want, skin, keep };
   setGrip(m.real, 0);
-  ACTIVE.push(new WeakRef(m));
+  if (first) ACTIVE.push(new WeakRef(m));
   return true;
 }
 
@@ -211,7 +355,7 @@ function setGrip(R, g) {
   R.grip = g;
   for (const f of R.fingers) {
     const a = f.thumb ? 0.15 + g * 0.35 : (0.28 + 0.12 * f.k) + g * (f.trigger ? 0.35 : 0.95);
-    f.b.quaternion.copy(f.q0).multiply(_q.setFromAxisAngle(_v.set(1, 0, 0), a));
+    f.b.quaternion.copy(f.q0).multiply(_q.setFromAxisAngle(f.ax, a));
   }
 }
 
@@ -319,6 +463,14 @@ export function syncAllReal() {
     const m = ACTIVE[i].deref();
     if (!m) { ACTIVE.splice(i, 1); continue; }
     if (!m.root.parent || !m.root.visible || !m.body.visible) continue;
+    const R = m.real;
+    if (R && R.want) {
+      if (REAL.bases[R.want] !== undefined) {
+        // è arrivato il personaggio della skin: sostituisce il modello base
+        if (REAL.bases[R.want]) attachReal(m, R.skin, { ...R.keep, hat: undefined });
+        else R.want = null;
+      } else loadSkinModel(R.want);
+    }
     syncReal(m);
   }
 }

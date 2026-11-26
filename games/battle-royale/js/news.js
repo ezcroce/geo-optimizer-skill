@@ -1,9 +1,17 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v25';
+export const NEWS_VERSION = 'v26';
 
 export const NEWS = [
+  {
+    v: 'v26', title: 'Ogni skin è una persona diversa', color: '#ffb35a', icon: '🧑',
+    items: [
+      '24 personaggi realistici, uno per skin: viso, corpo, capelli, barba e vestiti propri (non più solo un colore diverso)',
+      'Le casette di legno si aprono: porta vera con E, interni con letto, tavolo, mensole e bottino dentro',
+      'Novità: la stufa a legna! Accendila con E, guarda il fumo dal comignolo e resta al calduccio per recuperare salute',
+    ],
+  },
   {
     v: 'v25', title: 'Grafica realistica', color: '#7fd0ff', icon: '🎮',
     items: [

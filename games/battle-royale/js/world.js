@@ -7,7 +7,7 @@ import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from '.
 import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=25';
 import { carInstances } from './cars.js?v=25';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=19';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=26';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -1397,12 +1397,14 @@ export function buildWorld(scene, opts = {}) {
   const plateGeo = new THREE.BoxGeometry(0.06, 0.2, 0.01); plateGeo.userData.shared = true;
   /** costruisce le due ante (pivot sui cardini) quando il chunk diventa visibile */
   function buildDoorLeaves(dr, group) {
-    const lw = dr.gap / 2 - 0.03, lh = 2.36;
+    const lw2 = dr.gap / 2 - 0.03, lh = 2.36;
     const tx = dr.horiz ? 1 : 0, tz = dr.horiz ? 0 : 1;   // direzione lungo il muro
     dr.leaves = [];
-    for (const sgn of [-1, 1]) {
+    const single = dr.single, lwS = dr.gap - 0.03;
+    for (const sgn of single ? [-1] : [-1, 1]) {
       // cardine all'estremità del vano; l'asse x locale punta verso il centro della porta
       const hx = dr.x + tx * sgn * (dr.gap / 2 - 0.01), hz = dr.z + tz * sgn * (dr.gap / 2 - 0.01);
+      const lw = single ? lwS : lw2;
       const dx = -tx * sgn, dz = -tz * sgn;
       const base = Math.atan2(-dz, dx);
       const lzx = Math.sin(base), lzz = Math.cos(base);
@@ -2142,6 +2144,8 @@ export function buildWorld(scene, opts = {}) {
       pr.c = addCollider({ type: 'cyl', x, z, r: D.r, minY: y - 0.3, maxY: y + D.h, barrel: pr, harvest: type === 'barrelWood' ? 6 : 0 });
       if (type === 'barrelRed') { pr.explosive = true; pr.hp = pr.maxHp = 35; }
       barrels.push(pr);
+    } else if (type === 'shed' && MODEL_SOURCE.shed === 'procedurale') {
+      shedInterior(pr);
     } else if (type === 'shed') {
       const D = PROP_DIMS.shed;
       const w = q90 ? D.d : D.w, d = q90 ? D.w : D.d;
@@ -2151,6 +2155,50 @@ export function buildWorld(scene, opts = {}) {
       addCollider({ type: 'box', minX: x - (q90 ? w / 2 - 0.3 : w * k / 2), maxX: x + (q90 ? w / 2 - 0.3 : w * k / 2), minY: y + D.wallH, maxY: y + D.h - 0.2, minZ: z - (q90 ? d * k / 2 : d / 2 - 0.3), maxZ: z + (q90 ? d * k / 2 : d / 2 - 0.3) });
     }
     return pr;
+  }
+  // ── v26: casette di legno abitabili ──
+  const stoves = [];
+  /** box nelle coordinate del modello (x, z) → collisore nel mondo (rotazioni multiple di 90°) */
+  function shedBox(pr, x0, x1, z0, z1, y0, y1, extra = {}) {
+    const c = Math.round(Math.cos(pr.rot)), s = Math.round(Math.sin(pr.rot));
+    const xs = [], zs = [];
+    for (const lx of [x0, x1]) for (const lz of [z0, z1]) { xs.push(pr.x + lx * c + lz * s); zs.push(pr.z - lx * s + lz * c); }
+    return addCollider({ type: 'box', minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs), minY: pr.y + y0, maxY: pr.y + y1, ...extra });
+  }
+  function shedWorld(pr, lx, lz) {
+    const c = Math.cos(pr.rot), s = Math.sin(pr.rot);
+    return [pr.x + lx * c + lz * s, pr.z - lx * s + lz * c];
+  }
+  function shedInterior(pr) {
+    const { W, D, WH, RH, floor: F } = SHED, T = 0.12, top = F + WH;
+    const d0 = SHED.door.x - SHED.door.w / 2, d1 = SHED.door.x + SHED.door.w / 2;
+    shedBox(pr, -W / 2 - 0.1, W / 2 + 0.1, -D / 2 - 0.1, D / 2 + 0.1, -1, F);                 // basamento / pavimento
+    shedBox(pr, -W / 2, W / 2, -D / 2, -D / 2 + T, F, top);                                   // parete di fondo
+    shedBox(pr, -W / 2, -W / 2 + T, -D / 2, D / 2, F, top);                                   // fianchi
+    shedBox(pr, W / 2 - T, W / 2, -D / 2, D / 2, F, top);
+    shedBox(pr, -W / 2, d0, D / 2 - T, D / 2, F, top);                                        // davanti, ai lati della porta
+    shedBox(pr, d1, W / 2, D / 2 - T, D / 2, F, top);
+    shedBox(pr, d0, d1, D / 2 - T, D / 2, SHED.door.top, top);                                // sopra la porta
+    shedBox(pr, -W / 2, W / 2, -D / 2, D / 2, top, top + 0.25);                               // soffitto / base del tetto
+    const k = 0.45;                                                                           // falde (ci si sale a gradini)
+    shedBox(pr, -W * k / 2, W * k / 2, -D / 2 + 0.3, D / 2 - 0.3, top + 0.25, F + WH + RH - 0.2);
+    shedBox(pr, 0.95, 1.95, -1.72, 0.22, F, F + 0.62);                                        // letto
+    const S = SHED.stove;
+    shedBox(pr, S.x - 0.34, S.x + 0.34, S.z - 0.29, S.z + 0.29, F, F + 0.78);                // stufa
+    shedBox(pr, S.x - 0.08, S.x + 0.08, S.z - 0.08, S.z + 0.08, F + 0.78, top);              // tubo
+    shedBox(pr, -1.7, -0.9, -0.3, 0.3, F, F + 0.77);                                          // tavolo
+    // porta vera a un'anta (si apre verso l'interno, E per aprire/chiudere)
+    const [dx, dz] = shedWorld(pr, SHED.door.x, D / 2 - 0.05);
+    const q90 = Math.abs(Math.round(Math.sin(pr.rot))) === 1;
+    const house = { doors: [], shed: pr };
+    const dr = makeDoor(dx, dz, pr.y + F - 0.2, !q90, Math.sin(pr.rot), Math.cos(pr.rot), house, SHED.door.w - 0.02);
+    dr.single = true; dr.open0 = false; setDoor(dr, false, true);
+    pr.door = dr;
+    // stufa a legna (si accende con E: fuoco, fumo dal comignolo e calduccio che cura)
+    const [fx, fz] = shedWorld(pr, S.x, S.fireZ), [cx, cz] = shedWorld(pr, S.x, S.z);
+    const st = { i: stoves.length, x: fx, y: pr.y + S.fireY, z: fz, cx, cz, top: pr.y + S.pipeTop + 0.12, floor: pr.y + F, lit: false, t: 0, pr };
+    st.room = { x: pr.x, z: pr.z, w: W, d: D, rot: pr.rot };
+    stoves.push(st); pr.stove = st;
   }
   const barrelKinds = () => { const r = srand(); return r < 0.35 ? 'barrelRed' : r < 0.65 ? 'barrelBlue' : 'barrelWood'; };
   // nelle città
@@ -2184,13 +2232,20 @@ export function buildWorld(scene, opts = {}) {
     if (h < WATER_LEVEL + 1.2 || h > 24) continue;
     const base = flatEnough(x, z, 3.2, 1.3);
     if (base === null || !freeSpot(x, z, 3.6)) continue;
+    if (TALL.some(p => Math.hypot(p.x - x, p.z - z) < p.r * 1.06 + 3.6)) continue;   // v26: niente erba alta dentro la casetta
     const rot = Math.floor(srand() * 4) * Math.PI / 2;
     addProp('shed', x, z, rot, { y: base });
     nSheds++;
     // bottino accanto alla porta (la porta guarda verso +Z del modello)
     const fx = Math.sin(rot), fz = Math.cos(rot);
     const dd = PROP_DIMS.shed.d / 2 + 1.0;
-    lootSpots.push(new THREE.Vector3(x + fx * dd, terrainHeight(x + fx * dd, z + fz * dd), z + fz * dd));
+    if (MODEL_SOURCE.shed === 'procedurale') {
+      // v26: il bottino è dentro (sul tappeto) e spesso c'è un forziere ai piedi del letto
+      const pr = chunkAt(x, z).props[chunkAt(x, z).props.length - 1];
+      const [lx, lz] = shedWorld(pr, 0.2, 0.55);
+      lootSpots.push(new THREE.Vector3(lx, base + SHED.floor + 0.05, lz));
+      if (srand() < 0.6) { const [cx2, cz2] = shedWorld(pr, 1.45, 0.95); chestSpots.push({ pos: new THREE.Vector3(cx2, base + SHED.floor, cz2), rot: rot + Math.PI / 2 }); }
+    } else lootSpots.push(new THREE.Vector3(x + fx * dd, terrainHeight(x + fx * dd, z + fz * dd), z + fz * dd));
     if (srand() < 0.45) {
       const cxp = x - fz * (PROP_DIMS.shed.w / 2 + 1.2), czp = z + fx * (PROP_DIMS.shed.w / 2 + 1.2);
       if (freeSpot(cxp, czp, 0.8)) chestSpots.push({ pos: new THREE.Vector3(cxp, terrainHeight(cxp, czp), czp), rot: rot });
@@ -3112,5 +3167,5 @@ export function buildWorld(scene, opts = {}) {
   }
 
   Object.assign(stats, { city: cityStats });
-  return { doors, setDoor, poseDoor, lootSpots, chestSpots, houses, barrels, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks, destroyBarrel, resetProps, dispose, seed: MAP.seed, random: MAP.random };
+  return { doors, stoves, setDoor, poseDoor, lootSpots, chestSpots, houses, barrels, minimap: mm, crateMat, woodTex, update, prewarm, stats, chunks, destroyBarrel, resetProps, dispose, seed: MAP.seed, random: MAP.random };
 }

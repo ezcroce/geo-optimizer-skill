@@ -1,12 +1,12 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { REAL, attachReal, realKind } from './realchar.js?v=25';
+import { REAL, attachReal, realKind } from './realchar.js?v=26';
 import { normalFromHeight, NORMALS } from './texgen.js?v=19';
 import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=19';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
 import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=19';
-import { mergeParts } from './props.js?v=19';
+import { mergeParts } from './props.js?v=26';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -716,7 +716,7 @@ export function buildCharacter(skin, cos = {}) {
   const m = { root, body, legs, knees, feet, arms, elbows, hands, torso, head, gunPivot, cape, lod, lids };
   // v25: modello umano realistico (se caricato) al posto delle mesh procedurali; lo scheletro resta per le animazioni.
   // Il soldato ha già l'elmetto: i cappelli si vedono solo sul modello femminile
-  if (REAL.ready && !cos.procedural) attachReal(m, skin, { hat: realKind(skin) === 'woman' ? hatParts : [], back: backParts, cape });
+  if (REAL.ready && !cos.procedural) attachReal(m, skin, { hats: hatParts, chosenHat: !!(cos.hat && cos.hat !== 'none'), back: backParts, cape });
   return m;
 }
 function mask(skin) { return skin.acc === 'ninja'; }

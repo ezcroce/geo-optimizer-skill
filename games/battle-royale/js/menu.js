@@ -3,7 +3,7 @@
 //  + lobby online (codice stanza, chat, compagni)
 // ─────────────────────────────────────────────────────────────
 import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS } from './config.js?v=19';
-import { NEWS, NEWS_VERSION } from './news.js?v=25';
+import { NEWS, NEWS_VERSION } from './news.js?v=26';
 import * as PR from './progress.js?v=19';
 import * as N from './net.js?v=19';
 

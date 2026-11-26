@@ -24,6 +24,23 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: armi nella mano destra, prese per classe, camminata, cure animate e mirino dinamico (v32)
+
+- **Mano destra** (`js/anim.js`): tutte le pose dell'arma si calcolano come prima e poi si riflettono sul lato destro
+  (`mirrorPQ`, `ikM`, `setPivotM`); le dita si chiudono per mano (`setGrip` in `js/realchar.js`, `m._grip`).
+- **Prese per classe** (`HOLD` in `js/weapons.js`, campi `cls` e `one`): leggere compatte e alte, medie alla spalla,
+  pesanti basse con il busto girato e la posizione larga dei piedi; pistola e revolver a una mano.
+- **Camminata** (`gaitParams`, `legPose`, `gaitRate`, `legsLocomotion`): cadenza e lunghezza del passo dipendono dalla
+  velocità (camminata, corsa con fase di volo, scatto); `armsSwing` segue le gambe, bacino e spalle si controruotano.
+- **Cure e scudi** (`poseUse`): bende avvolte sull'avambraccio, medikit in ginocchio, mini scudo bevuto d'un sorso,
+  pozione grande svitata e bevuta a sorsi; la bocca si misura su ogni personaggio (`measureHead` → `front`), quindi
+  caschi, visiere e barbe non vengono trapassati.
+- **Piccone** (`js/held.js`): manico in frassino, cuoio avvolto, lama d'acciaio con texture generate; pose da fermo,
+  corsa e colpo in `posePickaxe`.
+- **Mirino** (`js/crosshair.js`): disegnato su canvas; apertura dalla dispersione vera, rinculo a molla, rosso sui
+  nemici, attenuato fuori portata e in scatto, anelli di ricarica/uso/colpo pronto/caricatore, indicatori di colpo
+  per corpo, scudo, testa ed eliminazione.
+
 ### Novità: skin sistemate, accovacciamento realistico e accessori più curati (v31)
 
 - **Testa del ninja** (`js/costume.js`): il corpo MakeHuman del ninja non ha la nuca né la calotta (erano coperte

@@ -1,9 +1,22 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v31';
+export const NEWS_VERSION = 'v32';
 
 export const NEWS = [
+  {
+    v: 'v32', title: 'Armi nella mano destra, camminata vera e un mirino nuovo', color: '#ffd23a', icon: '🎯',
+    items: [
+      'Tutte le armi e il piccone ora si tengono con la mano destra (indice sul grilletto), la sinistra regge la canna',
+      'Ogni arma ha la sua presa: le leggere (pistole, mitragliette) compatte e alte, a braccia strette; le medie al petto; le pesanti (mitragliatrici, cecchini, lanciarazzi, minigun) basse, col busto girato e i piedi più larghi. La pistola si spara a una mano',
+      'Camminata più realistica: passo lento e rilassato, corsa con la fase di volo, scatto lungo; le braccia oscillano in opposizione alle gambe e bacino e spalle ruotano insieme al passo',
+      'Cure e scudi animati: le bende si avvolgono attorno all’avambraccio, col medikit ci si inginocchia e si medicano le ferite, il mini scudo si stappa e si beve d’un sorso, la pozione grande si svita e si beve a sorsi con la testa all’indietro (anche chi ha casco o barba non ci passa più attraverso); alla fine scintille verdi o azzurre',
+      'Piccone nuovo con texture vera (manico in frassino, impugnatura in cuoio, lama d’acciaio battuto): da fermi appoggiato alla spalla, in corsa che ondeggia, colpo con carica e affondo',
+      'Nessuna arma, nessun piccone e nessuna pozione trapassa più le skin: controllato skin per skin in ogni posa',
+      'Mirino rifatto: si apre davvero quanto la dispersione (muovendosi, saltando, sparando in fila) e “salta” a ogni colpo; diventa rosso sopra un nemico, sbiadisce fuori portata o mentre scatti; anelli per ricarica, uso di cure e scudi, colpo pronto e caricatore quasi vuoto; forma diversa per ogni famiglia d’armi',
+      'Indicatori di colpo nuovi: bianco sul corpo, azzurro sullo scudo, giallo alla testa e una croce rossa con onda quando elimini qualcuno',
+    ],
+  },
   {
     v: 'v31', title: 'Skin sistemate, animazioni più fluide e accessori più belli', color: '#ff7a4a', icon: '🥷',
     items: [

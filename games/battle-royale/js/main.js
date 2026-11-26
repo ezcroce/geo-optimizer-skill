@@ -20,16 +20,18 @@ import {
 } from './world.js?v=27';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=31';
-import { weaponIcon } from './weapons.js?v=29';
-import { consIcon, ammoIcon } from './items.js?v=29';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=32';
+import { weaponIcon } from './weapons.js?v=32';
+import { consIcon, ammoIcon } from './items.js?v=32';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
 import { createInventory } from './inventory.js?v=29';
 import { loadModelOverrides, MODEL_SOURCE, PROPS, treeMaterial, bushMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=26';
-import { loadRealChars, syncAllReal } from './realchar.js?v=31';
+import { loadRealChars, syncAllReal } from './realchar.js?v=32';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=31';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=32';
+import { buildPickaxe, heldConsumable } from './held.js?v=32';
+import { createCrosshair } from './crosshair.js?v=32';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -326,16 +328,6 @@ const JUMP_V = 7.8;
 const CHAR_R = 0.4, CHAR_H = 1.85;
 const BODY = [[0.45, 0.33], [0.95, 0.36], [1.35, 0.36]];
 
-function buildPickaxe(color = '#7fd0ff') {
-  const g = new THREE.Group();
-  const h = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.85), new THREE.MeshStandardMaterial({ color: '#6b4524' }));
-  h.position.z = 0.25; g.add(h);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.55, 0.1), new THREE.MeshStandardMaterial({ color, metalness: 0.7, roughness: 0.3 }));
-  head.position.set(0, 0.05, 0.65); g.add(head);
-  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
-  return g;
-}
-
 // ─────────────── Personaggi ───────────────
 class Character {
   constructor(name, skin, isPlayer = false, cos = null) {
@@ -377,7 +369,7 @@ class Character {
     let mesh;
     if (!s) mesh = buildPickaxe(this.skin.accColor || '#7fd0ff');
     else if (s.kind === 'weapon') mesh = buildWeaponMesh(s.id, s.rarity);
-    else { mesh = buildItemMesh('cons', s.id); mesh.scale.setScalar(0.75); mesh.position.set(0, 0, 0.12); }
+    else mesh = heldConsumable(s.id);
     gp.add(mesh);
   }
   setActive(i) {
@@ -869,8 +861,14 @@ function animateChar(ch, dt) {
   ch.animSpd = lerp(ch.animSpd || 0, ch.moveAmt, Math.min(1, dt * 10));
   const spd = ch.animSpd;
   const ck = ch.crouchA ?? ch.crouchK;
-  const mv = Math.min(1, spd / (5.2 - ck * 2.6));
-  const run = clamp((spd - 5.6) / 2, 0, 1) * (1 - ck);
+  // v32: andatura in base alla velocità: si cammina fino a ~3 m/s, a 5,3 m/s (passo normale) si corre, a 7,6 m/s si scatta
+  const mv = Math.min(1, spd / 1.4);
+  const run = smooth01((spd - 2.8) / 2.2) * (1 - ck);
+  const spr = smooth01((spd - 5.8) / 1.6) * (1 - ck);
+  // medikit: da fermi ci si inginocchia per curarsi
+  const useMed = !!(ch.using && ch.slot && ch.slot.id === 'medkit' && ch.onGround);
+  ch.kneelK = lerp(ch.kneelK || 0, useMed && spd < 1 ? 1 : 0, Math.min(1, dt * 6));
+  const kneel = smooth01(ch.kneelK), ckL = Math.max(ck, kneel * 0.92);
   const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw);
   const fwd = ch.vel.x * fx + ch.vel.z * fz;
   const side = ch.vel.x * -fz + ch.vel.z * fx;   // positivo = verso destra
@@ -883,7 +881,7 @@ function animateChar(ch, dt) {
     backT = Math.cos(a) < (ch.backK > 0.5 ? -0.05 : -0.3) ? 1 : 0;   // isteresi: niente scatti a 90°
     strafeT = Math.abs(Math.sin(a));
     const rel = backT ? a - Math.sign(a) * Math.PI : a;
-    hipT = -clamp(rel, -1.2, 1.2) * 0.55 * (1 - run * 0.4);
+    hipT = -clamp(rel, -1.2, 1.2) * 0.55 * (1 - spr * 0.4);
   } else if (mv < 0.15 && ch.onGround) {
     hipT = clamp(-yawRate * 0.06, -0.35, 0.35);           // girandosi da fermo il bacino resta indietro
   }
@@ -893,21 +891,34 @@ function animateChar(ch, dt) {
   const sideSign = side >= 0 ? 1 : -1;
   // in retromarcia le gambe girano al contrario e il passo è più corto
   const dirSign = ch.backK > 0.5 ? -1 : 1;
-  ch.walkPhase += dt * (3.4 + spd * 1.45 + ck * 1.2) * (1 - ch.backK * 0.12) * (mv > 0.05 ? 1 : 0) * dirSign;
+  // v32: la frequenza dei passi viene dalla lunghezza dell'appoggio: il piede a terra non pattina
+  ch.walkPhase += dt * gaitRate(spd, mv, run, spr, ck) * (1 - ch.backK * 0.12) * (mv > 0.05 ? 1 : 0) * dirSign;
   const sw = Math.sin(ch.walkPhase) * mv;
   if (ch.isPlayer && mv > 0.3 && ch.onGround) {
-    const step = Math.floor(ch.walkPhase / Math.PI);
+    const step = Math.floor((ch.walkPhase - Math.PI / 2) / Math.PI);   // un passo a ogni appoggio
     if (step !== ch._lastStep) { ch._lastStep = step; A.playStep(); }
   }
   // inclinazioni morbide: avanti quando corri, di lato quando ti sposti o giri
-  ch.leanFwd = lerp(ch.leanFwd || 0, clamp(fwd * 0.016, -0.08, 0.1) + run * 0.14, Math.min(1, dt * 8));
+  ch.leanFwd = lerp(ch.leanFwd || 0, clamp(fwd * 0.012, -0.06, 0.07) + run * 0.05 + spr * 0.1, Math.min(1, dt * 8));
   ch.leanSide = lerp(ch.leanSide || 0, clamp(-side * 0.022 - yawRate * 0.03, -0.2, 0.2), Math.min(1, dt * 8));
   m.body.rotation.x = ch.leanFwd * (1 - ck * 0.6);
   m.body.rotation.z = ch.leanSide * (1 - ck * 0.5);
   m.body.rotation.y = ch.hipYaw;
 
   // gambe
-  let bodyY = legsLocomotion(m, ch.walkPhase, mv, run, ck);
+  let bodyY = legsLocomotion(m, ch.walkPhase, mv, run, ckL, spr);
+  // v32: con un'arma pesante, da fermi, gambe più larghe e ginocchia morbide (il peso va sostenuto)
+  {
+    const hw = m.gunPivot.children[0] && m.gunPivot.children[0].userData.hold;
+    const wH = hw && hw.cls === 'heavy' && ch.onGround && !ch.inWater ? (1 - mv) * (1 - ckL) : 0;
+    ch.heavyK = lerp(ch.heavyK || 0, wH, Math.min(1, dt * 6));
+    if (ch.heavyK > 0.01) for (let i = 0; i < 2; i++) {
+      const h = ch.heavyK;
+      m.legs[i].rotation.z += (i ? 1 : -1) * 0.055 * h; m.legs[i].rotation.x -= 0.05 * h; m.knees[i].rotation.x += 0.13 * h; m.feet[i].rotation.x -= 0.08 * h;
+      m.feet[i].rotation.z = -m.legs[i].rotation.z * 0.8;
+    }
+    bodyY -= 0.018 * ch.heavyK;
+  }
   // v31: in aria la posa delle gambe si fonde con quella a terra (niente scatto staccando o atterrando;
   // i saltini di un attimo, scendendo da un marciapiede, non cambiano posa)
   ch.airT = ch.onGround || ch.inWater ? 0 : (ch.airT || 0) + dt;
@@ -956,12 +967,21 @@ function animateChar(ch, dt) {
   if (land > 0) for (let i = 0; i < 2; i++) { m.legs[i].rotation.x -= land * 1.6; m.knees[i].rotation.x += land * 3.2; m.feet[i].rotation.x -= land * 1.6; }
   m.body.position.y = bodyY - land * 0.45 + breath * 0.01 * idle;
   // busto: si piega in avanti da accovacciato, ruota con le spalle quando cammini
-  m.torso.rotation.x = (0.26 + 0.08 * mv) * ck + land * 0.5 + breath * 0.022 * idle * (1 + ck) + run * 0.06;
-  m.torso.rotation.y = Math.sin(ch.walkPhase) * (0.1 + run * 0.08) * mv * (1 - ck * 0.7) * (1 - ch.strafeK * 0.5) - ch.hipYaw;
+  m.torso.rotation.x = (0.26 + 0.08 * mv) * ck + land * 0.5 + breath * 0.022 * idle * (1 + ck) + run * 0.03 + spr * 0.05 + kneel * 0.12;
+  // v32: il bacino ruota verso la gamba che avanza e le spalle in senso opposto (braccio destro avanti con la gamba
+  // sinistra); con un'arma in mano il busto resta quasi fermo per non far ballare la mira
+  {
+    const gh = m._gait ? m._gait.h[1] - m._gait.h[0] : 0;            // > 0: gamba destra avanti
+    const armed = !!(ch.slot && ch.slot.kind === 'weapon');
+    const red = (1 - ck * 0.7) * (1 - ch.strafeK * 0.6) * (1 - ch.backK * 0.5);
+    const pelvis = gh * (0.075 + 0.03 * run) * red;
+    m.body.rotation.y = ch.hipYaw + pelvis;
+    m.torso.rotation.y = -pelvis - gh * (armed ? 0.025 : 0.1 + 0.05 * run) * red - ch.hipYaw;
+  }
   m.torso.rotation.x -= 0.07 * ch.backK * mv;   // indietro: busto un po' più eretto
   // bacino/spalle: piccolo rollio opposto allo spostamento sulla gamba d'appoggio
-  m.torso.rotation.z = Math.sin(t * 0.9) * 0.015 * idle - Math.cos(ch.walkPhase) * 0.03 * mv * (1 - ck) * (1 - run * 0.5);
-  m.torso.position.y = RIG.hip + Math.abs(Math.cos(ch.walkPhase)) * 0.008 * mv;
+  m.torso.rotation.z = Math.sin(t * 0.9) * 0.015 * idle - Math.cos(ch.walkPhase) * 0.03 * mv * (1 - ck) * (1 - spr * 0.5);
+  m.torso.position.y = RIG.hip;
 
   // la testa ogni tanto si guarda attorno quando sei fermo
   ch.lookT = (ch.lookT ?? rand(2, 5)) - dt;
@@ -984,26 +1004,27 @@ function animateChar(ch, dt) {
   const p = ch.pitch;
   const s = ch.slot;
   const lean = m.torso.rotation.x + m.body.rotation.x;
-  const sprinting = run > 0.5 && ch.onGround && ck < 0.3 && !(ch.isPlayer && (mouse.left || G.ads));
+  const sprinting = spr > 0.5 && ch.onGround && ck < 0.3 && !(ch.isPlayer && (mouse.left || G.ads));
   ch.sprintK = lerp(ch.sprintK || 0, sprinting ? 1 : 0, Math.min(1, dt * 9));
   const sk = ch.sprintK;
   m.gunPivot.rotation.set(-p, 0, 0);
   m.gunPivot.position.set(0.12, 0.37, 0.34);
   if (!s) {
-    // piccone: braccia libere che oscillano, colpo dall'alto
+    // v32: piccone nella mano destra: pronto, oscilla col passo, colpo caricato sopra la spalla (anim.js)
     armsSwing(m, ch.walkPhase, mv, run, ck);
-    const k = ch.swing > 0 ? Math.sin((1 - ch.swing / 0.45) * Math.PI) : 0;
-    setArm(m, 1, -0.75 - k * 1.5 + sw * 0.2 - sk * 0.2 - lean * 0.5, 0.12, -0.75 + k * 0.5);
-    m.gunPivot.position.set(0.24, 0.18 + k * 0.3, 0.28);
-    m.gunPivot.rotation.set(-0.6 + k * 1.6, 0, 0);
+    posePickaxe(m, { mv, run, sk, swing: ch.swing > 0 ? clamp(1 - ch.swing / 0.45, 0, 1) : -1, ck });
   } else if (s.kind === 'cons') {
-    const k = ch.using ? Math.sin(G.time * 10) * 0.2 : 0;
-    setArm(m, 1, -0.75 + k - lean, 0.1, -1.0);
-    setArm(m, 0, -0.75 - k - lean, 0.4, -1.1);
-    m.gunPivot.position.set(0.05, 0.3, 0.32);
+    // v32: bende, medikit e pozioni hanno ognuno la sua animazione d'uso (anim.js)
+    poseUse(m, s.id, ch.using ? clamp(ch.using.t / ch.using.total, 0, 1) : -1, { mv, run, t });
   } else {
     // arma: posa di mira, oppure "arma in sicurezza" mentre corri (v29: mani sull'arma con la IK)
     poseHold(m, p, sk, sw, lean);
+    // v32: l'arma ondeggia col passo (le pesanti più lente e ampie) e respira appena da ferma
+    const hc = m._hold && m._hold.h.cls, wk = hc === 'heavy' ? 1.5 : hc === 'light' ? 0.7 : 1, aimK = 1 - sk;
+    const ph = ch.walkPhase;
+    m.gunPivot.position.y += (Math.cos(ph * 2) * 0.01 * mv + Math.sin(t * 1.6) * 0.0035 * idle) * wk * aimK;
+    m.gunPivot.position.x += Math.sin(ph) * 0.007 * mv * wk * aimK;
+    m.gunPivot.rotateZ(Math.sin(ph) * 0.028 * mv * wk * aimK);
   }
   const holdingGun = s && s.kind === 'weapon';
   let reloadPh = -1;
@@ -1013,7 +1034,7 @@ function animateChar(ch, dt) {
     reloadPh = clamp(1 - ch.reloading / dur, 0, 1);
     // il lanciarazzi resta sulla spalla: si inclina appena
     const b = bump(reloadPh) * (m._hold && m._hold.h.kind === 'shoulder' ? 0.3 : 1);
-    m.gunPivot.rotateZ(0.45 * b);
+    m.gunPivot.rotateZ(-0.45 * b);          // v32: arma nella destra, si inclina verso sinistra
     m.gunPivot.rotateX(0.22 * b);
     m.gunPivot.translateZ(0.08 * b);        // la porta via dalla spalla: il calcio non entra nel petto
     m.gunPivot.position.y -= 0.05 * b;
@@ -1045,7 +1066,7 @@ function animateChar(ch, dt) {
     m.torso.rotation.x -= h * 0.12;
     m.head.rotation.z = h * 0.25 * (ch.hitDir || 1);
   }
-  m.head.rotation.x += -p * 0.5 - m.torso.rotation.x * 0.6;
+  if (!m._headLock) m.head.rotation.x += -p * 0.5 - m.torso.rotation.x * 0.6;   // bevendo la testa la decide la posa
   m.head.rotation.y = ch.lookCur - m.torso.rotation.y - ch.hipYaw;
   // canne della minigun che girano
   const wm = m.gunPivot.children[0];
@@ -1143,6 +1164,7 @@ function fireWeapon(ch, aimFn, again = null) {
   }
   ch.emote = null;
   ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : def.spin ? 0.35 : 0.7;
+  if (ch.isPlayer) XH.fire(def.pellets > 1 || def.projectile ? 1.4 : def.rate > 0.5 ? 1.1 : def.spin ? 0.25 : 0.6);
   const mult = RARITIES[s.rarity].mult * (ch.isPlayer ? 1 : G.diff.dmgMult);
   const muzzle = muzzlePos(ch);
   A.playGun(def.sound, ch.isPlayer ? 0 : muzzle.distanceTo(camera.position));
@@ -1166,7 +1188,7 @@ function fireWeapon(ch, aimFn, again = null) {
 function melee(ch) {
   if (ch.swing > 0 || ch.fireCd > 0) return;
   ch.swing = 0.45; ch.fireCd = 0.45;
-  if (ch.isPlayer) A.playGun('melee');
+  if (ch.isPlayer) { A.playGun('melee'); XH.fire(0.5); }
   setTimeout(() => {
     if (!ch.alive) return;
     const o = ch.chest();
@@ -1213,6 +1235,7 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
     if (head) PR.track('headshot', 1);
     dmgNumber(new THREE.Vector3(t.pos.x + rand(-0.3, 0.3), t.pos.y + 2.1, t.pos.z), amount, head ? 'head' : (sh > 0 ? 'shield' : ''));
     G.hitT = 0.15; $('#hitmarker').classList.toggle('head', head);
+    XH.hit(head ? 'head' : sh > 0 ? 'shield' : 'body');
     sh > 0 ? A.playShieldHit() : A.playHit(head);
   }
   if (t === G.player) {
@@ -1292,6 +1315,7 @@ function kill(t, attacker, how) {
   addFeed(text, attacker === G.player || t === G.player);
   if (attacker === G.player && t !== G.player) {
     PR.track('kill', 1);
+    XH.kill();
     const wid = Object.keys(WEAPONS).find(k => WEAPONS[k].name === how);
     if (wid) {
       PR.track('kill_' + wid, 1);
@@ -1578,6 +1602,12 @@ function updateUse(ch, dt) {
     ch.using = null;
     ch.updateHeld();
     if (ch.isPlayer) A.playHeal();
+    // v32: piccolo sbuffo colorato (verde per le cure, azzurro per gli scudi)
+    if (ch.pos.distanceToSquared(camera.position) < 60 * 60) {
+      const c = ch.chest(_p.set(0, 0, 0));
+      emit(c, d.shield ? '#5ad0ff' : '#7dff8a', 12, 1.6, 0.7, 0.07, -0.6);
+      emit(c, '#ffffff', 5, 1.2, 0.5, 0.05, -0.4);
+    }
   }
 }
 
@@ -2807,6 +2837,8 @@ function updateCamera(dt) {
 }
 
 // ─────────────── HUD ───────────────
+const XH = createCrosshair($('#crosshair'));   // v32: mirino dinamico
+const _xhD = new THREE.Vector3();
 const hud = {
   alive: $('#aliveCount'), kills: $('#killCount'), storm: $('#stormInfo'),
   hpFill: $('#hpFill'), hpText: $('#hpText'), shFill: $('#shieldFill'), shText: $('#shieldText'),
@@ -2954,17 +2986,37 @@ function updateHUD(dt) {
   else if (p.using) prog = [p.using.t / p.using.total, `Uso ${CONSUMABLES[p.slot.id].name}…`];
   hud.progress.classList.toggle('hidden', !prog);
   if (prog) { hud.progFill.style.width = (prog[0] * 100) + '%'; setHTML(hud.progText, 'pt', prog[1]); }
-  // mirino
-  const spread = currentSpread(p);
-  const px = Math.tan(Math.max(spread, 0.004)) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * (innerHeight / 2);
-  hud.cross.style.setProperty('--s', Math.min(60, 3 + px) + 'px');
-  const scopedNow = !$('#scope').classList.contains('hidden');
-  hud.cross.style.display = (p.alive && p.mode === 'ground' && !G.build.on && !scopedNow && !G.sighted) ? 'block' : 'none';
+  // mirino (v32: dinamico, disegnato da crosshair.js)
   {
-    const cdef = p.slot && p.slot.kind === 'weapon' ? WEAPONS[p.slot.id] : null;
-    const ct = cdef ? cdef.cross : 'dot';
-    if (hud.cross.dataset.c !== ct) hud.cross.dataset.c = ct;
-    if (cdef && cdef.spin) hud.cross.style.setProperty('--spin', (p.spinK || 0).toFixed(2));
+    const scopedNow = !$('#scope').classList.contains('hidden');
+    const show = p.alive && p.mode === 'ground' && !G.build.on && !scopedNow && !G.sighted;
+    const w = p.weapon, cdef = w ? WEAPONS[w.id] : null, cons = !!(p.slot && p.slot.kind === 'cons');
+    const spread = currentSpread(p);
+    const px = Math.tan(Math.max(spread, 0.004)) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * (innerHeight / 2);
+    // cosa c'è sotto il mirino (ogni 60 ms): un nemico, a che distanza, se il piccone ci arriva
+    G.xhT = (G.xhT || 0) - dt;
+    if (!show) { G.xhEnemy = false; G.xhReach = false; }
+    else if (G.xhT <= 0) {
+      G.xhT = 0.06;
+      camera.getWorldDirection(_xhD);
+      const off = camera.position.distanceTo(p.chest());
+      const h = rayAll(camera.position, _xhD, cdef ? Math.min(700, (cdef.range || 300) * 1.6 + off) : off + 3, p);
+      G.xhEnemy = !!(h && h.char && h.char.alive && !(G.teamSize > 1 && h.char.team === p.team));
+      G.xhDist = h ? Math.max(0, h.t - off * 0.9) : Infinity;
+      G.xhReach = !cdef && !cons && !!h && h.t - off < 2.4;
+    }
+    XH.update(dt, {
+      show, style: cdef ? cdef.cross || 'cross' : cons ? 'cons' : 'melee',
+      spreadPx: cdef ? Math.min(60, px) : 4, color: settings.chColor, size: settings.chSize,
+      enemy: !!G.xhEnemy && (!!cdef || !!G.xhReach),
+      outRange: !!cdef && G.xhDist > (cdef.range || 999),
+      sprint: (p.sprintK || 0) > 0.5,
+      reload: p.reloading > 0 && cdef ? clamp(1 - p.reloading / cdef.reload, 0, 1) : -1,
+      ready: cdef && cdef.rate >= 0.5 && !cdef.burst ? 1 - clamp(p.fireCd / cdef.rate, 0, 1) : -1,
+      mag: cdef ? w.mag / cdef.mag : -1,
+      use: p.using ? p.using.t / p.using.total : -1, useShield: !!(p.using && cons && CONSUMABLES[p.slot.id].shield),
+      spin: cdef && cdef.spin ? p.spinK || 0 : 0, reach: !!G.xhReach,
+    });
   }
   // telemetro: distanza, tempo di volo e caduta del proiettile mentre miri
   {

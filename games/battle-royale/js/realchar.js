@@ -226,7 +226,11 @@ function measureHead(scene, bones, rg) {
   const x0 = pick(xs.slice(), 0.004), x1 = pick(xs.slice(), 0.996), z0 = pick(zs.slice(), 0.004), z1 = pick(zs.slice(), 0.996);
   let rx = (x1 - x0) / 2; const rz = (z1 - z0) / 2;
   if (rx > rz * 1.25) rx = rz * 0.9;   // capelli voluminosi ai lati: conta la forma del cranio
-  return { top, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, rx, rz };
+  // v32: quanto sporge davanti alla bocca (casco, visiera, barba, muso): per bere si appoggia lì
+  const cx = (x0 + x1) / 2, my = top - 0.175, fz = [];
+  for (let i = 0; i < P.length; i += 3) if (P[i + 1] > my - 0.06 && P[i + 1] < my + 0.03 && Math.abs(P[i] - cx) < 0.06) fz.push(P[i + 2]);
+  const front = fz.length > 8 ? pick(fz, 0.995) : -Infinity;
+  return { top, cx, cz: (z0 + z1) / 2, rx, rz, front };
 }
 
 /** v30: sezione vera del busto all'altezza del petto (schiena, petto, mezza larghezza), per appoggiare gli zaini */
@@ -432,20 +436,29 @@ export function attachReal(m, skin, keep = {}) {
   const fingers = [];
   for (const side of ['Left', 'Right']) for (const f of ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']) for (let k = 1; k <= 3; k++) {
     const b = bones[side + 'Hand' + f + k];
-    if (b) fingers.push({ b, q0: b.quaternion.clone(), thumb: f === 'Thumb', trigger: side === 'Right' && f === 'Index', k,
+    if (b) fingers.push({ b, q0: b.quaternion.clone(), thumb: f === 'Thumb', trigger: side === 'Right' && f === 'Index', k, hand: side === 'Right' ? 0 : 1,
       ax: (base.fingerAxis && base.fingerAxis[side + f + k]) || new THREE.Vector3(1, 0, 0) });
   }
   m.real = { rg, B, base, Q: B.map(() => new THREE.Quaternion()), P: B.map(() => new THREE.Vector3()), fingers, grip: -1, want, skin, keep };
+  // v32: bocca e collo nello spazio del busto (per bere dalle pozioni)
+  if (base.headFit && base.headPos) {
+    const f = base.headFit, hr = base.hipsRest;
+    m.neckRest = new THREE.Vector3(base.headPos.x - hr.x, base.headPos.y - hr.y, base.headPos.z - hr.z);
+    m.mouthRest = new THREE.Vector3(f.cx - hr.x, f.top - 0.175 - hr.y, Math.max(f.cz + f.rz * 0.95, f.front + 0.02) - hr.z);
+  }
   setGrip(m.real, 0);
   if (first) ACTIVE.push(new WeakRef(m));
   return true;
 }
 
-function setGrip(R, g) {
-  if (Math.abs(R.grip - g) < 0.02) return;
-  R.grip = g;
+/** v32: presa per mano (g0 destra, g1 sinistra; 0 rilassata → 1 stretta). full: anche l'indice destro chiuso (piccone, oggetti) */
+function setGrip(R, g0, g1 = g0, full = false) {
+  const key = g0 * 1000 + g1 + (full ? 0.5 : 0);
+  if (Math.abs(R.grip - key) < 0.02) return;
+  R.grip = key;
   for (const f of R.fingers) {
-    const a = f.thumb ? 0.15 + g * 0.35 : (0.28 + 0.12 * f.k) + g * (f.trigger ? 0.35 : 0.95);
+    const g = f.hand ? g1 : g0;
+    const a = f.thumb ? 0.15 + g * 0.35 : (0.28 + 0.12 * f.k) + g * (f.trigger && !full ? 0.35 : 0.95);
     f.b.quaternion.copy(f.q0).multiply(_q.setFromAxisAngle(f.ax, a));
   }
 }
@@ -499,7 +512,8 @@ export function syncReal(m) {
   // arma in mano → cinematica inversa delle braccia verso le mani procedurali (sull'impugnatura)
   const gp = m.gunPivot;
   let hold = gp.visible && gp.children.some(c => c.visible) && m.body.visible;
-  setGrip(R, hold ? 1 : 0);
+  const gr = m._grip, gun = hold && gp.children[0] && gp.children[0].userData.weapon;
+  if (gr && hold) setGrip(R, gr[0], gr[1], !gun); else setGrip(R, hold ? 1 : 0);
   if (hold) {
     for (let i = 0; i < 2; i++) {
       const side = i ? 'Left' : 'Right';

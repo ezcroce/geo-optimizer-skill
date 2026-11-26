@@ -929,28 +929,30 @@ function weaponMats(rarity) {
 //  Come si tiene ogni arma (v29): kind = rifle (calcio alla spalla), pistol (una o due mani),
 //  shoulder (tubo appoggiato sulla spalla), hip (all'anca, pesante).
 //  main = [y, z] del palmo della mano sull'impugnatura, fore = [y, z] della mano d'appoggio.
+//  v32: cls = peso dell'arma (light | medium | heavy): cambia la tenuta in mira e in corsa (vedi anim.js);
+//  one = pistola tenuta con la sola mano destra.
 const HOLD = {
-  pistol: { kind: 'pistol', main: [-0.11, -0.03], fore: [-0.12, -0.02] },
-  revolver: { kind: 'pistol', main: [-0.12, -0.05], fore: [-0.13, -0.04] },
-  smg: { main: [-0.11, -0.03], fore: [-0.03, 0.3] },
-  compact: { main: [-0.11, 0.0], fore: [-0.08, 0.145] },
+  pistol: { kind: 'pistol', one: true, cls: 'light', main: [-0.11, -0.03], fore: [-0.12, -0.02] },
+  revolver: { kind: 'pistol', one: true, cls: 'light', main: [-0.12, -0.05], fore: [-0.13, -0.04] },
+  smg: { cls: 'light', main: [-0.11, -0.03], fore: [-0.03, 0.3] },
+  compact: { cls: 'light', main: [-0.11, 0.0], fore: [-0.08, 0.145] },
   ar: { main: [-0.11, -0.05], fore: [-0.05, 0.44] },
   burst: { main: [-0.1, 0.03], fore: [-0.05, 0.25] },
-  heavyar: { main: [-0.1, -0.05], fore: [-0.05, 0.4] },
+  heavyar: { cls: 'heavy', main: [-0.1, -0.05], fore: [-0.05, 0.4] },
   shotgun: { main: [-0.08, -0.12], fore: [-0.06, 0.53] },
   tactical: { main: [-0.08, -0.12], fore: [-0.05, 0.5] },
-  drum: { main: [-0.1, -0.06], fore: [-0.11, 0.415] },
-  sniper: { main: [-0.08, -0.1], fore: [-0.05, 0.42] },
+  drum: { cls: 'heavy', main: [-0.1, -0.06], fore: [-0.11, 0.415] },
+  sniper: { cls: 'heavy', main: [-0.08, -0.1], fore: [-0.05, 0.42] },
   dmr: { main: [-0.1, -0.06], fore: [-0.04, 0.45] },
   hunting: { main: [-0.08, -0.12], fore: [-0.04, 0.45] },
-  rocket: { kind: 'shoulder', main: [-0.11, 0.0], fore: [-0.1, 0.32], rest: [-0.105, -0.18] },
-  minigun: { kind: 'hip', main: [-0.12, -0.04], fore: [0.15, 0.1] },
-  lmg: { main: [-0.09, -0.11], fore: [-0.03, 0.38] },
+  rocket: { kind: 'shoulder', cls: 'heavy', main: [-0.11, 0.0], fore: [-0.1, 0.32], rest: [-0.105, -0.18] },
+  minigun: { kind: 'hip', cls: 'heavy', main: [-0.12, -0.04], fore: [0.15, 0.1] },
+  lmg: { cls: 'heavy', main: [-0.09, -0.11], fore: [-0.03, 0.38] },
   doublebarrel: { main: [-0.07, -0.12], fore: [-0.04, 0.32] },
   handcannon: { kind: 'pistol', main: [-0.12, -0.03], fore: [-0.13, -0.02] },
   crossbow: { main: [-0.1, -0.04], fore: [-0.02, 0.3], sprint: 'low' },
-  grenade: { main: [-0.11, -0.04], fore: [-0.1, 0.43] },
-  silenced: { main: [-0.09, -0.04], fore: [0.0, 0.28] },
+  grenade: { cls: 'heavy', main: [-0.11, -0.04], fore: [-0.1, 0.43] },
+  silenced: { cls: 'light', main: [-0.09, -0.04], fore: [0.0, 0.28] },
 };
 const HOLD_CACHE = new Map();
 /** impugnatura + ingombro (z del calcio e della bocca, larghezza) di un'arma */
@@ -959,7 +961,7 @@ export function holdSpec(id) {
   const b = new THREE.Box3();
   if (MODELS[id]) for (const [, geo] of weaponGeo(id)) { if (!geo.boundingBox) geo.computeBoundingBox(); b.union(geo.boundingBox); }
   else b.set(new THREE.Vector3(-0.05, -0.2, -0.45), new THREE.Vector3(0.05, 0.15, 0.9));
-  const h = { kind: 'rifle', main: [-0.1, -0.05], fore: [-0.05, 0.4], ...(HOLD[id] || {}), zmin: b.min.z, zmax: b.max.z, xmin: b.min.x, xmax: b.max.x, ymin: b.min.y, ymax: b.max.y };
+  const h = { kind: 'rifle', cls: 'medium', main: [-0.1, -0.05], fore: [-0.05, 0.4], ...(HOLD[id] || {}), zmin: b.min.z, zmax: b.max.z, xmin: b.min.x, xmax: b.max.x, ymin: b.min.y, ymax: b.max.y };
   HOLD_CACHE.set(id, h);
   return h;
 }

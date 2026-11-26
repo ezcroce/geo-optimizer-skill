@@ -1,6 +1,6 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { REAL, attachReal, realKind } from './realchar.js?v=31';
+import { REAL, attachReal, realKind } from './realchar.js?v=32';
 import { normalFromHeight, NORMALS } from './texgen.js?v=19';
 import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=31';
 /** normal map ricavata dalla trama (cache per texture) */
@@ -1724,8 +1724,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=29';
-import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=29';
+export { buildWeaponMesh } from './weapons.js?v=32';
+import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=32';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */

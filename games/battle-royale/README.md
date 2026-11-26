@@ -24,6 +24,33 @@ python3 -m http.server 8080
 
 ## Cosa c'è
 
+### Novità: animazioni, armi che non trapassano il corpo e 6 armi nuove (v29)
+
+- **Niente più armi dentro il personaggio** (`js/anim.js`): ogni arma ha un'impugnatura descritta in
+  `js/weapons.js` (`HOLD`: tipo, punto della mano sull'impugnatura e sul paramano) e il suo ingombro misurato dal
+  modello. La posa la mette al posto giusto:
+  - fucili: **calcio nella tasca della spalla**, che ruota attorno alla spalla quando guardi su o giù;
+  - **lanciarazzi appoggiato sulla spalla**, minigun all'anca, pistole a due mani con le braccia tese;
+  - in corsa: fucile **di traverso davanti al petto** (la distanza dipende da quanto è spesso e lungo),
+    pistola bassa in una mano che dondola col passo, balestra in "low ready" (punta verso terra).
+- **Mani sull'arma con la cinematica inversa**: le braccia non hanno più angoli fissi, i polsi vanno
+  sull'impugnatura e sul paramano (se il paramano è troppo lontano la mano scivola indietro fin dove arriva il
+  braccio). Funziona anche in ricarica (mano al caricatore → tasca sul fianco → caricatore → paramano), nel
+  rinculo (l'arma arretra lungo la canna) e nel cambio arma.
+- Le armi impugnate sono in scala 0,86: proporzioni più credibili rispetto al corpo (la bocca da fuoco segue la scala).
+- Verificato con un test automatico che "voxelizza" il corpo vero (braccia escluse) e conta i punti delle armi
+  che ci finiscono dentro: per 18 armi × 4 skin × 8 pose (mira, mira su/giù, corsa, accovacciato, ricarica)
+  si passa da compenetrazioni fino a 16 cm a praticamente zero.
+- **Passo più naturale**: tallone che tocca per primo, ginocchio che assorbe l'appoggio, spinta di punta allo
+  stacco, bacino che si sposta sulla gamba d'appoggio con un piccolo rollio delle spalle; in corsa il tallone sale
+  verso il gluteo e il punto più alto è nella fase di volo. Braccia libere che "pompano" in corsa.
+- **Arrampicata**: la mano sale veloce staccandosi dal muro e poi tira giù lenta, la gamba opposta fa il passo,
+  il bacino oscilla e la testa segue la mano.
+- **6 armi nuove** (con modello 3D, suono, icona e rarità): **Mitragliatrice leggera** (nastro da 60, bipiede,
+  rallenta un po'), **Doppietta** (due colpi a raffica ravvicinata), **Pistola pesante** (54 danni),
+  **Balestra** (silenziosa, dardo lento che cade: mira più in alto), **Lanciagranate** a tamburo da 6 (granate a
+  parabola che esplodono) e **Mitraglietta silenziata**. In tutto ora le armi sono 21.
+
 ### Novità: skin riconoscibili (v28)
 
 - **Costumi veri sopra i personaggi realistici** (`js/costume.js`): i modelli MakeHuman delle skin erano persone

@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v28';
+export const NEWS_VERSION = 'v29';
 
 export const NEWS = [
+  {
+    v: 'v29', title: 'Animazioni nuove e 6 armi in più', color: '#4ad0ff', icon: '🏃',
+    items: [
+      'Le armi non trapassano più il personaggio: il calcio va alla spalla, il lanciarazzi poggia sulla spalla, la minigun si tiene all’anca e le mani stanno sull’impugnatura in ogni posa (mira, corsa, ricarica, rinculo)',
+      'Corsa con l’arma di traverso davanti al petto, pistola bassa in una mano, balestra puntata verso terra',
+      'Ricarica vera: la mano va al caricatore, alla tasca sul fianco e torna sull’arma',
+      'Passo più naturale: tallone che tocca per primo, spinta di punta, bacino che ondeggia, in corsa il tallone sale; arrampicata con mani che cercano l’appiglio e corpo che oscilla',
+      'Nuove armi: Mitragliatrice leggera (nastro da 60), Doppietta, Pistola pesante, Balestra silenziosa (il dardo cade, mira più in alto), Lanciagranate a tamburo (colpi a parabola) e Mitraglietta silenziata',
+    ],
+  },
   {
     v: 'v28', title: 'Le skin si riconoscono!', color: '#ff5a4a', icon: '🐉',
     items: [

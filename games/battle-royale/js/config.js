@@ -118,9 +118,46 @@ export const WEAPONS = {
     botRange: 35, moveMult: 0.82, sound: 'minigun', recoil: 0.004, muzzle: 0.955, role: 'smg', cross: 'square4', sight: 'none',
     desc: 'Le canne devono girare prima di sparare, poi è una pioggia di piombo.',
   },
+  // ── v29: armi nuove ──
+  lmg: {
+    name: 'Mitragliatrice leggera', speed: 390, drop: 1.0, dmg: 23, pellets: 1, rate: 0.1, mag: 60, reload: 4.2,
+    spread: 0.045, adsSpread: 0.022, range: 220, ammo: 'medium', auto: true, zoom: 1.5,
+    botRange: 55, moveMult: 0.9, sound: 'lmg', recoil: 0.008, muzzle: 1.02, role: 'ar', cross: 'cross', sight: 'reddot',
+    desc: 'Nastro da 60 colpi e bipiede: tiene giù la testa a una squadra intera, ma ricaricare è lento.',
+  },
+  doublebarrel: {
+    name: 'Doppietta', speed: 220, drop: 1.35, dmg: 11, pellets: 11, rate: 0.26, mag: 2, reload: 2.4,
+    spread: 0.12, range: 32, ammo: 'shells', auto: false, zoom: 1.15,
+    botRange: 11, sound: 'doublebarrel', recoil: 0.06, muzzle: 0.87, role: 'shotgun', cross: 'circle2', sight: 'bead',
+    desc: 'Due colpi uno dietro l\'altro: da vicinissimo non perdona, poi devi ricaricare.',
+  },
+  handcannon: {
+    name: 'Pistola pesante', speed: 320, drop: 1.1, dmg: 54, pellets: 1, rate: 0.5, mag: 7, reload: 1.9,
+    spread: 0.015, range: 160, ammo: 'medium', auto: false, zoom: 1.35,
+    botRange: 40, sound: 'handcannon', recoil: 0.034, muzzle: 0.29, role: 'pistol', cross: 'dot', sight: 'iron',
+    desc: 'Calibro enorme in una pistola: due colpi e lo scudo è andato.',
+  },
+  crossbow: {
+    name: 'Balestra', speed: 115, drop: 2.2, dmg: 92, pellets: 1, rate: 1.0, mag: 1, reload: 1.6,
+    spread: 0.03, adsSpread: 0.0, range: 260, ammo: 'heavy', auto: false, zoom: 2.0,
+    botRange: 70, sound: 'crossbow', recoil: 0.02, muzzle: 0.57, role: 'sniper', cross: 'hunt', sight: 'tri',
+    desc: 'Silenziosa e letale, ma il dardo è lento e cade: mira un po\' più in alto.',
+  },
+  grenade: {
+    name: 'Lanciagranate', speed: 36, drop: 1.0, dmg: 70, pellets: 1, rate: 0.75, mag: 6, reload: 3.6,
+    spread: 0.012, range: 160, ammo: 'rockets', auto: false, zoom: 1.3, projectile: true, splash: 4.5, grenade: true,
+    botRange: 35, sound: 'grenade', recoil: 0.04, muzzle: 0.67, role: 'rocket', cross: 'rocket', sight: 'rocket',
+    desc: 'Sei granate a parabola: scavalcano i muri e sfondano le coperture.',
+  },
+  silenced: {
+    name: 'Mitraglietta silenziata', speed: 250, drop: 1.25, dmg: 16, pellets: 1, rate: 0.085, mag: 30, reload: 2.0,
+    spread: 0.036, range: 85, ammo: 'light', auto: true, zoom: 1.3,
+    botRange: 26, sound: 'silenced', recoil: 0.005, muzzle: 0.64, role: 'smg', cross: 'tri', sight: 'holo',
+    desc: 'Quasi non si sente: perfetta per chi gioca d\'astuzia.',
+  },
 };
 // le varianti usano la sagoma semplificata dell'arma di base (icona di riserva senza WebGL)
-for (const [id, base] of [['revolver', 'pistol'], ['compact', 'smg'], ['burst', 'ar'], ['heavyar', 'ar'], ['dmr', 'sniper'], ['tactical', 'shotgun'], ['drum', 'shotgun'], ['hunting', 'sniper'], ['minigun', 'rocket']]) WEAPONS[id].parts = WEAPONS[base].parts;
+for (const [id, base] of [['revolver', 'pistol'], ['compact', 'smg'], ['burst', 'ar'], ['heavyar', 'ar'], ['dmr', 'sniper'], ['tactical', 'shotgun'], ['drum', 'shotgun'], ['hunting', 'sniper'], ['minigun', 'rocket'], ['lmg', 'ar'], ['doublebarrel', 'shotgun'], ['handcannon', 'pistol'], ['crossbow', 'sniper'], ['grenade', 'rocket'], ['silenced', 'smg']]) WEAPONS[id].parts = WEAPONS[base].parts;
 
 // speed = velocità del proiettile (m/s), drop = quanto la gravità lo fa cadere (1 = normale)
 // Rarità tipiche per arma (probabilità per livello)
@@ -141,6 +178,13 @@ export const WEAPON_POOL = [
   { id: 'drum', w: 6, rar: [0, 34, 54, 10, 2] },
   { id: 'hunting', w: 7, rar: [20, 40, 34, 5, 1] },
   { id: 'minigun', w: 2, rar: [0, 0, 60, 34, 6] },
+  // v29
+  { id: 'lmg', w: 4, rar: [0, 30, 55, 12, 3] },
+  { id: 'doublebarrel', w: 9, rar: [40, 36, 20, 3.5, 0.5] },
+  { id: 'handcannon', w: 7, rar: [20, 40, 33, 6, 1] },
+  { id: 'crossbow', w: 5, rar: [0, 35, 52, 11, 2] },
+  { id: 'grenade', w: 2, rar: [0, 0, 55, 38, 7] },
+  { id: 'silenced', w: 8, rar: [30, 40, 25, 4, 1] },
 ];
 
 export const CONSUMABLES = {

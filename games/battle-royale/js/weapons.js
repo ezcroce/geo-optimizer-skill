@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { WEAPONS, RARITIES } from './config.js?v=19';
+import { WEAPONS, RARITIES } from './config.js?v=29';
 import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=19';
 
 /** quante volte la texture si ripete in un metro di superficie */
@@ -459,6 +459,142 @@ const MODELS = {
     P('p', prof([[0.34, -0.04], [0.4, -0.04], [0.39, -0.18], [0.35, -0.18]], 0.045));               // impugnatura anteriore
     P('m', bx(0.03, 0.03, 0.05, 0, -0.03, 0.37));
   },
+
+  // ───────── v29: armi nuove ─────────
+  lmg(P) {   // mitragliatrice leggera a nastro, con bipiede e cassetta delle munizioni
+    P('b', prof([[-0.18, 0.0], [0.22, 0.0], [0.22, 0.09], [-0.15, 0.09], [-0.18, 0.07]], 0.085));                  // castello
+    P('m', prof([[-0.13, 0.09], [0.17, 0.09], [0.15, 0.118], [-0.11, 0.118]], 0.08, { bevel: 0.004 }));             // coperchio d'alimentazione
+    for (let i = 0; i < 5; i++) P('k', bx(0.084, 0.006, 0.012, 0, 0.12, -0.08 + i * 0.05));
+    P('p', prof([[0.22, 0.072], [0.5, 0.066], [0.512, 0.05], [0.512, -0.02], [0.5, -0.03], [0.22, -0.034]], 0.082, { bevel: 0.008 }));   // paramano
+    for (let i = 0; i < 4; i++) P('k', bx(0.084, 0.012, 0.04, 0, 0.02, 0.26 + i * 0.06));
+    P('r', prof([[0.24, 0.05], [0.49, 0.046], [0.49, 0.036], [0.24, 0.04]], 0.086, { bevel: 0.002 }));
+    P('m', cyl(0.021, 0.021, 0.5, 0.95, { y: 0.03, seg: 12 }));                                       // canna
+    P('k', cyl(0.027, 0.025, 0.93, 1.02, { y: 0.03, seg: 8 }));                                       // spegnifiamma
+    for (const z of [0.95, 0.98]) P('m', bx(0.058, 0.008, 0.012, 0, 0.03, z));
+    P('m', cyl(0.013, 0.013, 0.5, 0.8, { y: -0.012, seg: 8 }));                                       // tubo del gas
+    P('k', bx(0.012, 0.058, 0.02, 0, 0.075, 0.9));                                                   // mirino
+    P('k', prof([[0.3, 0.07], [0.33, 0.14], [0.52, 0.14], [0.55, 0.07], [0.52, 0.07], [0.5, 0.118], [0.35, 0.118], [0.33, 0.07]], 0.022));   // maniglia per il cambio canna
+    for (const x of [-0.02, 0.02]) P('k', cyl(0.008, 0.008, 0.56, 0.86, { x, y: -0.035, seg: 6 }));   // bipiede ripiegato
+    P('m', bx(0.06, 0.024, 0.03, 0, -0.02, 0.86));
+    P('b', prof([[-0.03, 0.0], [0.16, 0.0], [0.16, -0.17], [0.14, -0.19], [-0.03, -0.19]], 0.1, { x: -0.025, bevel: 0.008 }));   // cassetta munizioni
+    P('y', bx(0.104, 0.02, 0.186, -0.025, -0.06, 0.065));
+    P('m', bx(0.03, 0.012, 0.16, -0.025, -0.192, 0.065));
+    P('k', bx(0.03, 0.035, 0.07, -0.058, 0.03, 0.05, { ry: 0.3 }));                                   // nastro
+    for (let i = 0; i < 4; i++) P('s', cylX(0.007, 0.04, -0.07 + i * 0.006, 0.05, 0.03 + i * 0.022, 6));
+    P('p', prof([[-0.13, -0.0], [-0.06, -0.0], [-0.085, -0.17], [-0.16, -0.176], [-0.17, -0.16]], 0.06));          // impugnatura
+    P('k', guard(-0.07, 0.0, -0.0, -0.07, 0.022));
+    P('m', cyl(0.022, 0.022, -0.32, -0.17, { y: 0.03 }));
+    P('b', prof([[-0.18, 0.075], [-0.5, 0.064], [-0.52, 0.045], [-0.52, -0.1], [-0.48, -0.112], [-0.3, -0.04], [-0.18, -0.01]], 0.066, {
+      holes: [[[-0.31, 0.04], [-0.46, 0.04], [-0.46, -0.07], [-0.35, -0.025]]],
+    }));                                                                                             // calcio
+    P('k', prof([[-0.515, 0.068], [-0.54, 0.068], [-0.54, -0.118], [-0.515, -0.118]], 0.07, { bevel: 0.006 }));
+    P('k', bx(0.032, 0.03, 0.08, 0, 0.135, -0.02));                                                  // red dot sul coperchio
+    P('k', cyl(0.024, 0.024, -0.06, 0.04, { y: 0.16, seg: 12 }));
+    P('g', cyl(0.02, 0.02, 0.04, 0.044, { y: 0.16, seg: 12 }));
+    P('dot', bx(0.005, 0.005, 0.002, 0, 0.16, -0.064));
+  },
+  doublebarrel(P) {   // doppietta a canne affiancate con cani esterni
+    for (const x of [-0.023, 0.023]) {
+      P('m', cyl(0.022, 0.021, 0.12, 0.86, { x, y: 0.03, seg: 14 }));                                 // canne
+      P('k', cyl(0.0225, 0.0225, 0.855, 0.87, { x, y: 0.03, seg: 14 }));
+      P('m', prof([[-0.1, 0.05], [-0.078, 0.05], [-0.105, 0.092], [-0.122, 0.088]], 0.012, { x: x * 0.9 }));   // cani
+    }
+    P('k', bx(0.014, 0.012, 0.72, 0, 0.056, 0.5));                                                  // bindella
+    P('s', sph(0.007, 0, 0.066, 0.848));                                                            // mirino a perla
+    P('k', bx(0.02, 0.012, 0.7, 0, 0.008, 0.5));
+    P('m', prof([[-0.1, 0.052], [0.13, 0.052], [0.13, -0.035], [0.0, -0.046], [-0.1, -0.03]], 0.09, { bevel: 0.006 }));   // bascula
+    P('r', prof([[-0.08, 0.034], [0.09, 0.034], [0.09, -0.02], [-0.08, -0.02]], 0.094, { bevel: 0.002 }));   // placche incise
+    P('m', bx(0.02, 0.016, 0.05, 0, 0.06, -0.03));                                                  // chiave d'apertura
+    P('w', prof([[0.14, 0.006], [0.46, 0.006], [0.48, -0.01], [0.465, -0.042], [0.16, -0.046]], 0.076, { bevel: 0.01 }));   // astina
+    P('s', guard(-0.065, 0.03, -0.035, -0.092, 0.022));                                              // guardia in ottone
+    P('m', bx(0.01, 0.03, 0.01, 0, -0.058, -0.02, { rx: 0.25 })); P('m', bx(0.01, 0.03, 0.01, 0, -0.058, 0.0, { rx: 0.25 }));
+    P('w', prof([[-0.1, 0.046], [-0.16, 0.032], [-0.5, 0.036], [-0.52, 0.02], [-0.52, -0.15], [-0.47, -0.156], [-0.19, -0.078], [-0.1, -0.035]], 0.068, { bevel: 0.01 }));   // calcio
+    P('k', prof([[-0.515, 0.04], [-0.536, 0.04], [-0.536, -0.162], [-0.515, -0.162]], 0.072, { bevel: 0.005 }));
+    P('l', bx(0.012, 0.075, 0.17, -0.037, -0.045, -0.3));                                            // cartucciera in cuoio
+    for (let i = 0; i < 3; i++) P('sh', cyl(0.011, 0.011, -0.37, -0.31, { x: -0.046, y: -0.07 + i * 0.026, seg: 8 }));
+  },
+  handcannon(P) {   // pistola pesante con canna lunga e carrello massiccio
+    P('b', prof([[-0.085, 0.0], [0.275, 0.0], [0.275, 0.06], [-0.065, 0.062], [-0.085, 0.046]], 0.068, { bevel: 0.005 }));   // carrello
+    for (let i = 0; i < 6; i++) P('k', bx(0.072, 0.04, 0.006, 0, 0.03, -0.06 + i * 0.014));          // zigrinatura
+    P('m', bx(0.03, 0.012, 0.32, 0, 0.066, 0.11));                                                  // costola superiore
+    P('r', bx(0.072, 0.008, 0.2, 0, 0.04, 0.13));
+    P('k', cyl(0.017, 0.017, 0.272, 0.285, { y: 0.03, seg: 10 }));
+    P('m', prof([[-0.065, 0.0], [0.27, 0.0], [0.27, -0.03], [0.1, -0.036], [0.05, -0.05], [0.036, -0.21], [-0.062, -0.226], [-0.092, -0.205], [-0.077, -0.06], [-0.087, -0.025]], 0.062));   // fusto
+    P('p', prof([[-0.064, -0.06], [0.03, -0.06], [0.022, -0.2], [-0.062, -0.212], [-0.078, -0.196]], 0.07, { bevel: 0.004 }));   // guancette
+    P('m', guard(0.042, 0.135, -0.03, -0.1, 0.022));
+    P('k', bx(0.01, 0.03, 0.01, 0, -0.06, 0.075, { rx: 0.25 }));
+    P('k', bx(0.01, 0.018, 0.02, 0, 0.073, 0.255));                                                 // mirino
+    P('k', bx(0.032, 0.016, 0.016, 0, 0.073, -0.05));                                                // tacca
+    P('m', prof([[-0.087, 0.04], [-0.07, 0.052], [-0.096, 0.078], [-0.112, 0.072]], 0.02));           // cane
+    P('m', bx(0.02, 0.012, 0.03, 0.034, 0.02, -0.02));                                               // sicura
+  },
+  crossbow(P) {   // balestra a flettenti con ottica e dardo incoccato
+    P('b', prof([[-0.12, 0.035], [0.5, 0.035], [0.5, -0.02], [-0.12, -0.03]], 0.05, { bevel: 0.006 }));            // fusto con la guida
+    P('r', bx(0.02, 0.006, 0.6, 0, 0.038, 0.2));                                                    // guida del dardo
+    P('p', prof([[-0.12, 0.035], [-0.48, 0.04], [-0.5, 0.025], [-0.5, -0.12], [-0.45, -0.126], [-0.25, -0.05], [-0.12, -0.03]], 0.06, {
+      holes: [[[-0.27, 0.015], [-0.43, 0.015], [-0.43, -0.08], [-0.31, -0.03]]],
+    }));                                                                                             // calcio
+    P('k', prof([[-0.495, 0.045], [-0.52, 0.045], [-0.52, -0.128], [-0.495, -0.128]], 0.066, { bevel: 0.006 }));
+    P('p', prof([[-0.06, -0.03], [0.01, -0.03], [-0.015, -0.18], [-0.085, -0.186], [-0.1, -0.17]], 0.056));        // impugnatura
+    P('k', guard(-0.05, 0.04, -0.03, -0.086, 0.022));
+    P('m', bx(0.13, 0.055, 0.07, 0, 0.012, 0.45));                                                  // supporto dei flettenti
+    for (const sd of [-1, 1]) {
+      P('r', bx(0.17, 0.028, 0.045, sd * 0.13, 0.015, 0.44, { ry: sd * 0.16 }));                      // flettenti curvi
+      P('b', bx(0.15, 0.024, 0.04, sd * 0.275, 0.015, 0.397, { ry: sd * 0.5 }));
+      P('k', cylY(0.016, 0.036, sd * 0.34, 0.015, 0.36, 10));                                         // carrucole
+      P('m', bx(0.003, 0.004, 0.5, sd * 0.17, 0.04, 0.175, { ry: sd * Math.atan2(0.34, 0.38) }));      // corda tesa
+      P('m', bx(0.012, 0.012, 0.11, sd * 0.05, -0.005, 0.55));                                        // staffa
+    }
+    P('m', bx(0.11, 0.012, 0.012, 0, -0.005, 0.605));
+    P('k', bx(0.05, 0.03, 0.05, 0, 0.04, -0.015));                                                  // noce di sgancio
+    P('m', cyl(0.006, 0.006, -0.01, 0.5, { y: 0.05, seg: 6 }));                                       // dardo
+    P('r', cyl(0.013, 0.001, 0.5, 0.57, { y: 0.05, seg: 6 }));
+    for (const r of [0, 2.1, 4.2]) P('r', bx(0.002, 0.022, 0.05, Math.sin(r) * 0.012, 0.05 + Math.cos(r) * 0.012, 0.02, { rz: -r }));   // alette
+    for (const z of [-0.02, 0.14]) P('m', bx(0.024, 0.045, 0.02, 0, 0.075, z));                       // anelli dell'ottica
+    P('k', cyl(0.022, 0.022, -0.08, 0.22, { y: 0.11, seg: 14 }));
+    P('g', cyl(0.019, 0.019, 0.22, 0.224, { y: 0.11, seg: 14 }));
+  },
+  grenade(P) {   // lanciagranate a tamburo da sei colpi
+    P('b', cyl(0.1, 0.1, 0.06, 0.28, { seg: 20 }));                                                  // tamburo
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2 + Math.PI / 6, cx = Math.cos(a), cy = Math.sin(a);
+      P('k', bx(0.016, 0.016, 0.19, cx * 0.1, cy * 0.1, 0.17, { rz: a }));                             // scanalature
+      P('y', cyl(0.028, 0.028, 0.279, 0.285, { x: Math.cos(a + Math.PI / 6) * 0.062, y: Math.sin(a + Math.PI / 6) * 0.062, seg: 10 }));   // granate nelle camere
+    }
+    P('m', cylX(0.012, 0.21, 0, 0.0, 0.17));                                                       // perno
+    P('m', cyl(0.038, 0.038, 0.28, 0.66, { y: 0.065, seg: 16 }));                                    // canna
+    P('k', cyl(0.043, 0.043, 0.64, 0.672, { y: 0.065, seg: 16 }));
+    P('p', prof([[0.3, 0.03], [0.58, 0.03], [0.6, 0.01], [0.6, -0.03], [0.3, -0.035]], 0.07, { bevel: 0.008 }));   // paramano
+    P('p', prof([[0.4, -0.03], [0.46, -0.03], [0.45, -0.165], [0.41, -0.165]], 0.046));               // impugnatura anteriore
+    P('m', bx(0.04, 0.02, 0.66, 0, 0.125, 0.26));                                                   // slitta
+    for (const z of [0.0, 0.5]) P('m', bx(0.04, 0.03, 0.03, 0, 0.105, z));
+    P('m', prof([[-0.08, 0.115], [0.06, 0.115], [0.06, -0.105], [-0.02, -0.105], [-0.08, -0.04]], 0.07, { bevel: 0.006 }));   // castello
+    P('m', bx(0.05, 0.022, 0.3, 0, -0.115, 0.15));                                                  // cinghia inferiore
+    P('p', prof([[-0.07, -0.04], [0.0, -0.04], [-0.025, -0.2], [-0.1, -0.205], [-0.112, -0.19]], 0.058));          // impugnatura
+    P('k', guard(-0.01, 0.06, -0.05, -0.11, 0.022));
+    P('m', cyl(0.02, 0.02, -0.35, -0.08, { y: 0.04 }));                                              // calcio telescopico
+    P('b', prof([[-0.3, 0.08], [-0.44, 0.08], [-0.46, 0.06], [-0.46, -0.1], [-0.42, -0.11], [-0.3, -0.02]], 0.06));
+    P('k', prof([[-0.455, 0.084], [-0.476, 0.084], [-0.476, -0.114], [-0.455, -0.114]], 0.066, { bevel: 0.005 }));
+    P('k', prof([[0.12, 0.135], [0.2, 0.135], [0.19, 0.18], [0.13, 0.18]], 0.032));                   // alzo a quadrante
+    P('r', bx(0.034, 0.008, 0.008, 0, 0.17, 0.16));
+  },
+  silenced(P) {   // mitraglietta integralmente silenziata
+    P('b', prof([[-0.14, 0.0], [0.2, 0.0], [0.2, 0.07], [-0.12, 0.07], [-0.14, 0.05]], 0.064));                    // castello
+    P('k', bx(0.066, 0.022, 0.06, 0, 0.04, 0.06));
+    P('p', prof([[0.2, 0.068], [0.36, 0.068], [0.37, 0.05], [0.37, 0.0], [0.2, -0.002]], 0.076, { bevel: 0.008 }));   // paramano
+    P('k', cyl(0.032, 0.032, 0.36, 0.62, { y: 0.035, seg: 16 }));                                    // silenziatore
+    for (const z of [0.4, 0.58]) P('r', cyl(0.034, 0.034, z, z + 0.012, { y: 0.035, seg: 16 }));
+    P('m', cyl(0.03, 0.025, 0.62, 0.64, { y: 0.035, seg: 16 }));
+    P('m', bx(0.034, 0.014, 0.3, 0, 0.077, 0.04));                                                  // slitta
+    P('k', bx(0.04, 0.045, 0.06, 0, 0.106, 0.0));                                                   // olografico
+    P('g', bx(0.032, 0.03, 0.002, 0, 0.11, 0.031));
+    P('m', prof([[0.08, 0.0], [0.13, 0.0], [0.15, -0.08], [0.18, -0.2], [0.13, -0.212], [0.1, -0.09], [0.08, -0.04]], 0.04));   // caricatore
+    P('p', prof([[-0.06, 0.0], [0.01, 0.0], [-0.015, -0.17], [-0.085, -0.176], [-0.096, -0.16]], 0.058));          // impugnatura
+    P('k', guard(0.0, 0.07, 0.0, -0.065, 0.022));
+    for (const x of [-0.026, 0.026]) P('k', cyl(0.007, 0.007, -0.37, -0.12, { x, y: 0.03, seg: 6 }));  // calcio retrattile
+    P('b', prof([[-0.36, 0.07], [-0.4, 0.07], [-0.4, -0.08], [-0.36, -0.08]], 0.07, { bevel: 0.008 }));
+    P('r', bx(0.012, 0.01, 0.03, 0.036, 0.04, -0.08));                                               // leva d'armamento
+  },
 };
 
 const GEO = new Map();
@@ -789,6 +925,45 @@ function weaponMats(rarity) {
   return m;
 }
 
+// ───────────── impugnatura ─────────────
+//  Come si tiene ogni arma (v29): kind = rifle (calcio alla spalla), pistol (una o due mani),
+//  shoulder (tubo appoggiato sulla spalla), hip (all'anca, pesante).
+//  main = [y, z] del palmo della mano sull'impugnatura, fore = [y, z] della mano d'appoggio.
+const HOLD = {
+  pistol: { kind: 'pistol', main: [-0.11, -0.03], fore: [-0.12, -0.02] },
+  revolver: { kind: 'pistol', main: [-0.12, -0.05], fore: [-0.13, -0.04] },
+  smg: { main: [-0.11, -0.03], fore: [-0.03, 0.3] },
+  compact: { main: [-0.11, 0.0], fore: [-0.08, 0.145] },
+  ar: { main: [-0.11, -0.05], fore: [-0.05, 0.44] },
+  burst: { main: [-0.1, 0.03], fore: [-0.05, 0.25] },
+  heavyar: { main: [-0.1, -0.05], fore: [-0.05, 0.4] },
+  shotgun: { main: [-0.08, -0.12], fore: [-0.06, 0.53] },
+  tactical: { main: [-0.08, -0.12], fore: [-0.05, 0.5] },
+  drum: { main: [-0.1, -0.06], fore: [-0.11, 0.415] },
+  sniper: { main: [-0.08, -0.1], fore: [-0.05, 0.42] },
+  dmr: { main: [-0.1, -0.06], fore: [-0.04, 0.45] },
+  hunting: { main: [-0.08, -0.12], fore: [-0.04, 0.45] },
+  rocket: { kind: 'shoulder', main: [-0.11, 0.0], fore: [-0.1, 0.32], rest: [-0.105, -0.18] },
+  minigun: { kind: 'hip', main: [-0.12, -0.04], fore: [0.15, 0.1] },
+  lmg: { main: [-0.09, -0.11], fore: [-0.03, 0.38] },
+  doublebarrel: { main: [-0.07, -0.12], fore: [-0.04, 0.32] },
+  handcannon: { kind: 'pistol', main: [-0.12, -0.03], fore: [-0.13, -0.02] },
+  crossbow: { main: [-0.1, -0.04], fore: [-0.02, 0.3], sprint: 'low' },
+  grenade: { main: [-0.11, -0.04], fore: [-0.1, 0.43] },
+  silenced: { main: [-0.09, -0.04], fore: [0.0, 0.28] },
+};
+const HOLD_CACHE = new Map();
+/** impugnatura + ingombro (z del calcio e della bocca, larghezza) di un'arma */
+export function holdSpec(id) {
+  if (HOLD_CACHE.has(id)) return HOLD_CACHE.get(id);
+  const b = new THREE.Box3();
+  if (MODELS[id]) for (const [, geo] of weaponGeo(id)) { if (!geo.boundingBox) geo.computeBoundingBox(); b.union(geo.boundingBox); }
+  else b.set(new THREE.Vector3(-0.05, -0.2, -0.45), new THREE.Vector3(0.05, 0.15, 0.9));
+  const h = { kind: 'rifle', main: [-0.1, -0.05], fore: [-0.05, 0.4], ...(HOLD[id] || {}), zmin: b.min.z, zmax: b.max.z, xmin: b.min.x, xmax: b.max.x, ymin: b.min.y, ymax: b.max.y };
+  HOLD_CACHE.set(id, h);
+  return h;
+}
+
 /** Modello dell'arma: la canna punta verso +Z */
 export function buildWeaponMesh(id, rarity = 0) {
   const g = new THREE.Group();
@@ -805,6 +980,7 @@ export function buildWeaponMesh(id, rarity = 0) {
   }
   g.userData.weapon = id;
   g.userData.spin = spin;
+  g.userData.hold = holdSpec(id);
   return g;
 }
 

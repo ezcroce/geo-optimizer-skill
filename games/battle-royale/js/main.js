@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=19';
-import * as PR from './progress.js?v=19';
+} from './config.js?v=29';
+import * as PR from './progress.js?v=29';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=19';
-import { initMenu } from './menu.js?v=28';
+import { initMenu } from './menu.js?v=29';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=19';
 import { initSettingsUI } from './settings-ui.js?v=19';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=19';
+import * as A from './audio.js?v=29';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
@@ -20,16 +20,16 @@ import {
 } from './world.js?v=27';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=28';
-import { weaponIcon } from './weapons.js?v=19';
-import { consIcon, ammoIcon } from './items.js?v=27';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=29';
+import { weaponIcon } from './weapons.js?v=29';
+import { consIcon, ammoIcon } from './items.js?v=29';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=26';
-import { createInventory } from './inventory.js?v=19';
+import { createInventory } from './inventory.js?v=29';
 import { loadModelOverrides, MODEL_SOURCE } from './props.js?v=26';
 import { loadRealChars, syncAllReal } from './realchar.js?v=28';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=28';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath } from './anim.js?v=29';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -494,8 +494,9 @@ function updateClimb(ch, dt, up, down, jump) {
 function muzzlePos(ch, out = new THREE.Vector3()) {
   const s = ch.weapon;
   const z = s ? WEAPONS[s.id].muzzle : 0.6;
+  const g = ch.m.gunPivot.children[0], sc = g ? g.scale.z : 1;   // v29: le armi in mano sono in scala
   ch.m.root.updateMatrixWorld();
-  return ch.m.gunPivot.localToWorld(out.set(0, 0.02, z));
+  return ch.m.gunPivot.localToWorld(out.set(0, 0.02 * sc, z * sc));
 }
 
 function showGlider(ch, on) {
@@ -938,7 +939,8 @@ function animateChar(ch, dt) {
   m.torso.rotation.x = 0.32 * ck + land * 0.5 + breath * 0.022 * idle + run * 0.06;
   m.torso.rotation.y = Math.sin(ch.walkPhase) * (0.1 + run * 0.08) * mv * (1 - ck * 0.7) * (1 - ch.strafeK * 0.5) - ch.hipYaw;
   m.torso.rotation.x -= 0.07 * ch.backK * mv;   // indietro: busto un po' più eretto
-  m.torso.rotation.z = Math.sin(t * 0.9) * 0.015 * idle;
+  // bacino/spalle: piccolo rollio opposto allo spostamento sulla gamba d'appoggio
+  m.torso.rotation.z = Math.sin(t * 0.9) * 0.015 * idle - Math.cos(ch.walkPhase) * 0.03 * mv * (1 - ck) * (1 - run * 0.5);
   m.torso.position.y = RIG.hip + Math.abs(Math.cos(ch.walkPhase)) * 0.008 * mv;
 
   // la testa ogni tanto si guarda attorno quando sei fermo
@@ -980,41 +982,41 @@ function animateChar(ch, dt) {
     setArm(m, 0, -0.75 - k - lean, 0.4, -1.1);
     m.gunPivot.position.set(0.05, 0.3, 0.32);
   } else {
-    // arma: posa di mira, oppure "arma bassa" mentre corri
+    // arma: posa di mira, oppure "arma in sicurezza" mentre corri (v29: mani sull'arma con la IK)
     poseHold(m, p, sk, sw, lean);
-    // ricarica: la mano sinistra scende al caricatore e torna su, l'arma si inclina
-    if (ch.reloading > 0) {
-      const dur = WEAPONS[s.id].reload;
-      const ph = 1 - ch.reloading / dur;
-      const dip = bump(ph / 0.55), push = bump((ph - 0.55) / 0.45);
-      m.arms[0].rotation.x += dip * 0.9 - push * 0.25;
-      m.elbows[0].rotation.x -= dip * 0.6;
-      m.arms[0].rotation.z += dip * 0.2;
-      m.gunPivot.rotation.z += 0.55 * bump(ph);
-      m.gunPivot.rotation.x += 0.35 * bump(ph);
-      m.head.rotation.x = 0.25 * bump(ph);
-    }
   }
-  // rinculo
+  const holdingGun = s && s.kind === 'weapon';
+  let reloadPh = -1;
+  // ricarica: l'arma si inclina verso l'interno, la mano d'appoggio va al caricatore e alla tasca
+  if (holdingGun && ch.reloading > 0) {
+    const dur = WEAPONS[s.id].reload;
+    reloadPh = clamp(1 - ch.reloading / dur, 0, 1);
+    // il lanciarazzi resta sulla spalla: si inclina appena
+    const b = bump(reloadPh) * (m._hold && m._hold.h.kind === 'shoulder' ? 0.3 : 1);
+    m.gunPivot.rotateZ(0.45 * b);
+    m.gunPivot.rotateX(0.22 * b);
+    m.gunPivot.translateZ(0.08 * b);        // la porta via dalla spalla: il calcio non entra nel petto
+    m.gunPivot.position.y -= 0.05 * b;
+    m.head.rotation.x = 0.25 * b;
+  }
+  // rinculo: l'arma arretra lungo la canna e la bocca sale
   if (ch.recoilT > 0) {
     ch.recoilT = Math.max(0, ch.recoilT - dt);
     const r = ch.recoilT / 0.14;
     const kick = r * r * (ch.recoilK || 1);
-    m.gunPivot.position.z -= kick * 0.1;
-    m.gunPivot.rotation.x += kick * 0.3;
-    m.arms[0].rotation.x += kick * 0.14; m.arms[1].rotation.x += kick * 0.14;
-    m.elbows[1].rotation.x = Math.min(0, m.elbows[1].rotation.x - kick * 0.2);
+    if (holdingGun) { m.gunPivot.translateZ(-kick * 0.06); m.gunPivot.rotateX(-kick * 0.16); }
+    else { m.gunPivot.position.z -= kick * 0.1; m.gunPivot.rotation.x += kick * 0.3; }
     m.torso.rotation.x -= kick * 0.06;
   }
   // cambio arma: l'oggetto scende e risale con un'animazione morbida
   if (ch.equipT > 0) {
     ch.equipT = Math.max(0, ch.equipT - dt);
     const e = Math.sin((ch.equipT / 0.28) * Math.PI * 0.5);
-    m.gunPivot.position.y -= e * 0.4;
-    m.gunPivot.rotation.x += e * 1.2;
-    m.arms[1].rotation.x += e * 0.8;
-    m.arms[0].rotation.x += e * 0.8;
+    m.gunPivot.position.y -= e * 0.3;
+    m.gunPivot.rotateX(e * 1.1);
+    if (!holdingGun) { m.arms[1].rotation.x += e * 0.8; m.arms[0].rotation.x += e * 0.8; }
   }
+  if (holdingGun) handsToGun(m, reloadPh);
   // colpito: sussulto
   if (ch.hitT > 0) {
     ch.hitT = Math.max(0, ch.hitT - dt);
@@ -1307,8 +1309,10 @@ function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 // ─────────────── Razzi ───────────────
 const rocketGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.6, 8).rotateX(Math.PI / 2);
 const rocketMat = new THREE.MeshStandardMaterial({ color: '#555', emissive: '#ff5020', emissiveIntensity: 0.3 });
+const grenadeGeo = new THREE.SphereGeometry(0.055, 10, 8).scale(1, 1, 1.35);
+const grenadeMat = new THREE.MeshStandardMaterial({ color: '#4a5a32', roughness: 0.6, metalness: 0.3, emissive: '#ffb030', emissiveIntensity: 0.12 });
 function spawnRocket(owner, pos, dir, dmg, def) {
-  const mesh = new THREE.Mesh(rocketGeo, rocketMat);
+  const mesh = new THREE.Mesh(def.grenade ? grenadeGeo : rocketGeo, def.grenade ? grenadeMat : rocketMat);
   mesh.position.copy(pos);
   scene.add(mesh);
   G.projectiles.push({ owner, pos: pos.clone(), dir: dir.clone(), vel: dir.clone().multiplyScalar(def.speed || 55), g: BULLET_G * (def.drop ?? 0), dmg, def, life: 6, mesh });
@@ -1880,7 +1884,7 @@ function updateBus(dt) {
 }
 
 // ─────────────── Intelligenza artificiale dei bot ───────────────
-const WEAPON_VALUE = { pistol: 1, smg: 2, shotgun: 2.4, ar: 2.7, sniper: 2.3, rocket: 2.4, revolver: 1.5, compact: 1.9, burst: 2.6, heavyar: 2.6, dmr: 2.4, tactical: 2.3, drum: 2.5, hunting: 2.1, minigun: 2.6 };
+const WEAPON_VALUE = { pistol: 1, smg: 2, shotgun: 2.4, ar: 2.7, sniper: 2.3, rocket: 2.4, revolver: 1.5, compact: 1.9, burst: 2.6, heavyar: 2.6, dmr: 2.4, tactical: 2.3, drum: 2.5, hunting: 2.1, minigun: 2.6, lmg: 2.7, doublebarrel: 2.3, handcannon: 1.7, crossbow: 2.2, grenade: 2.5, silenced: 2.1 };
 function weaponScore(s, dist) {
   if (!s || s.kind !== 'weapon') return -1;
   const id = s.id;

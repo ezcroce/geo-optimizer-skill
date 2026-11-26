@@ -1,6 +1,7 @@
 // Pose e animazioni dei personaggi articolati (anche, ginocchia, caviglie, spalle, gomiti).
 // Condivise tra il gioco (main.js) e il sito (site.js), così le animazioni sono identiche.
-import { RIG } from './character.js?v=28';
+import * as THREE from 'three';
+import { RIG } from './character.js?v=29';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -38,24 +39,44 @@ export function setArm(m, i, x, z, elbow, twist = 0) {
  * Camminata / corsa / accovacciata.
  * phase: fase del passo · mv: 0..1 quanto si muove · run: 0..1 corsa · ck: 0..1 accovacciato
  * Restituisce l'altezza del corpo (dondolio) da sommare a body.position.y.
+ * v29: ciclo del passo più naturale — tallone che tocca per primo, ginocchio che assorbe l'appoggio,
+ * spinta di punta allo stacco, in corsa il tallone sale verso il gluteo; il bacino ondeggia sulla
+ * gamba d'appoggio.
  */
 export function legsLocomotion(m, phase, mv, run, ck) {
+  const toeOff = 0.42 + 0.3 * run, heel = 0.26 - 0.12 * run;
   for (let i = 0; i < 2; i++) {
     const ph = phase + i * Math.PI;
     const s = Math.sin(ph), c = Math.cos(ph);
-    const swing = Math.max(0, c);                       // gamba che avanza (fase di volo)
-    // in piedi: falcata più lunga e ginocchio più piegato in corsa
-    const hipW = -s * (0.48 + 0.34 * run) * mv - run * 0.12 * mv;
-    const kneeW = 0.06 + (swing * (0.7 + 0.85 * run) + Math.max(0, -s) * 0.12 * run) * mv;
-    const footW = -(hipW + kneeW) + swing * 0.25 * mv - Math.max(0, -c) * Math.max(0, s) * 0.2 * mv;
+    let a = Math.atan2(s, c);                                   // -π..π
+    let kneeW, footAdd;
+    if (c > 0) {
+      // volo: t = 0 stacco (gamba dietro) → 1 appoggio (gamba avanti)
+      const t = (a + Math.PI / 2) / Math.PI;
+      const tk = Math.pow(t, 0.85 - 0.3 * run);                  // in corsa la piega arriva prima (calciata)
+      kneeW = Math.pow(Math.sin(Math.PI * tk), 1.3) * (1.0 + 0.85 * run);
+      footAdd = (1 - smooth(t / 0.45)) * toeOff * 0.7 - smooth((t - 0.62) / 0.38) * heel;
+    } else {
+      // appoggio: u = 0 tallone a terra → 1 stacco
+      if (a < 0) a += 2 * Math.PI;
+      const u = (a - Math.PI / 2) / Math.PI;
+      kneeW = (0.1 + 0.36 * run) * Math.sin(Math.PI * clamp(u * 1.5, 0, 1)) + 0.12 * run * smooth((u - 0.75) / 0.25);
+      footAdd = -heel * (1 - smooth(u / 0.22)) + toeOff * smooth((u - 0.58) / 0.42);
+    }
+    const hipW = -s * (0.46 + 0.32 * run) * mv - run * 0.1 * mv;
+    const kW = 0.05 + kneeW * mv;
+    const footW = -(hipW + kW) + footAdd * mv;
     // accovacciato: anche flesse, ginocchia molto piegate, passi corti e bassi
     const hipC = -1.12 - s * 0.38 * mv - (i ? 0.05 : -0.05) * (1 - mv);
-    const kneeC = 2.02 - (i ? 0.08 : -0.08) * (1 - mv) + swing * 0.3 * mv;
-    const footC = -(hipC + kneeC) + swing * 0.12 * mv;
-    setLeg(m, i, lerp(hipW, hipC, ck), lerp(kneeW, kneeC, ck), lerp(footW, footC, ck), (i ? 1 : -1) * 0.03 * ck);
+    const kneeC = 2.02 - (i ? 0.08 : -0.08) * (1 - mv) + Math.max(0, c) * 0.3 * mv;
+    const footC = -(hipC + kneeC) + Math.max(0, c) * 0.12 * mv;
+    setLeg(m, i, lerp(hipW, hipC, ck), lerp(kW, kneeC, ck), lerp(footW, footC, ck), (i ? 1 : -1) * 0.03 * ck);
   }
-  // dondolio: più basso quando le gambe sono aperte, più alto al passaggio
-  const bob = (Math.abs(Math.cos(phase)) - 0.6) * (0.035 + run * 0.05) * mv * (1 - ck * 0.6);
+  // bacino che si sposta sulla gamba d'appoggio (gamba 0 = x negativa)
+  m.body.position.x = Math.cos(phase) * 0.024 * mv * (1 - 0.6 * run) * (1 - ck * 0.5);
+  // dondolio: camminando il punto più alto è a metà appoggio; correndo è nella fase di volo
+  const ac = Math.abs(Math.cos(phase));
+  const bob = lerp((ac - 0.6) * 0.036, (0.55 - ac) * 0.075, run) * mv * (1 - ck * 0.6);
   return bob - 0.4 * ck;
 }
 
@@ -71,40 +92,202 @@ export function armsSwing(m, phase, mv, run, ck) {
   for (let i = 0; i < 2; i++) {
     const side = i ? 1 : -1;
     const s = Math.sin(phase + i * Math.PI);
-    setArm(m, i, s * (0.42 + 0.5 * run) * mv - ck * 0.5, side * (0.09 + run * 0.05), -(0.18 + 1.25 * run) * (0.3 + 0.7 * mv) - ck * 0.7);
+    // il gomito si piega di più quando il braccio va avanti, e in corsa le braccia "pompano"
+    const el = -(0.2 + 1.2 * run) * (0.3 + 0.7 * mv) - Math.max(0, -s) * 0.3 * mv - ck * 0.7;
+    setArm(m, i, s * (0.42 + 0.5 * run) * mv - ck * 0.5, side * (0.09 + run * 0.05 + Math.max(0, -s) * 0.04 * mv), el, side * 0.1 * run);
   }
+}
+
+// ───────────── cinematica inversa delle braccia ─────────────
+const UPA = RIG.upper, FOA = RIG.fore, REACH = (RIG.upper + RIG.fore) * 0.97;
+const _d = new THREE.Vector3(), _h0 = new THREE.Vector3(), _e = new THREE.Vector3(), _pl = new THREE.Vector3(), _c = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+/**
+ * Porta il polso del braccio i sul punto target (spazio del busto), col gomito verso pole.
+ * Imposta il quaternione della spalla e la piega del gomito.
+ */
+export function armIK(m, i, target, pole) {
+  const S = m.arms[i].position;
+  _d.copy(target).sub(S);
+  const d = clamp(_d.length(), 0.12, REACH);
+  _d.normalize();
+  const cosI = (UPA * UPA + FOA * FOA - d * d) / (2 * UPA * FOA);
+  const e = -(Math.PI - Math.acos(clamp(cosI, -1, 1)));        // piega del gomito (negativa)
+  _h0.set(0, -UPA - FOA * Math.cos(e), -FOA * Math.sin(e)).normalize();
+  _q1.setFromUnitVectors(_h0, _d);
+  // rotazione attorno all'asse spalla→polso perché il gomito punti verso pole
+  _e.set(0, -1, 0).applyQuaternion(_q1); _e.addScaledVector(_d, -_e.dot(_d));
+  _pl.copy(pole).addScaledVector(_d, -pole.dot(_d));
+  if (_e.lengthSq() > 1e-6 && _pl.lengthSq() > 1e-6) {
+    const ang = Math.atan2(_c.crossVectors(_e, _pl).dot(_d), _e.dot(_pl));
+    _q1.premultiply(_q2.setFromAxisAngle(_d, ang));
+  }
+  m.arms[i].quaternion.copy(_q1);
+  m.elbows[i].rotation.set(e, 0, 0);
+}
+
+// ───────────── arma in mano ─────────────
+/** scala delle armi impugnate: i modelli sono un po' "eroici", in mano li riduciamo alle proporzioni del corpo */
+export const HELD_SCALE = 0.86;
+const DEF_HOLD = { kind: 'rifle', main: [-0.1, -0.05], fore: [-0.05, 0.4], zmin: -0.45, zmax: 0.9, xmin: -0.06, xmax: 0.06, ymin: -0.25, ymax: 0.15 };
+export function holdOf(m) { const g = m.gunPivot.children[0]; return (g && g.userData.hold) || DEF_HOLD; }
+const _qa = new THREE.Quaternion(), _qs = new THREE.Quaternion(), _pa = new THREE.Vector3(), _ps = new THREE.Vector3();
+const _eu = new THREE.Euler(), _m4 = new THREE.Matrix4(), _bx = new THREE.Vector3(), _by = new THREE.Vector3(), _bz = new THREE.Vector3();
+const _t = new THREE.Vector3(), _t2 = new THREE.Vector3(), _pole = new THREE.Vector3();
+// punti del busto: tasca della spalla (calcio), spalla destra (appoggio del tubo)
+const POCKET = new THREE.Vector3(0.155, 0.45, 0.07);
+const SHOULDER_TOP = new THREE.Vector3(0.3, 0.6, 0.03);
+
+/** trasforma il punto locale dell'arma (già in scala) in spazio del busto con posizione p e rotazione q */
+function gunPoint(out, p, q, x, y, z, s) { return out.set(x * s, y * s, z * s).applyQuaternion(q).add(p); }
+
+/**
+ * Posa con l'arma: mira (sk = 0) oppure arma in sicurezza mentre corri (sk = 1).
+ * lean: inclinazione in avanti di busto+corpo, compensata perché l'arma resti sulla linea di mira.
+ * v29: l'arma è posizionata in base al suo ingombro (calcio alla spalla, tubo sulla spalla, minigun
+ * all'anca) e le mani vanno sull'impugnatura con la cinematica inversa: niente più armi dentro il corpo.
+ */
+export function poseHold(m, pitch, sk = 0, sw = 0, lean = 0) {
+  const g = m.gunPivot.children[0];
+  const h = holdOf(m), s = HELD_SCALE;
+  if (g && g.userData.hold) g.scale.setScalar(s);
+  const p = pitch + lean;
+  const k = h.kind;
+  // ── mira ──
+  _qa.setFromEuler(_eu.set(-(k === 'hip' ? p * 0.55 : p), 0, 0));
+  if (k === 'pistol') {
+    // due mani, braccia tese: ruota attorno al centro delle spalle
+    _pa.set(0, 0.04, 0.47).applyQuaternion(_qa).add(_t.set(0.07, 0.42, 0.0));
+  } else if (k === 'shoulder') {
+    // il tubo poggia sulla spalla: ruota attorno al punto d'appoggio
+    _pa.copy(SHOULDER_TOP).sub(gunPoint(_t, _t2.set(0, 0, 0), _qa, 0, h.rest[0], h.rest[1], s));
+  } else if (k === 'hip') {
+    _pa.set(0.22, 0.2, 0.38);
+  } else {
+    // calcio nella tasca della spalla; se l'arma è lunga la mano d'appoggio scivola indietro (vedi handsToGun).
+    // Le armi corte (calcio ripiegato) stanno più avanti, a braccia tese.
+    _pa.copy(POCKET).sub(gunPoint(_t, _t2.set(0, 0, 0), _qa, 0, -0.02, h.zmin + 0.04 - Math.max(0, -0.3 - h.zmin), s));
+    // mirando in basso caricatore e impugnatura ruotano verso il ventre: se serve l'arma va più avanti
+    const mz = gunPoint(_t, _pa, _qa, 0, h.ymin, h.main[1] + 0.12, s).z;
+    if (mz < 0.24) _pa.z += 0.24 - mz;
+  }
+  // ── corsa ──
+  const bob = sw * 0.035;
+  if (k === 'pistol') {
+    // pistola bassa in una mano, che dondola col passo
+    _qs.setFromEuler(_eu.set(0.95 - sw * 0.25, 0.12, 0));
+    _ps.set(0.29, 0.08 + Math.abs(sw) * 0.03, 0.17 + sw * 0.1);
+  } else if (k === 'shoulder') {
+    _qs.setFromEuler(_eu.set(-0.3 + bob, 0, -0.05));
+    _ps.copy(SHOULDER_TOP).sub(gunPoint(_t, _t2.set(0, 0, 0), _qs, 0, h.rest[0], h.rest[1], s));
+  } else if (k === 'hip') {
+    _qs.setFromEuler(_eu.set(0.32 + bob, 0.12, 0));
+    _ps.set(0.23, 0.16 + bob * 0.5, 0.36);
+  } else if (h.sprint === 'low') {
+    // "low ready": calcio alla spalla, bocca verso terra davanti ai piedi (armi larghe come la balestra)
+    _qs.setFromEuler(_eu.set(0.78 + bob, 0.1, 0));
+    _ps.copy(POCKET).sub(gunPoint(_t, _t2.set(0, 0, 0), _qs, 0, -0.02, h.zmin + 0.04, s));
+  } else {
+    // "port arms": l'arma di traverso davanti al petto, di piatto, canna in alto a sinistra.
+    // La posizione dipende dalla lunghezza: il centro dell'arma sta davanti allo sterno.
+    const a = 0.68 + sw * 0.05;                                       // inclinazione sull'orizzontale
+    _bz.set(-Math.cos(a), Math.sin(a), 0.32).normalize();             // asse della canna (un po' in avanti)
+    _by.set(Math.sin(a), Math.cos(a), 0).normalize();                 // "sopra" dell'arma, nel piano del petto
+    _by.addScaledVector(_bz, -_by.dot(_bz)).normalize();
+    _bx.crossVectors(_by, _bz);
+    _qs.setFromRotationMatrix(_m4.makeBasis(_bx, _by, _bz));
+    const zc = (h.zmin + h.zmax) * 0.5;
+    const depth = Math.max(0.07, -h.xmin) * s;                        // ingombro verso il petto
+    _ps.set(0.06, 0.32 + bob, 0.2 + depth).sub(gunPoint(_t, _t2.set(0, 0, 0), _qs, 0, 0, zc, s));
+    // il calcio non deve rientrare nel fianco
+    const bz = gunPoint(_t, _ps, _qs, 0, 0, h.zmin, s).z;
+    if (bz < 0.17 + depth) _ps.z += 0.17 + depth - bz;
+  }
+  // fusione mira ↔ corsa
+  const e = smooth(sk);
+  m.gunPivot.position.lerpVectors(_pa, _ps, e);
+  m.gunPivot.quaternion.slerpQuaternions(_qa, _qs, e);
+  m._hold = { h, sk: e, sw };
+  handsToGun(m);
 }
 
 /**
- * Posa con l'arma: mira (aim) oppure arma bassa in corsa (sk = 0..1).
- * lean: inclinazione in avanti di busto+corpo, compensata perché l'arma resti sulla linea di mira.
+ * Mani sull'arma (cinematica inversa), dalla posa attuale di gunPivot.
+ * reload: 0..1 fase della ricarica (la mano d'appoggio va al caricatore e alla tasca), -1 = no.
  */
-export function poseHold(m, pitch, sk = 0, sw = 0, lean = 0) {
-  const p = pitch + lean;
-  // mira: mano destra sull'impugnatura (gomito piegato), sinistra avanti sul paramano
-  // corsa: arma di traverso sul petto, canna in alto ("port arms")
-  setArm(m, 1, lerp(-0.95 - p, -0.55 + sw * 0.12, sk), lerp(-0.14, -0.05, sk), lerp(-0.85, -1.75, sk));
-  setArm(m, 0, lerp(-1.22 - p, -0.95 - sw * 0.1, sk), lerp(0.62, 0.78, sk), lerp(-0.28, -1.45, sk));
-  m.gunPivot.rotation.set(lerp(-p, -0.85, sk), lerp(0, -0.75, sk), lerp(0, 0.25, sk));
-  m.gunPivot.position.set(lerp(0.12, 0.08, sk), lerp(0.43 - p * 0.05, 0.36, sk), lerp(0.3, 0.24, sk));
+export function handsToGun(m, reload = -1) {
+  const H = m._hold; if (!H) return;
+  const h = H.h, s = (m.gunPivot.children[0] && m.gunPivot.children[0].scale.x) || 1;
+  const P = m.gunPivot.position, Q = m.gunPivot.quaternion;
+  const k = h.kind, sk = H.sk;
+  // mano dell'impugnatura (braccio 1, lato dell'arma): polso un po' dietro e sotto il palmo
+  const pis = k === 'pistol';
+  // con la pistola le braccia sono tese in avanti: il polso sta dietro l'impugnatura, non sotto
+  gunPoint(_t, P, Q, 0.012, h.main[0] - (pis ? 0.005 : 0.045), h.main[1] - (pis ? 0.095 : 0.075), s);
+  _pole.set(0.8, -1, k === 'shoulder' ? 0.3 : -0.35);
+  armIK(m, 1, _t, _pole);
+  // mano d'appoggio (braccio 0): sul paramano, ma solo fin dove arriva il braccio
+  const S0 = m.arms[0].position;
+  let fz = h.fore[1];
+  if (k === 'rifle') {
+    const zMin = h.main[1] + 0.12;
+    for (let n = 0; n < 24 && fz > zMin; n++) {
+      gunPoint(_t, P, Q, -0.04, h.fore[0] - 0.045, fz - 0.06, s);
+      if (_t.distanceTo(S0) <= REACH * 0.985) break;
+      fz -= 0.03;
+    }
+  }
+  if (pis) gunPoint(_t, P, Q, -0.045, h.fore[0] - 0.02, fz - 0.07, s);
+  else gunPoint(_t, P, Q, -0.04, h.fore[0] - 0.045, fz - 0.06, s);
+  if (pis && sk > 0) {
+    // corsa con la pistola: la mano libera oscilla opposta al passo
+    _t2.set(-0.33, 0.12 + Math.max(0, -H.sw) * 0.1, 0.06 - H.sw * 0.2);
+    _t.lerp(_t2, sk);
+  }
+  if (reload >= 0) {
+    // 0–0.3 al caricatore, 0.3–0.55 alla tasca sul fianco, 0.55–0.85 di nuovo al caricatore, poi al paramano
+    gunPoint(_t2, P, Q, -0.03, h.ymin * 0.7 - 0.04, k === 'shoulder' ? h.zmin + 0.05 : Math.max(h.main[1] + 0.12, 0.08), s);
+    const pouch = _c.set(-0.17, 0.08, 0.12);
+    const toMag = smooth(reload / 0.3) * (1 - smooth((reload - 0.85) / 0.15));
+    const toPouch = smooth((reload - 0.3) / 0.12) * (1 - smooth((reload - 0.5) / 0.12));
+    _t.lerp(_t2, toMag).lerp(pouch, toPouch);
+  }
+  _pole.set(-0.6, -1, k === 'hip' ? 0.2 : -0.1);
+  armIK(m, 0, _t, _pole);
+  // polsi: leggera rotazione verso l'impugnatura
+  m.hands[1].rotation.set(0.25, 0, 0);
+  m.hands[0].rotation.set(0.15, 0, 0);
 }
 
-/** arrampicata: arti alternati (mano sinistra con piede destro), il corpo sale a strattoni */
+/**
+ * arrampicata: arti alternati (mano sinistra con piede destro). v29: la mano sale veloce a cercare
+ * l'appiglio e poi tira giù lenta mentre il corpo sale; il bacino ondeggia verso la gamba che spinge
+ * e la testa segue la mano che sale.
+ */
 export function poseClimb(m, ph) {
+  const TAU = Math.PI * 2;
   for (let i = 0; i < 2; i++) {
     const side = i ? 1 : -1;
-    const reach = 0.5 + 0.5 * Math.sin(ph + i * Math.PI);          // 1 = mano in alto
-    setArm(m, i, -2.25 - 0.55 * reach, side * (0.2 + 0.12 * (1 - reach)), -(0.25 + 1.25 * (1 - reach)));
-    m.hands[i].rotation.x = -0.6;
-    const lift = 0.5 + 0.5 * Math.sin(ph + (1 - i) * Math.PI);     // gamba opposta al braccio
-    setLeg(m, i, -0.2 - 0.95 * lift, 0.35 + 1.45 * lift, -0.25 * lift, side * 0.12);
+    const u = (((ph + i * Math.PI) / TAU) % 1 + 1) % 1;
+    const reach = u < 0.32 ? smooth(u / 0.32) : 1 - smooth((u - 0.32) / 0.68);    // 1 = mano in alto
+    const lifting = u < 0.32 ? Math.sin(Math.PI * u / 0.32) : 0;                     // si stacca dal muro mentre sale
+    setArm(m, i, -2.2 - 0.62 * reach + lifting * 0.25, side * (0.2 + 0.14 * (1 - reach) + lifting * 0.08), -(0.22 + 1.35 * (1 - reach)) - lifting * 0.35);
+    m.hands[i].rotation.x = -0.65 + lifting * 0.4;
+    // gamba opposta: sale veloce sul nuovo appoggio, poi spinge
+    const v = (u + 0.5) % 1;
+    const lift = v < 0.3 ? smooth(v / 0.3) : 1 - smooth((v - 0.3) / 0.7);
+    const step = v < 0.3 ? Math.sin(Math.PI * v / 0.3) : 0;
+    setLeg(m, i, -0.18 - 0.95 * lift - step * 0.15, 0.32 + 1.45 * lift + step * 0.3, -0.25 * lift + step * 0.2, side * (0.12 + step * 0.08));
   }
-  const pull = Math.abs(Math.sin(ph));
-  m.body.position.y = -0.02 + (pull - 0.5) * 0.06;
+  const s1 = Math.sin(ph);
+  m.body.position.y = -0.03 + Math.abs(Math.sin(ph)) * 0.05;
   m.body.position.z = 0.04;
-  m.torso.rotation.x = 0.05 + pull * 0.05;
-  m.torso.rotation.y = Math.sin(ph) * 0.12;
-  m.head.rotation.x = -0.45;
+  m.body.position.x = s1 * 0.035;
+  m.torso.rotation.x = 0.06 + Math.abs(Math.cos(ph)) * 0.05;
+  m.torso.rotation.y = s1 * 0.1;
+  m.torso.rotation.z = -s1 * 0.07;
+  m.head.rotation.x = -0.5;
+  m.head.rotation.y = -s1 * 0.18;
 }
 
 /** scavalcamento del bordo: tirarsi su con le braccia, spinta e gamba appoggiata sopra */

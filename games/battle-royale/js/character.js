@@ -5,7 +5,7 @@ import { normalFromHeight, NORMALS } from './texgen.js?v=19';
 import { clothTexture, skinTexture, hairTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=19';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=19';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=29';
 import { mergeParts } from './props.js?v=26';
 
 const matCache = new Map();
@@ -1525,8 +1525,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=19';
-import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=27';
+export { buildWeaponMesh } from './weapons.js?v=29';
+import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=29';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */

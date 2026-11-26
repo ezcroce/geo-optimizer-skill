@@ -5,33 +5,33 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=34';
-import * as PR from './progress.js?v=34';
+} from './config.js?v=35';
+import * as PR from './progress.js?v=35';
 import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=34';
-import { initMenu } from './menu.js?v=34';
+import { initMenu } from './menu.js?v=35';
 import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=34';
-import { initSettingsUI } from './settings-ui.js?v=19';
+import { initSettingsUI } from './settings-ui.js?v=35';
 import { applyAnisotropy } from './texgen.js?v=19';
 import * as A from './audio.js?v=29';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
-} from './world.js?v=33';
+} from './world.js?v=35';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=34';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=34';
-import { consIcon, ammoIcon } from './items.js?v=34';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=35';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=35';
+import { consIcon, ammoIcon } from './items.js?v=35';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=33';
-import { createInventory } from './inventory.js?v=34';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, treeMaterial, bushMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=33';
+import { createInventory } from './inventory.js?v=35';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, WIND } from './props.js?v=35';
 import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=34';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=34';
-import { buildPickaxe, heldConsumable } from './held.js?v=34';
-import { createCrosshair } from './crosshair.js?v=33';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=35';
+import { buildPickaxe, heldConsumable } from './held.js?v=35';
+import { createCrosshair } from './crosshair.js?v=35';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -4024,13 +4024,13 @@ lobby.scene.onBeforeRender = syncAllReal;
     const x = (rnd() - 0.5) * 70, z = 4 - rnd() * 52;
     if (!free(x, z) || (z > -6 && Math.abs(x) < 9)) continue;
     const kind = Math.abs(x) > 12 || z < -22 ? (rnd() < 0.65 ? 'pine' : 'oak') : (rnd() < 0.5 ? 'birch' : 'oak');
-    trees[kind].push({ x, z, s: 0.75 + rnd() * 0.5, sy: 0.9 + rnd() * 0.25 }); k++;
+    trees[kind].push({ x, z, s: 0.75 + rnd() * 0.5, sy: 0.9 + rnd() * 0.25, r: rnd() * 6.3 }); k++;
   }
-  for (const [kind, list] of Object.entries(trees)) if (list.length) inst(PROPS[kind], treeMaterial, list);
+  for (const [kind, list] of Object.entries(trees)) if (list.length) { inst(PROPS[kind], treeMaterial, list); if (LEAVES[kind]) inst(LEAVES[kind], leafMaterial, list); }
   const rocks = [[-4.2, -3.5, 0.5], [5.8, -6, 0.8], [-9, -4, 1.1], [8.5, 1.5, 0.7], [-6.5, 0.8, 0.45], [2.6, -14, 1.3], [-12, -16, 1.6], [11, -12, 1.4]];
   rocks.forEach(([x, z, s], k) => inst(PROPS.rocks[k % PROPS.rocks.length], rockMaterial, [{ x, z, s, y: hAt(x, z) - 0.15 * s }]));
   const bushes = [[-5.2, -2.2], [5.1, -2.8], [-7.6, -7.4], [6.8, -9], [-3.6, -9.5], [9.2, -4.5], [-10, -1.5], [2.2, -11.5]];
-  bushes.forEach(([x, z], k) => inst(PROPS.bushes[k % PROPS.bushes.length], bushMaterial, [{ x, z, s: 0.9 + (k % 3) * 0.2 }]));
+  bushes.forEach(([x, z], k) => { const o = [{ x, z, s: 0.9 + (k % 3) * 0.2, r: k * 1.7 }], v = k % PROPS.bushes.length; inst(PROPS.bushes[v], bushMaterial, o, false); if (LEAVES.bushes[v]) inst(LEAVES.bushes[v], bushLeafMaterial, o, false); });
   inst(PROPS.shed, propMaterial, [{ x: -7.6, z: -11.2, r: 0.55 }]);
   inst(PROPS.logs, logMaterial, [{ x: -4.6, z: -10.4, r: 1.9, s: 0.8 }]);
   inst(PROPS.stumps[0], propMaterial, [{ x: 4.6, z: -4.6 }, { x: -8.4, z: -5.8, s: 1.2 }]);

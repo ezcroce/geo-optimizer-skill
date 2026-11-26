@@ -38,7 +38,7 @@ export const WEAPONS = {
   ar: {
     name: "Fucile d'assalto", speed: 380, drop: 1.0,  dmg: 30, pellets: 1, rate: 0.13, mag: 30, reload: 2.1,
     spread: 0.02, range: 220, ammo: 'medium', auto: true, zoom: 1.6,
-    botRange: 60, sound: 'ar', recoil: 0.009, muzzle: 0.96, role: 'ar', cross: 'cross', sight: 'reddot',
+    botRange: 60, sound: 'ar', recoil: 0.009, muzzle: 0.96, role: 'ar', cross: 'ar', sight: 'reddot',
     desc: "L'arma tuttofare: affidabile a ogni distanza.",
     parts: [[0.1, 0.14, 0.72, 0, 0, 0.18, 'b'], [0.05, 0.05, 0.32, 0, 0.02, 0.7, 'm'], [0.07, 0.24, 0.1, 0, -0.17, 0.25, 'm'], [0.07, 0.15, 0.08, 0, -0.12, -0.02, 'm'], [0.09, 0.16, 0.3, 0, -0.02, -0.3, 'b'], [0.06, 0.07, 0.22, 0, 0.11, 0.18, 'r']],
   },
@@ -79,13 +79,13 @@ export const WEAPONS = {
   burst: {
     name: 'Fucile a raffica', speed: 390, drop: 1.0, dmg: 27, pellets: 1, rate: 0.42, burst: 3, burstGap: 0.07, mag: 24, reload: 2.2,
     spread: 0.016, range: 230, ammo: 'medium', auto: false, zoom: 1.7,
-    botRange: 60, sound: 'burst', recoil: 0.007, muzzle: 0.5, role: 'ar', cross: 'chev', sight: 'reddot',
+    botRange: 60, sound: 'burst', recoil: 0.007, muzzle: 0.5, role: 'ar', cross: 'burst', sight: 'reddot',
     desc: 'Tre colpi per pressione del grilletto, molto preciso.',
   },
   heavyar: {
     name: "Fucile d'assalto pesante", speed: 400, drop: 1.0, dmg: 38, pellets: 1, rate: 0.19, mag: 25, reload: 2.5,
     spread: 0.024, range: 240, ammo: 'medium', auto: true, zoom: 1.6,
-    botRange: 60, sound: 'heavyar', recoil: 0.016, muzzle: 0.86, role: 'ar', cross: 'cross', sight: 'tri',
+    botRange: 60, sound: 'heavyar', recoil: 0.016, muzzle: 0.86, role: 'ar', cross: 'heavy', sight: 'tri',
     desc: 'Più danni ma rinculo forte: spara a brevi raffiche.',
   },
   dmr: {
@@ -122,7 +122,7 @@ export const WEAPONS = {
   lmg: {
     name: 'Mitragliatrice leggera', speed: 390, drop: 1.0, dmg: 23, pellets: 1, rate: 0.1, mag: 60, reload: 4.2,
     spread: 0.045, adsSpread: 0.022, range: 220, ammo: 'medium', auto: true, zoom: 1.5,
-    botRange: 55, moveMult: 0.9, sound: 'lmg', recoil: 0.008, muzzle: 1.02, role: 'ar', cross: 'cross', sight: 'reddot',
+    botRange: 55, moveMult: 0.9, sound: 'lmg', recoil: 0.008, muzzle: 1.02, role: 'ar', cross: 'lmg', sight: 'reddot',
     desc: 'Nastro da 60 colpi e bipiede: tiene giù la testa a una squadra intera, ma ricaricare è lento.',
   },
   doublebarrel: {

@@ -1,9 +1,20 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v34';
+export const NEWS_VERSION = 'v35';
 
 export const NEWS = [
+  {
+    v: 'v35', title: 'Mirini al neon e boschi rifatti', color: '#7dff5a', icon: '🌳',
+    items: [
+      'Mirini ridisegnati con un alone luminoso: fucili a pompa con quattro archi sulle diagonali (il tattico con i pallini, il tamburo che ruota a ogni colpo, la doppietta con le due canne)',
+      'Fucili d’assalto con l’anello: d’assalto con le tacche che attraversano l’anello e il punto, a raffica con la croce sottile interna, pesante con l’anello spesso e la croce lunga, mitragliatrice con l’anello spesso e il più al centro',
+      'Sette colori del mirino nelle impostazioni: bianco, magenta, blu, azzurro, verde, giallo e rosso',
+      'Alberi rifatti da zero: chiome gonfie fatte di centinaia di ciuffi di foglie, con l’ombra all’interno e le cime schiarite dal sole. Querce verdi, alberi verde lime, querce rosse e alberi arancioni (anche nei boschi normali, non solo in autunno)',
+      'Abeti a palchi di rami che pendono verso il basso, con la neve sulle punte in montagna',
+      'Cespugli fitti di rametti fogliosi con l’interno scuro, alcuni con i fiori. Si muovono ancora con il vento',
+    ],
+  },
   {
     v: 'v34', title: 'Online sistemato, bot più forti a squadre e niente più scatti', color: '#3ad6ff', icon: '🌐',
     items: [

@@ -39,13 +39,19 @@ export function createCrosshair(el) {
   function strokePath(path, w = lw, c = col) {
     g.lineCap = 'round'; g.lineJoin = 'round';
     g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = w + 2.2; path(); g.stroke();
+    // v35: alone luminoso del colore del mirino (stile "neon" dei riferimenti)
+    g.shadowColor = c; g.shadowBlur = glowPx;
     g.strokeStyle = c; g.lineWidth = w; path(); g.stroke();
+    g.shadowBlur = 0;
   }
+  let glowPx = 4;
   const line = (x1, y1, x2, y2, w, c) => strokePath(() => { g.beginPath(); g.moveTo(C + x1, C + y1); g.lineTo(C + x2, C + y2); }, w, c);
   const arc = (r, a0, a1, w, c) => strokePath(() => { g.beginPath(); g.arc(C, C, r, a0, a1); }, w, c);
   function dot(r = 1.6, c = col) {
     g.fillStyle = 'rgba(0,0,0,0.55)'; g.beginPath(); g.arc(C, C, r + 1.1, 0, TAU); g.fill();
+    g.shadowColor = c; g.shadowBlur = glowPx;
     g.fillStyle = c; g.beginPath(); g.arc(C, C, r, 0, TAU); g.fill();
+    g.shadowBlur = 0;
   }
   /** quattro linee (o meno: mask = [su, giù, sinistra, destra]) a distanza gap, lunghe len */
   function ticks(gap, len, w, mask = [1, 1, 1, 1]) {
@@ -68,7 +74,9 @@ export function createCrosshair(el) {
   /** punto pieno in una posizione qualsiasi (pallini, mil-dot) */
   function pip(x, y, r, c = col) {
     g.fillStyle = 'rgba(0,0,0,0.5)'; g.beginPath(); g.arc(C + x, C + y, r + 0.9, 0, TAU); g.fill();
+    g.shadowColor = c; g.shadowBlur = glowPx * 0.7;
     g.fillStyle = c; g.beginPath(); g.arc(C + x, C + y, r, 0, TAU); g.fill();
+    g.shadowBlur = 0;
   }
   /** cerchio vuoto in una posizione qualsiasi */
   function ringAt(x, y, r, w, fill) {
@@ -79,6 +87,11 @@ export function createCrosshair(el) {
   function diamond(r, w) { strokePath(() => { g.beginPath(); g.moveTo(C, C - r); g.lineTo(C + r, C); g.lineTo(C, C + r); g.lineTo(C - r, C); g.closePath(); }, w); }
   /** tacca radiale all'angolo a, da r0 a r1 */
   const radial = (a, r0, r1, w, c) => line(Math.cos(a) * r0, Math.sin(a) * r0, Math.cos(a) * r1, Math.sin(a) * r1, w, c);
+  /** raggio degli anelli: segue la dispersione ma non scende sotto un minimo leggibile */
+  const arR = (gp, s) => Math.max(9 * s, gp * 0.9 + 4 * s);
+  const shotR = (gp, s) => Math.max(10 * s, gp * 0.92 + 3 * s);
+  /** quattro archi centrati sulle diagonali (rot) di ampiezza span (radianti) */
+  function shotArcs(r, span, w, rot = Math.PI / 4) { for (let i = 0; i < 4; i++) { const a = rot + i * Math.PI / 2; arc(r, a - span / 2, a + span / 2, w); } }
   const faint = (k, fn) => { const a = g.globalAlpha; g.globalAlpha = a * k; fn(); g.globalAlpha = a; };
 
   // ── forme per famiglia d'armi (v33: tutte ridisegnate, i pompa rifatti da zero) ──
@@ -100,41 +113,61 @@ export function createCrosshair(el) {
         }
         ticks(gp, 7 * s, 2 * s, [0, 0, 1, 1]); dot(1.4 * s); break;
       }
-      // ━━━━━━━━━━━━━━ POMPA (nuovi) ━━━━━━━━━━━━━━
-      case 'pump': {   // fucile a pompa: quattro archi spessi sul cono dei pallini, tacche verso il centro,
-                       // i pallini come puntini nel cono; mentre si pompa gli archi si ritirano verso l'esterno
-        const r = Math.max(11 * s, gp * 0.85), rd = st.ready >= 0 && st.ready < 1 ? st.ready : 1;
-        const rr = r + (1 - rd) * 8 * s, span = 0.55 + 0.25 * rd;
-        for (let i = 0; i < 4; i++) {
-          const a = Math.PI / 4 + i * Math.PI / 2;
-          arc(rr, a - span / 2, a + span / 2, 2.6 * s);
-          radial(a, rr - 1, rr - 5 * s, 1.8 * s);
-        }
-        faint(0.55 * rd, () => { for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + Math.PI / 8; pip(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, 0.9 * s); } });
-        dot(1.7 * s); break;
+      // ━━━━━━━━━━━━━━ POMPA (v35, dal riferimento) ━━━━━━━━━━━━━━
+      // cerchio spezzato in quattro archi (vuoti in alto, in basso e ai lati) che si apre sul cono dei pallini
+      case 'pump': {   // fucile a pompa: i quattro archi puliti; mentre si pompa si allontanano e si accorciano
+        const rd = st.ready >= 0 && st.ready < 1 ? st.ready : 1;
+        const r = shotR(gp, s) + (1 - rd) * 7 * s;
+        shotArcs(r, 0.95 - (1 - rd) * 0.35, 2.4 * s);
+        dot(1.5 * s); break;
       }
-      case 'tactical': {// tattico: due parentesi ( ) sul cono, tacche orizzontali dentro e un rombo al centro
-        const r = Math.max(10 * s, gp * 0.82);
-        arc(r, Math.PI - 0.62, Math.PI + 0.62, 2.4 * s); arc(r, -0.62, 0.62, 2.4 * s);
-        line(-r + 2 * s, 0, -r + 7 * s, 0, 2 * s); line(r - 2 * s, 0, r - 7 * s, 0, 2 * s);
-        faint(0.7, () => { line(0, r - 3 * s, 0, r + 3 * s, 1.6 * s); line(0, -r + 3 * s, 0, -r - 3 * s, 1.6 * s); });
-        diamond(3 * s, 1.5 * s); break;
+      case 'tactical': {// tattico: stessi archi, più corti, con i pallini nel cono
+        const r = shotR(gp, s);
+        shotArcs(r, 0.78, 2.4 * s);
+        faint(0.7, () => { for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2; pip(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5, 0.95 * s); } });
+        dot(1.4 * s); break;
       }
-      case 'drum': {   // a tamburo: anello di sei segmenti che ruota di un "colpo" a ogni sparo, tre punti al centro
-        const r = Math.max(11 * s, gp * 0.9), rot = (st.shots || 0) * (TAU / 6) * 0.5 + st.kick * 0.01;
-        for (let i = 0; i < 6; i++) { const a = rot + i / 6 * TAU; arc(r, a + 0.14, a + TAU / 6 - 0.14, 2.4 * s); }
-        for (let i = 0; i < 6; i++) { const a = rot + i / 6 * TAU; radial(a, r + 2 * s, r + 5 * s, 1.4 * s); }
-        for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + i * TAU / 3; pip(Math.cos(a) * 3.2 * s, Math.sin(a) * 3.2 * s, 1.05 * s); }
+      case 'drum': {   // a tamburo: gli archi ruotano di un ottavo di giro a ogni colpo
+        st.drumRot = lerp(st.drumRot || 0, (st.shots || 0) * Math.PI / 4, 0.25);
+        const r = shotR(gp, s);
+        shotArcs(r, 0.9, 2.4 * s, Math.PI / 4 + st.drumRot);
+        dot(1.5 * s); break;
+      }
+      case 'double': { // doppietta: archi + le due canne al centro (piene se cariche)
+        const r = shotR(gp, s) + 1 * s, loaded = st.mag >= 0 ? Math.round(st.mag * 2) : 2;
+        shotArcs(r, 1.0, 2.4 * s);
+        ringAt(-3.6 * s, 0, 2.4 * s, 1.4 * s, loaded >= 1);
+        ringAt(3.6 * s, 0, 2.4 * s, 1.4 * s, loaded >= 2);
         break;
       }
-      case 'double': { // doppietta: due cerchietti (le canne, pieni se cariche) dentro un cono aperto sopra e sotto
-        const r = Math.max(12 * s, gp * 0.9), loaded = st.mag >= 0 ? Math.round(st.mag * 2) : 2;
-        arc(r, -Math.PI * 0.3, Math.PI * 0.3, 2.2 * s); arc(r, Math.PI * 0.7, Math.PI * 1.3, 2.2 * s);
-        faint(0.6, () => { arc(r, -Math.PI * 0.62, -Math.PI * 0.38, 1.4 * s); arc(r, Math.PI * 0.38, Math.PI * 0.62, 1.4 * s); });
-        ringAt(-4.5 * s, 0, 3.2 * s, 1.6 * s, loaded >= 1);
-        ringAt(4.5 * s, 0, 3.2 * s, 1.6 * s, loaded >= 2);
+      // ━━━━━━━━━━━━━━ FUCILI D'ASSALTO (v35, dal riferimento) ━━━━━━━━━━━━━━
+      case 'ar': {     // assalto: anello sottile, quattro tacche che lo attraversano e punto al centro
+        const r = arR(gp, s);
+        arc(r, 0, TAU, 1.7 * s);
+        for (let i = 0; i < 4; i++) radial(i * Math.PI / 2, r - 4 * s, r + 4 * s, 2 * s);
+        dot(1.6 * s); break;
+      }
+      case 'heavy': {  // assalto pesante: anello spesso, croce che esce dall'anello e punto grosso
+        const r = arR(gp, s);
+        arc(r, 0, TAU, 3 * s);
+        for (let i = 0; i < 4; i++) radial(i * Math.PI / 2, 4.5 * s, r + 6 * s, 2.6 * s);
+        dot(2.8 * s); break;
+      }
+      case 'burst': {  // a raffica: anello sottile, croce fine all'interno e quattro paletti sull'anello
+        const r = arR(gp, s);
+        arc(r, 0, TAU, 1.6 * s);
+        for (let i = 0; i < 4; i++) radial(i * Math.PI / 2, 2.5 * s, r - 1 * s, 1.1 * s);
+        for (let i = 0; i < 4; i++) radial(i * Math.PI / 2, r - 5 * s, r + 0.5 * s, 3 * s);
         break;
       }
+      case 'lmg': {    // mitragliatrice leggera: anello spesso e piccola croce piena al centro
+        const r = arR(gp, s) + 1 * s;
+        arc(r, 0, TAU, 3.2 * s);
+        line(-3.6 * s, 0, 3.6 * s, 0, 2.6 * s); line(0, -3.6 * s, 0, 3.6 * s, 2.6 * s);
+        break;
+      }
+      case 'cross': shape('ar', gp, s); break;
+      case 'chev': shape('burst', gp, s); break;
       // vecchi nomi (salvataggi e mod): portati sulle forme nuove
       case 'circle': shape('pump', gp, s); break;
       case 'circle2': shape('drum', gp, s); break;
@@ -179,10 +212,8 @@ export function createCrosshair(el) {
       }
       case 'cons':     // cure e scudi in mano: solo un punto discreto
         g.globalAlpha *= 0.55; dot(1.6 * s); g.globalAlpha /= 0.55; break;
-      default:         // fucili d'assalto: croce con tacche rastremate e un piccolo rombo al centro
-        ticks(gp, 8 * s, 2.2 * s);
-        faint(0.6, () => ticks(gp + 8 * s, 3 * s, 1.2 * s));
-        diamond(2.4 * s, 1.3 * s);
+      default:         // qualsiasi altro nome: mirino d'assalto
+        if (style !== 'ar') shape('ar', gp, s);
     }
   }
 
@@ -214,6 +245,7 @@ export function createCrosshair(el) {
       st.styleT = Math.min(1, st.styleT + dt * 6);
 
       const k = s.size || 1;
+      glowPx = 3.5 * k;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, S, S);
       col = mixHex(s.color || '#ffffff', COL.enemy, st.enemyK);

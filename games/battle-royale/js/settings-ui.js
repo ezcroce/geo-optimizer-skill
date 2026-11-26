@@ -3,7 +3,7 @@
 //  Costruito da uno schema: ogni voce legge/scrive settings[key] o settings.gfx[key].
 // ─────────────────────────────────────────────────────────────
 const pct = v => Math.round(v * 100) + '%';
-const CH_COLORS = ['#ffffff', '#4dff6a', '#ffe14d', '#4de8ff', '#ff4d5e', '#ff6bf0'];
+const CH_COLORS = ['#ffffff', '#ff6bf0', '#7a7aff', '#4de8ff', '#4dff6a', '#ffe14d', '#ff4d5e'];
 
 const SCHEMA = [
   { id: 'gfx', label: 'Grafica', items: [

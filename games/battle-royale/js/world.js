@@ -4,10 +4,10 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=33';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=35';
 import { carInstances } from './cars.js?v=25';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND } from './props.js?v=33';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial } from './props.js?v=35';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -2063,7 +2063,7 @@ export function buildWorld(scene, opts = {}) {
     else if (wS > pick && wS > 0.2) t.k = r < 0.93 ? 'snowPine' : 'deadTree';
     else if (wT > pick && wT > 0.2) t.k = r < 0.62 ? 'palm' : (r < 0.85 ? 'oak' : 'birch');
     else if (wA > pick && wA > 0.2) t.k = r < 0.5 ? 'autumnOak' : (r < 0.78 ? 'autumnBirch' : (r < 0.95 ? 'pine' : 'deadTree'));
-    else t.k = r < (h > 12 ? 0.8 : 0.5) ? 'pine' : (t.rot > 4.4 ? 'birch' : 'oak');
+    else t.k = r < (h > 12 ? 0.8 : 0.5) ? 'pine' : (t.rot > 4.4 ? 'birch' : (t.rot < 0.55 ? 'autumnOak' : (t.rot < 0.9 ? 'autumnBirch' : 'oak')));
     if (h > 34 && t.k !== 'cactus') t.k = h > 42 || wS > 0.3 ? 'snowPine' : 'pine';
     t.pine = t.k === 'pine' || t.k === 'snowPine';
     if (t.k === 'cactus') t.s *= 0.85;
@@ -2425,7 +2425,7 @@ export function buildWorld(scene, opts = {}) {
     return geo;
   }
 
-  const LOD_TREE = { pine: ['#2f5f30', 2.6, 6, 4], oak: ['#457f35', 2.6, 6, 4], birch: ['#6fa645', 2, 5, 4.4], snowPine: ['#9fb3ad', 2.5, 6, 4], autumnOak: ['#c8702a', 2.8, 5, 4.4], autumnBirch: ['#e0b830', 2, 5, 4.4], palm: ['#4a9a40', 3.2, 1.2, 6.2], cactus: ['#4f8a3a', 0.8, 4, 2], deadTree: ['#6b5a4a', 0.6, 3.5, 1.8] };
+  const LOD_TREE = { pine: ['#2b5c30', 2.6, 6, 4], oak: ['#417f30', 2.8, 6, 4.7], birch: ['#82b23a', 2.2, 5, 5.5], snowPine: ['#9fb3ad', 2.5, 6, 4], autumnOak: ['#b2321f', 2.8, 5, 4.7], autumnBirch: ['#d8722a', 2.4, 5, 5.2], palm: ['#4a9a40', 3.2, 1.2, 6.2], cactus: ['#4f8a3a', 0.8, 4, 2], deadTree: ['#6b5a4a', 0.6, 3.5, 1.8] };
   function buildLod(ch) {
     const group = new THREE.Group();
     const t = new THREE.Mesh(terrainGeo(ch, LSEG, 0.35), lodMat);
@@ -2858,19 +2858,22 @@ export function buildWorld(scene, opts = {}) {
       for (const t of ch.trees) (kinds[t.k] || (kinds[t.k] = [])).push(t);
       ch.treeHi = []; ch.treeLo = [];
       for (const [k, list] of Object.entries(kinds)) {
+        const placeTree = (t, i, im) => {
+          q.setFromAxisAngle(up, t.rot); sc.set(t.s, t.s * (0.92 + (t.light - 0.28) * 1.2), t.s); p.set(t.x, t.h - 0.15, t.z);
+          mat4.compose(p, q, sc);
+          im.setMatrixAt(i, mat4);
+          const v = 0.86 + (t.light - 0.28) * 1.1, hs = (t.hue - 0.28) * 2.2;
+          im.setColorAt(i, col.setRGB(v * (1 + hs * 0.6), v, v * (1 - hs * 0.4)));
+        };
         for (const low of [false, true]) {
-          const im = instanced(PROPS[low ? k + 'Low' : k], treeMaterial, list, (t, i, im) => {
-            q.setFromAxisAngle(up, t.rot); sc.set(t.s, t.s * (0.92 + (t.light - 0.28) * 1.2), t.s); p.set(t.x, t.h - 0.15, t.z);
-            mat4.compose(p, q, sc);
-            im.setMatrixAt(i, mat4);
-            const v = 0.86 + (t.light - 0.28) * 1.1, hs = (t.hue - 0.28) * 2.2;
-            im.setColorAt(i, col.setRGB(v * (1 + hs * 0.6), v, v * (1 - hs * 0.4)));
-          });
+          const im = instanced(PROPS[low ? k + 'Low' : k], treeMaterial, list, placeTree);
           if (!im) continue;
           if (low) { im.castShadow = false; im.visible = false; }
           group.add(im);
           (low ? ch.treeLo : ch.treeHi).push(im);
         }
+        // v35: chioma a carte di foglie (solo nella versione dettagliata)
+        if (LEAVES[k]) { const lm = instanced(LEAVES[k], leafMaterial, list, placeTree); if (lm) { group.add(lm); ch.treeHi.push(lm); } }
       }
     }
     // rocce (5 forme): sono statiche, quindi vengono unite in un'unica geometria per chunk (1 draw call)
@@ -2938,7 +2941,7 @@ export function buildWorld(scene, opts = {}) {
       const lists = PROPS.bushes.map(() => []);
       for (const b of ch.bushes) lists[b.v].push(b);
       lists.forEach((list, k) => {
-        const im = instanced(PROPS.bushes[k], bushMaterial, list, (b, i, im) => {
+        const placeBush = (b, i, im) => {
           q.setFromAxisAngle(up, b.rot); sc.set(b.s, b.s * 0.9, b.s); p.set(b.x, b.h - 0.1, b.z);
           mat4.compose(p, q, sc);
           im.setMatrixAt(i, mat4);
@@ -2948,8 +2951,11 @@ export function buildWorld(scene, opts = {}) {
           const bw = biomeAt(b.x, b.z), wA = bw[3], wS = bw[1], wD = bw[2];
           const tr = 1 + wA * 0.5 + wS * 0.1 + wD * 0.25, tg = 1 - wA * 0.2 + wS * 0.12, tb = 1 - wA * 0.5 + wS * 0.25 - wD * 0.35;
           im.setColorAt(i, col.setRGB(v * tr, v * tg, v * 0.95 * tb));
-        });
-        if (im) { im.castShadow = false; group.add(im); ch.nearOnly.push(im); }
+        };
+        for (const [geo, matl] of [[PROPS.bushes[k], bushMaterial], [LEAVES.bushes[k], bushLeafMaterial]]) {
+          const im = geo && instanced(geo, matl, list, placeBush);
+          if (im) { im.castShadow = false; group.add(im); ch.nearOnly.push(im); }
+        }
       });
     }
     // ciuffi d'erba radi per la media distanza (quelli fitti li gestisce grassField)

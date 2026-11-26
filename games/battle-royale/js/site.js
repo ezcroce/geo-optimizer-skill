@@ -1,11 +1,11 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
-import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=34';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=34';
-import { createCrosshair } from './crosshair.js?v=33';
+import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=35';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=35';
+import { createCrosshair } from './crosshair.js?v=35';
 // rarità più frequente di ogni arma (colore della scheda e dell'anteprima)
 const WEAPON_RAR = Object.fromEntries(WEAPON_POOL.map(e => [e.id, e.rar.indexOf(Math.max(...e.rar))]));
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=34';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=35';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -564,7 +564,7 @@ window.__site = { hero, demo, thumbs };
 {
   const row = $('#xhDemos');
   if (row) {
-    const list = [['pump', 'Fucile a pompa', 'cono a 4 archi'], ['tactical', 'Pompa tattico', 'parentesi e rombo'], ['drum', 'Pompa a tamburo', 'anello che ruota'], ['double', 'Doppietta', 'canne cariche']];
+    const list = [['pump', 'Fucile a pompa', '4 archi'], ['tactical', 'Pompa tattico', 'archi e pallini'], ['drum', 'Pompa a tamburo', 'archi che ruotano'], ['double', 'Doppietta', 'canne cariche'], ['ar', 'Fucile d’assalto', 'anello e tacche'], ['heavy', 'Assalto pesante', 'anello spesso'], ['burst', 'A raffica', 'paletti e croce'], ['lmg', 'Mitragliatrice', 'anello e croce']];
     const demos = list.map(([style, name, sub]) => {
       const card = document.createElement('div'); card.className = 'xh-card';
       card.innerHTML = `<div class="xh"></div><b>${name}</b><span>${sub}</span>`;

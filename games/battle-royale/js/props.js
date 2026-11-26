@@ -90,130 +90,324 @@ function wobble(geo, amt, seed, keepBottom = false) {
   return g;
 }
 
+// ═════════════ v35: fogliame a ciuffi (stile cartoon) ═════════════
+// Le chiome non sono più poliedri pieni: un nucleo scuro (per non vedere attraverso) coperto da tante
+// "carte" con un ciuffo di foglie ritagliato (alpha test) e normali sferiche → chiome morbide e gonfie
+// con il bordo frastagliato di foglie. Atlante 2×2: 0 ciuffo di foglie, 1 ramo di aghi, 2 fogliame fitto
+// (per i nuclei), 3 rametto a foglie tonde (cespugli).
+function makeLeafAtlas() {
+  const S = 512, H = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  const rnd = mulberry32(3535);
+  const grey = (k) => { const L = Math.round(255 * Math.max(0, Math.min(1, k))); return `rgb(${L},${L},${L})`; };
+  const leaf = (x, y, len, wid, ang, k) => {
+    g.save(); g.translate(x, y); g.rotate(ang);
+    g.fillStyle = grey(k);
+    g.beginPath(); g.moveTo(0, 0);
+    g.bezierCurveTo(wid * 0.95, -len * 0.18, wid * 0.8, -len * 0.72, 0, -len);
+    g.bezierCurveTo(-wid * 0.8, -len * 0.72, -wid * 0.95, -len * 0.18, 0, 0);
+    g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.11)';                       // metà in ombra: dà volume alla foglia
+    g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(wid * 0.95, -len * 0.18, wid * 0.8, -len * 0.72, 0, -len); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.17)'; g.lineWidth = Math.max(1, wid * 0.09);
+    g.beginPath(); g.moveTo(0, -len * 0.06); g.lineTo(0, -len * 0.84); g.stroke();
+    g.restore();
+  };
+  const tileClip = (ox, oy) => { g.save(); g.beginPath(); g.rect(ox + 2, oy + 2, H - 4, H - 4); g.clip(); };
+  const cluster = (ox, oy, n, rIn, len0, len1, wid0, wid1, k0) => {
+    tileClip(ox, oy);
+    const cx = ox + H / 2, cy = oy + H / 2;
+    g.lineCap = 'round';
+    for (let i = 0; i < 7; i++) {                            // rametti sotto le foglie
+      const a = rnd() * 6.283;
+      g.strokeStyle = grey(0.36 + rnd() * 0.1); g.lineWidth = 2.5 + rnd() * 2;
+      g.beginPath(); g.moveTo(cx, cy + H * 0.12);
+      g.quadraticCurveTo(cx + Math.cos(a) * rIn * 0.4, cy + Math.sin(a) * rIn * 0.4, cx + Math.cos(a) * rIn * 0.95, cy + Math.sin(a) * rIn * 0.95); g.stroke();
+    }
+    const L = [];
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * 6.283, d = Math.pow(rnd(), 0.6) * rIn;
+      L.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, a: a + Math.PI / 2 + (rnd() - 0.5) * 0.9, len: len0 + rnd() * (len1 - len0), wid: wid0 + rnd() * (wid1 - wid0), k: k0 + rnd() * (1 - k0) });
+    }
+    L.sort((p, q) => p.k - q.k);                             // prima le foglie scure (dietro), poi le chiare
+    for (const l of L) leaf(l.x, l.y, l.len, l.wid, l.a, l.k);
+    g.restore();
+  };
+  // 0 · ciuffo di foglie per le chiome
+  cluster(0, 0, 48, 60, 40, 62, 15, 24, 0.5);
+  // 1 · ramo di aghi (il ramo va dal basso verso l'alto del riquadro)
+  {
+    const ox = H, oy = 0, cx = ox + H / 2;
+    tileClip(ox, oy);
+    g.lineCap = 'round';
+    const N = [];
+    for (let i = 0; i < 190; i++) {
+      const t = Math.pow(rnd(), 0.85), y = oy + H - 10 - t * (H - 26), side = rnd() < 0.5 ? -1 : 1;
+      const len = (16 + 92 * Math.pow(1 - t, 0.8)) * (0.7 + rnd() * 0.3), a = (0.55 + rnd() * 0.5) * side;
+      N.push({ x: cx + (rnd() - 0.5) * 6, y, ex: cx + Math.sin(a) * len, ey: y - Math.cos(a) * len * 0.75, w: 2.2 + rnd() * 1.8, k: 0.45 + rnd() * 0.55 });
+    }
+    N.sort((p, q) => p.k - q.k);
+    for (const nd of N) { g.strokeStyle = grey(nd.k); g.lineWidth = nd.w; g.beginPath(); g.moveTo(nd.x, nd.y); g.quadraticCurveTo((nd.x + nd.ex) / 2, (nd.y + nd.ey) / 2 - 6, nd.ex, nd.ey); g.stroke(); }
+    g.strokeStyle = grey(0.4);
+    for (let i = 0; i < 12; i++) { const y0 = oy + H - 8 - i * 20; g.lineWidth = 7 - i * 0.45; g.beginPath(); g.moveTo(cx, y0); g.lineTo(cx, y0 - 22); g.stroke(); }
+    g.restore();
+  }
+  // 2 · fogliame fitto e opaco (nuclei delle chiome)
+  {
+    const ox = 0, oy = H;
+    tileClip(ox, oy);
+    g.fillStyle = grey(0.5); g.fillRect(ox, oy, H, H);
+    for (let i = 0; i < 300; i++) leaf(ox + rnd() * H, oy + rnd() * H, 26 + rnd() * 22, 11 + rnd() * 8, rnd() * 6.283, 0.42 + rnd() * 0.58);
+    g.restore();
+  }
+  // 3 · rametto a foglie tonde e fitte (cespugli)
+  cluster(H, H, 70, 68, 26, 42, 15, 23, 0.45);
+  const img = g.getImageData(0, 0, S, S), d = img.data;
+  // pixel trasparenti → grigio medio (niente aloni neri con il filtro bilineare e le mipmap)
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] < 8) { d[i] = d[i + 1] = d[i + 2] = 150; d[i + 3] = 0; }
+  const tex = new THREE.DataTexture(new Uint8Array(d.buffer.slice(0)), S, S, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 4; tex.needsUpdate = true;
+  return tex;
+}
+export const leafTexture = makeLeafAtlas();
+
+/** accumulatore di triangoli per il fogliame (posizione, normale, colore, uv) */
+function leafBuf() {
+  const P = [], N = [], C = [], U = [];
+  return {
+    v(p, n, c, u, w) { P.push(p.x, p.y, p.z); N.push(n.x, n.y, n.z); C.push(c.r, c.g, c.b); U.push(u, w); },
+    build() {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+      g.computeBoundingSphere(); g.computeBoundingBox();
+      g.userData.shared = true;
+      return g;
+    },
+  };
+}
+const TILE = (i) => [(i % 2) * 0.5, Math.floor(i / 2) * 0.5];
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _cA = new THREE.Color(), _cB = new THREE.Color();
+function randUnit(rnd, out) {
+  const z = rnd() * 2 - 1, a = rnd() * 6.2832, r = Math.sqrt(1 - z * z);
+  return out.set(Math.cos(a) * r, z, Math.sin(a) * r);
+}
+/** una carta (quad) di foglie: centro, semiasse orizzontale U, semiasse verticale V (verso la punta) */
+function leafCard(B, ctr, Ua, Va, tile, nrm, col) {
+  const [u0, v0] = TILE(tile);
+  const cs = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([s, t]) => {
+    const p = ctr.clone().addScaledVector(Ua, s).addScaledVector(Va, t);
+    return { p, n: nrm(p), c: col(p), u: u0 + 0.006 + (0.5 + 0.5 * s) * 0.488, w: v0 + 0.006 + (0.5 - 0.5 * t) * 0.488 };
+  });
+  for (const k of [0, 1, 2, 0, 2, 3]) { const q = cs[k]; B.v(q.p, q.n, q.c, q.u, q.w); }
+}
+/** nucleo opaco (geometria qualunque) con uv proiettate dalla normale sul riquadro del fogliame fitto */
+function leafCore(B, geo, off, nrm, col) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const P = g.attributes.position, [u0, v0] = TILE(2);
+  for (let i = 0; i < P.count; i++) {
+    const p = new THREE.Vector3(P.getX(i) + off.x, P.getY(i) + off.y, P.getZ(i) + off.z), n = nrm(p);
+    B.v(p, n, col(p), u0 + 0.02 + (0.5 + 0.5 * n.x) * 0.46, v0 + 0.02 + (0.5 + 0.5 * n.z) * 0.46);
+  }
+}
+/**
+ * chioma a grappoli: blobs = [x, y, z, r]. Nucleo scuro per ogni grappolo + carte di foglie sulla superficie,
+ * colori della tavolozza con ombra interna (più scuro in basso e verso il centro) e cime schiarite dal sole.
+ */
+function leafCanopy(B, o) {
+  const rnd = mulberry32(o.seed), blobs = o.blobs;
+  const C = new THREE.Vector3(...o.center);
+  let yMin = Infinity, yMax = -Infinity, R = 0;
+  for (const [x, y, z, r] of blobs) { yMin = Math.min(yMin, y - r); yMax = Math.max(yMax, y + r); R = Math.max(R, Math.hypot(x - C.x, y - C.y, z - C.z) + r); }
+  const rMax = Math.max(...blobs.map((b) => b[3]));
+  const deep = new THREE.Color(o.deep).lerp(new THREE.Color(o.palette[0]), 0.45), top = new THREE.Color(o.top || '#ffffff'), pal = o.palette.map((c) => new THREE.Color(c));
+  const nrmAt = (p, bc) => _v3.subVectors(p, C).divideScalar(R).addScaledVector(_v2.subVectors(p, bc).normalize(), 0.35).normalize().clone();
+  const shade = (p, base, out) => {
+    const h = Math.min(1, Math.max(0, (p.y - yMin) / (yMax - yMin))), rr = Math.min(1, p.distanceTo(C) / R);
+    const ao = 0.56 + 0.44 * Math.min(1, Math.max(0, h * 0.5 + rr * 0.75 - 0.15));
+    out.copy(base).multiplyScalar(ao);
+    return out.lerp(top, Math.max(0, h * 1.5 - 0.85) * (o.topK ?? 0.3) * ao).clone();
+  };
+  blobs.forEach(([x, y, z, r], bi) => {
+    const bc = new THREE.Vector3(x, y, z);
+    const core = wobble(new THREE.IcosahedronGeometry(r * (o.core ?? 0.78), 1), r * 0.07, o.seed + 50 + bi);
+    leafCore(B, core, bc, (p) => nrmAt(p, bc), (p) => shade(p, deep, _cA).multiplyScalar(0.85 + rnd() * 0.15));
+  });
+  const dir = new THREE.Vector3(), nn = new THREE.Vector3(), Ua = new THREE.Vector3(), Va = new THREE.Vector3();
+  blobs.forEach(([x, y, z, r], bi) => {
+    const bc = new THREE.Vector3(x, y, z), n = Math.round((o.density ?? 20) * r * r);
+    for (let k = 0; k < n; k++) {
+      randUnit(rnd, dir);
+      if (dir.y < -0.35 && rnd() < 0.6) dir.y = -dir.y * 0.4;
+      dir.normalize();
+      const p = bc.clone().addScaledVector(dir, r * (0.8 + rnd() * 0.28));
+      // carte completamente sepolte dentro un altro grappolo: non servono
+      let hidden = false;
+      for (let j = 0; j < blobs.length; j++) if (j !== bi) { const b = blobs[j]; if (Math.hypot(p.x - b[0], p.y - b[1], p.z - b[2]) < b[3] * 0.8) { hidden = true; break; } }
+      if (hidden) continue;
+      nn.copy(dir).addScaledVector(randUnit(rnd, _v1), o.spread ?? 0.5).normalize();
+      Ua.crossVectors(Math.abs(nn.y) < 0.92 ? _v1.set(0, 1, 0) : _v1.set(1, 0, 0), nn).normalize();
+      Va.crossVectors(nn, Ua).normalize();
+      const roll = rnd() * 6.2832, cr = Math.cos(roll), sr = Math.sin(roll);
+      const U2 = Ua.clone().multiplyScalar(cr).addScaledVector(Va, sr), V2 = Va.clone().multiplyScalar(cr).addScaledVector(Ua, -sr);
+      const sz = o.card * (0.8 + rnd() * 0.4) * (0.7 + 0.3 * r / rMax) * 0.5;
+      U2.multiplyScalar(sz); V2.multiplyScalar(sz);
+      const base = _cB.copy(pal[Math.floor(rnd() * pal.length)]).multiplyScalar(0.92 + rnd() * 0.16).clone();
+      leafCard(B, p, U2, V2, o.tile ?? 0, (q) => nrmAt(q, bc), (q) => shade(q, base, _cA));
+    }
+  });
+}
+const pal0 = (o) => new THREE.Color(o.palette[0]);
+/** abete: palchi di rami (carte di aghi che pendono verso il basso) attorno a coni scuri */
+function pineCanopy(B, o) {
+  const rnd = mulberry32(o.seed), up = new THREE.Vector3(0, 1, 0);
+  const pal = o.palette.map((c) => new THREE.Color(c)), deep = new THREE.Color(o.deep).lerp(pal0(o), 0.35), snow = new THREE.Color('#e6eef6');
+  const nT = o.tiers.length;
+  o.tiers.forEach(([R, y, cnt, hh], i) => {
+    const fr = i / (nT - 1);
+    const cone = wobble(new THREE.ConeGeometry(R * 0.5, hh, 8, 1), 0.06, o.seed + i);
+    leafCore(B, cone, new THREE.Vector3(0, y + hh * 0.38, 0),
+      (p) => _v1.set(p.x, 0, p.z).normalize().multiplyScalar(0.7).add(_v2.set(0, 0.7, 0)).normalize().clone(),
+      (p) => _cA.copy(deep).multiplyScalar(0.7 + 0.3 * (p.y - y) / hh).clone());
+    const cn = Math.round(cnt * 1.35);
+    for (let j = 0; j < cn; j++) {
+      const ang = (j + rnd() * 0.5) / cn * 6.2832 + i * 0.7;
+      const dir = new THREE.Vector3(Math.sin(ang), 0, Math.cos(ang));
+      for (const layer of [0, 1, 2]) {
+        const len = R * (0.92 + rnd() * 0.22) * [1, 0.85, 0.72][layer], droop = [0.32, 0.55, 0.1][layer] + rnd() * 0.18;
+        const Vt = dir.clone().multiplyScalar(Math.cos(droop)).addScaledVector(up, -Math.sin(droop));
+        const side = new THREE.Vector3().crossVectors(up, dir).normalize();
+        const tilt = [1, -1, 1][layer] * (0.25 + rnd() * 0.3) + (layer === 2 ? 0.75 : 0);
+        const Us = side.clone().multiplyScalar(Math.cos(tilt)).addScaledVector(up, Math.sin(tilt));
+        const ctr = new THREE.Vector3(0, y + hh * [0.18, 0.3, 0.45][layer], 0).addScaledVector(Vt, len * 0.5);
+        const base = _cB.copy(pal[Math.floor(rnd() * pal.length)]).multiplyScalar(0.9 + rnd() * 0.18).clone();
+        const snowy = (o.snow || 0) * (rnd() < 0.85 ? 1 : 0.3);
+        leafCard(B, ctr, Us.multiplyScalar(len * 0.5), Vt.multiplyScalar(len * 0.58), 1,
+          (p) => { const rr = Math.hypot(p.x, p.z) + 0.001; return new THREE.Vector3(p.x / rr * 0.6, 0.8, p.z / rr * 0.6).normalize(); },
+          (p) => {
+            const rr = Math.min(1, Math.hypot(p.x, p.z) / R);
+            const c = _cA.copy(base).multiplyScalar((0.6 + 0.45 * rr) * (0.85 + 0.2 * fr));
+            if (snowy) c.lerp(snow, Math.min(1, snowy * (0.35 + rr * 0.65)) * (layer ? 0.55 : 0.9));
+            return c.clone();
+          });
+      }
+    }
+  });
+  // punta
+  const [tR, tY] = o.tip;
+  for (let k = 0; k < 3; k++) {
+    const a = k / 3 * Math.PI;
+    const base = _cB.copy(pal[pal.length - 1]).clone();
+    leafCard(B, new THREE.Vector3(0, tY, 0), new THREE.Vector3(Math.cos(a) * tR * 0.5, 0, Math.sin(a) * tR * 0.5), new THREE.Vector3(0, tR, 0), 1,
+      () => new THREE.Vector3(0, 1, 0), () => (o.snow ? _cA.copy(base).lerp(snow, 0.6 * o.snow) : _cA.copy(base)).clone());
+  }
+}
+
 // ═════════════ 01 · ALBERI ═════════════
 function trunkParts(h, r0, r1, color, lean = 0) {
   return [part(new THREE.CylinderGeometry(r1, r0, h, 7, 2), color, { y: h / 2, rz: lean, jit: 0.12 })];
 }
-
+function branchParts(color, list) {
+  return list.map(([x, y, z, len, rz, ry]) => part(new THREE.CylinderGeometry(0.06, 0.12, len, 6), color, { x, y, z, rz, ry, jit: 0.1 }));
+}
+const PINE_TIERS = [[2.5, 1.7, 9, 1.6], [2.15, 2.55, 9, 1.5], [1.8, 3.4, 8, 1.4], [1.45, 4.2, 7, 1.3], [1.1, 4.95, 6, 1.2], [0.75, 5.65, 5, 1.05], [0.45, 6.3, 4, 0.9]];
 function makePine() {
-  const parts = trunkParts(3.2, 0.32, 0.18, '#5e3d22');
-  // radici
-  for (let i = 0; i < 4; i++) parts.push(part(new THREE.BoxGeometry(0.16, 0.2, 0.7), '#5a3a20', { y: 0.08, ry: i * Math.PI / 2 + 0.4, z: 0, x: 0, post: new THREE.Matrix4().makeTranslation(Math.sin(i * Math.PI / 2 + 0.4) * 0.3, 0, Math.cos(i * Math.PI / 2 + 0.4) * 0.3) }));
-  const tiers = [[2.4, 2.3, 2.1], [1.95, 2.1, 3.2], [1.5, 1.9, 4.25], [1.05, 1.7, 5.25], [0.6, 1.3, 6.15]];
-  const greens = ['#2a5d2f', '#2f6834', '#357238', '#3b7c3e', '#43884a'];
-  tiers.forEach(([r, h, y], i) => {
-    const cone = wobble(new THREE.ConeGeometry(r, h, 8, 1), 0.12, 11 + i);
-    parts.push(part(cone, greens[i], { y: y + h / 2 - 0.2, ry: i * 0.7, jit: 0.13, colorFn: (nx, ny, nz, x, yy, z, rnd) => ny < -0.3 ? '#1f4524' : null }));
-  });
-  return mergeParts(parts, 101);
+  const parts = trunkParts(6.4, 0.32, 0.07, '#5e3d22');
+  for (let i = 0; i < 4; i++) parts.push(part(new THREE.BoxGeometry(0.16, 0.2, 0.7), '#5a3a20', { y: 0.08, ry: i * Math.PI / 2 + 0.4, post: new THREE.Matrix4().makeTranslation(Math.sin(i * Math.PI / 2 + 0.4) * 0.3, 0, Math.cos(i * Math.PI / 2 + 0.4) * 0.3) }));
+  const B = leafBuf();
+  pineCanopy(B, { seed: 101, tiers: PINE_TIERS, tip: [0.55, 7.2], palette: ['#2f7538', '#3a8640', '#2d6a33', '#459049'], deep: '#1a4422' });
+  return { wood: mergeParts(parts, 101), leaf: B.build() };
 }
-
+const OAK_BLOBS = [[0, 4.9, 0, 1.95], [1.35, 4.45, 0.35, 1.4], [-1.3, 4.55, -0.25, 1.45], [0.35, 4.5, 1.3, 1.35], [-0.25, 4.4, -1.3, 1.35], [0.15, 6.05, 0.1, 1.4], [0.95, 5.55, -0.8, 1.1], [-0.9, 5.65, 0.8, 1.1]];
 function makeOak() {
-  const parts = trunkParts(3.4, 0.4, 0.24, '#6a4526');
-  // rami
-  parts.push(part(new THREE.CylinderGeometry(0.08, 0.13, 1.6, 6), '#6a4526', { x: 0.45, y: 3.2, rz: -0.8, jit: 0.1 }));
-  parts.push(part(new THREE.CylinderGeometry(0.07, 0.12, 1.4, 6), '#6a4526', { x: -0.4, y: 3.3, z: 0.2, rz: 0.75, ry: 0.4, jit: 0.1 }));
-  // chioma a grappoli
-  const blobs = [[0, 4.7, 0, 1.9], [1.2, 4.3, 0.3, 1.35], [-1.15, 4.4, -0.2, 1.4], [0.3, 4.4, 1.15, 1.3], [-0.2, 4.3, -1.15, 1.3], [0.2, 5.7, 0.1, 1.3]];
-  const greens = ['#4b9437', '#559f3d', '#438731', '#5aa842', '#4f9a3a', '#62b048'];
-  blobs.forEach(([x, y, z, r], i) => {
-    const g = wobble(new THREE.IcosahedronGeometry(r, 0), r * 0.12, 30 + i);
-    parts.push(part(g, greens[i], { x, y, z, jit: 0.14, colorFn: (nx, ny) => ny < -0.4 ? '#346b28' : null }));
-  });
-  return mergeParts(parts, 202);
+  const parts = trunkParts(3.6, 0.42, 0.26, '#6a4526');
+  parts.push(...branchParts('#6a4526', [[0.5, 3.5, 0, 1.7, -0.8, 0], [-0.45, 3.6, 0.2, 1.5, 0.75, 0.4], [0.1, 3.7, -0.5, 1.4, 0.7, 1.7]]));
+  const B = leafBuf();
+  leafCanopy(B, { seed: 202, blobs: OAK_BLOBS, center: [0, 4.6, 0], palette: ['#4c9a34', '#58a83a', '#3f8a2e', '#66b444'], deep: '#244f1c', top: '#d8ec7a', card: 1.9 });
+  return { wood: mergeParts(parts, 202), leaf: B.build() };
 }
-
+const BIRCH_TRUNK = () => part(new THREE.CylinderGeometry(0.13, 0.24, 5.6, 7, 6), '#e6e2d6', { y: 2.8, jit: 0.05, colorFn: (nx, ny, nz, x, y, z, rnd) => (rnd() < 0.22 ? '#3a3a36' : '#e8e4d8') });
 function makeBirch() {
-  const parts = [];
-  // tronco bianco con segni scuri
-  parts.push(part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 7, 6), '#e6e2d6', {
-    y: 2.1, jit: 0.05,
-    colorFn: (nx, ny, nz, x, y, z, rnd) => (rnd() < 0.22 ? '#3a3a36' : '#e8e4d8'),
-  }));
-  const blobs = [[0, 4.4, 0, 1.25, 1.5], [0.15, 5.6, -0.1, 1.05, 1.4], [-0.1, 6.6, 0.1, 0.75, 1.3]];
-  const greens = ['#7ab546', '#86bf4e', '#93c957'];
-  blobs.forEach(([x, y, z, r, sy], i) => {
-    const g = wobble(new THREE.DodecahedronGeometry(r, 0), r * 0.1, 60 + i);
-    parts.push(part(g, greens[i], { x, y, z, sy, jit: 0.13 }));
-  });
-  return mergeParts(parts, 303);
+  // betulla "lime": chioma ovale verde acido
+  const parts = [BIRCH_TRUNK()];
+  parts.push(...branchParts('#d8d4c8', [[0.35, 4.2, 0, 1.0, -0.7, 0], [-0.3, 4.6, 0.1, 0.9, 0.7, 0.5]]));
+  const B = leafBuf();
+  leafCanopy(B, { seed: 303, blobs: [[0, 4.7, 0, 1.4], [0.2, 5.85, -0.1, 1.3], [-0.1, 6.9, 0.1, 0.98], [0.8, 5.1, 0.4, 0.95], [-0.75, 5.4, -0.35, 1.0]], center: [0, 5.5, 0], palette: ['#8fc63a', '#a3d444', '#7cb832', '#b5df52'], deep: '#3f6e1c', top: '#eef68a', card: 1.6 });
+  return { wood: mergeParts(parts, 303), leaf: B.build() };
 }
 
 // versioni semplificate per la media distanza (stessa sagoma e colori, molti meno triangoli)
 function makePineLow() {
   return mergeParts([
     part(new THREE.CylinderGeometry(0.2, 0.3, 3.2, 5, 1, true), '#5e3d22', { y: 1.6 }),
-    part(new THREE.ConeGeometry(2.3, 3.6, 6, 1, true), '#2f6834', { y: 3.6, jit: 0.1 }),
-    part(new THREE.ConeGeometry(1.5, 3.0, 6, 1, true), '#3b7c3e', { y: 5.5, ry: 0.5, jit: 0.1 }),
+    part(new THREE.ConeGeometry(2.4, 3.8, 7, 1, true), '#2c6232', { y: 3.5, jit: 0.1 }),
+    part(new THREE.ConeGeometry(1.5, 3.3, 7, 1, true), '#34703a', { y: 5.6, ry: 0.5, jit: 0.1 }),
   ], 111);
 }
 function makeOakLow() {
   return mergeParts([
     part(new THREE.CylinderGeometry(0.24, 0.4, 3.4, 5, 1, true), '#6a4526', { y: 1.7 }),
-    part(new THREE.IcosahedronGeometry(2.3, 0), '#4f9a3a', { y: 4.7, sy: 0.85, jit: 0.12 }),
-    part(new THREE.IcosahedronGeometry(1.3, 0), '#5aa842', { y: 5.8, x: 0.3, jit: 0.12 }),
+    part(new THREE.IcosahedronGeometry(2.5, 0), '#43862f', { y: 4.8, sy: 0.85, jit: 0.12 }),
+    part(new THREE.IcosahedronGeometry(1.4, 0), '#509a38', { y: 6.0, x: 0.3, jit: 0.12 }),
   ], 222);
 }
 function makeBirchLow() {
   return mergeParts([
     part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 5, 1, true), '#e6e2d6', { y: 2.1 }),
-    part(new THREE.IcosahedronGeometry(1.3, 0), '#86bf4e', { y: 5.2, sy: 1.6, jit: 0.12 }),
+    part(new THREE.IcosahedronGeometry(1.45, 0), '#86b838', { y: 5.6, sy: 1.6, jit: 0.12 }),
   ], 333);
 }
 
 // ═════════════ alberi dei biomi ═════════════
 const SNOWC = '#dde5ee';
 function makeSnowPine() {
-  const parts = trunkParts(3.0, 0.3, 0.17, '#4e3420');
-  const tiers = [[2.3, 2.2, 2.0], [1.85, 2.0, 3.1], [1.4, 1.8, 4.1], [0.95, 1.6, 5.05], [0.55, 1.2, 5.9]];
-  const greens = ['#1f4a2c', '#24522f', '#2a5b33', '#2f6437', '#356d3c'];
-  tiers.forEach(([r, h, y], i) => {
-    const cone = wobble(new THREE.ConeGeometry(r, h, 8, 1), 0.12, 15 + i);
-    // neve sulle facce rivolte verso l'alto
-    parts.push(part(cone, greens[i], { y: y + h / 2 - 0.2, ry: i * 0.7, jit: 0.1, colorFn: (nx, ny, nz, x, yy, z, rnd) => ny > 0.3 && rnd() < 0.85 ? SNOWC : (ny < -0.3 ? '#173a22' : null) }));
-  });
-  parts.push(part(wobble(new THREE.ConeGeometry(0.32, 0.6, 6, 1), 0.04, 9), SNOWC, { y: 6.7, jit: 0.04 }));
-  return mergeParts(parts, 121);
+  const parts = trunkParts(6.2, 0.3, 0.07, '#4e3420');
+  const B = leafBuf();
+  pineCanopy(B, { seed: 121, tiers: PINE_TIERS.map(([r, y, n, h]) => [r * 0.95, y - 0.1, n, h]), tip: [0.5, 7.05], palette: ['#1f4a2c', '#24522f', '#2a5b33', '#2f6437'], deep: '#14301c', snow: 1 });
+  return { wood: mergeParts(parts, 121), leaf: B.build() };
 }
 function makeSnowPineLow() {
   return mergeParts([
     part(new THREE.CylinderGeometry(0.2, 0.3, 3, 5, 1, true), '#4e3420', { y: 1.5 }),
-    part(new THREE.ConeGeometry(2.2, 3.5, 6, 1, true), '#24522f', { y: 3.5, jit: 0.1, colorFn: (nx, ny) => ny > 0.45 ? SNOWC : null }),
-    part(new THREE.ConeGeometry(1.4, 2.9, 6, 1, true), '#2f6437', { y: 5.3, ry: 0.5, jit: 0.1, colorFn: (nx, ny) => ny > 0.45 ? SNOWC : null }),
+    part(new THREE.ConeGeometry(2.3, 3.7, 7, 1, true), '#24522f', { y: 3.4, jit: 0.1, colorFn: (nx, ny) => ny > 0.45 ? SNOWC : null }),
+    part(new THREE.ConeGeometry(1.45, 3.2, 7, 1, true), '#2f6437', { y: 5.4, ry: 0.5, jit: 0.1, colorFn: (nx, ny) => ny > 0.45 ? SNOWC : null }),
   ], 131);
 }
 function makeAutumnOak() {
-  const parts = trunkParts(3.3, 0.4, 0.24, '#5e3b22');
-  parts.push(part(new THREE.CylinderGeometry(0.08, 0.13, 1.6, 6), '#5e3b22', { x: 0.45, y: 3.2, rz: -0.8, jit: 0.1 }));
-  parts.push(part(new THREE.CylinderGeometry(0.07, 0.12, 1.4, 6), '#5e3b22', { x: -0.4, y: 3.3, z: 0.2, rz: 0.75, ry: 0.4, jit: 0.1 }));
-  const blobs = [[0, 4.6, 0, 1.85], [1.2, 4.2, 0.3, 1.3], [-1.15, 4.3, -0.2, 1.35], [0.3, 4.3, 1.15, 1.25], [-0.2, 4.2, -1.15, 1.25], [0.2, 5.6, 0.1, 1.25]];
-  const cols = ['#d9822b', '#c8562a', '#e0a030', '#b8452a', '#d97a2a', '#e8b040'];
-  blobs.forEach(([x, y, z, r], i) => {
-    const g = wobble(new THREE.IcosahedronGeometry(r, 0), r * 0.13, 70 + i);
-    parts.push(part(g, cols[i], { x, y, z, jit: 0.16, colorFn: (nx, ny) => ny < -0.4 ? '#8a3a1c' : null }));
-  });
-  return mergeParts(parts, 212);
+  // quercia rossa
+  const parts = trunkParts(3.5, 0.4, 0.24, '#5e3b22');
+  parts.push(...branchParts('#5e3b22', [[0.5, 3.4, 0, 1.7, -0.8, 0], [-0.45, 3.5, 0.2, 1.5, 0.75, 0.4], [0.1, 3.6, -0.5, 1.4, 0.7, 1.7]]));
+  const B = leafBuf();
+  leafCanopy(B, { seed: 212, blobs: OAK_BLOBS.map(([x, y, z, r]) => [-z, y - 0.1, x, r * 0.97]), center: [0, 4.5, 0], palette: ['#d8402a', '#c23222', '#e85a2e', '#b52a20'], deep: '#5e1810', top: '#ffb070', topK: 0.35, card: 1.9 });
+  return { wood: mergeParts(parts, 212), leaf: B.build() };
 }
 function makeAutumnOakLow() {
   return mergeParts([
     part(new THREE.CylinderGeometry(0.24, 0.4, 3.3, 5, 1, true), '#5e3b22', { y: 1.65 }),
-    part(new THREE.IcosahedronGeometry(2.25, 0), '#d27a2a', { y: 4.6, sy: 0.85, jit: 0.14 }),
-    part(new THREE.IcosahedronGeometry(1.25, 0), '#e2a434', { y: 5.7, x: 0.3, jit: 0.12 }),
+    part(new THREE.IcosahedronGeometry(2.45, 0), '#b8321f', { y: 4.7, sy: 0.85, jit: 0.14 }),
+    part(new THREE.IcosahedronGeometry(1.35, 0), '#d0482a', { y: 5.9, x: 0.3, jit: 0.12 }),
   ], 232);
 }
 function makeAutumnBirch() {
-  const parts = [part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 7, 6), '#e6e2d6', { y: 2.1, jit: 0.05, colorFn: (nx, ny, nz, x, y, z, rnd) => (rnd() < 0.22 ? '#3a3a36' : '#e8e4d8') })];
-  const blobs = [[0, 4.4, 0, 1.25, 1.5], [0.15, 5.6, -0.1, 1.05, 1.4], [-0.1, 6.6, 0.1, 0.75, 1.3]];
-  const cols = ['#e8c02c', '#f0cf3a', '#f2b632'];
-  blobs.forEach(([x, y, z, r, sy], i) => parts.push(part(wobble(new THREE.DodecahedronGeometry(r, 0), r * 0.1, 64 + i), cols[i], { x, y, z, sy, jit: 0.14 })));
-  return mergeParts(parts, 313);
+  // albero arancione dalla chioma tonda
+  const parts = [BIRCH_TRUNK()];
+  parts.push(...branchParts('#d8d4c8', [[0.4, 4.0, 0, 1.1, -0.75, 0], [-0.35, 4.2, 0.1, 1.0, 0.7, 0.5]]));
+  const B = leafBuf();
+  leafCanopy(B, { seed: 313, blobs: [[0, 5.2, 0, 1.65], [1.05, 4.85, 0.3, 1.15], [-1.0, 4.95, -0.3, 1.2], [0.2, 6.35, 0, 1.25], [0.3, 4.75, -1.05, 1.05], [-0.3, 4.85, 1.05, 1.05]], center: [0, 5.2, 0], palette: ['#f08a2a', '#e8702a', '#f5a43a', '#dc5f24'], deep: '#7a3010', top: '#ffe08a', topK: 0.35, card: 1.75 });
+  return { wood: mergeParts(parts, 313), leaf: B.build() };
 }
 function makeAutumnBirchLow() {
   return mergeParts([
     part(new THREE.CylinderGeometry(0.15, 0.24, 4.2, 5, 1, true), '#e6e2d6', { y: 2.1 }),
-    part(new THREE.IcosahedronGeometry(1.3, 0), '#eec636', { y: 5.2, sy: 1.6, jit: 0.12 }),
+    part(new THREE.IcosahedronGeometry(1.7, 0), '#de7426', { y: 5.4, sy: 1.25, jit: 0.12 }),
   ], 343);
 }
+
 function makePalm() {
   const parts = [];
   // tronco curvo ad anelli
@@ -359,29 +553,33 @@ function withUV(g) {
 }
 
 // ═════════════ cespugli ═════════════
-function makeBush(seed, flowers = null) {
+// v35: cupola fitta di rametti fogliosi (carte del riquadro 3) attorno a un nucleo scuro; la parte
+// "legnosa" (instanziata col materiale dei cespugli) ha solo i rametti alla base e gli eventuali fiori.
+function makeBush(seed, flowers = null, palette = ['#4a9a38', '#58aa40', '#64b848', '#43903a']) {
   const rnd = mulberry32(seed);
   const parts = [];
   const n = 4 + Math.floor(rnd() * 3);
-  const greens = ['#3f8a33', '#4a9a3a', '#55a540', '#3a7d2f'];
   const blobs = [];
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * 6.28 + rnd(), d = i === 0 ? 0 : 0.35 + rnd() * 0.25, r = i === 0 ? 0.62 : 0.38 + rnd() * 0.2;
-    const x = Math.cos(a) * d, y = (i === 0 ? 0.6 : 0.4 + rnd() * 0.25), z = Math.sin(a) * d;
-    blobs.push([x, y, z, r]);
-    const g = wobble(new THREE.IcosahedronGeometry(r, 0), r * 0.18, seed + i);
-    parts.push(part(g, greens[i % greens.length], { x, y, z, sy: 0.85, jit: 0.14, colorFn: (nx, ny) => (ny < -0.4 ? '#2c5e25' : null) }));
+    const a = (i / n) * 6.28 + rnd(), d = i === 0 ? 0 : 0.36 + rnd() * 0.22, r = i === 0 ? 0.64 : 0.4 + rnd() * 0.18;
+    blobs.push([Math.cos(a) * d, i === 0 ? 0.6 : 0.42 + rnd() * 0.22, Math.sin(a) * d, r]);
   }
-  // fiori: piccole gemme sulla parte alta della chioma
+  // rametti alla base
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * 6.28 + rnd() * 0.6;
+    parts.push(part(new THREE.CylinderGeometry(0.018, 0.035, 0.55, 4), '#4a3520', { x: Math.cos(a) * 0.12, y: 0.22, z: Math.sin(a) * 0.12, rz: Math.cos(a) * 0.5, rx: -Math.sin(a) * 0.5, jit: 0.1 }));
+  }
   if (flowers) {
-    for (let k = 0; k < 14; k++) {
+    for (let k = 0; k < 16; k++) {
       const [bx, by, bz, br] = blobs[Math.floor(rnd() * blobs.length)];
-      const th = rnd() * 6.283, ph = rnd() * 1.1;              // solo emisfero superiore
-      const x = bx + Math.sin(ph) * Math.cos(th) * br * 0.98, y = by + Math.cos(ph) * br * 0.85 * 0.98, z = bz + Math.sin(ph) * Math.sin(th) * br * 0.98;
-      parts.push(part(new THREE.OctahedronGeometry(0.09, 0), flowers[k % flowers.length], { x, y, z, jit: 0.05, noSky: true }));
+      const th = rnd() * 6.283, ph = rnd() * 1.1;
+      const rr = br * (1.0 + rnd() * 0.08);
+      parts.push(part(new THREE.OctahedronGeometry(0.085, 0), flowers[k % flowers.length], { x: bx + Math.sin(ph) * Math.cos(th) * rr, y: by + Math.cos(ph) * rr * 0.9, z: bz + Math.sin(ph) * Math.sin(th) * rr, jit: 0.05, noSky: true }));
     }
   }
-  return mergeParts(parts, seed);
+  const B = leafBuf();
+  leafCanopy(B, { seed: seed + 7, blobs: blobs.map(([x, y, z, r]) => [x, y * 0.95, z, r]), center: [0, 0.3, 0], palette, deep: '#2c5a20', top: '#d6ee7a', topK: 0.3, card: 0.72, density: 74, core: 0.82, tile: 3, spread: 0.3 });
+  return { wood: mergeParts(parts, seed), leaf: B.build() };
 }
 
 // ═════════════ texture della pietra (dati lineari, media ~0,5) ═════════════
@@ -670,15 +868,20 @@ function makeShed() {
 }
 
 // ═════════════ catalogo ═════════════
+// v35: gli alberi a foglie hanno due geometrie: legno (materiale degli alberi) e fogliame (LEAVES, materiale delle foglie)
+const LEAFY = { pine: makePine(), oak: makeOak(), birch: makeBirch(), snowPine: makeSnowPine(), autumnOak: makeAutumnOak(), autumnBirch: makeAutumnBirch() };
+const BUSHES = [makeBush(401), makeBush(433, null, ['#5aa83c', '#68b844', '#78c64c', '#509c38']), makeBush(467, ['#f2f2f2', '#ffe066']), makeBush(491, ['#e86fa8', '#c77dff'], ['#418a34', '#4e9a3c', '#5aa844', '#3c8031'])];
+export const LEAVES = { bushes: BUSHES.map((b) => b.leaf) };
+for (const [k, t] of Object.entries(LEAFY)) LEAVES[k] = t.leaf;
 export const PROPS = {
-  pine: makePine(), oak: makeOak(), birch: makeBirch(),
+  pine: LEAFY.pine.wood, oak: LEAFY.oak.wood, birch: LEAFY.birch.wood,
   pineLow: makePineLow(), oakLow: makeOakLow(), birchLow: makeBirchLow(),
-  snowPine: makeSnowPine(), snowPineLow: makeSnowPineLow(), autumnOak: makeAutumnOak(), autumnOakLow: makeAutumnOakLow(),
-  autumnBirch: makeAutumnBirch(), autumnBirchLow: makeAutumnBirchLow(), palm: makePalm(), palmLow: makePalmLow(),
+  snowPine: LEAFY.snowPine.wood, snowPineLow: makeSnowPineLow(), autumnOak: LEAFY.autumnOak.wood, autumnOakLow: makeAutumnOakLow(),
+  autumnBirch: LEAFY.autumnBirch.wood, autumnBirchLow: makeAutumnBirchLow(), palm: makePalm(), palmLow: makePalmLow(),
   cactus: makeCactus(), cactusLow: makeCactusLow(), deadTree: makeDeadTree(), deadTreeLow: makeDeadTreeLow(),
   rocks: [makeRock(5, 0), makeRock(17, 0), makeRock(29, 1), makeRock(41, 2), makeRock(53, 3)],
   pebbles: makePebbles(),
-  bushes: [makeBush(401), makeBush(433), makeBush(467, ['#f2f2f2', '#ffe066']), makeBush(491, ['#e86fa8', '#c77dff'])],
+  bushes: BUSHES.map((b) => b.wood),
   logs: makeLogs(), bricks: makeBricks(),
   mushrooms: [makeMushrooms(611, false), makeMushrooms(631, true), makeMushrooms(653, false)],
   stumps: [makeStump(701), makeStump(733)],
@@ -814,6 +1017,23 @@ function addFoliageDetail(mat, bush) {
 }
 export const treeMaterial = addWind(addFoliageDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.02, flatShading: true }), false), 2.2, 0.0045, 'tree');
 export const bushMaterial = addWind(addFoliageDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.0, flatShading: true }), true), 0.3, 0.07, 'bush');
+/**
+ * v35: materiale delle carte di foglie. Alpha test sul ritaglio, doppia faccia SENZA ribaltare la normale
+ * sul retro (le normali sferiche della chioma valgono per entrambe le facce → luce morbida e gonfia),
+ * e un po' di luce che "passa" attraverso le foglie in controluce.
+ */
+function makeLeafMaterial(bush) {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: leafTexture, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.82, metalness: 0.0 });
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''))
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance += diffuseColor.rgb * ${bush ? '0.08' : '0.11'};`);
+  };
+  return m;
+}
+export const leafMaterial = addWind(makeLeafMaterial(false), 2.2, 0.0045, 'leaf');
+export const bushLeafMaterial = addWind(makeLeafMaterial(true), 0.3, 0.07, 'bushleaf');
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
 const stoneTex = makeStoneTexture();
@@ -1043,7 +1263,7 @@ export async function loadModelOverrides(base = 'models/') {
       const geo = gltfToGeometry(gltf.scene, key);
       if (!geo) return;
       const s = geo.boundingBox.getSize(new THREE.Vector3());
-      if (key === 'tree') { for (const k of TREE_KINDS) PROPS[k] = PROPS[k + 'Low'] = geo; }
+      if (key === 'tree') { for (const k of TREE_KINDS) { PROPS[k] = PROPS[k + 'Low'] = geo; LEAVES[k] = null; } }
       else if (key === 'barrel') { PROPS.barrelWood = PROPS.barrelBlue = PROPS.barrelRed = geo; PROP_DIMS.barrel = { r: Math.max(s.x, s.z) / 2 + 0.02, h: s.y }; }
       else if (key === 'shed') { PROPS.shed = geo; PROP_DIMS.shed = { w: s.x, d: s.z, wallH: s.y * 0.6, h: s.y }; }
       else { PROPS[key] = geo; PROP_DIMS[key] = { w: s.x, h: s.y, d: s.z }; }

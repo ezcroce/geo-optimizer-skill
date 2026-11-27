@@ -13,6 +13,7 @@
     <div class="phase" id="phase">MENU</div>
     <div class="timer" id="timer">--:--</div>
     <div class="top-actions">
+      <button class="ghost" id="btnStream" title="Modalità streamer: voti e glitch dalla chat di Twitch">📺</button>
       <button class="ghost" id="btnClip" title="Registra una clip del canvas (WebM)">⏺ Clip</button>
       <button class="ghost" id="btnHelp" title="Regole">?</button>
       <button class="ghost" id="btnMenu" title="Torna al menu">☰</button>
@@ -23,6 +24,7 @@
     <section class="stage">
       <div class="canvas-wrap">
         <canvas id="cctv" aria-label="Telecamere di sorveglianza della villa"></canvas>
+        <div class="stream-box hidden" id="streamBox" aria-live="polite"></div>
       </div>
       <div class="hint" id="hint"></div>
       <div class="transport">
@@ -48,6 +50,8 @@
   <script src="js/world.js"></script>
   <script src="js/footage.js"></script>
   <script src="js/render.js"></script>
+  <script src="js/clip.js"></script>
+  <script src="js/stream.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

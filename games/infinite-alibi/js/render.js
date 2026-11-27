@@ -271,21 +271,32 @@
     ctx.restore();
   }
 
-  function drawCharacter(ctx, ch, initials, time) {
-    const T = AVATARS[ch.idx]; // vero personaggio: ombra e oggetti
-    const L = AVATARS[ch.look]; // aspetto mostrato (diverso solo durante il deepfake)
-    const bob = ch.moving ? Math.sin(time * 15 + ch.idx * 2) * 0.7 : 0;
-    const x = ch.x;
+  /**
+   * ch: { look, shadow, prop, disguised, x, y, ang, moving, crime }
+   *  look   = aspetto mostrato · shadow = di chi è l'ombra · prop = di chi è l'oggetto
+   * Nel deepfake look ≠ vero personaggio e uno fra ombra e oggetto "fallisce".
+   */
+  function drawCharacter(ctx, ch, initials, time, footT) {
+    const L = AVATARS[ch.look];
+    const Sh = AVATARS[ch.shadow != null ? ch.shadow : ch.look];
+    const P = AVATARS[ch.prop != null ? ch.prop : ch.look];
+    const seed = ch.look * 2 + (ch.prop || 0);
+    const bob = ch.moving ? Math.sin(time * 15 + seed) * 0.7 : 0;
+    let x = ch.x;
     const y = ch.y + bob;
-    // ombra: sempre la sagoma vera
-    const sx = x + T.h * 1.7;
-    const sy = y + T.h * 1.25;
+    // sfarfallio del deepfake: legato al tempo del filmato, quindi visibile anche in pausa/fotogramma
+    const fl = CONFIG.fx ? CONFIG.fx.flicker : 0.6;
+    const ghost = ch.disguised && footT != null && Math.floor(footT * 12) % 4 === 0;
+    if (ch.disguised && footT != null) x += Math.sin(footT * 90) * 1.4 * fl;
+    // ombra
+    const sx = x + Sh.h * 1.7;
+    const sy = y + Sh.h * 1.25;
     ctx.save();
-    ctx.beginPath(); ctx.ellipse(sx, sy, T.r * 1.08, T.r * 0.9, 0.5, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.ellipse(sx, sy, Sh.r * 1.08, Sh.r * 0.9, 0.5, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
-    drawProp(ctx, T.prop, sx, sy, ch.ang, T.r, 'rgba(0,0,0,0.42)', null, true);
+    // la sagoma dell'ombra include l'oggetto del proprietario dell'ombra
+    drawProp(ctx, Sh.prop, sx, sy, ch.ang, Sh.r, 'rgba(0,0,0,0.42)', null, true);
     ctx.restore();
-    // braccio teso verso il piedistallo durante il furto
     if (ch.crime) {
       const ped = IA.toGlobal(STUDIO, [PEDESTAL.x, PEDESTAL.y]);
       const a = Math.atan2(ped.y - y, ped.x - x);
@@ -294,23 +305,35 @@
       ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * L.r, y + Math.sin(a) * L.r);
       ctx.lineTo(x + Math.cos(a) * (L.r + reach), y + Math.sin(a) * (L.r + reach)); ctx.stroke();
     }
-    if (T.prop !== 'hat' && T.prop !== 'scarf') drawProp(ctx, T.prop, x, y, ch.ang, L.r, g(190), g(20));
-    if (T.prop === 'scarf') drawProp(ctx, 'scarf', x, y, ch.ang, L.r, g(236), g(20));
+    if (P.prop !== 'hat' && P.prop !== 'scarf') drawProp(ctx, P.prop, x, y, ch.ang, L.r, g(190), g(20));
+    if (P.prop === 'scarf') drawProp(ctx, 'scarf', x, y, ch.ang, L.r, g(236), g(20));
     patternFill(ctx, L, x, y, L.r);
     circle(ctx, x, y, L.r, null, g(12), 1.6);
-    // direzione dello sguardo
     circle(ctx, x + Math.cos(ch.ang) * (L.r - 2.5), y + Math.sin(ch.ang) * (L.r - 2.5), 1.6, L.lum > 140 ? g(10) : g(245));
-    if (T.prop === 'hat') drawHat(ctx, x, y, L.r);
+    if (P.prop === 'hat') drawHat(ctx, x, y, L.r);
     const label = initials[ch.look] || L.key;
     ctx.font = `bold ${Math.max(8, L.r * 1.05)}px "Courier New", monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const onHat = T.prop === 'hat';
+    const onHat = P.prop === 'hat';
     ctx.fillStyle = onHat ? g(240) : L.lum > 140 ? g(10) : g(250);
     if (!onHat && (L.pattern === 'stripes' || L.pattern === 'dots' || L.pattern === 'cross')) {
       ctx.lineWidth = 2.6; ctx.strokeStyle = L.lum > 140 ? g(250) : g(10); ctx.strokeText(label, x, y + 0.5);
     }
     ctx.fillText(label, x, y + 0.5);
+    // fotogramma "fantasma": per un istante si intravede la sagoma vera sotto il deepfake
+    if (ghost) {
+      const trueIdx = ch.shadow !== ch.look ? ch.shadow : ch.prop;
+      const T = AVATARS[trueIdx];
+      ctx.save();
+      ctx.globalAlpha = 0.25 + 0.45 * fl;
+      patternFill(ctx, T, x + 1.5, y - 1, T.r);
+      circle(ctx, x + 1.5, y - 1, T.r, null, g(255), 1.2);
+      ctx.fillStyle = T.lum > 140 ? g(10) : g(250);
+      ctx.font = `bold ${Math.max(8, T.r * 1.05)}px "Courier New", monospace`;
+      ctx.fillText(initials[trueIdx] || T.key, x + 1.5, y - 0.5);
+      ctx.restore();
+    }
   }
 
   function drawJewel(ctx, time) {
@@ -363,60 +386,98 @@
     return { x: r.x + lx * r.s, y: r.y + ly * r.s, s: r.s };
   };
 
+  /** Rettangolo per una camera disegnata dentro un'area arbitraria (es. clip verticale). */
+  Renderer.fitRect = function (x, y, w, h) {
+    const s = Math.min(w / RW, h / RH);
+    return { x: x + (w - RW * s) / 2, y: y + (h - RH * s) / 2, w: RW * s, h: RH * s, s };
+  };
+
   /**
-   * opts: { cs, edits, t, initials, time, selectedCam, mode: 'live'|'edit'|'replay', previewEdits, pins, lasers, botMarks }
+   * opts: { cs, edits, feed?(cam,t), t, initials, time, now, selectedCam, mode: 'live'|'edit'|'replay',
+   *         previewEdits, realEdits, pins, lasers, botMarks, lens, glow?(cam,t), audienceGlitch, banner }
    */
   Renderer.prototype.draw = function (o) {
     const ctx = this.ctx;
     ctx.fillStyle = '#05070a';
     ctx.fillRect(0, 0, CW, CH);
-    const tiles = noise();
     for (let cam = 0; cam < ROOMS.length; cam++) {
       const R = this.feedRect(cam);
       if (!R) continue;
-      const st = IA.feedState(o.cs, o.edits, cam, o.t);
-      ctx.save();
-      ctx.beginPath(); ctx.rect(R.x, R.y, R.w, R.h); ctx.clip();
-      if (st.glitch) {
-        this.drawStatic(R, o.time, tiles);
-      } else {
-        ctx.drawImage(roomBackground(cam), R.x, R.y, R.w, R.h);
-        ctx.save();
-        ctx.translate(R.x, R.y);
-        ctx.scale(R.s, R.s);
-        const rr = IA.roomRect(cam);
-        ctx.translate(-rr.x, -rr.y);
-        if (st.jewel) drawJewel(ctx, o.time);
-        const sorted = st.chars.slice().sort((a, b) => a.y - b.y);
-        for (const ch of sorted) drawCharacter(ctx, ch, o.initials, o.time);
-        if (o.mode === 'replay') this.replayMarks(ctx, o, st, cam);
-        ctx.restore();
-        // pellicola: rumore, scanline, vignetta
-        ctx.globalAlpha = 0.07;
-        ctx.drawImage(tiles[Math.floor(o.time * 24) % 4], R.x - Math.random() * 40, R.y - Math.random() * 40, R.w + 80, R.h + 80);
-        ctx.globalAlpha = 1;
-      }
-      ctx.fillStyle = 'rgba(0,0,0,0.13)';
-      for (let y = R.y; y < R.y + R.h; y += 3) ctx.fillRect(R.x, y, R.w, 1);
-      const vg = ctx.createRadialGradient(R.x + R.w / 2, R.y + R.h / 2, R.h * 0.35, R.x + R.w / 2, R.y + R.h / 2, R.w * 0.72);
-      vg.addColorStop(0, 'rgba(0,0,0,0)');
-      vg.addColorStop(1, 'rgba(0,0,0,0.55)');
-      ctx.fillStyle = vg;
-      ctx.fillRect(R.x, R.y, R.w, R.h);
-      this.hud(R, cam, st, o);
-      ctx.restore();
-      // cornici
-      ctx.lineWidth = 2;
-      if (o.mode === 'replay' && this.editedAt(o, cam)) { ctx.strokeStyle = '#ff3b3b'; ctx.setLineDash([8, 5]); }
-      else if (o.selectedCam === cam) ctx.strokeStyle = '#ffb703';
-      else ctx.strokeStyle = '#1d2733';
-      ctx.strokeRect(R.x + 1, R.y + 1, R.w - 2, R.h - 2);
-      ctx.setLineDash([]);
+      this.drawFeed(ctx, R, cam, o);
     }
     this.drawPins(o);
     this.drawBotMarks(o);
+    this.drawLens(o);
     this.drawLasers(o);
     if (o.banner) this.drawBanner(o.banner);
+  };
+
+  Renderer.prototype.feedAt = function (o, cam) {
+    if (o.feed) return o.feed(cam, o.t);
+    return IA.feedState(o.cs, o.edits, cam, o.t);
+  };
+
+  /** Disegna una telecamera completa (scena, pellicola, HUD, cornice) dentro R su ctx. */
+  Renderer.prototype.drawFeed = function (ctx, R, cam, o) {
+    const tiles = noise();
+    const st = this.feedAt(o, cam);
+    const audience = o.audienceGlitch && o.audienceGlitch.cam === cam && o.now < o.audienceGlitch.until;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(R.x, R.y, R.w, R.h); ctx.clip();
+    if (st.glitch || audience) {
+      this.drawStatic(ctx, R, o.time, tiles, audience && !st.glitch ? 'DISTURBO DALLA CHAT 📺' : 'SEGNALE PERSO');
+    } else {
+      ctx.drawImage(roomBackground(cam), R.x, R.y, R.w, R.h);
+      ctx.save();
+      ctx.translate(R.x, R.y);
+      ctx.scale(R.s, R.s);
+      const rr = IA.roomRect(cam);
+      ctx.translate(-rr.x, -rr.y);
+      if (st.jewel) drawJewel(ctx, o.time);
+      const sorted = st.chars.slice().sort((a, b) => a.y - b.y);
+      for (const ch of sorted) drawCharacter(ctx, ch, o.initials, o.time, o.t);
+      if (o.mode === 'replay') this.replayMarks(ctx, o, st, cam);
+      ctx.restore();
+      ctx.globalAlpha = 0.07;
+      ctx.drawImage(tiles[Math.floor(o.time * 24) % 4], R.x - Math.random() * 40, R.y - Math.random() * 40, R.w + 80, R.h + 80);
+      ctx.globalAlpha = 1;
+      // micro-scatto del taglio: fotogrammi saltati, luce che sfarfalla, righe strappate
+      if (st.lag) {
+        ctx.fillStyle = 'rgba(255,255,255,0.16)';
+        ctx.fillRect(R.x, R.y, R.w, R.h);
+        const k = Math.floor(o.t * 40);
+        for (let b = 0; b < 3; b++) {
+          const by = R.y + (((k * 37 + b * 83) % 100) / 100) * R.h;
+          const bh = 6 + ((k + b) % 4) * 5;
+          const dx = (b % 2 ? 1 : -1) * (5 + (k % 3) * 3) * (R.s / 1.67);
+          ctx.drawImage(ctx.canvas, R.x, by, R.w, bh, R.x + dx, by, R.w, bh);
+        }
+      }
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.13)';
+    for (let y = R.y; y < R.y + R.h; y += 3) ctx.fillRect(R.x, y, R.w, 1);
+    const vg = ctx.createRadialGradient(R.x + R.w / 2, R.y + R.h / 2, R.h * 0.35, R.x + R.w / 2, R.y + R.h / 2, R.w * 0.72);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(R.x, R.y, R.w, R.h);
+    this.hud(ctx, R, cam, st, o);
+    // filtro di movimento (aiuto per principianti): la camera si illumina dove c'è un'anomalia
+    const gl = o.glow ? o.glow(cam, o.t) : 0;
+    if (gl > 0) {
+      const pulse = 0.55 + 0.45 * Math.sin(o.time * 5);
+      ctx.strokeStyle = `rgba(255,190,40,${0.25 + 0.5 * gl * pulse})`;
+      ctx.lineWidth = 10;
+      ctx.strokeRect(R.x + 5, R.y + 5, R.w - 10, R.h - 10);
+    }
+    ctx.restore();
+    ctx.lineWidth = 2;
+    if (o.mode === 'replay' && this.editedAt(o, cam)) { ctx.strokeStyle = '#ff3b3b'; ctx.setLineDash([8, 5]); }
+    else if (o.selectedCam === cam) ctx.strokeStyle = '#ffb703';
+    else ctx.strokeStyle = '#1d2733';
+    ctx.strokeRect(R.x + 1, R.y + 1, R.w - 2, R.h - 2);
+    ctx.setLineDash([]);
+    return st;
   };
 
   Renderer.prototype.editedAt = function (o, cam) {
@@ -428,8 +489,7 @@
     return false;
   };
 
-  Renderer.prototype.drawStatic = function (R, time, tiles) {
-    const ctx = this.ctx;
+  Renderer.prototype.drawStatic = function (ctx, R, time, tiles, label) {
     ctx.fillStyle = '#111';
     ctx.fillRect(R.x, R.y, R.w, R.h);
     for (let k = 0; k < 3; k++) {
@@ -445,7 +505,7 @@
     ctx.fillStyle = 'rgba(0,0,0,0.65)';
     const fs = Math.round(R.h * 0.075);
     ctx.font = `bold ${fs}px "Courier New", monospace`;
-    const txt = 'SEGNALE PERSO';
+    const txt = label || 'SEGNALE PERSO';
     const w = ctx.measureText(txt).width + 24;
     ctx.fillRect(R.x + R.w / 2 - w / 2, R.y + R.h / 2 - fs, w, fs * 2);
     ctx.fillStyle = '#eee';
@@ -454,8 +514,7 @@
     ctx.fillText(txt, R.x + R.w / 2, R.y + R.h / 2);
   };
 
-  Renderer.prototype.hud = function (R, cam, st, o) {
-    const ctx = this.ctx;
+  Renderer.prototype.hud = function (ctx, R, cam, st, o) {
     const fs = Math.max(11, Math.round(R.h * 0.045));
     ctx.font = `bold ${fs}px "Courier New", monospace`;
     ctx.textBaseline = 'top';
@@ -465,7 +524,6 @@
     ctx.fillRect(R.x + 6, R.y + 6, ctx.measureText(label).width + 10, fs + 6);
     ctx.fillStyle = '#e8e8e8';
     ctx.fillText(label, R.x + 11, R.y + 9);
-    // REC
     if (Math.floor(o.time * 1.6) % 2 === 0) {
       ctx.fillStyle = '#ff2a2a';
       ctx.beginPath(); ctx.arc(R.x + R.w - 44, R.y + 9 + fs / 2, fs * 0.32, 0, Math.PI * 2); ctx.fill();
@@ -486,6 +544,35 @@
       ctx.fillStyle = st.glitch ? '#ff6b6b' : '#ffb703';
       ctx.fillText(st.glitch ? '▲ DISTURBO' : `✂ TAGLIO da ${IA.clockText(st.s)}`, R.x + 10, R.y + R.h - 9);
     }
+  };
+
+  Renderer.prototype.drawLens = function (o) {
+    const L = o.lens;
+    if (!L) return;
+    const age = o.now - L.born;
+    if (age > L.life) return;
+    const s = this.toScreen(L.cam, L.lx, L.ly);
+    if (!s) return;
+    const ctx = this.ctx;
+    const rad = (34 + Math.sin(age * 6) * 4) * (s.s / 1.67);
+    ctx.save();
+    ctx.globalAlpha = age > L.life - 0.6 ? (L.life - age) / 0.6 : 1;
+    ctx.strokeStyle = '#7fe0ff';
+    ctx.shadowColor = '#7fe0ff';
+    ctx.shadowBlur = 14;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(s.x, s.y, rad, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(s.x + rad * 0.72, s.y + rad * 0.72);
+    ctx.lineTo(s.x + rad * 1.3, s.y + rad * 1.3);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillStyle = '#7fe0ff';
+    ctx.textAlign = 'center';
+    ctx.fillText('🔍 guarda qui', s.x, s.y - rad - 8);
+    ctx.restore();
   };
 
   Renderer.prototype.replayMarks = function (ctx, o, st, cam) {

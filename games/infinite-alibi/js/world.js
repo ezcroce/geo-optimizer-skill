@@ -20,10 +20,28 @@
     crimeLen: 3, // secondi passati al piedistallo
     jewelTakenAfter: 2, // il gioiello sparisce a Tc + 2 s
     splice: { minLen: 0.5, maxLen: 3, uses: 1 },
-    deepfake: { len: 0.8, uses: 1 },
+    deepfake: { len: 1.2, uses: 1 },
     glitch: { minLen: 0.5, maxLen: 3, uses: 1 },
-    phases: { edit: 45, evidence: 60, trial: 60 },
+    phases: { edit: 45, evidence: 60, trial: 60, overtime: 20 },
+    difficulty: 'normale',
+    // Intensità dei micro-indizi visivi. Si sceglie nel menu (o nella stanza online).
+    //  deepfakeLen: durata del deepfake · flicker: forza dello sfarfallio del deepfake (0..1)
+    //  spliceLag: durata del micro-scatto ai bordi di un taglio · noticeMul: acume dei bot
+    DIFFICULTY: {
+      facile: { label: 'Facile', deepfakeLen: 1.5, flicker: 1.0, spliceLag: 0.25, noticeMul: 1.2 },
+      normale: { label: 'Normale', deepfakeLen: 1.3, flicker: 0.6, spliceLag: 0.15, noticeMul: 1.0 },
+      esperto: { label: 'Esperto', deepfakeLen: 1.2, flicker: 0.3, spliceLag: 0.08, noticeMul: 0.85 },
+    },
+    fx: null,
   };
+  function setDifficulty(name) {
+    const d = CONFIG.DIFFICULTY[name] || CONFIG.DIFFICULTY.normale;
+    CONFIG.difficulty = CONFIG.DIFFICULTY[name] ? name : 'normale';
+    CONFIG.deepfake.len = d.deepfakeLen;
+    CONFIG.fx = d;
+    return d;
+  }
+  setDifficulty('normale');
   const W = CONFIG.roomW;
   const H = CONFIG.roomH;
 
@@ -335,6 +353,18 @@
     };
   }
 
+  /** Iniziali univoche (1–2 lettere) a partire dai nomi dei giocatori. */
+  function makeInitials(names) {
+    const used = {};
+    return names.map((nm, i) => {
+      const clean = String(nm || '').trim() || 'G' + (i + 1);
+      let ini = clean.charAt(0).toUpperCase();
+      if (used[ini]) ini = (clean.charAt(0) + (clean.charAt(1) || String(used[ini] + 1))).toUpperCase().slice(0, 2);
+      used[ini.charAt(0)] = (used[ini.charAt(0)] || 0) + 1;
+      return ini;
+    });
+  }
+
   function charPos(cs, idx, t) {
     return samplePath(cs.chars[idx].keys, t);
   }
@@ -349,6 +379,8 @@
 
   Object.assign(IA, {
     CONFIG,
+    setDifficulty,
+    makeInitials,
     ROOMS,
     STUDIO,
     SPOTS,

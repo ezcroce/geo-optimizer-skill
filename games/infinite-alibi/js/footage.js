@@ -3,7 +3,8 @@
  * Il filmato "reale" è deterministico (world.js). Le manipolazioni sono una piccola struttura:
  *   edits = {
  *     splice:   { cam, t0, len, src0 } | null   // Taglia e Cuci: stessa camera, altro momento
- *     deepfake: { t, victim }          | null   // Sostituzione avatar per CONFIG.deepfake.len s
+ *     deepfake: { t, victim, weak }    | null   // Sostituzione avatar per CONFIG.deepfake.len s
+ *                                              // weak = 'prop' (l'oggetto resta il tuo) | 'shadow' (l'ombra resta la tua)
  *     glitch:   { cam, t0, len }       | null   // Disturbo segnale
  *   }
  * Ogni manipolazione lascia micro-indizi che analyze() trova guardando SOLO ciò che vede
@@ -34,6 +35,16 @@
     if (d && t >= d.t && t < d.t + CONFIG.deepfake.len) return d.victim;
     return -1;
   }
+  function deepfakeWeak(edits) {
+    return (edits && edits.deepfake && edits.deepfake.weak) === 'shadow' ? 'shadow' : 'prop';
+  }
+  /** Micro-scatto (fps drop) ai bordi di un taglio: entro CONFIG.fx.spliceLag s dal salto. */
+  function spliceLagAt(edits, cam, t) {
+    const sp = edits && edits.splice;
+    if (!sp || sp.cam !== cam) return false;
+    const L = CONFIG.fx.spliceLag;
+    return (t >= sp.t0 && t < sp.t0 + L) || (t >= sp.t0 + sp.len && t < sp.t0 + sp.len + L);
+  }
   function jewelPresent(cs, s) {
     return s < cs.jewelGone;
   }
@@ -44,14 +55,21 @@
     const rect = IA.roomRect(cam);
     const chars = [];
     const victim = disguiseAt(edits, t);
+    const weak = deepfakeWeak(edits);
     for (const c of cs.chars) {
       const p = IA.samplePath(c.keys, s);
       const av = AVATARS[c.idx];
       const pad = av.r + 22; // margine per ombra e oggetti che sporgono
       if (p.x < rect.x - pad || p.x > rect.x + rect.w + pad || p.y < rect.y - pad || p.y > rect.y + rect.h + pad) continue;
+      const disguised = c.idx === cs.culprit && victim >= 0;
+      const look = disguised ? victim : c.idx;
       chars.push({
         idx: c.idx,
-        look: c.idx === cs.culprit && victim >= 0 ? victim : c.idx,
+        look,
+        // ombra e oggetto: nel deepfake uno dei due "fallisce" e resta quello del vero colpevole
+        shadow: disguised && weak === 'prop' ? look : c.idx,
+        prop: disguised && weak === 'shadow' ? look : c.idx,
+        disguised,
         x: p.x,
         y: p.y,
         ang: p.ang,
@@ -66,6 +84,7 @@
       s,
       glitch: isGlitched(edits, cam, t),
       spliced: s !== t,
+      lag: spliceLagAt(edits, cam, t),
       jewel: cam === STUDIO ? jewelPresent(cs, s) : null,
       chars,
     };
@@ -89,6 +108,7 @@
     if (d) {
       if (d.victim === cs.culprit || d.victim < 0 || d.victim >= cs.n) errs.push('Vittima del deepfake non valida');
       if (d.t < 0 || d.t + CONFIG.deepfake.len > D + 1e-6) errs.push('Deepfake fuori dal filmato');
+      if (d.weak != null && d.weak !== 'prop' && d.weak !== 'shadow') errs.push('Punto debole del deepfake non valido');
     }
     return errs;
   }
@@ -272,7 +292,7 @@
           const len = end - runStart;
           if (len >= 0.45) {
             const at = lastSeen || (copies[0] ? { cam: copies[0].cam, x: copies[0].x, y: copies[0].y } : { cam: STUDIO, x: PED.x, y: PED.y });
-            const points = { [look]: nearCrime(runStart) || nearCrime(end) ? 3 : 1.5 };
+            const points = { [look]: nearCrime(runStart) || nearCrime(end) ? 2.5 : 1.2 };
             const g = edits.glitch;
             if (g && g.cam === STUDIO && runStart < g.t0 + g.len && end > g.t0) add(points, look, 1);
             push({
@@ -360,7 +380,16 @@
         type: 'timestamp', cam: sp.cam, t: sp.t0, t2: sp.t0 + sp.len, lx: 196, ly: 168,
         text: `Il timestamp della CAM ${sp.cam + 1} (${ROOMS[sp.cam].name}) salta da :${a} a :${b} e poi da :${sec(sp.src0 + sp.len - DT)} a :${sec(sp.t0 + sp.len)}: quei ${sp.len.toFixed(1)} s sono incollati da un altro momento.`,
         say: `Guardate l'orologio della CAM ${sp.cam + 1}! Salta da ${a} a ${b}!`,
-        notice: off >= 2 ? 0.5 : 0.25, points,
+        notice: off >= 2 ? 0.45 : 0.22, points,
+      });
+      // il micro-scatto è un secondo indizio, visivo: non serve leggere l'orologio
+      const lagPoints = {};
+      for (const k in points) lagPoints[k] = points[k] * 0.4;
+      push({
+        type: 'splice-lag', cam: sp.cam, t: sp.t0, t2: sp.t0 + sp.len, lx: 120, ly: 90,
+        text: `La CAM ${sp.cam + 1} (${ROOMS[sp.cam].name}) fa un micro-scatto alle ${IA.clockText(sp.t0)} e alle ${IA.clockText(sp.t0 + sp.len)}: l'immagine trema e la luce sfarfalla, come se mancassero dei fotogrammi.`,
+        say: `Avete visto lo scatto sulla CAM ${sp.cam + 1}? L'immagine trema proprio lì: è un taglio!`,
+        notice: Math.min(0.6, 0.35 * (CONFIG.fx.spliceLag / 0.15)), points: lagPoints,
       });
     }
 
@@ -390,18 +419,31 @@
         if (!copy) continue;
         const cul = AVATARS[cs.culprit];
         const vic = AVATARS[df.victim];
-        const big = cul.prop === 'hat' || cul.prop === 'umbrella';
+        const weak = deepfakeWeak(edits);
+        const fl = CONFIG.fx.flicker;
+        if (weak === 'prop') {
+          const big = cul.prop === 'hat' || cul.prop === 'umbrella';
+          push({
+            type: 'deepfake-prop', cam: copy.cam, t: smp.t, ...local(copy.cam, copy.x, copy.y), who: df.victim,
+            text: `Alle ${IA.clockText(smp.t)} "${nm(cs, df.victim)}" in ${ROOMS[copy.cam].name} ha ${PROP_NAMES[cul.prop]}... ma quello è di ${nm(cs, cs.culprit)}!`,
+            say: `Quella non è ${nm(cs, df.victim)}! Guardate cosa tiene: ${PROP_NAMES[cul.prop]} di ${nm(cs, cs.culprit)}!`,
+            notice: big ? 0.52 : 0.42, points: { [cs.culprit]: 5, [df.victim]: -3 },
+          });
+        } else {
+          const diff = Math.abs(cul.r - vic.r) >= 2;
+          push({
+            type: 'deepfake-shadow', cam: copy.cam, t: smp.t, ...local(copy.cam, copy.x + cul.h * 2, copy.y + cul.h * 1.5), who: df.victim,
+            text: `L'ombra di "${nm(cs, df.victim)}" alle ${IA.clockText(smp.t)} non corrisponde alla sua sagoma: ${diff ? (cul.r > vic.r ? 'è troppo grande' : 'è troppo piccola') : 'ha una forma diversa'}${cul.prop === 'hat' || cul.prop === 'umbrella' ? ` e ha la forma del${cul.prop === 'hat' ? ' cappello' : "l'ombrello"} di ${nm(cs, cs.culprit)}` : ''}.`,
+            say: `L'ombra non torna! Quella sagoma non è di ${nm(cs, df.victim)}!`,
+            notice: diff ? 0.36 : 0.26, points: { [df.victim]: -3, [cs.culprit]: 3 },
+          });
+        }
+        // sfarfallio costante: per un istante si intravede la sagoma vera
         push({
-          type: 'deepfake-prop', cam: copy.cam, t: smp.t, ...local(copy.cam, copy.x, copy.y), who: df.victim,
-          text: `Alle ${IA.clockText(smp.t)} "${nm(cs, df.victim)}" in ${ROOMS[copy.cam].name} ha ${PROP_NAMES[cul.prop]}... ma quello è di ${nm(cs, cs.culprit)}!`,
-          say: `Quella non è ${nm(cs, df.victim)}! Guardate cosa tiene: ${PROP_NAMES[cul.prop]} di ${nm(cs, cs.culprit)}!`,
-          notice: big ? 0.55 : 0.42, points: { [cs.culprit]: 6, [df.victim]: -4 },
-        });
-        push({
-          type: 'deepfake-shadow', cam: copy.cam, t: smp.t, ...local(copy.cam, copy.x + cul.h * 2, copy.y + cul.h * 1.5), who: df.victim,
-          text: `L'ombra di "${nm(cs, df.victim)}" alle ${IA.clockText(smp.t)} non corrisponde alla sua sagoma: ${Math.abs(cul.r - vic.r) >= 2 ? (cul.r > vic.r ? 'è troppo grande' : 'è troppo piccola') : 'ha una forma diversa'}.`,
-          say: `L'ombra non torna! Quella sagoma non è di ${nm(cs, df.victim)}!`,
-          notice: Math.abs(cul.r - vic.r) >= 2 ? 0.35 : 0.2, points: { [df.victim]: -3, [cs.culprit]: 2 },
+          type: 'deepfake-flicker', cam: copy.cam, t: smp.t, t2: df.t + CONFIG.deepfake.len, ...local(copy.cam, copy.x, copy.y), who: df.victim,
+          text: `"${nm(cs, df.victim)}" sfarfalla alle ${IA.clockText(smp.t)}: per un attimo, sotto, si intravede la sagoma di ${nm(cs, cs.culprit)}.`,
+          say: `"${nm(cs, df.victim)}" sfarfalla! Sotto c'è qualcun altro!`,
+          notice: Math.min(0.7, (weak === 'shadow' ? 0.45 : 0.3) * (fl / 0.6)), points: { [df.victim]: -1.5, [cs.culprit]: 1.5 },
         });
         break;
       }
@@ -440,15 +482,28 @@
         for (let i = 0; i < cs.n; i++) b.bias[i] = rng.gauss() * BIAS;
         botScores(cs, clues, b).forEach((v, i) => (cons[i] += v));
       }
-      const votes = new Array(cs.n).fill(0);
-      for (const b of bots) votes[botVote(cs, clues, b, rng)]++;
-      votes[botVote(cs, clues, { idx: cs.culprit, bias: [], noticed: new Set() }, rng, true, cons)]++;
-      const max = Math.max.apply(null, votes);
-      if (votes[cs.culprit] === max && votes.filter((v) => v === max).length === 1) convicted++;
+      const cbot = { idx: cs.culprit, bias: [], noticed: new Set() };
+      const round = (cands) => {
+        const votes = new Array(cs.n).fill(0);
+        for (const b of bots) { const v = botVote(cs, clues, b, rng, false, null, cands); if (v >= 0) votes[v]++; }
+        const cv = botVote(cs, clues, cbot, rng, true, cons, cands);
+        if (cv >= 0) votes[cv]++;
+        return tallyResult(votes);
+      };
+      let r = round(null);
+      if (r.tied) r = round(r.top); // tempi supplementari: ballottaggio fra i più votati
+      if (r.convicted === cs.culprit) convicted++;
     }
     return convicted / trials;
   }
-  const BIAS = 1.5; // "istinto" personale di ogni bot
+  /** Maggioranza relativa. Pareggio → tied (si va ai tempi supplementari). */
+  function tallyResult(votes) {
+    const max = Math.max.apply(null, votes);
+    const top = [];
+    votes.forEach((v, i) => { if (v === max && max > 0) top.push(i); });
+    return { votes, top, tied: top.length > 1, convicted: top.length === 1 ? top[0] : -1 };
+  }
+  const BIAS = 1.8; // "istinto" personale di ogni bot
 
   function dangerLabel(p) {
     if (p >= 0.65) return { label: 'ALTO', level: 2 };
@@ -460,7 +515,8 @@
     return { idx, skill: 0.75 + rng.next() * 0.4, noticed: new Set(), bias: new Array(8).fill(0) };
   }
   function botObserve(bot, clues, rng) {
-    for (const c of clues) if (rng.next() < Math.min(0.98, c.notice * bot.skill)) bot.noticed.add(c.id);
+    const mul = (CONFIG.fx && CONFIG.fx.noticeMul) || 1;
+    for (const c of clues) if (rng.next() < Math.min(0.98, c.notice * bot.skill * mul)) bot.noticed.add(c.id);
   }
   function botScores(cs, clues, bot) {
     const s = new Array(cs.n).fill(0);
@@ -468,13 +524,15 @@
     for (let i = 0; i < cs.n; i++) s[i] += bot.bias[i] || 0;
     return s;
   }
-  function botVote(cs, clues, bot, rng, isCulpritBot, consensus) {
+  /** candidates (opzionale): ballottaggio dei tempi supplementari, si vota solo fra loro. */
+  function botVote(cs, clues, bot, rng, isCulpritBot, consensus, candidates) {
     let best = -1;
     let bestV = -Infinity;
     const s = isCulpritBot && consensus ? consensus : botScores(cs, clues, bot);
     for (let i = 0; i < cs.n; i++) {
+      if (candidates && !candidates.includes(i)) continue;
       if (i === bot.idx) continue;
-      if (isCulpritBot && i === cs.culprit) continue;
+      if (isCulpritBot && i === cs.culprit && !(candidates && candidates.length === 2 && candidates.includes(bot.idx))) continue;
       const v = s[i] + rng.gauss() * 0.8;
       if (v > bestV) { bestV = v; best = i; }
     }
@@ -512,7 +570,7 @@
   const r1 = (v) => Math.round(v * 10) / 10;
 
   function aiEdits(cs, rng, tries) {
-    tries = tries || 70;
+    tries = tries || 90;
     const { tin, tout } = culpritWindow(cs);
     const L = CONFIG.splice.maxLen;
     const innocents = [];
@@ -542,7 +600,7 @@
     for (let k = 0; k < 4; k++) {
       dfOpts.push(() => {
         const t = r1(rng.range(Math.max(0, tin - 2), Math.min(D - 1, tout + 1)));
-        return { t, victim: rng.pick(innocents) };
+        return { t, victim: rng.pick(innocents), weak: rng.next() < 0.5 ? 'prop' : 'shadow' };
       });
     }
 
@@ -562,7 +620,138 @@
     return top.length ? rng.pick(top).edits : emptyEdits();
   }
 
+  // ---------------------------------------------------------------------------
+  // Filmato "precotto" per l'online: il server manda ai client SOLO ciò che si vede,
+  // mai i percorsi reali né l'identità del colpevole (anti-cheat).
+  // frames[cam][i] = { s, g, l, j, c: [[look, shadow, prop, x, y, ang, moving, crime], ...] }  (niente identità reale)
+  // ---------------------------------------------------------------------------
+  const r2 = (v) => Math.round(v * 100) / 100;
+  function bakeFootage(cs, edits, dt) {
+    dt = dt || 0.1;
+    const N = Math.round(D / dt);
+    const frames = [];
+    for (let cam = 0; cam < ROOMS.length; cam++) {
+      const arr = [];
+      for (let i = 0; i <= N; i++) {
+        const t = Math.min(D, i * dt);
+        const st = feedState(cs, edits, cam, t);
+        arr.push({
+          s: r2(st.s),
+          g: st.glitch ? 1 : 0,
+          l: st.lag ? 1 : 0,
+          j: st.jewel ? 1 : 0,
+          // niente identità reale né flag "travestito": solo ciò che si vede (aspetto, ombra, oggetto)
+          c: st.glitch ? [] : st.chars.map((ch) => [ch.look, ch.shadow, ch.prop, r1(ch.x), r1(ch.y), r2(ch.ang), ch.moving ? 1 : 0, ch.crime ? 1 : 0]),
+        });
+      }
+      frames.push(arr);
+    }
+    return { v: 1, dt, duration: D, deepfakeLen: CONFIG.deepfake.len, frames };
+  }
+  function unpackChar(a) {
+    return { look: a[0], shadow: a[1], prop: a[2], x: a[3], y: a[4], ang: a[5], moving: !!a[6], crime: !!a[7], disguised: a[1] !== a[0] || a[2] !== a[0], inRoom: true };
+  }
+  function bakedFeedState(baked, cam, t) {
+    const fr = baked.frames[cam];
+    const pos = Math.max(0, Math.min(fr.length - 1, Math.round((t / baked.dt) * 1e4) / 1e4));
+    const i = Math.floor(pos);
+    const f = pos - i;
+    const A = fr[i];
+    const B = fr[Math.min(fr.length - 1, i + 1)];
+    const cont = Math.abs(B.s - A.s - baked.dt) < 0.02;
+    const chars = A.c.map((a) => {
+      const ch = unpackChar(a);
+      if (cont && f > 0) {
+        const b = B.c.find((x) => x[0] === a[0] && x[2] === a[2]);
+        if (b && Math.hypot(b[3] - a[3], b[4] - a[4]) < 30) { ch.x = a[3] + (b[3] - a[3]) * f; ch.y = a[4] + (b[4] - a[4]) * f; }
+      }
+      return ch;
+    });
+    return { cam, t, s: cont ? A.s + f * baked.dt : A.s, glitch: !!A.g, spliced: false, lag: !!A.l, jewel: cam === STUDIO ? !!A.j : null, chars };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Consigli narrativi dei complici (sostituiscono la barra di rischio numerica)
+  // ---------------------------------------------------------------------------
+  const ACCOMPLICES = ['il Socio', 'la Talpa', 'Zio Montatore'];
+  function culpritAdvice(cs, clues, rng) {
+    const cul = cs.culprit;
+    const R = (cam) => `CAM 0${cam + 1} (${ROOMS[cam].name})`;
+    const T = (t) => IA.clockText(t).slice(3);
+    const lines = [];
+    const add = (risk, text) => lines.push({ risk, text });
+    for (const c of clues) {
+      const p = c.points[cul] || 0;
+      const risk = c.notice * (p > 0 ? p : 0.6);
+      switch (c.type) {
+        case 'crime': if (p > 0) add(risk, `Ti si vede allungare la mano sul gioiello alle ${T(c.t)}! Copri quel momento con un taglio o un glitch.`); break;
+        case 'presence': if (c.who === cul) add(risk, `Sei inquadrato nello Studio alle ${T(c.t)}. Cancellati con un taglio, o mettici la faccia di qualcun altro.`); break;
+        case 'missing': if (c.who === cul) add(risk, `Sparisci da tutte le camere per ${(c.t2 - c.t).toFixed(1)} s (${T(c.t)}–${T(c.t2)}). Chi conta le teste se ne accorge: fatti vedere altrove, magari con un alibi incollato.`); break;
+        case 'timestamp': add(risk, `L'orologio della ${R(c.cam)} salta. Una sorgente più vicina nel tempo farebbe meno rumore, ma nasconderebbe meno.`); break;
+        case 'splice-lag': add(risk * 0.8, `Il taglio fa uno scatto visibile sulla ${R(c.cam)}. Se cade quando la stanza è vuota, quasi nessuno lo guarda.`); break;
+        case 'glitch': add(risk * 0.7, c.cam === STUDIO ? 'I bot odiano i glitch nello Studio: tutti guarderanno lì. Prova a tagliare una stanza vicina, invece.' : `Un glitch sulla ${R(c.cam)} attira tutti gli sguardi. E chi non si vede altrove... era lì.`); break;
+        case 'teleport': if (c.who === cul || p > 0) add(risk, `Attento: passi da una stanza all'altra in un lampo (${T(c.t)}). Nessuno corre così veloce.`); break;
+        case 'duplicate': if (p > 0) add(risk, `Alle ${T(c.t)} compari in due stanze insieme: una copia è di troppo.`); break;
+        case 'deepfake-prop': add(risk, `Nel deepfake hai ancora in mano ${PROP_NAMES[AVATARS[cul].prop]}. Qualcuno lo noterà... oppure fai fallire l'ombra al posto dell'oggetto.`); break;
+        case 'deepfake-shadow': add(risk, "L'ombra del deepfake resta la tua: è sottile, ma così l'avatar sfarfalla di più."); break;
+        case 'deepfake-flicker': add(risk * 0.8, `Il deepfake sfarfalla alle ${T(c.t)}. Fallo cadere quando sei in movimento e lontano dal centro della scena.`); break;
+        case 'jewel-alone': add(risk, `Il gioiello svanisce da solo alle ${T(c.t)}: firma evidente di un montaggio. Sposta il taglio.`); break;
+        case 'jewel-back': add(risk, `Il gioiello ricompare dopo il furto alle ${T(c.t)}. Ops.`); break;
+        case 'jewel-glitch': add(risk * 0.6, "Il gioiello sparisce durante il disturbo: tutti capiranno quando è successo. Almeno non si vede chi."); break;
+      }
+    }
+    lines.sort((a, b) => b.risk - a.risk);
+    const off = rng ? rng.int(ACCOMPLICES.length) : 0;
+    const out = lines.slice(0, 3).map((l, k) => ({ who: ACCOMPLICES[(off + k) % ACCOMPLICES.length], text: l.text, risk: l.risk }));
+    // buona notizia: l'innocente su cui ricadono i sospetti
+    const e = expectedScores(cs, clues);
+    let best = -1;
+    e.forEach((v, i) => { if (i !== cul && v > 0.8 && (best < 0 || v > e[best])) best = i; });
+    if (best >= 0) out.push({ who: ACCOMPLICES[(off + out.length) % ACCOMPLICES.length], text: `Ottimo: i sospetti cadono su ${nm(cs, best)}. Al processo spingi su di lui/lei.`, risk: -1 });
+    if (!out.length) out.push({ who: ACCOMPLICES[0], text: 'Hai cancellato le tue tracce? Pulito. Forse troppo pulito... ma per ora nessuno ti punta il dito.', risk: 0 });
+    return out;
+  }
+  // Aiuti per principianti (Detective / online): finestre di anomalia per il "filtro di movimento"
+  // e bersagli ordinati per le lenti d'ingrandimento automatiche. Indica DOVE guardare, non CHI.
+  const HINT_TYPES = ['timestamp', 'splice-lag', 'teleport', 'duplicate', 'missing', 'deepfake-prop', 'deepfake-shadow', 'deepfake-flicker', 'jewel-alone', 'jewel-back', 'jewel-glitch'];
+  function anomalyHints(cs, clues) {
+    const glow = [];
+    for (const c of clues) {
+      if (!HINT_TYPES.includes(c.type)) continue;
+      if (c.type === 'missing') continue; // un'assenza non "si illumina" su una camera precisa
+      glow.push({ cam: c.cam, t0: Math.max(0, c.t - 0.3), t1: c.t + 0.7 });
+      if (c.t2 != null && (c.type === 'timestamp' || c.type === 'splice-lag')) glow.push({ cam: c.cam, t0: Math.max(0, c.t2 - 0.3), t1: c.t2 + 0.7 });
+    }
+    const lens = clues.filter((c) => HINT_TYPES.includes(c.type) && c.type !== 'missing')
+      .sort((a, b) => b.notice - a.notice)
+      .map((c) => ({ cam: c.cam, t: c.t, lx: c.lx, ly: c.ly, type: c.type }));
+    return { glow, lens };
+  }
+  function glowAt(glow, cam, t) {
+    let v = 0;
+    for (const w of glow || []) {
+      if (w.cam !== cam || t < w.t0 - 0.4 || t > w.t1 + 0.4) continue;
+      v = Math.max(v, t < w.t0 ? 1 - (w.t0 - t) / 0.4 : t > w.t1 ? 1 - (t - w.t1) / 0.4 : 1);
+    }
+    return v;
+  }
+
+  function moodLabel(p) {
+    if (p >= 0.65) return { label: 'nel panico', icon: '😱', level: 2 };
+    if (p >= 0.35) return { label: 'nervoso', icon: '😬', level: 1 };
+    return { label: 'tranquillo', icon: '😎', level: 0 };
+  }
+
   Object.assign(IA, {
+    anomalyHints,
+    glowAt,
+    bakeFootage,
+    bakedFeedState,
+    culpritAdvice,
+    moodLabel,
+    tallyResult,
+    spliceLagAt,
+    deepfakeWeak,
     emptyEdits,
     sourceTime,
     isGlitched,

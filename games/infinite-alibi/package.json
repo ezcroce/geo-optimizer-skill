@@ -1,0 +1,17 @@
+{
+  "name": "infinite-alibi",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Infinite Alibi — gioco di deduzione sociale da 3 minuti con server online autoritativo",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node tests/sim.test.js && node tests/server.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

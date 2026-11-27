@@ -246,3 +246,6 @@ footer a { color: var(--mute); }
 .xh-card span { position: absolute; left: 12px; top: 10px; font-size: 11px; color: var(--mute); }
 .xh-note { color: var(--mute); margin-top: 14px; font-size: 14px; }
 @media (max-width: 900px) { .xh-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* v40: skin da sbloccare */
+.skin .lk { position: absolute; top: 10px; left: 10px; background: rgba(10,14,40,.8); color: #fff; font-size: 10px; font-weight: 900; padding: 3px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); }

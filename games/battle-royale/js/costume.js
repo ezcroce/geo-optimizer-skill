@@ -556,6 +556,27 @@ function hangSword(ctx, sw, blade, guard, back, out) {
   return attach(ctx, 'Hips', sw, tip, new THREE.Quaternion().setFromUnitVectors(v3(0, 1, 0), dir));
 }
 
+/** v40: corona d'alloro attorno alla testa (due rami di foglie a coppie che si incontrano sulla fronte) */
+function laurel(ctx, M, m) {
+  const hc = M.hc, E = M.eye, R = M.hw + 0.016, ZK = ((M.front - M.back) / 2 + 0.016) / R, cz = (M.front + M.back) / 2, y0 = E.y + 0.075;
+  const leaves = [], E3 = new THREE.Euler(0, 0, 0, 'YXZ'), Q = new THREE.Quaternion(), M4 = new THREE.Matrix4();
+  for (const sd of [-1, 1]) for (let k = 0; k < 13; k++) {
+    const a = Math.PI - 0.15 - k * (Math.PI - 0.5) / 12;
+    const dx = -sd * Math.cos(a), dz = ZK * Math.sin(a), yaw = Math.atan2(dx, dz), dir = v3(dx, 0, dz).normalize();
+    const L = 0.018 + 0.008 * (k / 12);
+    for (const [dy, pitch] of [[0.008, -0.6], [-0.006, 0.5]]) {
+      E3.set(pitch, yaw, sd * 0.3); Q.setFromEuler(E3);
+      const P = v3(hc.x + sd * Math.sin(a) * (R + 0.004), y0 + dy - Math.cos(a) * 0.012, cz + Math.cos(a) * R * ZK).addScaledVector(dir, L * 0.6);
+      leaves.push(rigid(new THREE.SphereGeometry(1, 8, 6).applyMatrix4(M4.compose(P, Q, v3(0.0026, 0.0085, L)))));
+    }
+  }
+  const ring = new THREE.TorusGeometry(R, 0.0035, 4, 40, Math.PI * 2 - 0.7); ring.rotateX(Math.PI / 2); ring.rotateY(-(Math.PI / 2 + 0.35)); ring.scale(1, 1, ZK);
+  { const q = ring.attributes.position; for (let i = 0; i < q.count; i++) q.setY(i, q.getY(i) - (q.getZ(i) / (R * ZK)) * 0.012); }
+  ring.translate(hc.x, y0, cz);
+  leaves.push(rigid(ring));
+  attach(ctx, 'Head', mesh(mergeG(leaves), m, 'alloro'));
+}
+
 // ═════════ costumi ═════════
 const COSTUMES = {
   // ── Drago Rosso: pelle a scaglie, muso, corna all'indietro, ali membranose, coda con punta a freccia ──
@@ -1081,6 +1102,242 @@ const COSTUMES = {
     attach(ctx, 'Head', mesh(crown, felt, 'cappello'));
     attach(ctx, 'Head', mesh(brim, felt, 'falda'));
     attach(ctx, 'Head', mesh(rigid(new THREE.CylinderGeometry(r0 + 0.004, r0 + 0.005, 0.016, 28, 1, true).scale(0.95, 1, 1.18).translate(base.x, base.y + 0.012, base.z)), MAT.leather('#2a1a10'), 'nastro'));
+  },
+  // ═════════ v40: Stagione 2 · Il Colosseo ═════════
+  // ── Gladiatore: corazza muscolare di bronzo, gonnellino a strisce di cuoio, manica, schinieri, elmo con cresta, gladio ──
+  gladiatore(ctx, M) {
+    hideMesh(ctx, 'short02');
+    const body = ctx.meshes.body, J = M.J, E = M.eye, hc = M.hc, hy = J.Hips.y;
+    const kn = J.LeftLeg, an = J.LeftFoot, sx = J.LeftArm ? Math.abs(J.LeftArm.x) : 0.17;
+    const cuir = pmat('gladCuirass', { color: '#b67c3c', rough: 0.34, metal: 0.82, envI: 2.0, code: `
+      float ax = abs(p.x), fr = step(0.0, n.z);
+      float pec = (1.0 - smoothstep(0.0, 0.006, abs(length(vec2((ax - 0.068) / 1.25, p.y - ${f4(J.Spine2.y + 0.01)})) - 0.07))) * fr * step(p.y, ${f4(J.Spine2.y + 0.01)});
+      float ab = (1.0 - smoothstep(0.0, 0.005, abs(fract((p.y - ${f4(hy + 0.03)}) / 0.055) - 0.5) - 0.45)) * step(ax, 0.065) * step(p.y, ${f4(J.Spine2.y - 0.07)}) * fr;
+      float mid = (1.0 - smoothstep(0.0, 0.004, ax)) * fr * step(p.y, ${f4(J.Spine2.y - 0.04)});
+      float g = pec + ab + mid;
+      H = hammered(p) * 0.6 - g * 0.0016;
+      col *= 1.0 - g * 0.3;
+      float rim = 1.0 - smoothstep(0.0, 0.01, min(p.y - ${f4(hy + 0.035)}, ${f4(J.Neck.y - 0.025)} - p.y));
+      col = mix(col, vec3(0.16, 0.08, 0.025), rim * 0.7); H += rim * 0.0008;` });
+    shell(body, 'corazza', cuir, {
+      sel: (p, n, b) => (!isArm(b) || (/Shoulder/.test(b) && Math.abs(p.x) < sx - 0.05)) && !isLeg(b) && !/Head|Neck/.test(b) && p.y > hy + 0.035 && p.y < J.Neck.y - 0.025,
+      off: () => 0.026, edge: (p) => Math.min(p.y - hy - 0.035, J.Neck.y - 0.025 - p.y) });
+    // spallacci di cuoio sopra le spalle
+    // gonnellino a strisce (pteruges) con cintura e borchie
+    const pt = pmat('gladPteruges', { color: '#5a3018', rough: 0.6, code: `
+      float s = atan(p.x, p.z) * 0.16 / 0.034; float f = fract(s);
+      float low = step(p.y, ${f4(hy - 0.04)});
+      CLIP = low > 0.5 && (f < 0.06 || f > 0.94);
+      float stud = 1.0 - smoothstep(0.004, 0.006, length(vec2((f - 0.5) * 0.034, p.y - ${f4(hy - 0.2)})));
+      col = col * (0.82 + vnoise(p * 40.0) * 0.3);
+      col = mix(col, vec3(0.86, 0.62, 0.3), stud); MET = stud * 0.9; RGH = mix(0.6, 0.3, stud);
+      float belt = step(${f4(hy - 0.025)}, p.y);
+      col = mix(col, vec3(0.05, 0.025, 0.012), belt);
+      H = fbm(p * 140.0) * 0.0005 + stud * 0.0012 - (1.0 - smoothstep(0.0, 0.006, abs(p.y - ${f4(hy - 0.025)}))) * 0.0008;` });
+    shell(body, 'gonnellino', pt, { sel: (p, n, b) => !isArm(b) && p.y > hy - 0.23 && p.y < hy + 0.06,
+      off: (p) => 0.036 + Math.max(0, hy - p.y) * 0.2, edge: (p) => Math.min(p.y - (hy - 0.23), hy + 0.06 - p.y) });
+    // schinieri di bronzo sugli stinchi
+    const grv = pmat('gladGreave', { color: '#b67c3c', rough: 0.34, metal: 0.82, envI: 2.0, code: `
+      float ridge = (1.0 - smoothstep(0.0, 0.01, abs(p.x - sign(p.x) * 0.09))) * step(0.3, n.z);
+      H = hammered(p) * 0.6 + ridge * 0.0015;
+      float rim = 1.0 - smoothstep(0.0, 0.008, min(p.y - ${f4(an.y + 0.06)}, ${f4(kn.y + 0.05)} - p.y));
+      col = mix(col, vec3(0.16, 0.08, 0.025), rim * 0.7);` });
+    shell(body, 'schinieri', grv, { sel: (p, n, b) => /Leg/.test(b) && !/UpLeg/.test(b) && p.y > an.y + 0.06 && p.y < kn.y + 0.05, off: () => 0.024,
+      edge: (p) => Math.min(p.y - an.y - 0.06, kn.y + 0.05 - p.y) });
+    // manica a lamine sul braccio destro
+    const man = pmat('gladManica', { color: '#a8acb2', rough: 0.3, metal: 0.92, envI: 1.6, code: `
+      float r = fract(p.y / 0.032); float edge = 1.0 - smoothstep(0.0, 0.12, r);
+      H = edge * 0.0014 + hammered(p) * 0.4; col *= 1.0 - edge * 0.35;` });
+    shell(body, 'manica', man, { sel: (p, n, b) => /RightArm|RightForeArm/.test(b) && p.y < J.RightArm.y + 0.02, off: () => 0.02 });
+    // elmo: calotta, tesa larga, paraguance e cresta di piume rosse
+    const cy = E.y + 0.03, rx = M.hw + 0.026, rz = (M.front - M.back) / 2 + 0.022, czc = (M.front + M.back) / 2 - 0.004, ry = M.top + 0.03 - cy;
+    const bronze = pmat('gladHelm', { color: '#b67c3c', rough: 0.3, metal: 0.85, envI: 2.2, side: THREE.DoubleSide, code: `H = hammered(p) * 0.6;` });
+    attach(ctx, 'Head', mesh(rigid(new THREE.SphereGeometry(1, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2).scale(rx, ry, rz).translate(hc.x, cy, czc)), bronze, 'elmo'));
+    const brim = surf((u, v) => { const a = u * Math.PI * 2, R = 1 + v * 0.42, back = Math.max(0, -Math.cos(a)); return [hc.x + Math.sin(a) * rx * R, cy - v * v * (0.02 + back * 0.06), czc + Math.cos(a) * rz * R]; }, 48, 4, false);
+    attach(ctx, 'Head', mesh(brim, bronze, 'tesa'));
+    attach(ctx, 'Head', mesh(rigid(new THREE.TorusGeometry(1, 0.012, 6, 48).rotateX(Math.PI / 2).scale(rx * 1.42, 1, rz * 1.42).translate(hc.x, cy - 0.02, czc)), bronze, 'bordo'));
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Shape(); sh.moveTo(-0.045, 0.03); sh.lineTo(0.04, 0.03); sh.quadraticCurveTo(0.05, -0.05, 0.015, -0.1); sh.quadraticCurveTo(-0.03, -0.08, -0.045, 0.03);
+      const g = rigid(new THREE.ExtrudeGeometry(sh, { depth: 0.006, bevelEnabled: true, bevelThickness: 0.002, bevelSize: 0.002, bevelSegments: 1, curveSegments: 8 }));
+      g.rotateY(s * Math.PI / 2 - s * 0.2); g.translate(hc.x + s * (rx - 0.012), cy - 0.035, czc + rz * 0.35);
+      attach(ctx, 'Head', mesh(rigid(g), bronze, 'paraguance'));
+    }
+    const crest = surf((u, v) => { const a = -1.15 + u * 2.3; return [hc.x, cy + Math.cos(a) * ry + 0.008 + v * (0.1 + 0.02 * Math.cos(a)), czc + Math.sin(a) * rz * 1.02 + v * 0.02 * Math.sin(a)]; }, 24, 4, false);
+    attach(ctx, 'Head', mesh(crest, MAT.plume('#b8141e'), 'cresta'));
+    attach(ctx, 'Head', mesh(taper([v3(hc.x, cy + ry * Math.cos(1.1), czc + Math.sin(-1.1) * rz), v3(hc.x, cy + ry + 0.004, czc), v3(hc.x, cy + ry * Math.cos(1.1), czc + Math.sin(1.1) * rz)], () => 0.009, 20, 6), bronze, 'portacresta'));
+    // gladio al fianco
+    hangSword(ctx, longsword(0.66, MAT.wood('#5a3a1e'), MAT.gold()), 0.66 * 0.75, v3(0.235, hy + 0.0, J.Hips.z + 0.06), 0.3, 0.12);
+  },
+
+  // ── Imperatore: toga bianca con la banda porpora, mantello porpora, corona d'alloro d'oro, fibula ──
+  imperatore(ctx, M) {
+    hideMesh(ctx, 'glasses');
+    const body = ctx.meshes.body, J = M.J, E = M.eye, hc = M.hc, hy = J.Hips.y, kn = J.LeftLeg;
+    const low = kn.y - 0.14;
+    const fold = (p) => Math.sin((p.x * 0.7 + p.y) * 38.0) * 0.006;
+    const toga = pmat('toga', { color: '#efe9dc', rough: 0.85, code: `
+      float d = (p.y - ${f4(hy + 0.28)}) + p.x * 1.05;
+      float band = 1.0 - smoothstep(0.03, 0.036, abs(d - 0.0));
+      float hem = 1.0 - smoothstep(0.0, 0.006, p.y - ${f4(low + 0.04)});
+      float pr = max(band * step(${f4(hy - 0.05)}, p.y), hem);
+      col = mix(vec3(0.8, 0.77, 0.69), vec3(0.4, 0.07, 0.36), pr);
+      float f = sin((p.x * 0.7 + p.y) * 38.0);
+      col *= 0.86 + 0.14 * (f * 0.5 + 0.5);
+      H = cloth(p) * 1.3 + f * 0.0012;` });
+    const elY = (J.LeftForeArm ? J.LeftForeArm.y : hy + 0.2) + 0.03;
+    shell(body, 'toga', toga, {
+      sel: (p, n, b) => !/Hand|Head|Foot|Toe|Neck/.test(b) && (!isArm(b) || p.y > elY) && p.y > low && p.y < J.Neck.y - 0.02,
+      off: (p) => 0.022 + Math.max(0, hy - p.y) * 0.1 + fold(p) * 0.6, edge: (p, n, b) => (isArm(b) && !/Shoulder/.test(b) ? p.y - elY : Math.min(p.y - low, J.Neck.y - 0.02 - p.y)) });
+    // mantello porpora dalle spalle
+    const S2 = J.Spine2;
+    const capeG = surf((u, v) => {
+      const w = 0.19 + v * 0.16, x = (u - 0.5) * 2 * w, y = J.Neck.y - 0.05 - v * 1.02;
+      const z = S2.z - 0.15 - v * 0.12 - Math.cos((u - 0.5) * Math.PI) * 0.05 * (1 - v * 0.4) + Math.sin(u * Math.PI * 7) * 0.016 * v;
+      return [x, y, z];
+    }, 18, 12, false);
+    attach(ctx, 'Spine2', mesh(capeG, MAT.cape('#4a1050'), 'mantello'));
+    // fibule d'oro sulle spalle
+    for (const s of [-1, 1]) attach(ctx, 'Spine2', mesh(rigid(new THREE.SphereGeometry(0.026, 14, 8).scale(1, 1, 0.5).translate(s * 0.12, J.Neck.y - 0.045, S2.z + 0.075)), MAT.gold(), 'fibula'));
+    // corona d'alloro
+    laurel(ctx, M, MAT.gold());
+  },
+
+  // ── Arlecchino: costume a losanghe colorate, maschera nera, bicorno, gorgiera bianca ──
+  arlecchino(ctx, M) {
+    hideMesh(ctx, 'glasses');
+    const body = ctx.meshes.body, J = M.J, E = M.eye, hc = M.hc;
+    const suit = meshBy(ctx, 'suit');
+    if (suit) {
+      addRest(suit);
+      suit.material = pmat('harlequin', { code: `
+        float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+        if (l < 0.25) {
+          float s = atan(p.x, p.z) * 0.16;
+          vec2 q = vec2(s / 0.045, p.y / 0.065); vec2 r = vec2(q.x + q.y, q.x - q.y);
+          vec2 cid = floor(r); float k = mod(cid.x + cid.y * 2.0 + 30.0, 3.0);
+          vec3 c = k < 0.5 ? vec3(0.72, 0.07, 0.09) : (k < 1.5 ? vec3(0.08, 0.42, 0.14) : vec3(0.1, 0.24, 0.62));
+          vec2 f = fract(r); float e = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
+          float line = (1.0 - smoothstep(0.02, 0.06, e)) * AAF;
+          col = mix(c * (0.8 + clamp(l / 0.05, 0.4, 1.6) * 0.25), vec3(0.95, 0.78, 0.3), line * 0.85);
+          H = cloth(p) + line * 0.0004; MET = line * 0.5;
+        }` }, suit.material);
+    }
+    // maschera nera sugli occhi
+    const ex = (ctx.eyeW || 0.032) * 0.5;
+    const mask = pmat('harlMask', { color: '#121214', rough: 0.35, code: `
+      CLIP = min(length(vec2((p.x - ${f4(ex)}) / 0.017, (p.y - ${f4(E.y)}) / 0.01)), length(vec2((p.x + ${f4(ex)}) / 0.017, (p.y - ${f4(E.y)}) / 0.01))) < 1.0;
+      float rim = 1.0 - smoothstep(0.0, 0.004, abs(abs(p.y - ${f4(E.y + 0.002)}) - 0.03));
+      col = mix(col, vec3(0.85, 0.65, 0.25), rim * 0.9); MET = rim * 0.8;` });
+    shell(body, 'maschera', mask, { sel: (p) => p.y > E.y - 0.03 && p.y < E.y + 0.034 && p.z > E.z - 0.045 && Math.abs(p.x - hc.x) < 0.085, off: () => 0.006,
+      edge: (p) => Math.min(p.y - (E.y - 0.03), E.y + 0.034 - p.y) });
+    // bicorno: tesa rialzata davanti e dietro, punte sui lati
+    const r0 = M.hw + 0.012, base = v3(hc.x, M.top - 0.045, hc.z - 0.005);
+    const crown = rigid(new THREE.LatheGeometry([[r0, 0], [r0 + 0.003, 0.05], [r0 - 0.012, 0.08], [r0 * 0.55, 0.09], [0.001, 0.092]].map(([x, y]) => new THREE.Vector2(x, y)), 28).scale(1, 1, 1.12).translate(base.x, base.y, base.z));
+    const brim = surf((u, v) => {
+      const a = u * Math.PI * 2, fb = Math.pow(Math.abs(Math.cos(a)), 1.5);
+      const R = r0 + v * (0.05 + 0.1 * (1 - fb)), up = v * (0.02 + 0.12 * fb);
+      return [base.x + Math.sin(a) * R * (1 + v * 0.35 * (1 - fb)), base.y + 0.005 + up, base.z + Math.cos(a) * (r0 + v * 0.03) * 1.12];
+    }, 60, 5, false);
+    { const Pp = brim.attributes.position, Rr = brim.attributes.aRest; for (let i = 0; i < Pp.count; i++) { Rr.setXYZ(i, i % 6 / 5, Pp.getY(i), 0); } }
+    attach(ctx, 'Head', mesh(crown, MAT.felt('#141416'), 'bicorno'));
+    attach(ctx, 'Head', mesh(brim, MAT.feltTrim('#141416', 'vec3(0.85, 0.65, 0.25)'), 'falda'));
+    attach(ctx, 'Head', mesh(rigid(new THREE.CylinderGeometry(0.022, 0.022, 0.008, 14).rotateX(Math.PI / 2).translate(hc.x, base.y + 0.08, base.z + r0 * 1.12 + 0.025)), MAT.gold(), 'coccarda'));
+    // gorgiera bianca pieghettata
+    const ny = J.Neck.y - 0.012, nr = 0.07;
+    const ruff = new THREE.TorusGeometry(nr + 0.03, 0.028, 8, 64);
+    { const Pp = ruff.attributes.position; for (let i = 0; i < Pp.count; i++) { const x = Pp.getX(i), y = Pp.getY(i), a = Math.atan2(y, x), k = 1 + 0.12 * Math.sin(a * 22); const d = Math.hypot(x, y); Pp.setXY(i, x * (1 + (k - 1) * Math.min(1, (d - nr) / 0.03)), y * (1 + (k - 1) * Math.min(1, (d - nr) / 0.03))); } ruff.computeVertexNormals(); }
+    ruff.rotateX(Math.PI / 2); ruff.scale(1.05, 0.55, 1.0); ruff.translate(J.Neck.x, ny, J.Neck.z + 0.012);
+    attach(ctx, 'Spine2', mesh(rigid(ruff), pmat('ruff', { color: '#f6f4ee', rough: 0.8, code: `H = vnoise(p * 300.0) * 0.0002;` }), 'gorgiera'));
+  },
+
+  // ── Chef Gusto: giacca da cuoco a doppio petto, grembiule a righe, foulard rosso e cappello alto ──
+  cuoco(ctx, M) {
+    const body = ctx.meshes.body, J = M.J, E = M.eye, hc = M.hc, hy = J.Hips.y, kn = J.LeftLeg;
+    const jacket = pmat('chefJacket', { color: '#f6f6f2', rough: 0.82, code: `
+      H = cloth(p);
+      vec2 b = vec2(abs(p.x - 0.012) - 0.06, fract((p.y - ${f4(hy)}) / 0.06) - 0.5);
+      float btn = (1.0 - smoothstep(0.006, 0.0085, length(vec2(b.x, b.y * 0.06)))) * step(0.3, n.z) * step(${f4(hy + 0.04)}, p.y) * step(p.y, ${f4(J.Spine2.y + 0.08)});
+      col = mix(col, vec3(0.08), btn); H += btn * 0.0015; RGH = mix(0.82, 0.4, btn);
+      float cuff = step(0.5, vK) * (1.0 - smoothstep(0.0, 0.004, p.y - ${f4((J.LeftHand ? J.LeftHand.y : hy - 0.1) + 0.1)}));
+      col = mix(col, vec3(0.12), cuff * 0.85);` });
+    shell(body, 'giacca', jacket, {
+      sel: (p, n, b) => !/Hand|Head|Foot|Toe/.test(b) && !(/Leg/.test(b) && !/UpLeg/.test(b)) && p.y > hy - 0.1 && p.y < J.Neck.y + 0.02 && !(/ForeArm/.test(b) && J.LeftHand && p.y < J.LeftHand.y + 0.06),
+      off: () => 0.02, k: (p, n, b) => (isArm(b) && !/Shoulder/.test(b) ? 1 : 0), edge: (p, n, b) => (isArm(b) ? 1 : Math.min(p.y - (hy - 0.1), J.Neck.y + 0.02 - p.y)) });
+    // grembiule a righe blu davanti
+    const apron = pmat('chefApron', { color: '#f2f2ee', rough: 0.85, code: `
+      float st = step(0.5, fract((p.x + 0.4) / 0.03));
+      col = mix(col, vec3(0.1, 0.16, 0.36), st * 0.92); H = cloth(p);` });
+    shell(body, 'grembiule', apron, { sel: (p, n, b) => !isArm(b) && p.y > kn.y - 0.04 && p.y < hy + 0.04 && n.z > -0.15 && p.z > J.Hips.z - 0.03,
+      off: (p) => 0.034 + Math.max(0, hy - p.y) * 0.06, edge: (p) => Math.min(p.y - (kn.y - 0.04), hy + 0.04 - p.y) });
+    shell(body, 'laccio', MAT.leather('#e8e8e2'), { sel: (p, n, b) => !isArm(b) && Math.abs(p.y - hy - 0.035) < 0.012, off: () => 0.038 });
+    // foulard rosso al collo
+    const ny = J.Neck.y - 0.005;
+    attach(ctx, 'Spine2', mesh(rigid(new THREE.TorusGeometry(0.072, 0.017, 8, 32).rotateX(Math.PI / 2).scale(1.05, 1, 1.12).translate(J.Neck.x, ny, J.Neck.z + 0.008)), MAT.sash('#c0202a'), 'foulard'));
+    attach(ctx, 'Spine2', mesh(rigid(new THREE.SphereGeometry(0.024, 10, 8).scale(1.2, 0.9, 0.7).translate(J.Neck.x, ny - 0.02, J.Neck.z + 0.088)), MAT.sash('#c0202a'), 'nodo'));
+    // cappello da cuoco
+    const r0 = M.hw + 0.014, base = v3(hc.x, M.top - 0.06, hc.z - 0.004);
+    const top = new THREE.LatheGeometry([[r0, -0.01], [r0, 0.07], [r0 + 0.025, 0.11], [r0 + 0.055, 0.17], [r0 + 0.062, 0.22], [r0 + 0.045, 0.265], [r0 - 0.01, 0.29], [r0 * 0.5, 0.3], [0.001, 0.296]].map(([x, y]) => new THREE.Vector2(x, y)), 48);
+    { const q = top.attributes.position; for (let i = 0; i < q.count; i++) { const x = q.getX(i), z = q.getZ(i), y = q.getY(i), a = Math.atan2(x, z); const k = 1 + (y < 0.07 ? 0.01 : 0.03 * Math.min(1, (y - 0.07) / 0.04)) * Math.sin(a * 18); q.setX(i, x * k); q.setZ(i, z * k); } top.computeVertexNormals(); }
+    top.scale(1, 1, 1.1); top.translate(base.x, base.y, base.z);
+    attach(ctx, 'Head', mesh(rigid(top), pmat('toque', { color: '#fbfbf8', rough: 0.85, side: THREE.DoubleSide, code: `H = cloth(p) * 0.8;` }), 'cappello'));
+  },
+
+  // ── Sommozzatrice: muta in neoprene con fasce turchesi, maschera e boccaglio sulla fronte ──
+  sommozzatrice(ctx, M) {
+    const body = ctx.meshes.body, J = M.J, E = M.eye, hc = M.hc, an = J.LeftFoot;
+    const suit = pmat('wetsuit', { color: '#121316', rough: 0.55, code: `
+      float side = smoothstep(0.75, 0.85, abs(n.x)) * (step(vK, 0.5) * step(${f4(J.Hips.y + 0.08)}, p.y) + step(1.5, vK) * step(p.y, ${f4(J.Hips.y - 0.14)}));
+      // maniche turchesi con fasce nere
+      float arm = step(0.5, vK) * step(vK, 1.5) * smoothstep(0.0, 0.006, 0.47 - abs(fract(p.y / 0.12) - 0.5));
+      float knee = step(1.5, vK) * (1.0 - smoothstep(0.0, 0.01, abs(p.y - ${f4(J.LeftLeg ? J.LeftLeg.y : 0.5)}) - 0.04)) * step(0.2, n.z);
+      float zip = step(n.z, -0.6) * (1.0 - smoothstep(0.004, 0.007, abs(p.x))) * step(${f4(J.Hips.y)}, p.y);
+      col = mix(col, vec3(0.05, 0.62, 0.7), max(side, arm));
+      col = mix(col, vec3(0.2, 0.21, 0.24), knee);
+      col = mix(col, vec3(0.6, 0.62, 0.65), zip); MET = zip * 0.8;
+      H = vnoise(p * 500.0) * 0.00012 + knee * 0.001;` });
+    shell(body, 'muta', suit, {
+      sel: (p, n, b) => !/Head|Hand/.test(b) && p.y > an.y + 0.045 && p.y < J.Neck.y + 0.03 && !(/ForeArm/.test(b) && J.LeftHand && p.y < J.LeftHand.y + 0.03),
+      off: () => 0.01, k: (p, n, b) => (isArm(b) && !/Shoulder/.test(b) ? 1 : isLeg(b) ? 2 : 0), edge: (p, n, b) => (isArm(b) ? 1 : Math.min(p.y - an.y - 0.045, J.Neck.y + 0.03 - p.y)) });
+    // maschera sollevata sulla fronte, con la cinghia e il boccaglio
+    const my = E.y + 0.06, mz = M.front - 0.004;
+    const frame = rigid(new THREE.TorusGeometry(0.052, 0.012, 8, 28).scale(1.15, 0.72, 1).rotateX(-0.35).translate(hc.x, my, mz));
+    attach(ctx, 'Head', mesh(frame, pmat('maskRub', { color: '#1ab0c0', rough: 0.5 }), 'maschera'));
+    attach(ctx, 'Head', mesh(rigid(new THREE.CircleGeometry(0.05, 24).scale(1.15, 0.72, 1).rotateX(-0.35).translate(hc.x, my, mz + 0.006)), pmat('maskGlass', { color: '#bfe8f2', rough: 0.04, metal: 0.4, envI: 2.4, transparent: true, opacity: 0.55 }), 'vetro'));
+    attach(ctx, 'Head', mesh(rigid(new THREE.TorusGeometry(1, 0.006, 4, 40).rotateX(Math.PI / 2).scale(M.hw + 0.014, 1, (M.front - M.back) / 2 + 0.014).rotateX(-0.12).translate(hc.x, my - 0.005, (M.front + M.back) / 2)), pmat('maskStrap', { color: '#141416', rough: 0.7 }), 'cinghia'));
+    const sx = hc.x + M.hw + 0.01;
+    attach(ctx, 'Head', mesh(taper([v3(sx, E.y - 0.06, hc.z + 0.02), v3(sx + 0.012, E.y + 0.03, hc.z), v3(sx + 0.006, M.top + 0.03, hc.z - 0.03)], () => 0.009, 16, 8), pmat('snorkel', { color: '#f2c21a', rough: 0.4 }), 'boccaglio'));
+    attach(ctx, 'Head', mesh(rigid(new THREE.SphereGeometry(0.012, 8, 6).translate(sx + 0.006, M.top + 0.035, hc.z - 0.032)), pmat('snorkelTop', { color: '#1ab0c0', rough: 0.4 }), 'tappo'));
+  },
+
+  // ── Mummia: bende di lino ingiallito avvolte dappertutto (con qualche strappo), occhi accesi, bende che penzolano ──
+  mummia(ctx, M) {
+    for (const k of ['messy_hair', 'eyebrow', 'eyelash']) hideMesh(ctx, k);
+    const body = ctx.meshes.body, J = M.J, E = M.eye, hc = M.hc, hy = J.Hips.y;
+    if (ctx.meshes.eyes) { addRest(ctx.meshes.eyes); ctx.meshes.eyes.material = MAT.glowEye(ctx.meshes.eyes.material, 'vec3(1.4, 1.0, 0.25)'); }
+    const ex = (ctx.eyeW || 0.032) * 0.5;
+    const wrap = pmat('mummyWrap', { color: '#d6c8a6', rough: 0.95, code: `
+      float u = p.y + atan(p.x, p.z) * 0.009 * (vK > 0.5 ? 1.6 : 1.0);
+      float bi = floor(u / 0.026), f = fract(u / 0.026);
+      float hv = h31(vec3(bi, 3.1, 7.7));
+      float seam = 1.0 - smoothstep(0.0, 0.12, min(f, 1.0 - f));
+      col = mix(vec3(0.84, 0.78, 0.62), vec3(0.66, 0.58, 0.42), hv * 0.7 + fbm(p * 18.0) * 0.5);
+      col *= 1.0 - seam * 0.45;
+      col = mix(col, vec3(0.36, 0.3, 0.2), smoothstep(0.6, 0.8, fbm(p * 9.0 + 2.0)) * 0.6);
+      H = (1.0 - seam) * 0.0012 + vnoise(vec3(p.x * 600.0, u * 900.0, p.z * 600.0)) * 0.00025;
+      bool eyes = min(length(vec2((p.x - ${f4(ex)}) / 0.022, (p.y - ${f4(E.y)}) / 0.012)), length(vec2((p.x + ${f4(ex)}) / 0.022, (p.y - ${f4(E.y)}) / 0.012))) < 1.0 && p.z > ${f4(E.z - 0.04)};
+      vec3 c = cell3(p * 11.0);
+      CLIP = eyes || (c.x < 0.11 && c.z > 0.9);` });
+    shell(body, 'bende', wrap, { sel: (p, n, b) => true, off: (p, n, b) => (/Hand/.test(b) ? 0.004 : /Head/.test(b) ? 0.008 : 0.013) + Math.sin(p.y * 240) * 0.0015,
+      k: (p, n, b) => (isArm(b) && !/Shoulder/.test(b) ? 1 : isLeg(b) ? 2 : 0) });
+    // bende che penzolano da un braccio, dalla vita e dalla nuca
+    const loose = pmat('mummyLoose', { color: '#cdbf9c', rough: 0.95, side: THREE.DoubleSide, code: `col *= 0.8 + fbm(p * 30.0) * 0.4; H = vnoise(p * 300.0) * 0.0003;` });
+    const strip = (bone, a, d, L, w = 0.024) => {
+      const pts = [a, a.clone().addScaledVector(d, L * 0.4).add(v3(0, 0, -0.01)), a.clone().addScaledVector(d, L)];
+      attach(ctx, bone, mesh(taper(pts, () => w, 10, 6, { sx: 1, sy: 0.12, closed: false }), loose, 'benda'));
+    };
+    if (J.LeftForeArm) strip('LeftForeArm', J.LeftForeArm.clone().add(v3(0.03, -0.1, 0)), v3(0.25, -1, 0.1).normalize(), 0.22);
+    strip('Hips', v3(-0.12, hy - 0.02, J.Hips.z + 0.09), v3(-0.15, -1, 0.15).normalize(), 0.3);
+    strip('Head', v3(hc.x - 0.02, E.y + 0.02, M.back + 0.004), v3(0.1, -1, -0.25).normalize(), 0.26, 0.02);
   },
 };
 

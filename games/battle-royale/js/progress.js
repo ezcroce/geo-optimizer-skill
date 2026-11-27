@@ -2,13 +2,16 @@
 //  Progressi del giocatore: pass battaglia, negozio, missioni, monete
 //  (tutto salvato nel browser con localStorage)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=39';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=40';
 
 const KEY = 'arenaRoyaleProfile';
 export const XP_PER_TIER = 1000;
 export const PASS_TIERS = 40;
 export const PREMIUM_PRICE = 950;
-export const SEASON = { name: 'Stagione 1 · Isole Selvagge', ends: '2027-02-28' };
+export const SEASON = { id: 2, name: 'Stagione 2 · Il Colosseo', ends: '2027-05-31', art: 'img/loading/load1.jpg' };
+export const TIER_PRICE = 150;          // v40: compra un livello del pass
+export const BONUS_COINS = 50;          // v40: dopo il livello 40, ogni 1000 XP = 50 monete
+export const MILESTONES = [10, 20, 30, 40];
 
 /** catalogo: tipo → lista oggetti */
 export const CATALOG = { skin: SKINS, hat: HATS, back: BACKPACKS, glider: GLIDERS };
@@ -17,15 +20,21 @@ export function itemOf(type, id) { return (CATALOG[type] || []).find(x => x.id =
 
 // ── ricompense del pass: [livello, ricompensa] ──
 const R = (type, idOrN) => type === 'coins' ? { type, n: idOrN } : { type, id: idOrN };
+// v40: Stagione 2 · Il Colosseo: una ricompensa per OGNI livello, sia gratis sia premium (80 in tutto).
+// Tornano anche gli oggetti della Stagione 1, per chi non li aveva sbloccati; i doppioni diventano monete.
+const C = (n) => R('coins', Math.max(25, Math.round(n * 0.6 / 25) * 25));
 const FREE = [
-  [1, R('hat', 'beanie')], [4, R('coins', 100)], [6, R('back', 'hiker')], [8, R('coins', 100)], [10, R('skin', 'cowboy')],
-  [12, R('hat', 'beret')], [13, R('coins', 150)], [16, R('glider', 'arcobaleno')], [19, R('coins', 150)], [22, R('hat', 'cowboy')], [25, R('skin', 'scienziata')],
-  [28, R('coins', 200)], [30, R('back', 'tactical')], [32, R('back', 'sword')], [36, R('coins', 200)], [40, R('coins', 500)],
-];
+  R('hat', 'cuoco'), C(50), R('glider', 'tramonto'), C(75), R('hat', 'beanie'), C(75), R('back', 'hiker'), C(100), R('hat', 'gondoliere'), R('skin', 'cuoco'),
+  C(100), R('hat', 'beret'), C(100), R('glider', 'arcobaleno'), C(125), R('back', 'tactical'), C(125), R('hat', 'cowboy'), C(150), R('skin', 'cowboy'),
+  C(150), R('glider', 'laguna'), C(150), R('back', 'sword'), R('skin', 'sommozzatrice'), C(150), C(175), R('hat', 'galea'), C(175), R('skin', 'scienziata'),
+  C(175), C(200), R('glider', 'mosaico'), C(200), C(200), C(225), C(225), C(250), C(250), C(500),
+].map((r, i) => [i + 1, r]);
 const PREMIUM = [
-  [1, R('coins', 300)], [3, R('hat', 'viking')], [7, R('coins', 200)], [9, R('skin', 'vichingo')], [12, R('hat', 'tactical')], [14, R('hat', 'wizard')],
-  [18, R('coins', 250)], [21, R('back', 'shield')], [24, R('back', 'wings')], [29, R('glider', 'oro')], [34, R('coins', 300)], [37, R('hat', 'crown')], [40, R('skin', 'samurai')],
-];
+  R('skin', 'gladiatore'), C(100), R('hat', 'viking'), C(100), R('back', 'scutum'), C(100), R('hat', 'wizard'), C(150), C(150), R('skin', 'vichingo'),
+  C(150), R('back', 'wings'), C(150), R('hat', 'tactical'), R('skin', 'arlecchino'), C(150), R('glider', 'oro'), C(200), R('back', 'aquila'), R('skin', 'samurai'),
+  C(200), R('hat', 'crown'), C(200), R('back', 'shield'), C(200), R('glider', 'imperiale'), C(250), C(250), C(250), R('hat', 'alloro'),
+  C(250), C(250), C(250), C(300), C(300), C(300), C(300), C(300), C(400), R('skin', 'imperatore'),
+].map((r, i) => [i + 1, r]);
 /** tutti i livelli del pass con le due ricompense (gratis / premium) */
 export const PASS = Array.from({ length: PASS_TIERS }, (_, i) => ({
   tier: i + 1,
@@ -70,16 +79,23 @@ const WEEKLY = [
 function defaults() {
   const owned = {};
   for (const [t, list] of Object.entries(CATALOG)) owned[t] = list.filter(x => !x.lock).map(x => x.id);
-  return { xp: 0, coins: 300, premium: false, owned, granted: { free: 0, prem: 0 }, missions: {}, stats: { matches: 0, wins: 0, kills: 0, best: 0 }, equip: { hat: 'none', back: 'none' }, seen: {} };
+  return { xp: 0, coins: 300, premium: false, owned, granted: { free: 0, prem: 0 }, bonus: 0, season: SEASON.id, missions: {}, stats: { matches: 0, wins: 0, kills: 0, best: 0 }, equip: { hat: 'none', back: 'none' }, seen: {} };
 }
 function load() {
   let p;
   try { p = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { p = null; }
   const d = defaults();
   if (!p) return d;
+  const oldSeason = p.season || 1;
   p = Object.assign(d, p);
   for (const t of Object.keys(CATALOG)) {           // nuovi oggetti gratuiti aggiunti in futuro
     p.owned[t] = Array.from(new Set([...(p.owned[t] || []), ...d.owned[t]]));
+  }
+  // v40: nuova stagione: il pass riparte dal livello 1 (gli oggetti e le monete restano tuoi)
+  if (oldSeason !== SEASON.id) {
+    p.prevSeason = { id: oldSeason, tier: Math.min(PASS_TIERS, 1 + Math.floor((p.xp || 0) / XP_PER_TIER)), premium: !!p.premium };
+    p.xp = 0; p.premium = false; p.granted = { free: 0, prem: 0 }; p.bonus = 0; p.season = SEASON.id; p.seasonNew = true;
+    p.seasonGift = p.prevSeason.premium ? 300 : 100; p.coins += p.seasonGift;   // regalo di benvenuto (di più a chi aveva il premium)
   }
   return p;
 }
@@ -96,9 +112,16 @@ function give(type, id) { if (!owns(type, id)) { profile.owned[type].push(id); p
 function grant(r, source) {
   if (!r) return;
   if (r.type === 'coins') profile.coins += r.n;
-  else give(r.type, r.id);
+  else if (owns(r.type, r.id)) {
+    // v40: doppione (oggetto già tuo dalla stagione scorsa o dal negozio) → monete
+    const n = dupCoins(r);
+    profile.coins += n;
+    emit({ type: 'reward', reward: { type: 'coins', n, dup: r }, source });
+    return;
+  } else give(r.type, r.id);
   emit({ type: 'reward', reward: r, source });
 }
+export function dupCoins(r) { const it = itemOf(r.type, r.id); return it ? Math.max(50, Math.round(priceOf(r.type, it) * 0.3 / 25) * 25) : 50; }
 
 // ── livelli ──
 export function tier() { return Math.min(PASS_TIERS, 1 + Math.floor(profile.xp / XP_PER_TIER)); }
@@ -108,6 +131,23 @@ function grantTiers() {
   const t = tier();
   while (profile.granted.free < t) { profile.granted.free++; grant(PASS[profile.granted.free - 1].free, 'pass'); }
   if (profile.premium) while (profile.granted.prem < t) { profile.granted.prem++; grant(PASS[profile.granted.prem - 1].prem, 'pass'); }
+  // v40: livelli bonus oltre il 40
+  const b = bonusLevels();
+  while ((profile.bonus || 0) < b) { profile.bonus = (profile.bonus || 0) + 1; grant({ type: 'coins', n: BONUS_COINS, bonus: true }, 'bonus'); }
+}
+/** v40: livelli bonus guadagnati dopo aver completato il pass */
+export function bonusLevels() { return Math.max(0, Math.floor(profile.xp / XP_PER_TIER) + 1 - PASS_TIERS); }
+export function bonusProgress() { return tier() >= PASS_TIERS ? (profile.xp % XP_PER_TIER) / XP_PER_TIER : 0; }
+/** v40: quante ricompense del pass hai già ottenuto (gratis + premium) */
+export function rewardsClaimed() { const t = tier(); return Math.min(t, profile.granted.free) + (profile.premium ? Math.min(t, profile.granted.prem) : 0); }
+export function daysLeft() { return Math.max(0, Math.ceil((new Date(SEASON.ends + 'T23:59:59') - new Date()) / 86400000)); }
+/** v40: compra il livello successivo del pass */
+export function buyTier() {
+  if (tier() >= PASS_TIERS) return { ok: false, msg: 'Hai già completato il pass' };
+  if (profile.coins < TIER_PRICE) return { ok: false, msg: `Servono ${TIER_PRICE} monete` };
+  profile.coins -= TIER_PRICE;
+  addXP(tier() * XP_PER_TIER - profile.xp);
+  return { ok: true, tier: tier() };
 }
 export function addXP(n) {
   const before = tier();

@@ -6,8 +6,11 @@
 <title>Arena Royale 3D — Il battle royale nel tuo browser</title>
 <meta name="description" content="Arena Royale 3D: battle royale gratuito nel browser. Salta dal bus, raccogli armi, costruisci, abbassati, arrampicati e resta l'ultimo in piedi." />
 <meta name="theme-color" content="#0b1020" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 4l24 10v16c0 15-10 26-24 30C18 56 8 45 8 30V14z' fill='%23ffc21a'/%3E%3Cpath d='M32 14l5 11 12 1-9 8 3 12-11-6-11 6 3-12-9-8 12-1z' fill='%231a2a7a'/%3E%3C/svg%3E" />
-<link rel="stylesheet" href="site.css?v=33" />
+<link rel="icon" href="favicon-64.png" type="image/png" sizes="64x64" />
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="stylesheet" href="site.css?v=40" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -48,8 +51,8 @@
     </div>
     <div class="stats reveal" style="--d:.8s">
       <div><b data-count="100">0</b><span>giocatori</span></div>
-      <div><b data-count="21">0</b><span>armi</span></div>
-      <div><b data-count="24">0</b><span>skin</span></div>
+      <div><b data-count="22">0</b><span>armi</span></div>
+      <div><b data-count="30">0</b><span>skin</span></div>
       <div><b data-count="18">0</b><span>città</span></div>
     </div>
   </div>
@@ -68,8 +71,25 @@
 <!-- ───────── TICKER ───────── -->
 <div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
 
-<!-- ───────── NOVITÀ v39 ───────── -->
+<!-- ───────── NOVITÀ v40 ───────── -->
 <section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v40 · STAGIONE 2</span>
+    <h2 class="h2 reveal">Stagione 2:<br /><em>Il Colosseo.</em></h2>
+    <p class="lead33 reveal">Un pass battaglia con 80 ricompense, sei skin nuove ispirate a Roma e a Venezia, cappelli, zaini e deltaplani nuovi, comandi touch che si possono spostare e schermate di caricamento illustrate. E il gioco ora si installa con la sua icona.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🏛️</div><h3>Pass da 80 ricompense</h3><p>Una ricompensa gratis e una premium a <b>ogni</b> livello, dal 1 al 40: Gladiatore e Imperatore, Arlecchino, Chef Gusto, la Sommozzatrice e tutti gli oggetti della Stagione 1. Puoi comprare un livello a 150 monete, dopo il 40 i livelli bonus danno monete e gli oggetti che hai già diventano monete.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🎭</div><h3>Sei skin nuove</h3><p>Gladiatore con corazza, schinieri e gladio; Imperatore con toga, mantello porpora e alloro d'oro; Arlecchino a rombi con la maschera; Chef Gusto con grembiule e toque; Sommozzatrice con muta e boccaglio; e la Mummia nel negozio.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🪖</div><h3>Accessori nuovi</h3><p>Corona d'alloro, elmo da legionario, paglietta da gondoliere, cappello da chef e tricorno; scudo romano, aquila della legione e bombole da sub; cinque deltaplani: Imperiale, Laguna, Mosaico, Tramonto e Carnevale.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">📱</div><h3>Più comodo da telefono</h3><p>Sposta e ingrandisci ogni pulsante con l'editor dei comandi, fuoco automatico quando il mirino è su un nemico, mira assistita, trasparenza dei pulsanti regolabile e vibrazione quando colpisci o vieni colpito.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">🖼️</div><h3>Caricamenti illustrati</h3><p>Mentre il gioco prepara l'isola vedi un'illustrazione, una barra con le fasi del caricamento e un consiglio per vincere.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">📲</div><h3>Installa il gioco</h3><p>Dal menu del browser scegli «Aggiungi a schermata Home» o «Installa»: Arena Royale si apre a tutto schermo con la sua icona nuova.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v39 ───────── -->
+<section id="novita39" class="section news33">
   <div class="wrap">
     <span class="badge-new reveal">NOVITÀ · v39</span>
     <h2 class="h2 reveal">Balletti veri<br /><em>e un Gargoyle scolpito.</em></h2>
@@ -181,11 +201,14 @@
     <h2 class="h2 reveal">Tutto quello che serve<br /><em>per sopravvivere</em></h2>
     <div class="cards">
       <article class="card tilt reveal" style="--d:0s"><div class="ico">🚌</div><h3>Il Bus della Battaglia</h3><p>Scegli il momento giusto, salta e apri il deltaplano sopra la città che preferisci.</p></article>
-      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🔫</div><h3>21 armi, 5 rarità</h3><p>Balestra, lanciagranate, doppietta, minigun, pompa tattico… ognuna con il suo mirino e la sua ottica. Più è rara, più fa male.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🔫</div><h3>22 armi, 5 rarità</h3><p>Balestra, lanciagranate, doppietta, minigun, pompa tattico e gli Artigli del Gargoyle… ognuna con il suo mirino e la sua ottica. Più è rara, più fa male.</p></article>
       <article class="card tilt reveal" style="--d:.16s"><div class="ico">🧱</div><h3>Costruisci e distruggi</h3><p>Premi <kbd>Q</kbd> e alza muri al volo per ripararti. Col piccone sfondi le pareti e raccogli materiali.</p></article>
-      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🏝️</div><h3>Isola gigante</h3><p>1,2 km per lato, 18 località, montagne e laghi, caricati a blocchi mentre ti muovi. La tempesta si stringe lentamente in sei fasi.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🏝️</div><h3>Isola gigante</h3><p>1,2 km per lato, 18 località, montagne e laghi, caricati a blocchi mentre ti muovi. Al centro il Colosseo, e una tempesta che si stringe fase dopo fase.</p></article>
       <article class="card tilt reveal" style="--d:.32s"><div class="ico">🤖</div><h3>Bot intelligenti</h3><p>Raccolgono il bottino, aprono forzieri, ti inseguono, si abbassano e scavalcano gli ostacoli.</p></article>
       <article class="card tilt reveal" style="--d:.40s"><div class="ico">✨</div><h3>Forzieri e cure</h3><p>Bende, kit medici e pozioni scudo. I forzieri dorati luccicano: seguili!</p></article>
+      <article class="card tilt reveal" style="--d:.48s"><div class="ico">👥</div><h3>Modalità e amici</h3><p>Da solo, in coppia o in squadra, contro i bot o online con gli amici con un codice stanza, e il 1 contro 1.</p></article>
+      <article class="card tilt reveal" style="--d:.56s"><div class="ico">🎟️</div><h3>Pass, negozio e missioni</h3><p>Sali di livello giocando, completa le missioni del giorno e della settimana, sblocca skin, cappelli, zaini e deltaplani.</p></article>
+      <article class="card tilt reveal" style="--d:.64s"><div class="ico">💃</div><h3>Balletti</h3><p>Sei balletti a tutto corpo per festeggiare: Ballo disco, Saluto, Floss, Esultanza, Robot e Running man.</p></article>
     </div>
   </div>
 </section>
@@ -267,6 +290,7 @@
       <div class="key reveal"><kbd>Tab</kbd><span>Inventario (puoi muoverti)</span></div>
       <div class="key reveal hl"><kbd>M</kbd>+<kbd>Rotellina</kbd><span>Mappa con zoom</span></div>
       <div class="key reveal hl"><kbd>←</kbd><kbd>→</kbd><span>Spettatore: cambia giocatore</span></div>
+      <div class="key reveal hl"><kbd>B</kbd> · <kbd>6-0</kbd><span>Balletti</span></div>
       <div class="key reveal"><kbd>Esc</kbd><span>Pausa</span></div>
     </div>
     <h3 class="h3touch reveal">📱 Su telefono e tablet</h3>
@@ -277,6 +301,10 @@
       <div class="key reveal"><kbd>MIRA</kbd><span>Mira di precisione</span></div>
       <div class="key reveal"><kbd>Slot</kbd><span>Tocca per cambiare arma</span></div>
       <div class="key reveal"><kbd>RACCOGLI</kbd><span>Appare vicino a bottino e forzieri</span></div>
+      <div class="key reveal hl"><kbd>✏️ Editor</kbd><span>Impostazioni › Disponi i pulsanti: trascina e ridimensiona ognuno</span></div>
+      <div class="key reveal hl"><kbd>🔫 Auto</kbd><span>Fuoco automatico e mira assistita (si possono spegnere)</span></div>
+      <div class="key reveal hl"><kbd>📳 Vibrazione</kbd><span>Quando colpisci o vieni colpito</span></div>
+      <div class="key reveal"><kbd>👁️ Opacità</kbd><span>Pulsanti più o meno trasparenti</span></div>
     </div>
   </div>
 </section>
@@ -296,7 +324,7 @@
 
 <div id="toast"></div>
 
-<script type="module" src="js/site.js?v=39"></script>
-<script src="js/transition.js?v=19"></script>
+<script type="module" src="js/site.js?v=40"></script>
+<script src="js/transition.js?v=40"></script>
 </body>
 </html>

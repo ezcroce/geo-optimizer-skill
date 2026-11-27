@@ -453,6 +453,8 @@ export const SKIN_CLOTH = {
   leo: ['cotton', 'ripstop'], tamsin: ['silk', 'linen'], oren: ['ripstop', 'ripstop'], cowboy: ['plaid', 'denim'],
   scienziata: ['cotton', 'denim'], vichingo: ['knit', 'leather'], samurai: ['silk', 'linen'], spettro: ['frost', 'frost'],
   giardiniera: ['gingham', 'denim'], rapper: ['knit', 'denim'],
+  gladiatore: ['linen', 'leather'], imperatore: ['linen', 'linen'], arlecchino: ['silk', 'silk'], cuoco: ['cotton', 'suit'],
+  sommozzatrice: ['rubber', 'rubber'], mummia: ['linen', 'linen'],
 };
 
 
@@ -529,6 +531,85 @@ export function gliderTexture(id, color, accent) {
           g.bezierCurveTo(X(u + w * 0.5), Y(1 - len * 0.6), X(u + w * 1.4), Y(1 - len * 0.3), X(u + w), H); g.fill();
         }
       });
+      break;
+    }
+    // ── v40: Stagione 2 · Il Colosseo ──
+    case 'imperiale': {   // porpora imperiale: greca d'oro sul bordo, aquila con le ali spiegate e alloro
+      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, shade(color, 1.1)); gr.addColorStop(1, shade(color, 0.7));
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      g.fillStyle = accent; g.fillRect(0, Y(0.06), W, Y(0.1));
+      // greca (meandro) sul bordo d'attacco
+      g.strokeStyle = shade(color, 0.8); g.lineWidth = 2.2;
+      for (let x = 0; x < W; x += 16) { g.beginPath(); g.moveTo(x, Y(0.145)); g.lineTo(x, Y(0.075)); g.lineTo(x + 12, Y(0.075)); g.lineTo(x + 12, Y(0.125)); g.lineTo(x + 5, Y(0.125)); g.lineTo(x + 5, Y(0.1)); g.stroke(); }
+      g.fillStyle = accent; g.fillRect(0, Y(0.9), W, Y(0.04));
+      // aquila stilizzata al centro
+      g.fillStyle = accent;
+      sym(() => {
+        g.beginPath(); g.moveTo(X(0.5), Y(0.38));
+        for (let k = 0; k < 5; k++) { const u = 0.5 - 0.035 - k * 0.032, v = 0.36 + k * 0.035; g.lineTo(X(u), Y(v - 0.08)); g.lineTo(X(u + 0.012), Y(v + 0.06)); }
+        g.lineTo(X(0.47), Y(0.62)); g.lineTo(X(0.5), Y(0.66)); g.closePath(); g.fill();
+        // rami d'alloro ai lati
+        for (let k = 0; k < 8; k++) { const t = k / 7, u = 0.3 - t * 0.2, v = 0.55 + Math.sin(t * 2.6) * 0.12; g.beginPath(); g.ellipse(X(u), Y(v), 9, 4, -0.6 + t, 0, 7); g.fill(); }
+      });
+      g.beginPath(); g.arc(X(0.5), Y(0.34), 11, 0, 7); g.fill();
+      g.fillStyle = shade(color, 0.9); g.font = 'bold 22px serif'; g.textAlign = 'center'; g.fillText('SPQR', X(0.5), Y(0.82));
+      break;
+    }
+    case 'laguna': {   // la laguna veneta: onde, gondola e leone alato sul fondo azzurro
+      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, mix(color, '#ffffff', 0.25)); gr.addColorStop(1, shade(color, 0.75));
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 2;
+      for (let r = 0; r < 7; r++) { g.beginPath(); for (let x = 0; x <= W; x += 8) { const y = Y(0.42 + r * 0.075) + Math.sin(x * 0.06 + r) * 4; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+      g.fillStyle = accent; g.fillRect(0, Y(0.08), W, Y(0.06));
+      sym(() => {   // gondola
+        g.fillStyle = '#141414'; g.beginPath(); g.moveTo(X(0.08), Y(0.6)); g.quadraticCurveTo(X(0.2), Y(0.72), X(0.34), Y(0.6)); g.lineTo(X(0.36), Y(0.5)); g.quadraticCurveTo(X(0.3), Y(0.64), X(0.1), Y(0.58)); g.closePath(); g.fill();
+        g.fillStyle = accent; g.fillRect(X(0.34), Y(0.48), 4, 10);
+        g.strokeStyle = '#141414'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(0.12), Y(0.62)); g.lineTo(X(0.1), Y(0.4)); g.stroke();
+      });
+      // leone alato (sagoma semplice) in oro
+      g.fillStyle = accent;
+      g.beginPath(); g.ellipse(X(0.5), Y(0.36), 16, 11, 0, 0, 7); g.fill();
+      g.beginPath(); g.arc(X(0.5) + 14, Y(0.29), 8, 0, 7); g.fill();
+      sym(() => { g.beginPath(); g.moveTo(X(0.49), Y(0.32)); g.quadraticCurveTo(X(0.43), Y(0.16), X(0.4), Y(0.22)); g.quadraticCurveTo(X(0.44), Y(0.3), X(0.47), Y(0.36)); g.fill(); });
+      break;
+    }
+    case 'carnevale': {   // arlecchino: losanghe colorate con bordino dorato
+      const C = [color, accent, '#2a8a3a', '#f2c230', '#1a1a1a'];
+      const dw = 32, dh = 40;
+      for (let j = -1; j < H / dh * 2 + 1; j++) for (let i = -1; i < W / dw + 1; i++) {
+        const cx = i * dw + (j % 2 ? dw / 2 : 0), cy = j * dh / 2;
+        g.fillStyle = C[(i * 3 + j * 2 + 100) % C.length];
+        g.beginPath(); g.moveTo(cx, cy - dh / 2); g.lineTo(cx + dw / 2, cy); g.lineTo(cx, cy + dh / 2); g.lineTo(cx - dw / 2, cy); g.closePath(); g.fill();
+        g.strokeStyle = 'rgba(255,215,90,0.75)'; g.lineWidth = 1.2; g.stroke();
+      }
+      break;
+    }
+    case 'mosaico': {   // tessere di un mosaico romano: fondo chiaro, greca e rosone al centro
+      const T = 8;
+      for (let y = 0; y < H; y += T) for (let x = 0; x < W; x += T) { g.fillStyle = mix(color, '#ffffff', rnd() * 0.25 - 0.05); g.fillRect(x + 0.6, y + 0.6, T - 1.2, T - 1.2); }
+      const tile = (x, y, c) => { g.fillStyle = mix(c, '#000000', rnd() * 0.18); g.fillRect(x * T + 0.6, y * T + 0.6, T - 1.2, T - 1.2); };
+      const nx = W / T, ny = H / T;
+      for (let x = 0; x < nx; x++) { tile(x, 2, accent); tile(x, ny - 3, accent); if (x % 4 < 2) tile(x, 3, '#2a2a2a'); }
+      const cx = nx / 2 - 0.5, cy = ny / 2;
+      for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+        const d = Math.hypot(x - cx, (y - cy) * 1.0), a = Math.atan2(y - cy, x - cx);
+        if (d < 9 && d > 7.6) tile(x, y, accent);
+        else if (d < 6.5 && Math.cos(a * 8) > 0.2 && d > 1.5) tile(x, y, '#2a6a8a');
+        else if (d < 1.6) tile(x, y, '#f0c040');
+        const ex = Math.min(x, nx - 1 - x);
+        if (ex > 3 && ex < 26 && Math.abs(y - cy) < 6 && Math.cos(ex * 0.9) * 4 > Math.abs(y - cy) - 1 && Math.cos(ex * 0.9) * 4 < Math.abs(y - cy) + 1) tile(x, y, '#3a7a3a');
+      }
+      break;
+    }
+    case 'tramonto': {   // tramonto sul mare: sfumatura arancio-viola, sole e gabbiani
+      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#ffd27a'); gr.addColorStop(0.45, color); gr.addColorStop(1, accent);
+      g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      g.fillStyle = 'rgba(255,240,190,0.95)'; g.beginPath(); g.arc(X(0.5), Y(0.62), 34, 0, 7); g.fill();
+      g.fillStyle = shade(accent, 0.8); g.fillRect(0, Y(0.72), W, Y(0.28));
+      g.strokeStyle = 'rgba(255,200,140,0.6)'; g.lineWidth = 2;
+      for (let k = 0; k < 6; k++) { const y = Y(0.76 + k * 0.035), w = 60 - k * 8; g.beginPath(); g.moveTo(X(0.5) - w, y); g.lineTo(X(0.5) + w, y); g.stroke(); }
+      g.strokeStyle = '#2a1030'; g.lineWidth = 2;
+      sym(() => { for (const [u, v] of [[0.2, 0.3], [0.28, 0.22], [0.12, 0.4]]) { g.beginPath(); g.moveTo(X(u) - 8, Y(v)); g.quadraticCurveTo(X(u) - 4, Y(v) - 6, X(u), Y(v)); g.quadraticCurveTo(X(u) + 4, Y(v) - 6, X(u) + 8, Y(v)); g.stroke(); } });
       break;
     }
     default: {   // classico: due fasce parallele al bordo d'attacco e un sole al centro

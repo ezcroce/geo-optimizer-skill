@@ -9,10 +9,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Arena Royale" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="icon" href="favicon-64.png" type="image/png" sizes="64x64" />
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=39" />
+<link rel="stylesheet" href="style.css?v=40" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -143,11 +144,20 @@
   <!-- PASS BATTAGLIA -->
   <div class="tabpage hidden" data-page="pass">
     <div class="passhead">
-      <div><div class="season" id="seasonName"></div><div class="passlvl">Livello <b id="passLvl">1</b> / 40 · <span id="passXp"></span></div></div>
-      <button id="premiumBtn" class="play small">Pass premium · 950 🪙</button>
+      <div class="passinfo">
+        <div class="season" id="seasonName"></div>
+        <div class="passmeta"><span id="seasonDays"></span> · <span id="passClaimed"></span></div>
+        <div class="passlvl">Livello <b id="passLvl">1</b> / 40 · <span id="passXp"></span></div>
+        <div class="passbar"><i id="passBar"></i></div>
+      </div>
+      <div class="passbtns">
+        <button id="buyTierBtn" class="ghost small">+1 livello · 150 🪙</button>
+        <button id="premiumBtn" class="play small">Pass premium · 950 🪙</button>
+      </div>
     </div>
+    <div class="passfeat" id="passFeat"></div>
     <div class="passtrack" id="passTrack"></div>
-    <div class="hint passhint">Le ricompense si sbloccano da sole salendo di livello: guadagni XP giocando e completando le missioni. Clicca un oggetto per vederlo addosso.</div>
+    <div class="hint passhint">80 ricompense: una gratis e una premium a ogni livello. Si sbloccano da sole salendo di livello (XP da partite e missioni); dopo il 40 ogni livello bonus vale 50 monete. Gli oggetti che hai già diventano monete. Tocca un oggetto per vederlo addosso.</div>
   </div>
 
   <!-- NEGOZIO -->
@@ -291,9 +301,10 @@
 
 <div id="rotateHint"><div class="phone"></div><b>Ruota il telefono</b><span>Arena Royale si gioca in orizzontale</span></div>
 
-<div id="loading" class="screen"><div class="spinner"></div><p>Caricamento dell'isola…</p></div>
+<div id="loading" class="screen"><div class="spinner"></div><p>Caricamento del gioco…</p></div>
+<script src="js/loading.js?v=40"></script>
 
-<script type="module" src="js/main.js?v=39"></script>
-<script src="js/transition.js?v=19"></script>
+<script type="module" src="js/main.js?v=40"></script>
+<script src="js/transition.js?v=40"></script>
 </body>
 </html>

@@ -1,12 +1,12 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { REAL, attachReal, realKind } from './realchar.js?v=39';
+import { REAL, attachReal, realKind } from './realchar.js?v=40';
 import { normalFromHeight, NORMALS } from './texgen.js?v=19';
-import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=31';
+import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=40';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=39';
-import { mergeParts } from './props.js?v=39';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=40';
+import { mergeParts } from './props.js?v=40';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -1438,6 +1438,102 @@ function buildHat(id, skin, head) {
       mesh(boxGeo(0.3, 0.014, 0.08), lq, 0, -0.012, 0.215, g).rotation.x = 0.28;
       break;
     }
+    // ═════════ v40: Stagione 2 · Il Colosseo ═════════
+    case 'alloro': {
+      // corona d'alloro dorata: due rami che partono dalla nuca e si incontrano sulla fronte, foglie a coppie e bacche
+      const gm = texMat('metal', H.color, { side: THREE.DoubleSide });
+      mesh(cachedGeo('alloro40', () => {
+        const parts = [], E = new THREE.Euler(0, 0, 0, 'YXZ'), Q = new THREE.Quaternion(), M4 = new THREE.Matrix4(), S = new THREE.Vector3(), P = new THREE.Vector3();
+        const leaf = new THREE.SphereGeometry(1, 8, 6);
+        const R = 0.212, ZK = 1.07;
+        for (const sd of [-1, 1]) for (let k = 0; k < 15; k++) {
+          const a = Math.PI - 0.12 - k * (Math.PI - 0.5) / 14;
+          const dx = -sd * Math.cos(a), dz = ZK * Math.sin(a), yaw = Math.atan2(dx, dz);
+          const sz = 0.024 + 0.012 * (k / 14);
+          for (const [dy, pitch, out] of [[0.012, -0.55, 0.006], [-0.008, 0.45, 0.004]]) {
+            E.set(pitch, yaw, sd * 0.25); Q.setFromEuler(E);
+            P.set(sd * Math.sin(a) * (R + out), 0.025 + dy + k * 0.0012, Math.cos(a) * (R + out) * ZK);
+            S.set(0.0032, 0.0105 + k * 0.0003, sz);
+            parts.push(leaf.clone().applyMatrix4(M4.compose(P.clone().addScaledVector(new THREE.Vector3(dx, 0, dz).normalize(), sz * 0.6), Q, S)));
+          }
+        }
+        // rametto (anello aperto davanti) e bacche
+        const ring = new THREE.TorusGeometry(R - 0.002, 0.004, 4, 40, Math.PI * 2 - 0.62); ring.rotateX(Math.PI / 2); ring.rotateY(-(Math.PI / 2 + 0.31)); ring.scale(1, 1, ZK); ring.translate(0, 0.025, 0);
+        parts.push(ring);
+        for (const sd of [-1, 1]) for (const a of [0.55, 0.95, 1.5]) parts.push(new THREE.SphereGeometry(0.008, 6, 5).translate(sd * Math.sin(a) * (R + 0.012), 0.012, Math.cos(a) * (R + 0.012) * ZK));
+        return mergeSmooth(parts.map(gq => [gq, {}]));
+      }), gm, 0, 0, 0, g);
+      // nastro rosso annodato sulla nuca
+      const rib = mat(H.accent || '#b0182a', { roughness: 0.5, side: THREE.DoubleSide });
+      for (const sd of [-1, 1]) mesh(boxGeo(0.03, 0.16, 0.004), rib, 0.025 * sd, -0.06, -0.228, g).rotation.set(0.15, 0, 0.18 * sd);
+      sph(0.016, rib, 0, 0.02, -0.226, g, 0.8, 0.6);
+      break;
+    }
+    case 'galea': {
+      // elmo da legionario: calotta in bronzo, fascia frontale, paranuca svasato, paraguance e cresta di crine rosso
+      g.position.y += 0.075;   // calza più in alto: gli occhi restano scoperti
+      const br = texMat('metal', H.color, { side: THREE.DoubleSide }), st = texMat('metal', '#c8ccd2');
+      mesh(domeGeo(Math.PI / 2, 26), br, 0, -0.035, 0, g, 0.236, 0.24, 0.246);
+      mesh(cachedGeo('galeaBrow40', () => lathe([[0.244, -0.07], [0.25, -0.05], [0.246, -0.025]], 30, 1, 1.04)), br, 0, 0, 0, g);
+      mesh(cachedGeo('galeaRidge40', () => { const t = new THREE.TorusGeometry(0.25, 0.012, 5, 18, Math.PI * 0.55); t.rotateX(Math.PI / 2); t.rotateY(-Math.PI * 0.225 - Math.PI / 2); return t; }), st, 0, -0.03, 0, g, 1, 1, 1.04);
+      mesh(cachedGeo('galeaNeck40', () => {
+        const c = new THREE.CylinderGeometry(0.245, 0.33, 0.07, 22, 2, true, Math.PI * 0.62, Math.PI * 0.76);
+        return c;
+      }), br, 0, -0.1, -0.01, g, 1, 1, 1.02);
+      for (const sd of [-1, 1]) {
+        const ck = mesh(cachedGeo('galeaCheek40', () => {
+          const sh = new THREE.Shape(); sh.moveTo(-0.055, 0.05); sh.lineTo(0.05, 0.05); sh.quadraticCurveTo(0.06, -0.06, 0.02, -0.12); sh.quadraticCurveTo(-0.03, -0.1, -0.055, 0.05);
+          return new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 1, curveSegments: 8 });
+        }), br, 0.226 * sd, -0.13, 0.06, g);
+        ck.rotation.set(0, sd * Math.PI / 2 - sd * 0.18, sd * 0.06);
+        sph(0.009, st, 0.236 * sd, -0.07, 0.07, g);
+      }
+      // supporto e cresta (da davanti a dietro)
+      mesh(boxGeo(0.02, 0.04, 0.05), st, 0, 0.21, 0, g);
+      mesh(cachedGeo('galeaCrest40', () => { const t = new THREE.TorusGeometry(0.2, 0.045, 8, 24, Math.PI * 0.95); t.rotateZ(Math.PI * 0.025); t.rotateY(Math.PI / 2); return t; }), texMat('felt', H.accent || '#b8141e'), 0, 0.05, -0.01, g, 0.45, 1, 1);
+      for (let k = 0; k < 9; k++) { const an = 0.25 + k * 0.32; sph(0.02, texMat('felt', darker(H.accent || '#b8141e', 0.8)), 0, 0.05 + Math.sin(an) * 0.2 + 0.035, Math.cos(an) * 0.2 - 0.01, g, 1.2, 1.4); }
+      break;
+    }
+    case 'gondoliere': {
+      // paglietta da gondoliere: calotta piatta, tesa dritta, nastro rosso con le code che scendono dietro
+      const st = texMat('straw', H.color, { side: THREE.DoubleSide });
+      mesh(cachedGeo('gondCrown40', () => lathe([[0.216, -0.012], [0.215, 0.08], [0.212, 0.1], [0.2, 0.106], [0.0, 0.108]], 30, 1, 1.07, 3)), st, 0, 0, 0, g);
+      mesh(cachedGeo('gondBrim40', () => brimGeo(0.214, 0.34, 1.07, (r) => -0.02 * r)), st, 0, -0.01, 0, g);
+      mesh(cachedGeo('gondEdge40', () => new THREE.TorusGeometry(0.34, 0.006, 5, 44)), st, 0, -0.0135, 0, g, 1, 1, 1.07).rotation.x = Math.PI / 2;
+      const rb = texMat('silk', H.accent || '#c0202a', { side: THREE.DoubleSide });
+      mesh(cachedGeo('gondBand40', () => lathe([[0.2195, 0.004], [0.2185, 0.05]], 28, 1, 1.07)), rb, 0, 0, 0, g);
+      for (const sd of [-1, 1]) mesh(boxGeo(0.036, 0.2, 0.004), rb, 0.03 * sd, -0.1, -0.33, g).rotation.set(0.12, 0, 0.12 * sd);
+      break;
+    }
+    case 'tricorno': {
+      // tricorno veneziano: feltro nero con la tesa rialzata su tre lati, profilo dorato e coccarda
+      const fm = texMat('felt', H.color, { side: THREE.DoubleSide }), gd = texMat('metal', H.accent || '#e0b040', { side: THREE.DoubleSide });
+      const lift = (r, b) => { const a = b - Math.PI / 2; const u = (1 - Math.cos(3 * a)) / 2; return r * (0.35 + 1.25 * u) + r * r * 0.4; };
+      mesh(cachedGeo('triCrown40', () => lathe([[0.214, -0.012], [0.212, 0.08], [0.196, 0.13], [0.12, 0.152], [0.0, 0.156]], 30, 1, 1.08, 3)), fm, 0, 0, 0, g);
+      mesh(cachedGeo('triBrim40', () => brimGeo(0.212, 0.345, 1.08, lift, 60, 8)), fm, 0, -0.01, 0, g);
+      mesh(cachedGeo('triTrim40', () => brimGeo(0.345, 0.36, 1.08, (r, b) => lift(r + 0.133, b), 60, 1)), gd, 0, -0.01, 0, g);
+      // coccarda sul lato sinistro
+      const ck = new THREE.Group(); ck.position.set(-0.24, 0.1, 0.12); ck.rotation.set(0, -1.0, 0.25); g.add(ck);
+      mesh(cylGeo(0.035, 0.035, 0.01, 16), texMat('silk', '#c0202a'), 0, 0, 0, ck).rotation.x = Math.PI / 2;
+      mesh(cylGeo(0.012, 0.012, 0.016, 10), gd, 0, 0, 0.004, ck).rotation.x = Math.PI / 2;
+      break;
+    }
+    case 'cuoco': {
+      // cappello da cuoco: fascia pieghettata e cupola gonfia di cotone bianco
+      const ct = texMat('cotton', H.color, { side: THREE.DoubleSide });
+      mesh(cachedGeo('chefTop40', () => {
+        const gq = lathe([[0.214, -0.012], [0.214, 0.09], [0.24, 0.13], [0.275, 0.2], [0.282, 0.26], [0.262, 0.31], [0.2, 0.34], [0.1, 0.35], [0.0, 0.345]], 48, 1, 1.07, 2);
+        const q = gq.attributes.position;
+        for (let i = 0; i < q.count; i++) {
+          const x = q.getX(i), z = q.getZ(i), y = q.getY(i), an = Math.atan2(x, z);
+          const k = 1 + (y > 0.0 ? (y < 0.09 ? 0.012 : 0.035 * Math.min(1, (y - 0.09) / 0.05)) * Math.sin(an * 18) : 0);
+          q.setX(i, x * k); q.setZ(i, z * k);
+        }
+        gq.computeVertexNormals(); return gq;
+      }), ct, 0, 0, 0, g);
+      mesh(cachedGeo('chefBand40', () => lathe([[0.2175, -0.012], [0.2175, 0.05]], 32, 1, 1.07)), texMat('cotton', '#ffffff', { side: THREE.DoubleSide }), 0, 0, 0, g);
+      break;
+    }
     case 'bucket': {
       // cappello a secchiello da esploratore (Leo), leggermente inclinato all'indietro
       const bm = texMat('ripstop', H.color, { side: THREE.DoubleSide });
@@ -1463,6 +1559,32 @@ function featherGeo() {
   for (let i = 0; i < q.count; i++) { const x = q.getX(i), y = q.getY(i); q.setZ(i, -0.25 * x * x + 0.04 * y * y); uv.setXY(i, x * 0.5 + 0.5, -y); }
   geo.computeVertexNormals(); return geo;
 }
+/** v40: pittura dello scudo da legionario (fulmini e ali dorate sul rosso) */
+const scutumTex = (col, acc) => cachedTex('scutum40' + col + acc, () => {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256; const g = c.getContext('2d');
+  g.fillStyle = col; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = acc; g.fillStyle = acc; g.lineWidth = 6;
+  g.strokeRect(12, 12, 232, 232);
+  for (const sd of [-1, 1]) {
+    g.save(); g.translate(128, 128); g.scale(sd, 1);
+    g.beginPath(); g.moveTo(26, -6); g.quadraticCurveTo(70, -60, 112, -100); g.lineTo(96, -60); g.lineTo(110, -58); g.lineTo(60, -10); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(26, 6); g.quadraticCurveTo(70, 60, 112, 100); g.lineTo(96, 60); g.lineTo(110, 58); g.lineTo(60, 10); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(20, 0); g.lineTo(60, -4); g.lineTo(52, 2); g.lineTo(100, 0); g.lineTo(48, 8); g.lineTo(56, 2); g.closePath(); g.fill();
+    g.restore();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+});
+/** v40: vessillo rosso con frange e SPQR */
+const vexillumTex = (col, acc) => cachedTex('vexil40' + col + acc, () => {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d');
+  g.fillStyle = col; g.fillRect(0, 0, 128, 160);
+  g.strokeStyle = acc; g.lineWidth = 4; g.strokeRect(6, 6, 116, 148);
+  g.fillStyle = acc; g.font = 'bold 34px serif'; g.textAlign = 'center'; g.fillText('SPQR', 64, 92);
+  for (let x = 6; x < 124; x += 8) g.fillRect(x, 150, 4, 10);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+});
+const _texCache = new Map();
+function cachedTex(key, make) { if (!_texCache.has(key)) _texCache.set(key, make()); return _texCache.get(key); }
 /** zaini e oggetti sulla schiena (config BACKPACKS) */
 function buildBack(id, skin, torso) {
   const B = BACKPACKS.find(b => b.id === id) || { color: skin.backpack || '#7a5a2a', accent: skin.accColor || '#333' };
@@ -1575,6 +1697,63 @@ function buildBack(id, skin, torso) {
       mesh(torusGeo(0.27, 0.016, 28), met, 0, 0, 0, shg);
       sph(0.065, met, 0, 0, -0.018, shg, 1, 0.55);
       for (let i = 0; i < 8; i++) { const an = i / 8 * Math.PI * 2; sph(0.012, met, Math.cos(an) * 0.22, Math.sin(an) * 0.22, -0.017, shg); }
+      sling(texMat('leather', '#3a2414'));
+      break;
+    }
+    // ═════════ v40: Stagione 2 · Il Colosseo ═════════
+    case 'scutum': {
+      // scudo da legionario: grande rettangolo curvo rosso, umbone di bronzo, bordo e fasce di metallo, ali dipinte
+      const sg = new THREE.Group(); sg.position.set(0, -0.02, -0.06); sg.rotation.z = 0.06; g.add(sg);
+      const R = 0.48, span = 0.95, h = 0.66;
+      const red = mat(B.color, { roughness: 0.62, side: THREE.DoubleSide, map: scutumTex(B.color, B.accent) }), met = texMat('metal', B.accent, { side: THREE.DoubleSide });
+      const face = mesh(cachedGeo('scutum40', () => { const c = new THREE.CylinderGeometry(R, R, h, 24, 1, true, Math.PI - span / 2, span); c.translate(0, 0, R); return c; }), red, 0, 0, 0, sg);
+      face.castShadow = true;
+      mesh(cachedGeo('scutumBack40', () => { const c = new THREE.CylinderGeometry(R - 0.02, R - 0.02, h, 24, 1, true, Math.PI - span / 2, span); c.translate(0, 0, R); return c; }), texMat('wood', '#7a5a34', { side: THREE.DoubleSide }), 0, 0, 0, sg);
+      for (const y of [h / 2, -h / 2]) mesh(cachedGeo('scutumRim40', () => { const c = new THREE.CylinderGeometry(R + 0.004, R + 0.004, 0.022, 24, 1, true, Math.PI - span / 2, span); c.translate(0, 0, R); return c; }), met, 0, y, 0, sg);
+      for (const sd of [-1, 1]) { const a = span / 2; mesh(boxGeo(0.02, h + 0.02, 0.026), met, sd * Math.sin(a) * R, 0, R - Math.cos(a) * R - 0.006, sg).rotation.y = sd * a; }
+      mesh(cachedGeo('umbo40', () => lathe([[0.0, 0.05], [0.04, 0.045], [0.07, 0.02], [0.09, 0.0], [0.11, -0.004], [0.11, -0.012]], 20).rotateX(-Math.PI / 2)), met, 0, 0, -0.004, sg);
+      sling(texMat('leather', '#3a2414'));
+      break;
+    }
+    case 'bombole': {
+      // bombole da sub: due serbatoi gialli con rubinetteria, erogatore e tubi
+      const tk = mat(B.color, { roughness: 0.32, metalness: 0.15 }), ch = texMat('metal', '#c8ccd2'), hose = mat('#1a1a1e', { roughness: 0.6 });
+      for (const sd of [-1, 1]) {
+        mesh(cachedGeo('scubaTank40', () => lathe([[0.0, -0.21], [0.05, -0.205], [0.068, -0.18], [0.07, -0.15], [0.07, 0.15], [0.064, 0.19], [0.045, 0.215], [0.018, 0.226], [0.0, 0.228]], 18)), tk, 0.075 * sd, -0.02, -0.08, g);
+        mesh(torusGeo(0.071, 0.006, 18), mat(B.accent, { roughness: 0.5 }), 0.075 * sd, 0.1, -0.08, g).rotation.x = Math.PI / 2;
+        mesh(cylGeo(0.016, 0.016, 0.04, 8), ch, 0.075 * sd, 0.225, -0.08, g);
+      }
+      for (const y of [-0.12, 0.06]) mesh(roundBoxGeo(0.3, 0.035, 0.16, 0.012), texMat('webbing', '#24252a'), 0, y, -0.075, g);
+      mesh(cylGeo(0.012, 0.012, 0.17, 8), ch, 0, 0.245, -0.08, g).rotation.z = Math.PI / 2;
+      sph(0.03, ch, 0, 0.255, -0.08, g, 0.8);
+      mesh(cylGeo(0.02, 0.02, 0.03, 10), mat(B.accent, { roughness: 0.4 }), 0.1, 0.255, -0.08, g).rotation.z = Math.PI / 2;
+      mesh(cachedGeo('scubaHose40', () => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0.02, 0.26, -0.08), new THREE.Vector3(0.12, 0.3, -0.02), new THREE.Vector3(0.17, 0.26, 0.08), new THREE.Vector3(0.18, 0.15, 0.2)]), 16, 0.009, 6)), hose, 0, 0, 0, g);
+      sph(0.028, mat('#2a2a30', { roughness: 0.5 }), 0.18, 0.15, 0.21, g, 1, 0.8);
+      straps();
+      break;
+    }
+    case 'aquila': {
+      // insegna della legione: asta con l'aquila d'oro sulla corona d'alloro e il vessillo rosso con SPQR
+      const sg = new THREE.Group(); sg.rotation.z = 0.5; sg.position.z = -0.07; g.add(sg);
+      const gold = texMat('metal', B.accent), wood = texMat('wood', '#5a3a1e');
+      mesh(cylGeo(0.016, 0.016, 1.15, 8), wood, 0, 0.12, 0, sg);
+      mesh(coneGeo(0.022, 0.07, 6), gold, 0, -0.48, 0, sg).rotation.x = Math.PI;
+      mesh(cylGeo(0.06, 0.06, 0.006, 4), gold, 0, 0.32, 0, sg);
+      // vessillo appeso alla traversa
+      mesh(cylGeo(0.008, 0.008, 0.3, 6), gold, 0, 0.52, 0, sg).rotation.z = Math.PI / 2;
+      const ban = mesh(cachedGeo('vexil40', () => { const p = new THREE.PlaneGeometry(0.26, 0.3, 6, 6); const q = p.attributes.position; for (let i = 0; i < q.count; i++) q.setZ(i, Math.sin(q.getX(i) * 22) * 0.008); p.computeVertexNormals(); return p; }), mat('#ffffff', { roughness: 0.75, side: THREE.DoubleSide, map: vexillumTex(B.color, B.accent) }), 0, 0.36, -0.01, sg);
+      ban.rotation.y = Math.PI;
+      for (let k = 0; k < 5; k++) mesh(cylGeo(0.005, 0.005, 0.04, 4), gold, -0.12 + k * 0.06, 0.19, -0.01, sg);
+      // corona e aquila
+      mesh(torusGeo(0.06, 0.009, 18), gold, 0, 0.73, 0, sg);
+      const eg = new THREE.Group(); eg.position.y = 0.8; sg.add(eg);
+      sph(0.035, gold, 0, 0, 0, eg, 1.3, 0.8);
+      sph(0.022, gold, 0, 0.05, 0.012, eg);
+      mesh(coneGeo(0.009, 0.03, 5), gold, 0, 0.046, 0.04, eg).rotation.x = Math.PI / 2 + 0.4;
+      for (const sd of [-1, 1]) {
+        const w = mesh(cachedGeo('eagleWing40', () => { const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(0.06, 0.06, 0.12, 0.12); sh.lineTo(0.1, 0.06); sh.lineTo(0.12, 0.05); sh.lineTo(0.09, 0.0); sh.lineTo(0.1, -0.02); sh.quadraticCurveTo(0.05, -0.03, 0, -0.02); return new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: false }); }), gold, 0.02 * sd, 0.01, -0.004, eg);
+        w.scale.x = sd;
+      }
       sling(texMat('leather', '#3a2414'));
       break;
     }
@@ -1724,8 +1903,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=39';
-import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=39';
+export { buildWeaponMesh } from './weapons.js?v=40';
+import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=40';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
@@ -1845,4 +2024,4 @@ export function buildGlider(glider) {
 }
 
 /** Il "Battle Bus" volante: modello in models3d.js */
-export { buildBus } from './models3d.js?v=39';
+export { buildBus } from './models3d.js?v=40';

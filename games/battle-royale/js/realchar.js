@@ -12,20 +12,25 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { dressUp, HAS_COSTUME } from './costume.js?v=31';
+import { dressUp, HAS_COSTUME } from './costume.js?v=40';
 
 export const REAL = { ready: false, bases: {}, promise: null, prefix: 'models/chars/' };
 const FILES = { soldier: 'soldato.glb', woman: 'donna.glb' };
 // skin con il corpo femminile (le altre usano il soldato con l'armatura ricolorata)
-const WOMAN = new Set(['esploratrice', 'tamsin', 'scienziata', 'giardiniera']);
+const WOMAN = new Set(['esploratrice', 'tamsin', 'scienziata', 'giardiniera', 'sommozzatrice']);
 export const realKind = (skin) => (WOMAN.has(skin.id) ? 'woman' : 'soldier');
 
 // ── v26: un personaggio diverso per ogni skin ──
 export const SKIN_MODELS = new Set(['recluta', 'esploratrice', 'zombie', 'agente', 'ninja', 'tattico', 'pirata', 'meccanico',
   'cyber', 'astro', 'banana', 'cavaliere', 'drago', 'leo', 'tamsin', 'oren', 'cowboy', 'scienziata', 'vichingo', 'samurai',
-  'robot', 'spettro', 'giardiniera', 'rapper']);
+  'robot', 'spettro', 'giardiniera', 'rapper',
+  'gladiatore', 'imperatore', 'arlecchino', 'cuoco', 'sommozzatrice', 'mummia']);
+// v40: le skin nuove usano le stesse persone MakeHuman di altre skin (stesso file .glb, scaricato una volta sola
+// dal browser) con un costume e colori tutti loro
+const MODEL_FILE = { gladiatore: 'recluta', imperatore: 'agente', arlecchino: 'agente', cuoco: 'meccanico', sommozzatrice: 'esploratrice', mummia: 'zombie' };
 // questi personaggi hanno già un copricapo (casco, cappello, cappuccio, corna): niente cappello cosmetico sopra
-const OWN_HAT = new Set(['ninja', 'tattico', 'pirata', 'cavaliere', 'drago', 'cowboy', 'spettro', 'samurai', 'astro', 'vichingo', 'robot', 'banana']);
+const OWN_HAT = new Set(['ninja', 'tattico', 'pirata', 'cavaliere', 'drago', 'cowboy', 'spettro', 'samurai', 'astro', 'vichingo', 'robot', 'banana',
+  'gladiatore', 'imperatore', 'arlecchino', 'cuoco', 'sommozzatrice']);
 // tinte dei vestiti (parte del nome della mesh → colore): la trama del tessuto resta, cambia solo il colore
 const TINTS = {
   recluta: { 't-shirt': '#76845a', cargo: '#3e4630' },
@@ -42,6 +47,9 @@ const TINTS = {
   samurai: { kimono: '#9a1a24' },
   giardiniera: { casualsuit: '#5f8c40' },
   rapper: { 't-shirt': '#262626', cargo: '#3a5a9a' },
+  gladiatore: { 't-shirt': '#8a2a1e', cargo: '#6e2418', boots: '#5a3a1e' },
+  imperatore: { suit: '#e9e2d2', shoes: '#6a4a2a' },
+  cuoco: { worksuit: '#2e2e34', boots: '#1e1e1e' },
 };
 const skinModel = (skin) => (SKIN_MODELS.has(skin.id) ? skin.id : null);
 const LOADING = new Map();   // id → promise
@@ -87,7 +95,7 @@ function pump() {
   while (busy < 2 && QUEUE.length) {
     const [id, res] = QUEUE.shift();
     busy++;
-    loader.loadAsync(REAL.prefix + id + '.glb')
+    loader.loadAsync(REAL.prefix + (MODEL_FILE[id] || id) + '.glb')
       .then(g => (REAL.bases[id] = prepare(id, g)))
       .catch(e => { console.warn('Personaggio non caricato:', id, e); REAL.bases[id] = null; return null; })
       .then(r => { busy--; res(r); pump(); });

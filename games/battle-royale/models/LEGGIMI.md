@@ -30,6 +30,11 @@ Ogni skin ha un suo file, per esempio `chars/recluta.glb`, `chars/vichingo.glb` 
 - **Sostituzione:** si può usare qualunque glb umanoide con scheletro in stile Unreal (`pelvis`, `spine_01`,
   `upperarm_l`, `thumb_01_l`…) oppure Mixamo, con lo stesso nome file.
 - **Se un file manca:** quella skin usa il modello base qui sotto.
+- **Skin della Stagione 2 (v40):** non hanno un glb proprio, riusano il corpo di un'altra skin e ci costruiscono
+  sopra il costume (`js/costume.js`); la tabella `MODEL_FILE` in `js/realchar.js` dice quale file usano:
+  `gladiatore` → `recluta.glb`, `imperatore` → `agente.glb`, `arlecchino` → `agente.glb`, `cuoco` → `meccanico.glb`,
+  `sommozzatrice` → `esploratrice.glb`, `mummia` → `zombie.glb`. Per dare a una di queste skin un modello suo basta
+  aggiungere `chars/<id-skin>.glb` e togliere la sua riga da `MODEL_FILE`.
 
 ## Personaggi realistici (v25) — cartella `chars/`
 

@@ -2,16 +2,18 @@
 //  Menu principale: Gioca · Armadietto · Pass battaglia · Negozio · Missioni
 //  + lobby online (codice stanza, chat, compagni)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS, diffLabel } from './config.js?v=39';
-import { NEWS, NEWS_VERSION } from './news.js?v=39';
-import * as PR from './progress.js?v=39';
-import * as N from './net.js?v=39';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS, diffLabel } from './config.js?v=40';
+import { NEWS, NEWS_VERSION } from './news.js?v=40';
+import * as PR from './progress.js?v=40';
+import * as N from './net.js?v=40';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-const HAT_ICON = { none: '∅', cap: '🧢', beanie: '🧶', cowboy: '🤠', headphones: '🎧', straw: '👒', tophat: '🎩', viking: '⛑️', wizard: '🧙', crown: '👑', halo: '😇' };
-const BACK_ICON = { none: '∅', school: '🎒', hiker: '🏕️', guitar: '🎸', sword: '🗡️', jetpack: '🚀', wings: '🕊️', dragonwings: '🐉' };
+const HAT_ICON = { none: '∅', cap: '🧢', beanie: '🧶', cowboy: '🤠', headphones: '🎧', straw: '👒', tophat: '🎩', viking: '⛑️', wizard: '🧙', crown: '👑', halo: '😇',
+  alloro: '🌿', galea: '🪖', gondoliere: '👒', cuoco: '👨‍🍳', tricorno: '🎭', santa: '🎅', foxears: '🦊', samurai: '⛩️', tactical: '🪖', beret: '🎨', bucket: '🧭' };
+const BACK_ICON = { none: '∅', school: '🎒', hiker: '🏕️', guitar: '🎸', sword: '🗡️', jetpack: '🚀', wings: '🕊️', dragonwings: '🐉',
+  scutum: '🛡️', aquila: '🦅', bombole: '🤿', shield: '🛡️', quiver: '🏹', surf: '🏄', tactical: '📻' };
 const SETTING_KEY = { skin: 'skin', hat: 'hat', back: 'back', glider: 'glider' };
 
 function icon(type, it) {
@@ -42,9 +44,11 @@ export function initMenu(api) {
     toastT = setTimeout(() => t.classList.add('hidden'), 3200);
   }
   PR.onProgress(e => {
-    if (e.type === 'reward' && e.source === 'pass') {
+    if (e.type === 'reward' && (e.source === 'pass' || e.source === 'bonus')) {
       const r = e.reward, it = r.type === 'coins' ? null : PR.itemOf(r.type, r.id);
-      toast(`🎁 Ricompensa sbloccata: <b>${r.type === 'coins' ? r.n + ' monete' : esc(it ? it.name : r.id)}</b>`);
+      if (r.dup) { const d = PR.itemOf(r.dup.type, r.dup.id); toast(`🔁 ${esc(d ? d.name : r.dup.id)} era già tuo: <b>+${r.n} monete</b>`); }
+      else if (r.bonus) toast(`⭐ Livello bonus: <b>+${r.n} monete</b>`);
+      else toast(`🎁 Ricompensa sbloccata: <b>${r.type === 'coins' ? r.n + ' monete' : esc(it ? it.name : r.id)}</b>`);
     }
     refreshWallet();
   });
@@ -306,26 +310,70 @@ export function initMenu(api) {
     api.ui(); toast('🌟 Pass premium attivato! Le ricompense già raggiunte sono tue');
     renderPass(); refreshWallet();
   };
+  // v40: compra un livello
+  $('#buyTierBtn').onclick = () => {
+    const r = PR.buyTier();
+    if (!r.ok) { toast('❌ ' + esc(r.msg)); return; }
+    api.ui(); toast(`⭐ Livello ${r.tier} raggiunto!`);
+    renderPass(); refreshWallet();
+  };
+  // v40: messaggio di inizio stagione (una volta)
+  if (PR.profile.seasonNew) {
+    const ps = PR.profile.prevSeason;
+    setTimeout(() => toast(`🏛️ <b>${esc(PR.SEASON.name)}</b> è iniziata! Il pass riparte dal livello 1, i tuoi oggetti restano.${PR.profile.seasonGift ? ` Regalo: <b>+${PR.profile.seasonGift} monete</b>` : ''}${ps && ps.premium ? ' (grazie per il premium!)' : ''}`), 900);
+    PR.profile.seasonNew = false; PR.save();
+  }
   function rewardCell(r, prem, tier, reached) {
     if (!r) return `<div class="rw ${prem ? 'prem' : ''} empty"></div>`;
     const it = r.type === 'coins' ? null : PR.itemOf(r.type, r.id);
     const got = reached && (!prem || PR.profile.premium);
     const lock = !got;
-    const bg = it ? cardBg(r.type, it) : 'linear-gradient(160deg, #a07a1acc, #3a2a0a)';
+    const had = !got && it && PR.owns(r.type, r.id);   // già tuo: diventerà monete
+    const bg = it ? cardBg(r.type, it) : `linear-gradient(160deg, #a07a1acc, #3a2a0a)`;
     const ic = r.type === 'skin' ? `<div class="ic" style="font-size:12px;top:8px">${skinSwatch(it)}</div>` : `<div class="ic">${icon(r.type, it || {})}</div>`;
-    return `<div class="rw ${prem ? 'prem' : ''} ${got ? 'got' : ''} ${lock ? 'lock' : ''}" data-type="${r.type}" data-id="${r.id || ''}" style="background:${bg}">
+    const rar = it ? ` r${it.rarity || 0}` : '';
+    return `<div class="rw${rar} ${prem ? 'prem' : ''} ${got ? 'got' : ''} ${lock ? 'lock' : ''} ${had ? 'had' : ''} ${r.type === 'skin' ? 'skin' : ''}" data-type="${r.type}" data-id="${r.id || ''}" style="background:${bg}">
       ${ic}<span class="ty">${PR.TYPE_NAMES[r.type]}</span>${r.type === 'coins' ? r.n + ' monete' : esc(it.name)}</div>`;
   }
-  function renderPass() {
+  /** v40: vetrina delle ricompense più belle (skin e oggetti leggendari) con il livello */
+  function renderFeat() {
+    const feats = [];
+    for (const x of PR.PASS) for (const [r, prem] of [[x.free, false], [x.prem, true]]) {
+      if (!r || r.type === 'coins') continue;
+      const it = PR.itemOf(r.type, r.id);
+      if (r.type === 'skin' || (it.rarity || 0) >= 4) feats.push({ r, it, prem, tier: x.tier });
+    }
     const t = PR.tier();
+    $('#passFeat').innerHTML = feats.map(f => `<button class="pf ${f.prem ? 'prem' : ''} ${f.tier <= t && (!f.prem || PR.profile.premium) ? 'got' : ''}" data-type="${f.r.type}" data-id="${f.r.id}" data-tier="${f.tier}" style="background:${cardBg(f.r.type, f.it)}">
+      <span class="pft">${f.prem ? '★ ' : ''}Liv. ${f.tier}</span>${f.r.type === 'skin' ? skinSwatch(f.it) : `<span class="pfi">${icon(f.r.type, f.it)}</span>`}<b>${esc(f.it.name)}</b></button>`).join('');
+    $('#passFeat').querySelectorAll('.pf').forEach(el => {
+      el.onclick = () => {
+        api.ui(); previewItem(el.dataset.type, el.dataset.id);
+        const cell = $('#passTrack').children[+el.dataset.tier - 1];
+        if (cell) $('#passTrack').scrollLeft = cell.offsetLeft - $('#passTrack').clientWidth / 2 + 52;
+      };
+    });
+  }
+  function renderPass() {
+    const t = PR.tier(), done = t >= PR.PASS_TIERS;
     $('#passLvl').textContent = t;
-    $('#passXp').textContent = t >= PR.PASS_TIERS ? 'pass completato!' : `${Math.round(PR.tierProgress() * PR.XP_PER_TIER)} / ${PR.XP_PER_TIER} XP`;
+    $('#passXp').textContent = done ? `pass completato! Livelli bonus: ${PR.bonusLevels()} · ${Math.round(PR.bonusProgress() * PR.XP_PER_TIER)} / ${PR.XP_PER_TIER} XP` : `${Math.round(PR.tierProgress() * PR.XP_PER_TIER)} / ${PR.XP_PER_TIER} XP`;
+    $('#passBar').style.width = ((done ? PR.bonusProgress() : PR.tierProgress()) * 100).toFixed(1) + '%';
+    const d = PR.daysLeft();
+    $('#seasonDays').textContent = d > 1 ? `⏳ finisce tra ${d} giorni` : d === 1 ? '⏳ ultimo giorno!' : '⏳ stagione finita';
+    $('#passClaimed').textContent = `🎁 ${PR.rewardsClaimed()} / ${PR.PASS_TIERS * 2} ricompense`;
     const pb = $('#premiumBtn');
     pb.classList.toggle('owned', PR.profile.premium);
     pb.textContent = PR.profile.premium ? '✔ Pass premium attivo' : `Pass premium · ${PR.PREMIUM_PRICE} 🪙`;
+    const tb = $('#buyTierBtn');
+    tb.classList.toggle('hidden', done);
+    tb.textContent = `+1 livello · ${PR.TIER_PRICE} 🪙`;
+    const head = document.querySelector('.passhead');
+    if (head && PR.SEASON.art) head.style.setProperty('--art', `url(${PR.SEASON.art})`);
     const track = $('#passTrack');
-    track.innerHTML = PR.PASS.map(x => `<div class="tier ${x.tier <= t ? 'reached' : ''} ${x.tier === t ? 'current' : ''}">
-      <div class="num">${x.tier}</div>${rewardCell(x.free, false, x.tier, x.tier <= t)}${rewardCell(x.prem, true, x.tier, x.tier <= t)}</div>`).join('');
+    track.innerHTML = PR.PASS.map(x => `<div class="tier ${x.tier <= t ? 'reached' : ''} ${x.tier === t ? 'current' : ''} ${PR.MILESTONES.includes(x.tier) ? 'mile' : ''}">
+      <div class="num">${x.tier}</div>${rewardCell(x.free, false, x.tier, x.tier <= t)}${rewardCell(x.prem, true, x.tier, x.tier <= t)}</div>`).join('')
+      + `<div class="tier bonus ${done ? 'reached current' : ''}"><div class="num">40+</div><div class="rw bonusrw"><div class="ic">⭐</div><span class="ty">Livelli bonus</span>${PR.BONUS_COINS} monete ogni ${PR.XP_PER_TIER} XP</div></div>`;
     track.querySelectorAll('.rw[data-type]').forEach(el => {
       el.onclick = () => {
         const type = el.dataset.type, id = el.dataset.id;
@@ -333,9 +381,11 @@ export function initMenu(api) {
         api.ui();
         previewItem(type, id);
         const it = PR.itemOf(type, id);
-        toast(`${esc(it.name)} · ${PR.owns(type, id) ? 'già tuo: equipaggialo nell\'armadietto' : esc(PR.unlockInfo(type, id))}`);
+        const dup = PR.owns(type, id) && !el.classList.contains('got') ? ` (quando lo raggiungi: +${PR.dupCoins({ type, id })} monete)` : '';
+        toast(`${esc(it.name)} · ${PR.owns(type, id) ? 'già tuo: equipaggialo nell\'armadietto' + dup : esc(PR.unlockInfo(type, id))}`);
       };
     });
+    renderFeat();
     requestAnimationFrame(() => {
       const cur = track.querySelector('.tier.current');
       if (cur) track.scrollLeft = cur.offsetLeft - track.clientWidth / 2 + 52;

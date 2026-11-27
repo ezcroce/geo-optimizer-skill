@@ -1,42 +1,42 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=39';
+import { EMOTES, poseEmote } from './emotes.js?v=40';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=39';
-import * as PR from './progress.js?v=39';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=39';
-import { initMenu } from './menu.js?v=39';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=39';
-import { initSettingsUI } from './settings-ui.js?v=39';
+} from './config.js?v=40';
+import * as PR from './progress.js?v=40';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=40';
+import { initMenu } from './menu.js?v=40';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=40';
+import { initSettingsUI } from './settings-ui.js?v=40';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=39';
+import * as A from './audio.js?v=40';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
-} from './world.js?v=39';
+} from './world.js?v=40';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=39';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=39';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=39';
-import { buildChestMesh } from './models3d.js?v=39';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=33';
-import { createInventory } from './inventory.js?v=39';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=39';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=39';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=40';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=40';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=40';
+import { buildChestMesh } from './models3d.js?v=40';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=40';
+import { createInventory } from './inventory.js?v=40';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=40';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=40';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=39';
-import { buildPickaxe, heldConsumable } from './held.js?v=39';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=39';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=39';
-import { createCrosshair } from './crosshair.js?v=39';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=39';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=40';
+import { buildPickaxe, heldConsumable } from './held.js?v=40';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=40';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=40';
+import { createCrosshair } from './crosshair.js?v=40';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=40';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -72,6 +72,7 @@ const SETTINGS_DEFAULT = () => ({
   // controlli, audio e interfaccia
   adsSens: 1, invertY: false, fov: 70, crouchHold: false, shake: true, amb: 1, chColor: '#ffffff', chSize: 1, minimap: 'normal',
   touch: 'auto', touchSens: 1, touchSize: 1,
+  touchAlpha: 0.9, autoFire: 'on', aimAssist: 'on', haptics: true, touchLayout: {},   // v40
   gfx: { ...GFX_DEFAULT },
 });
 const FIRST_RUN = !localStorage.getItem('arenaRoyale');
@@ -182,17 +183,23 @@ const clouds = [];
 
 // Mondo
 // se in models/ ci sono i file .glb originali vengono caricati prima di costruire il mondo
+const LD = (f, t) => { try { window.LOADING && window.LOADING.set(f, t); } catch { /* schermata assente */ } };   // v40
+const nextPaint = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
+LD(0.62, 'Caricamento dei personaggi…');
 const [loadedModels] = await Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/', [settings.skin])]);   // v25/v26: personaggi realistici (quello del giocatore subito)
 if (loadedModels.length) console.info('Modelli GLB caricati:', loadedModels.join(', '));
+LD(0.74, "Costruzione dell'isola…");
+await nextPaint();
 let world = buildWorld(scene, { seed: 1337, random: false });
+LD(0.93, 'Ultimi ritocchi…');
 let stoves = createStoves(scene, world);   // v26: stufe a legna delle casette
 /** ricostruisce l'isola (Random Map: un seme nuovo a ogni partita) */
 async function prepareWorld(seed, random) {
-  if (world.seed === seed && world.random === random) return;
+  if (world.seed === seed && world.random === random) return false;
   const ld = $('#loading');
-  ld.querySelector('p').textContent = random ? "Generazione di un'isola casuale…" : "Caricamento dell'isola…";
   ld.classList.remove('hidden');
-  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 40)));
+  LD(0.18, random ? "Generazione di un'isola casuale…" : "Caricamento dell'isola…");
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 380)));   // v40: il tempo di far vedere la schermata
   for (const c of G.chests) if (c.mesh) scene.remove(c.mesh);
   G.chests = [];
   world.dispose();
@@ -201,6 +208,19 @@ async function prepareWorld(seed, random) {
   stoves = createStoves(scene, world);
   for (const cs of world.chestSpots) G.chests.push({ pos: cs.pos.clone(), rot: cs.rot, mesh: null, lid: null, opened: false, t: 0 });
   window.__game && (window.__game.world = world);
+  LD(1, 'Pronti al lancio!');
+  await new Promise(r => setTimeout(r, 250));
+  ld.classList.add('hidden');
+  return true;
+}
+/** v40: schermata di caricamento breve prima del bus quando l'isola è già pronta (si scaldano i personaggi) */
+async function matchIntro() {
+  const ld = $('#loading');
+  ld.classList.remove('hidden');
+  LD(0.35, 'Il bus della battaglia sta partendo…');
+  await new Promise(r => setTimeout(r, 500));
+  LD(1, 'Pronti al lancio!');
+  await new Promise(r => setTimeout(r, 700));
   ld.classList.add('hidden');
 }
 
@@ -1218,12 +1238,13 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
     if (head) PR.track('headshot', 1);
     dmgNumber(new THREE.Vector3(t.pos.x + rand(-0.3, 0.3), t.pos.y + 2.1, t.pos.z), amount, head ? 'head' : (sh > 0 ? 'shield' : ''));
     G.hitT = 0.15; $('#hitmarker').classList.toggle('head', head);
+    touch.buzz(head ? 22 : 12);   // v40
     XH.hit(head ? 'head' : sh > 0 ? 'shield' : 'body');
     sh > 0 ? A.playShieldHit() : A.playHit(head);
   }
   if (t === G.player) {
     G.hurtT = 0.4;
-    if (attacker) A.playHurt();
+    if (attacker) { A.playHurt(); touch.buzz(35); }
   }
   if (!t.isPlayer && attacker && attacker !== t && attacker.alive && t.ai) {
     if (!t.ai.target || Math.random() < 0.6) { t.ai.target = attacker; t.ai.lastSeen = G.time; t.ai.lastSeenPos.copy(attacker.pos); }
@@ -1938,19 +1959,19 @@ function preloadSkins(first = []) {
   if (first.length) prioritizeSkins(first);
 }
 /** v34: alla prima partita aspetta (al massimo maxMs) che i personaggi siano pronti, invece di scaricarli giocando */
-async function skinsReady(maxMs = 25000) {
+async function skinsReady(maxMs = 25000, keepOpen = false) {   // v40: keepOpen = subito dopo si carica l'isola (stessa schermata)
   let st = skinLoadStatus();
   if (st.done >= st.total) return;
   preloadSkins([settings.skin]);
-  const ld = $('#loading'), p = ld.querySelector('p');
+  const ld = $('#loading');
   ld.classList.remove('hidden');
   const t0 = performance.now();
   while (st.done < st.total && performance.now() - t0 < maxMs) {
-    p.textContent = `Preparazione dei personaggi… ${st.done}/${st.total}`;
+    LD(0.04 + 0.14 * st.done / Math.max(1, st.total), `Preparazione dei personaggi… ${st.done}/${st.total}`);
     await new Promise(r => setTimeout(r, 120));
     st = skinLoadStatus();
   }
-  ld.classList.add('hidden');
+  if (!keepOpen) ld.classList.add('hidden');
 }
 function preloadIcons() {
   const jobs = [];
@@ -2622,12 +2643,13 @@ const touch = createTouch({
   look(dx, dy) {
     if (G.paused || G.state === 'end' || G.state === 'menu') return;
     const zoomK = G.ads ? settings.adsSens / currentZoom() : 1;
-    const s = 0.0045 * (settings.touchSens || 1) * zoomK;
+    const s = 0.0045 * (settings.touchSens || 1) * zoomK * (G.assistSlow || 1);   // v40: rallenta sopra un avversario
     G.camYaw -= dx * s;
     G.camPitch = clamp(G.camPitch - dy * s * (settings.invertY ? -1 : 1), -1.35, 1.35);
   },
   togglePause: () => togglePause(true),
   toggleInv: () => toggleInventory(),
+  saveSettings: () => saveSettings(),
   onSlot(i) {
     const p = G.player;
     if (!p || !p.alive || G.state !== 'play') return;
@@ -2772,6 +2794,7 @@ function applySettings(key = '*') {
     $('#buildHint').textContent = touch.T.on ? 'MODALITÀ COSTRUZIONE · Spara: muro (10 🪵) · tocca di nuovo il pulsante per uscire' : 'MODALITÀ COSTRUZIONE · Click sx: muro (10 🪵) · Q per uscire';
   }
   if (all || key === 'touchSize') document.documentElement.style.setProperty('--tk', settings.touchSize || 1);
+  if (all || key === 'touchSize' || key === 'touchAlpha' || key === 'touchLayout') touch.applyLayout();   // v40
 }
 const settingsUI = initSettingsUI({
   settings, presets: PRESETS,
@@ -2779,6 +2802,7 @@ const settingsUI = initSettingsUI({
   apply: applySettings,
   defaults: () => { const d = SETTINGS_DEFAULT(); for (const k of ['name', 'skin', 'glider', 'difficulty', 'players', 'mode', 'hat', 'back']) delete d[k]; return d; },
   onReload: () => location.reload(),
+  action: (name, done) => { if (name === 'touchLayout') touch.editLayout(done); },   // v40
 });
 $('#setPauseBtn').onclick = e => { e.stopPropagation(); settingsUI.open(); };
 $('#setMenuBtn').onclick = () => { A.playUI(); settingsUI.open(); };
@@ -2948,6 +2972,7 @@ function updatePlayer(dt) {
   if (!keys.Space) p._noJumpUntilRelease = false;
   groundMove(p, mx, mz, speed, dt, keys.Space && !p._noJumpUntilRelease && !p.crouch);
   // azioni
+  touchAimTick(p, dt);   // v40: assistenza alla mira e fuoco automatico (solo touch)
   p.bloom = Math.max(0, p.bloom - dt * 0.12);
   if (G.build.on) {
     const s = buildSpot(p);
@@ -2968,8 +2993,49 @@ function updatePlayer(dt) {
         // la combo continua; mirando (tasto destro) il clic è un balzo
         if (mouse.leftPressed) clawAttack(p, G.ads ? 'pounce' : null);
         else if (mouse.left && !p.claw) clawAttack(p, null);
-      } else if ((def.auto && mouse.left) || mouse.leftPressed) playerFire(p, def);
+      } else if ((def.auto && (mouse.left || G.autoTrig)) || mouse.leftPressed || (G.autoTrig && p.fireCd <= 0)) playerFire(p, def);
     }
+  }
+}
+
+// ─────────────── v40: telefono: assistenza alla mira e fuoco automatico ───────────────
+const _aimD = new THREE.Vector3(), _aimR = new THREE.Vector3(), _aimU = new THREE.Vector3(), _aimT = new THREE.Vector3();
+function touchAimTick(p, dt) {
+  G.autoTrig = false; G.assistSlow = 1;
+  if (!touch.T.on || G.build.on || !p.alive || p.mode === 'climb' || p.inWater) return;
+  const s = p.slot, def = s && s.kind !== 'cons' ? WEAPONS[s.id] : null;
+  if (!def || def.melee) return;
+  camera.getWorldDirection(_aimD);
+  _aimR.crossVectors(_aimD, camera.up).normalize();
+  _aimU.crossVectors(_aimR, _aimD).normalize();
+  const camPos = camera.position;
+  const mode = settings.aimAssist || 'on';
+  if (mode !== 'off') {
+    const maxA = (mode === 'strong' ? 7 : 4.5) * Math.PI / 180;
+    let best = null, bestA = maxA;
+    for (const c of G.chars) {
+      if (c === p || !c.alive || c.mode === 'bus' || isMate(p, c)) continue;
+      _aimT.set(c.pos.x, c.pos.y + 1.15 * (c.hScale || 1), c.pos.z).sub(camPos);
+      const L = _aimT.length();
+      if (L > def.range || L < 1) continue;
+      _aimT.divideScalar(L);
+      const a = Math.acos(Math.min(1, _aimT.dot(_aimD)));
+      if (a < bestA && hasLOS(p, c)) { bestA = a; best = c; }
+    }
+    if (best) {
+      const k = 1 - bestA / maxA;
+      G.assistSlow = 1 - 0.45 * k;
+      // segue un po' il bersaglio (più forte se spari, miri o ti muovi)
+      const active = mouse.left || G.ads || touch.T.mx || touch.T.my;
+      const pull = (mode === 'strong' ? 5 : 3) * (active ? 1 : 0.35) * k * Math.min(1, dt);
+      _aimT.set(best.pos.x, best.pos.y + 1.15 * (best.hScale || 1), best.pos.z).sub(camPos).normalize();
+      G.camYaw -= _aimT.dot(_aimR) * pull;
+      G.camPitch = clamp(G.camPitch + _aimT.dot(_aimU) * pull, -1.35, 1.35);
+    }
+  }
+  if (settings.autoFire !== 'off' && G.state === 'play' && !(s.mag <= 0 && !(p.ammo[def.ammo] > 0))) {
+    const hit = rayAll(camPos, _aimD, def.range + 8, p);
+    if (hit && (hit.boss || (hit.char && !isMate(p, hit.char)))) G.autoTrig = true;
   }
 }
 
@@ -3566,8 +3632,9 @@ async function startMatch() {
     const mode = NET.role === 'host' ? NET.mode : settings.mode;
     const random = mode === 'random';
     const seed = random ? 1 + Math.floor(Math.random() * 2e9) : 1337;
-    await skinsReady();
-    await prepareWorld(seed, random);
+    await skinsReady(25000, !(world.seed === seed && world.random === random));
+    const rebuilt = await prepareWorld(seed, random);
+    if (!rebuilt && NET.role !== 'host') await matchIntro();
     if (NET.role === 'host') {
       // la lista dei partecipanti e dei bot la decide l'host
       const players = NET.players.map(p => ({ id: p.id, name: p.name, skin: p.skin, cos: { hat: p.hat, back: p.back, glider: p.glider } }));
@@ -3594,8 +3661,8 @@ async function startMatch() {
       netSend(start);
       if (wait.size) {
         const ld = $('#loading');
-        ld.querySelector('p').textContent = 'In attesa degli altri giocatori…';
         ld.classList.remove('hidden');
+        LD(null, 'In attesa degli altri giocatori…');
         const t0 = performance.now();
         while (wait.size && performance.now() - t0 < 45000 && NET.role === 'host') {
           wait.forEach(id => { if (!NET.players.some(p => p.id === id)) wait.delete(id); });
@@ -3616,14 +3683,14 @@ async function onNetStart(msg) {
   // v34: i messaggi che arrivano mentre l'isola si carica vengono messi da parte (prima andavano persi)
   G.netQueue = []; G.netGo = false; G.netAborted = false;
   try {
-    await skinsReady(20000);
+    await skinsReady(20000, !(world.seed === msg.seed && world.random === msg.random));
     await prepareWorld(msg.seed, msg.random);
   } catch (e) { G.netQueue = null; $('#loading').classList.add('hidden'); throw e; }
   netSend({ t: 'ready', relay: false });
   if (!G.netGo) {
     const ld = $('#loading');
-    ld.querySelector('p').textContent = 'In attesa degli altri giocatori…';
     ld.classList.remove('hidden');
+    LD(null, 'In attesa degli altri giocatori…');
     const t0 = performance.now();
     while (!G.netGo && performance.now() - t0 < 30000 && NET.role === 'client') await new Promise(r => setTimeout(r, 50));
     ld.classList.add('hidden');
@@ -4911,7 +4978,8 @@ addEventListener('resize', () => {
 
 applySettings();
 buildMenu();
-$('#loading').classList.add('hidden');
+LD(1, 'Pronti!');
+setTimeout(() => $('#loading').classList.add('hidden'), 300);
 // icone delle armi: preparate poco per volta, quando il menu è già visibile
 {
   const q = [];

@@ -1,11 +1,11 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
-import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=39';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=39';
-import { createCrosshair } from './crosshair.js?v=39';
+import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=40';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=40';
+import { createCrosshair } from './crosshair.js?v=40';
 // rarità più frequente di ogni arma (colore della scheda e dell'anteprima)
 const WEAPON_RAR = { claws: 4, ...Object.fromEntries(WEAPON_POOL.map(e => [e.id, e.rar.indexOf(Math.max(...e.rar))])) };
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=39';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=40';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -529,7 +529,7 @@ const thumbs = renderThumbs();
     const r = RARITIES[s.rarity];
     return `<button class="skin reveal${s.id === settings.skin ? ' equipped' : ''}" data-id="${s.id}" style="--rc:${r.color};--d:${(i % 5) * 0.06}s" aria-label="Equipaggia ${s.name}">
       <img src="${thumbs.skins[s.id]}" alt="" />
-      <span class="eq">IN USO</span>
+      <span class="eq">IN USO</span>${s.lock ? `<span class="lk">${s.lock === 'pass' ? '🎟️ Pass' : '🛒 Negozio'}</span>` : ''}
       <span class="info"><b>${s.name}</b><span>${r.name}</span></span>
     </button>`;
   }).join('');
@@ -537,6 +537,8 @@ const thumbs = renderThumbs();
     const b = e.target.closest('.skin');
     if (!b) return;
     const s = SKINS.find(x => x.id === b.dataset.id);
+    // v40: le skin del pass e del negozio si sbloccano nel gioco
+    if (s.lock) { hero.show(SKINS.indexOf(s)); toast(`🔒 ${s.name} si sblocca ${s.lock === 'pass' ? 'nel pass battaglia della Stagione 2' : 'nel negozio del gioco'}`); return; }
     settings.skin = s.id; saveSettings();
     el.querySelectorAll('.skin').forEach(x => x.classList.toggle('equipped', x === b));
     b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');

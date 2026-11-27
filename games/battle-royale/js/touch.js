@@ -93,6 +93,7 @@ export function createTouch(api) {
     setKnob(0, 0); T.mx = T.my = 0; T.sprint = false;
   }
   root.addEventListener('pointerdown', e => {
+    if (ED.on) { edDown(e); return; }
     if (!T.on) return;
     e.preventDefault();
     const b = e.target.closest('.tbtn');
@@ -102,7 +103,7 @@ export function createTouch(api) {
       ptr.set(e.pointerId, { kind: 'btn', b: name, el: b, x: e.clientX, y: e.clientY });
       try { root.setPointerCapture(e.pointerId); } catch { /* ok */ }
       DOWN[name] && DOWN[name]();
-      if (navigator.vibrate && name === 'fire') try { navigator.vibrate(8); } catch { /* ok */ }
+      if (name === 'fire' && api.settings?.haptics !== false && navigator.vibrate) try { navigator.vibrate(8); } catch { /* ok */ }
       return;
     }
     try { root.setPointerCapture(e.pointerId); } catch { /* ok */ }
@@ -133,6 +134,7 @@ export function createTouch(api) {
     joy.classList.toggle('sprint', T.sprint);
   }
   root.addEventListener('pointermove', e => {
+    if (ED.on) { edMove(e); return; }
     const p = ptr.get(e.pointerId);
     if (!p) return;
     e.preventDefault();
@@ -144,6 +146,7 @@ export function createTouch(api) {
     }
   }, { passive: false });
   function end(e) {
+    if (ED.on) { edUp(e); return; }
     const p = ptr.get(e.pointerId);
     if (!p) return;
     ptr.delete(e.pointerId);
@@ -186,6 +189,7 @@ export function createTouch(api) {
   const vis = (name, show) => { for (const b of btn[name] || []) b.classList.toggle('hidden', !show); };
   /** chiamato a ogni fotogramma: mostra solo i pulsanti che servono in quel momento */
   function update() {
+    if (ED.on) return;
     if (!T.on) return;
     const playing = (G.state === 'play' || G.state === 'bus') && !G.paused && G.player;
     root.classList.toggle('hidden', !playing);
@@ -213,5 +217,107 @@ export function createTouch(api) {
     if (!p.weapon && mouse.right) mouse.right = false;
   }
 
-  return { T, enable, update, releaseAll, root };
+  // ═════════ v40: pulsanti su misura (posizione e dimensione), trasparenza, vibrazione ═════════
+  const S = api.settings || {};
+  const keyOf = el => el.classList.contains('ttop') ? 'ttop' : [...el.classList].find(c => c !== 'tbtn' && c !== 'hidden' && c !== 'on' && c !== 'down' && c !== 'tsmall' && c !== 'sel' && /^t[A-Za-z]+$/.test(c));
+  const movable = () => [...root.querySelectorAll('.tbtn:not(.tsmall), .ttop')];
+  /** applica posizioni e dimensioni salvate (centro in frazione dello schermo, s = scala) */
+  function applyLayout() {
+    const L = S.touchLayout || {};
+    root.style.setProperty('--talpha', String(S.touchAlpha ?? 1));
+    for (const el of movable()) {
+      const k = keyOf(el), c = L[k];
+      el.style.removeProperty('--k');
+      el.style.left = el.style.top = el.style.right = el.style.bottom = '';
+      if (!c) continue;
+      if (c.s && c.s !== 1) el.style.setProperty('--k', `calc(var(--tk, 1) * ${c.s})`);
+      const w = el.offsetWidth || 60, h = el.offsetHeight || 60;
+      el.style.right = 'auto'; el.style.bottom = 'auto';
+      el.style.left = Math.round(c.x * innerWidth - w / 2) + 'px';
+      el.style.top = Math.round(c.y * innerHeight - h / 2) + 'px';
+    }
+  }
+  addEventListener('resize', () => setTimeout(applyLayout, 60));
+  const ED = { on: false, sel: null, drag: null, done: null, bar: null };
+  function edSelect(el) {
+    for (const b of movable()) b.classList.toggle('sel', b === el);
+    ED.sel = el;
+    const lbl = ED.bar.querySelector('.tedname');
+    lbl.textContent = el ? (el.getAttribute('aria-label') || (keyOf(el) === 'ttop' ? 'Pulsanti in alto' : 'Pulsante')) : 'Tocca un pulsante';
+  }
+  function edSave(el) {
+    const r = el.getBoundingClientRect(), k = keyOf(el);
+    S.touchLayout = S.touchLayout || {};
+    const prev = S.touchLayout[k] || {};
+    S.touchLayout[k] = { x: +((r.left + r.width / 2) / innerWidth).toFixed(4), y: +((r.top + r.height / 2) / innerHeight).toFixed(4), s: prev.s || 1 };
+  }
+  function edDown(e) {
+    e.preventDefault();
+    if (e.target.closest('.tedbar')) return;
+    let el = e.target.closest('.tbtn, .ttop');
+    if (el && el.classList.contains('tsmall')) el = el.closest('.ttop');
+    if (!el) { edSelect(null); return; }
+    edSelect(el);
+    const r = el.getBoundingClientRect();
+    ED.drag = { id: e.pointerId, el, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    try { root.setPointerCapture(e.pointerId); } catch { /* ok */ }
+  }
+  function edMove(e) {
+    const d = ED.drag; if (!d || d.id !== e.pointerId) return;
+    e.preventDefault();
+    const el = d.el, w = el.offsetWidth, h = el.offsetHeight;
+    el.style.right = 'auto'; el.style.bottom = 'auto';
+    el.style.left = Math.round(Math.max(0, Math.min(innerWidth - w, e.clientX - d.dx))) + 'px';
+    el.style.top = Math.round(Math.max(0, Math.min(innerHeight - h, e.clientY - d.dy))) + 'px';
+  }
+  function edUp(e) {
+    const d = ED.drag; if (!d || d.id !== e.pointerId) return;
+    ED.drag = null; edSave(d.el);
+  }
+  function edScale(f) {
+    const el = ED.sel; if (!el) return;
+    edSave(el);
+    const k = keyOf(el), c = S.touchLayout[k];
+    c.s = Math.max(0.6, Math.min(1.8, +((c.s || 1) * f).toFixed(3)));
+    applyLayout(); edSave(el);
+  }
+  /** apre l'editor dei pulsanti; done() quando si preme «Fatto» */
+  function editLayout(done) {
+    if (ED.on) return;
+    ED.on = true; ED.done = done || null;
+    releaseAll();
+    if (!ED.bar) {
+      ED.bar = document.createElement('div');
+      ED.bar.className = 'tedbar';
+      ED.bar.innerHTML = `<div class="tedtxt"><b>Disponi i pulsanti</b><span>Trascinali dove vuoi · tocca un pulsante per ingrandirlo o rimpicciolirlo</span></div>
+        <div class="tedctl"><span class="tedname">Tocca un pulsante</span><button data-a="minus" aria-label="Più piccolo">−</button><button data-a="plus" aria-label="Più grande">+</button>
+        <button data-a="reset" class="ghost">Ripristina</button><button data-a="done" class="ok">Fatto</button></div>`;
+      ED.bar.addEventListener('pointerdown', ev => {
+        ev.stopPropagation();
+        const a = ev.target.closest('button')?.dataset.a; if (!a) return;
+        ev.preventDefault();
+        if (a === 'minus') edScale(1 / 1.12);
+        else if (a === 'plus') edScale(1.12);
+        else if (a === 'reset') { S.touchLayout = {}; applyLayout(); edSelect(null); }
+        else if (a === 'done') closeEditor();
+      });
+      root.appendChild(ED.bar);
+    }
+    root.classList.remove('hidden'); root.classList.add('editing');
+    document.body.classList.add('touch-edit');
+    applyLayout(); edSelect(null);
+  }
+  function closeEditor() {
+    ED.on = false; ED.drag = null;
+    for (const b of movable()) b.classList.remove('sel');
+    root.classList.remove('editing'); document.body.classList.remove('touch-edit');
+    if (!T.on || !(G.state === 'play' || G.state === 'bus')) root.classList.add('hidden');
+    api.saveSettings && api.saveSettings();
+    const cb = ED.done; ED.done = null; if (cb) cb();
+  }
+  /** vibrazione breve (se il telefono la supporta e l'opzione è attiva) */
+  function buzz(ms) { if (!T.on || S.haptics === false || !navigator.vibrate) return; try { navigator.vibrate(ms); } catch { /* ok */ } }
+  applyLayout();
+
+  return { T, enable, update, releaseAll, root, applyLayout, editLayout, buzz, get editing() { return ED.on; } };
 }

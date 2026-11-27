@@ -1,9 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v39';
+export const NEWS_VERSION = 'v40';
 
 export const NEWS = [
+  {
+    v: 'v40', title: 'Stagione 2 · Il Colosseo', color: '#ffcf2e', icon: '🏛️',
+    items: [
+      'Nuovo pass battaglia con 80 ricompense: una gratis e una premium a ogni livello. Il pass riparte dal livello 1, ma tutto quello che hai sbloccato resta tuo (più un regalo di monete)',
+      'Puoi comprare un livello a 150 monete; dopo il livello 40 ogni 1000 XP è un livello bonus da 50 monete; gli oggetti del pass che possiedi già diventano monete',
+      'Sei skin nuove: Gladiatore e Imperatore (premium), Arlecchino, Chef Gusto e Sommozzatrice, e la Mummia nel negozio',
+      'Cappelli nuovi (alloro, elmo da legionario, paglietta da gondoliere, cappello da chef, tricorno), zaini nuovi (scudo romano, aquila della legione, bombole da sub) e cinque deltaplani',
+      'Da telefono: Impostazioni › Disponi i pulsanti per spostare e ingrandire ogni comando, fuoco automatico, mira assistita, trasparenza dei pulsanti e vibrazione',
+      'Schermate di caricamento illustrate, con le fasi del caricamento e un consiglio',
+      'Installa il gioco dal browser («Aggiungi a schermata Home»): ha un’icona tutta nuova',
+    ],
+  },
   {
     v: 'v39', title: 'Balletti nuovi e un Gargoyle in carne e ossa', color: '#ff7ab6', icon: '💃',
     items: [

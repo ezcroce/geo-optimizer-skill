@@ -30,6 +30,12 @@ const SCHEMA = [
     { key: 'touch', type: 'select', label: 'Comandi touch', options: [['auto', 'Automatici (su telefono e tablet)'], ['on', 'Sempre attivi'], ['off', 'Disattivati']], hint: 'Joystick, pulsanti e trascinamento per guardarsi intorno.' },
     { key: 'touchSens', type: 'range', label: 'Sensibilità touch', min: 0.3, max: 3, step: 0.05, fmt: v => v.toFixed(2) },
     { key: 'touchSize', type: 'range', label: 'Dimensione pulsanti touch', min: 0.7, max: 1.4, step: 0.05, fmt: pct },
+    // v40: più giocabile da telefono
+    { key: 'touchLayout', type: 'button', label: 'Disponi i pulsanti touch', btn: '✋ Disponi', action: 'touchLayout', hint: 'Sposta ogni pulsante dove ti viene comodo e cambiane la dimensione.' },
+    { key: 'touchAlpha', type: 'range', label: 'Opacità pulsanti touch', min: 0.25, max: 1, step: 0.05, fmt: pct, hint: 'Pulsanti più trasparenti = si vede meglio la partita.' },
+    { key: 'autoFire', type: 'select', label: 'Fuoco automatico (touch)', options: [['on', 'Attivo'], ['off', 'Disattivato']], hint: 'Spara da solo quando il mirino è sopra un avversario. Il pulsante di fuoco funziona sempre.' },
+    { key: 'aimAssist', type: 'select', label: 'Assistenza alla mira (touch)', options: [['strong', 'Forte'], ['on', 'Normale'], ['off', 'Disattivata']], hint: 'Vicino a un avversario la visuale rallenta e lo segue un po\'.' },
+    { key: 'haptics', type: 'toggle', label: 'Vibrazione', hint: 'Breve vibrazione quando spari, colpisci o vieni colpito (sui telefoni che la supportano).' },
   ] },
   { id: 'audio', label: 'Audio', items: [
     { key: 'vol', type: 'range', label: 'Volume generale', min: 0, max: 1, step: 0.05, fmt: pct },
@@ -83,6 +89,7 @@ export function initSettingsUI(o) {
     else if (it.type === 'toggle') html += `<button class="tgl${v ? ' on' : ''}" aria-pressed="${!!v}"><i></i></button>`;
     else if (it.type === 'select') html += `<select>${it.options.map(([val, l]) => `<option value="${val}"${String(val) === String(v) ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
     else if (it.type === 'seg') html += it.options.filter(([val]) => val !== 'custom' || v === 'custom').map(([val, l]) => `<button data-v="${val}" class="${val === v ? 'on' : ''}">${l}</button>`).join('');
+    else if (it.type === 'button') html += `<button class="setbtn">${it.btn}</button>`;
     else if (it.type === 'color') html += it.options.map(c => `<button class="sw${c === v ? ' on' : ''}" data-v="${c}" style="--c:${c}"></button>`).join('');
     row.innerHTML = html + '</div>';
     const ctl = row.querySelector('.setctl');
@@ -92,6 +99,12 @@ export function initSettingsUI(o) {
     } else if (it.type === 'toggle') {
       const b = ctl.querySelector('button');
       b.onclick = () => { const nv = !get(it); b.classList.toggle('on', nv); b.setAttribute('aria-pressed', nv); set(it, nv); };
+    } else if (it.type === 'button') {
+      ctl.querySelector('button').onclick = () => {
+        const reopen = onClose; onClose = null;
+        root.classList.add('hidden');
+        o.action && o.action(it.action, () => open(reopen));
+      };
     } else if (it.type === 'select') {
       const s = ctl.querySelector('select');
       s.onchange = () => set(it, it.num ? +s.value : it.bool ? s.value === 'true' : s.value);

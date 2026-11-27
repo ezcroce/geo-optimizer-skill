@@ -228,6 +228,13 @@ export const SKINS = [
   { id: 'spettro', name: 'Spettro Gelido', rarity: 4, shirt: '#dce8f8', pants: '#b8c8e0', skin: '#c8d8f0', shoes: '#8aa0c0', acc: 'none', hair: '#f0f8ff', glow: '#7fd0ff', torn: true, cape: '#a8c0e8', lock: 'shop' },
   { id: 'giardiniera', name: 'Giardiniera', rarity: 1, shirt: '#e8d06a', pants: '#5a8a3a', skin: '#c48a62', shoes: '#4a3a2a', acc: 'none', hair: '#2a1a12', overalls: '#5a8a3a', boots: true, hat: 'straw', lock: 'shop' },
   { id: 'rapper', name: 'MC Rima', rarity: 2, shirt: '#2a2a2a', pants: '#3a5a9a', skin: '#8a5a3a', shoes: '#f2f2f2', acc: 'shades', hair: '#141414', chain: '#ffd24a', hat: 'beanie', lock: 'shop' },
+  // ── v40: Stagione 2 · Il Colosseo (stessi personaggi MakeHuman, costumi nuovi) ──
+  { id: 'gladiatore', name: 'Gladiatore', rarity: 4, shirt: '#8a2a1e', pants: '#6e2418', skin: '#d9a070', shoes: '#5a3a1e', acc: 'knight', accColor: '#c8903a', hair: '#3a2414', belt: '#5a3018', boots: true, lock: 'pass' },
+  { id: 'imperatore', name: 'Imperatore', rarity: 4, shirt: '#efe9dc', pants: '#efe9dc', skin: '#e0b088', shoes: '#6a4a2a', acc: 'none', hair: '#2a1a10', cape: '#4a1050', gold: '#f0c860', lock: 'pass' },
+  { id: 'arlecchino', name: 'Arlecchino', rarity: 3, shirt: '#c0202a', pants: '#1a6a2a', skin: '#e8c0a0', shoes: '#141414', acc: 'pirate', accColor: '#141414', hair: '#1a1a1a', lock: 'pass' },
+  { id: 'cuoco', name: 'Chef Gusto', rarity: 2, shirt: '#f4f4f0', pants: '#2e2e34', skin: '#c8946a', shoes: '#1e1e1e', acc: 'none', hair: '#3a2a1a', beard: '#3a2a1a', scarf: '#c0202a', lock: 'pass' },
+  { id: 'sommozzatrice', name: 'Sommozzatrice', rarity: 2, shirt: '#141418', pants: '#141418', skin: '#e0b090', shoes: '#2a2a2a', acc: 'ponytail', accColor: '#1ab0c0', hair: '#5a3a22', lock: 'pass' },
+  { id: 'mummia', name: 'Mummia', rarity: 3, shirt: '#d8ccb0', pants: '#d0c4a8', skin: '#c8bca0', shoes: '#a89c80', acc: 'none', hair: '#c8bca0', glow: '#ffd23a', torn: true, lock: 'shop' },
 ];
 
 /** Cappelli (si mettono su qualsiasi skin che non abbia già un casco) */
@@ -249,6 +256,12 @@ export const HATS = [
   { id: 'santa', name: 'Cappello di Natale', rarity: 2, color: '#c8202a', accent: '#f6f2ea', lock: 'shop' },
   { id: 'foxears', name: 'Orecchie da volpe', rarity: 3, color: '#e0702a', accent: '#fff0e0', lock: 'shop' },
   { id: 'samurai', name: 'Kabuto da samurai', rarity: 4, color: '#1a1a22', accent: '#e8b830', lock: 'shop' },
+  // v40
+  { id: 'alloro', name: "Corona d'alloro", rarity: 4, color: '#e8bf48', accent: '#b0182a', lock: 'pass' },
+  { id: 'galea', name: 'Elmo da legionario', rarity: 3, color: '#b8863a', accent: '#b8141e', lock: 'pass' },
+  { id: 'gondoliere', name: 'Paglietta da gondoliere', rarity: 2, color: '#e8d08a', accent: '#c0202a', lock: 'pass' },
+  { id: 'cuoco', name: 'Cappello da cuoco', rarity: 1, color: '#f6f6f2', lock: 'pass' },
+  { id: 'tricorno', name: 'Tricorno veneziano', rarity: 3, color: '#17171a', accent: '#e0b040', lock: 'shop' },
 ];
 
 /** Zaini e oggetti sulla schiena */
@@ -265,6 +278,10 @@ export const BACKPACKS = [
   { id: 'quiver', name: 'Faretra', rarity: 2, color: '#6a3e1e', accent: '#e04a3a', lock: 'shop' },
   { id: 'surf', name: 'Tavola da surf', rarity: 2, color: '#f2f0e6', accent: '#1aa0d8', lock: 'shop' },
   { id: 'shield', name: 'Scudo del guerriero', rarity: 3, color: '#8a5a30', accent: '#c8ccd4', lock: 'pass' },
+  // v40
+  { id: 'scutum', name: 'Scudo da legionario', rarity: 3, color: '#a8141c', accent: '#e0b040', lock: 'pass' },
+  { id: 'aquila', name: 'Insegna della legione', rarity: 4, color: '#a8141c', accent: '#f0c040', lock: 'pass' },
+  { id: 'bombole', name: 'Bombole da sub', rarity: 2, color: '#f2c21a', accent: '#1a1a1e', lock: 'shop' },
 ];
 
 /** Modalità di gioco */
@@ -301,6 +318,12 @@ export const GLIDERS = [
   { id: 'arcobaleno', name: 'Arcobaleno', color: '#ff4ab0', accent: '#4affe0', rarity: 2, lock: 'pass' },
   { id: 'oro', name: 'Ala Dorata', color: '#ffc830', accent: '#fff4c0', rarity: 4, lock: 'pass' },
   { id: 'tigre', name: 'Tigre', color: '#ff8a1a', accent: '#1a1a1a', rarity: 3, lock: 'shop' },
+  // v40
+  { id: 'imperiale', name: 'Imperiale', color: '#6a1a5a', accent: '#f0c040', rarity: 4, lock: 'pass' },
+  { id: 'laguna', name: 'Laguna', color: '#2a8ac8', accent: '#f0c040', rarity: 2, lock: 'pass' },
+  { id: 'mosaico', name: 'Mosaico', color: '#e8dcc0', accent: '#a8141c', rarity: 3, lock: 'pass' },
+  { id: 'tramonto', name: 'Tramonto', color: '#ff7a3a', accent: '#5a1a6a', rarity: 1, lock: 'pass' },
+  { id: 'carnevale', name: 'Carnevale', color: '#c8202a', accent: '#2a5ad0', rarity: 3, lock: 'shop' },
 ];
 
 export const DIFFICULTY = {

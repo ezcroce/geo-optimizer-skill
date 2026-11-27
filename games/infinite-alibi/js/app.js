@@ -1650,14 +1650,17 @@
     let saved = '';
     try { saved = localStorage.getItem('ia-name') || ''; } catch (e) { /* niente */ }
     const fileMode = location.protocol === 'file:';
+    const staticHost = /(^|\.)githack\.com$/i.test(location.hostname);
+    const noServer = fileMode || staticHost;
     openModal(`
       <h2>🌐 Online</h2>
       <p class="tagline">Ognuno gioca dal suo dispositivo. Il server genera il caso e custodisce il montaggio del Colpevole: gli altri ricevono il filmato solo all'inizio della raccolta prove, senza dati segreti.</p>
       ${fileMode ? '<div class="card secret"><p>Stai aprendo il file in locale. Per giocare online avvia il server:<br/><span class="kbd">cd games/infinite-alibi && npm install && npm start</span><br/>poi apri <b>http://localhost:8080</b> (o l\'indirizzo del server) su ogni dispositivo.</p></div>' : ''}
+      ${staticHost ? '<div class="card secret"><p>Questa versione pubblica è statica: le partite online richiedono un server dedicato. Puoi giocare in modalità Detective, Colpevole o Party.</p></div>' : ''}
       ${err ? `<p class="bad">${esc(err)}</p>` : ''}
       <div class="row"><label>Il tuo nome</label><input type="text" id="netName" maxlength="14" value="${esc(saved)}" placeholder="es. Giulia"/></div>
-      <div class="row"><button class="primary" data-act="netCreate" ${fileMode ? 'disabled' : ''}>Crea una stanza</button></div>
-      <div class="row"><label>Codice</label><input type="text" id="netCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"/><button data-act="netJoin" ${fileMode ? 'disabled' : ''}>Entra</button></div>
+      <div class="row"><button class="primary" data-act="netCreate" ${noServer ? 'disabled' : ''}>Crea una stanza</button></div>
+      <div class="row"><label>Codice</label><input type="text" id="netCode" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"/><button data-act="netJoin" ${noServer ? 'disabled' : ''}>Entra</button></div>
       <div class="row"><button data-act="menu">← Menu</button></div>
     `);
   }

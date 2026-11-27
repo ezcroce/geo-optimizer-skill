@@ -1,0 +1,24 @@
+{
+  "name": "gravity-cafe",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test src/*.test.js",
+    "test:browser": "playwright test",
+    "models:generate": "node scripts/generate-models.mjs",
+    "build:standalone": "node scripts/build-standalone.mjs",
+    "test:offline": "npm run build:standalone && playwright test --config playwright.offline.config.js"
+  },
+  "dependencies": {
+    "lucide": "^0.468.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "vite": "^6.1.0"
+  }
+}

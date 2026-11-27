@@ -17,7 +17,7 @@ TH.world = (() => {
     { id: 'studio',    name: 'Studio Blindato',   x: 29, y: 2,  w: 13, h: 10, floor: T.FLOOR },
     { id: 'corridoio', name: 'Corridoio Servizio',x: 2,  y: 13, w: 40, h: 5,  floor: T.FLOOR },
     { id: 'salone',    name: 'Salone',            x: 2,  y: 19, w: 18, h: 11, floor: T.FLOOR },
-    { id: 'ingresso',  name: 'Ingresso',          x: 21, y: 19, w: 21, h: 11, floor: T.FLOOR },
+    { id: 'ingresso',  name: 'Giardino d’Inverno',x: 21, y: 19, w: 21, h: 11, floor: T.FLOOR },
   ];
   const roomById = (id) => ROOMS.find((r) => r.id === id);
 
@@ -60,6 +60,10 @@ TH.world = (() => {
     { tx: 30, ty: 10, kind: 'plant',   label: 'Pianta' },
     { tx: 40, ty: 10, kind: 'plant',   label: 'Pianta' },
     { tx: 24, ty: 28, kind: 'plant',   label: 'Pianta' },
+    { tx: 24, ty: 22, kind: 'plant',   label: 'Palma' },
+    { tx: 39, ty: 20, kind: 'plant',   label: 'Palma' },
+    { tx: 12, ty: 26, kind: 'column',  label: 'Colonna' },
+    { tx: 30, ty: 14, kind: 'column',  label: 'Colonna' },
   ];
 
   const EXIT_TILES = [{ tx: 30, ty: 29 }, { tx: 31, ty: 29 }, { tx: 32, ty: 29 }, { tx: 33, ty: 29 }, { tx: 34, ty: 29 }];

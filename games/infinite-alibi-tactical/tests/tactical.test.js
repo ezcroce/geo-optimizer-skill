@@ -55,6 +55,21 @@ test('interrogatorio rileva spostamenti impossibili fra dichiarazioni',()=>{
   const G=make(['hacker','trasformista']);safe(G);G.evidence=[{type:'testimone',thiefId:0,room:'cucina',turn:1,second:1},{type:'testimone',thiefId:0,room:'studio',turn:2,second:6}];
   M.startInvestigation('escape');assert.equal(M.answer('cucina').ok,true);const result=M.answer('studio');assert.equal(result.ok,false);assert.match(result.text,/geometrica/);assert.equal(G.outcome,'smascherati');
 });
+test('training solitario registra tracce reali senza allarme e passa all’indagine',()=>{
+  const G=M.newGame({training:true,roles:['infiltrato'],requireLockpick:true});const a=G.thieves[0];
+  M.queueAction(a,{type:'move',tx:27,ty:6,mode:'run'});execute();assert(G.evidence.some(e=>e.type==='impronte'&&e.room==='biblioteca'));assert.equal(G.phase,'planning');
+  M.queueAction(a,{type:'move',tx:34,ty:4,mode:'run'});M.queueAction(a,{type:'grab'});for(let i=0;i<3&&G.diamond.takenBy===null;i++)execute();assert.equal(G.diamond.takenBy,0);
+  M.startInvestigation('training');assert(G.investigation.findings.some(e=>e.type==='impronte'));while(G.phase==='investigation'){const e=G.investigation.findings[G.investigation.index];M.answer(e.room);}assert.equal(G.outcome,'training completato');
+});
+test('serratura meccanica richiede scasso in modalità immersiva',()=>{
+  const G=M.newGame({roles:['infiltrato','hacker'],requireLockpick:true});safe(G);const a=G.thieves[0];a.x=14.5;a.y=6.5;
+  M.queueAction(a,{type:'move',tx:16,ty:6,mode:'walk'});execute();assert(G.doorsState['15,6'].locked);assert(G.events.some(e=>e.type==='azione fallita'));
+  M.queueAction(a,{type:'lockpick',tx:15,ty:6});execute();assert.equal(G.doorsState['15,6'].locked,false);assert(G.evidence.some(e=>e.type==='effrazione'));
+});
+test('coperture bloccano la linea visiva e il terminale registra l’accesso',()=>{
+  assert.equal(V.los(23.5,22.5,25.5,22.5),false);
+  const G=make(['hacker','infiltrato']);safe(G);const h=G.thieves[0];h.x=33.5;h.y=16.5;M.queueAction(h,{type:'terminal'});execute();assert(G.evidence.some(e=>e.type==='accesso digitale'&&e.terminal));
+});
 test('colpo completo dalla posizione iniziale con pathfinding, condotto, furto e fuga',()=>{
   const G=make(['infiltrato','hacker']);safe(G);const [a,b]=G.thieves;
   for(const action of [{type:'move',tx:34,ty:4,mode:'sneak'},{type:'grab'},{type:'move',tx:30,ty:29,mode:'sneak'},{type:'escape'}])M.queueAction(a,action);

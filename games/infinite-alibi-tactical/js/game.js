@@ -24,10 +24,10 @@ TH.game = (() => {
   function message(s) { G.message=s; G.messages.unshift(`T${G.turn} · ${s}`); G.messages=G.messages.slice(0,30); }
   function newGame(opts={}) {
     let roles = opts.roles || ['infiltrato','hacker','trasformista','ricognitore'].slice(0,opts.teamSize || 4);
-    if (roles.length < 2 || roles.length > 4 || new Set(roles).size !== roles.length || roles.some(r=>!ROLES[r])) throw Error('Scegli da 2 a 4 specialisti diversi');
-    G={ phase:'planning', turn:1, elapsed:0, turnElapsed:0, alarm:0, selected:0, message:'Pianifica senza fretta. Conferma ogni specialista.', messages:[], events:[], evidence:[], spies:[], doorsState:{}, diamond:{takenBy:null,out:false}, outcome:null, investigation:null };
+    if (roles.length < (opts.training ? 1 : 2) || roles.length > 4 || new Set(roles).size !== roles.length || roles.some(r=>!ROLES[r])) throw Error('Scegli da 2 a 4 specialisti diversi');
+    G={ training:!!opts.training, requireLockpick:!!opts.requireLockpick, phase:'planning', turn:1, elapsed:0, turnElapsed:0, alarm:0, selected:0, message:'Pianifica senza fretta. Conferma ogni specialista.', messages:[], events:[], evidence:[], spies:[], doorsState:{}, diamond:{takenBy:null,out:false}, outcome:null, investigation:null };
     for (const d of W.DOORS) G.doorsState[d.tx+','+d.ty]={locked:d.type==='ldoor'||d.type==='edoor'};
-    const spawns=[[24,27],[26,27],[28,27],[30,27]];
+    const spawns=opts.training ? [[25,6]] : [[24,27],[26,27],[28,27],[30,27]];
     G.thieves=roles.map((role,id)=>({id, role, name:ROLES[role].name, color:ROLES[role].color, x:spawns[id][0]+.5,y:spawns[id][1]+.5,queue:[],ready:false,escaped:false,carrying:false, moveMode:'walk',revealed:new Set(), lastPrint:null}));
     // Pattuglie con tappe nella stessa stanza: nessun attraversamento dei muri.
     G.guards=[
@@ -37,6 +37,7 @@ TH.game = (() => {
     ].map((g,id)=>({...g,id,angle:0,det:{},distractedUntil:0,path:null}));
     G.guests=[{x:6.5,y:6.5,angle:0},{x:12.5,y:9.5,angle:1},{x:8.5,y:22.5,angle:2},{x:16.5,y:26.5,angle:3}].map((g,id)=>({...g,id,observed:{}}));
     G.cameras=[{x:40.5,y:3.5,base:2.65},{x:3.5,y:14.5,base:0},{x:18.5,y:20.5,base:2.8},{x:40.5,y:28.5,base:Math.PI}].map((c,id)=>({...c,id,angle:c.base,disabledUntil:0,det:{}}));
+    if (opts.training) { G.guards=[]; G.guests=[]; G.cameras=[{id:0,x:40.5,y:8.5,base:Math.PI,angle:Math.PI,disabledUntil:0,det:{}}]; }
     for(const th of G.thieves) event('inizio',th);
     return G;
   }
@@ -55,6 +56,7 @@ TH.game = (() => {
     if(d && doorState(d.tx,d.ty)?.locked) {
       const allowed=(d.type==='ldoor'&&th.role==='infiltrato')||(d.type==='edoor'&&th.role==='hacker');
       if(!allowed) return failed(th,'porta chiusa');
+      if(G.requireLockpick && d.type==='ldoor') return failed(th,'serratura chiusa: usa Scassina dalla posizione adiacente');
       if(!timed(a,dt,1.5)) return;
       a.progress=0; doorState(d.tx,d.ty).locked=false;
       trace(d.type==='ldoor'?'effrazione':'accesso digitale',th,{x:d.tx,y:d.ty,room:roomAt(d.tx+.5,d.ty+.5)});
@@ -63,6 +65,7 @@ TH.game = (() => {
     if(W.ventPair(prev.tx,prev.ty)?.tx===node.tx && W.ventPair(prev.tx,prev.ty)?.ty===node.ty) {
       if(!timed(a,dt,.5))return; a.progress=0; th.x=node.tx+.5;th.y=node.ty+.5; a.i++;trace('condotto',th); return;
     }
+    th.crouched=false;
     const tx=node.tx+.5, ty=node.ty+.5, dx=tx-th.x,dy=ty-th.y, len=Math.hypot(dx,dy), amount=Math.min(len,SPEED[a.mode||'walk']*dt);
     if(len>0){th.x+=dx/len*amount;th.y+=dy/len*amount;}
     if(len<=amount+1e-7){th.x=tx;th.y=ty;a.i++; event('movimento',th,{mode:a.mode||'walk'});
@@ -94,6 +97,17 @@ TH.game = (() => {
       case 'unlock': {
         const d=W.doorAt(a.tx,a.ty); if(th.role!=='hacker'||!d||d.type!=='edoor'||!doorState(d.tx,d.ty).locked||!near(th,d.tx,d.ty,7)||!V.los(th.x,th.y,d.tx+.5,d.ty+.5))return failed(th,'porta elettronica non raggiungibile');
         doorState(d.tx,d.ty).locked=false;trace('accesso digitale',th,{x:d.tx,y:d.ty});message('Porta elettronica sbloccata.');break;}
+      case 'lockpick': {
+        const d=W.doorAt(a.tx,a.ty);
+        if(th.role!=='infiltrato'||!d||d.type!=='ldoor'||!doorState(d.tx,d.ty).locked||!near(th,d.tx,d.ty,1.6))return failed(th,'serve una serratura meccanica adiacente');
+        doorState(d.tx,d.ty).locked=false;trace('effrazione',th,{x:d.tx,y:d.ty,room:roomAt(d.tx+.5,d.ty+.5)});message('Serratura scassinata.');break;}
+      case 'crouch': {
+        const cover=W.FURN.some(f=>near(th,f.tx,f.ty,2));
+        if(!cover && !th.crouched)return failed(th,'serve una copertura vicina');
+        th.crouched=!th.crouched;event('copertura',th,{crouched:th.crouched});message(th.crouched?'In copertura: esposizione ridotta.':'Copertura lasciata.');break;}
+      case 'terminal': {
+        if(th.role!=='hacker'||!near(th,33,16,2))return failed(th,'avvicina l’Hacker al terminale nel corridoio');
+        G.cameras.forEach(c=>c.disabledUntil=G.elapsed+15);trace('accesso digitale',th,{terminal:true});message('Terminale hackerato: telecamere offline per 15 secondi.');break;}
       case 'falsify': {
         if(th.role!=='hacker')return failed(th,'serve l’Hacker');
         let n=0;for(const e of G.evidence) if((e.type==='accesso digitale'||e.type==='telecamera spenta')&&!e.erased){e.erased=true;n++;}
@@ -131,12 +145,12 @@ TH.game = (() => {
       const poly=V.cone(o.x,o.y,o.angle,fov,range,24,G.doorsState);o._cone=poly;
       for(const th of G.thieves){if(th.escaped)continue;
         const d=dist(o,th), seen=(kind!=='guardia'||G.elapsed>=o.distractedUntil)&&d<range&&V.inCone(poly,th.x,th.y,o.x,o.y,G.doorsState);
-        const blending=th.role==='trasformista'&&G.guests.some(g=>dist(th,g)<2.5);
+        const blending=(th.role==='trasformista'&&G.guests.some(g=>dist(th,g)<2.5))||(th.crouched&&W.FURN.some(f=>near(th,f.tx,f.ty,2)));
         const mode=th.queue[0]?.type==='move'?th.queue[0].mode:'idle';
         const rate=V.spotRate(d,range,{state:mode,blending}) * 35;
         o.det[th.id]=Math.max(0,Math.min(100,(o.det[th.id]||0)+(seen?rate:-18)*dt));
         max=Math.max(max,o.det[th.id]);
-        if(o.det[th.id]>=100){ trace('avvistamento',th,{observer:kind});message(`${th.name} avvistato: allarme generale!`);G.alarm=100;startInvestigation('alarm');return; }
+        if(o.det[th.id]>=100 && !G.training){ trace('avvistamento',th,{observer:kind});message(`${th.name} avvistato: allarme generale!`);G.alarm=100;startInvestigation('alarm');return; }
       }
     }
     G.alarm=max;
@@ -195,7 +209,7 @@ TH.game = (() => {
     }
     if(!ok)I.contradictions++;
     I.answers.push({thiefId:e.thiefId,turn:e.turn,room,ok,text});I.index++;
-    if(I.index>=I.findings.length){G.phase='over';G.outcome=I.reason==='escape'&&I.contradictions===0?'fuga pulita':I.reason!=='escape'?'colpo interrotto':'smascherati';}
+    if(I.index>=I.findings.length){G.phase='over';G.outcome=I.reason==='training'?'training completato':I.reason==='escape'&&I.contradictions===0?'fuga pulita':I.reason!=='escape'?'colpo interrotto':'smascherati';}
     return {ok,text};
   }
   function visibleNow(){const s=new Set();for(const th of G.thieves){if(th.escaped)continue;for(const k of V.visibleTiles(th.x,th.y,th.role==='ricognitore'?9:6,G.doorsState))s.add(k);for(const k of th.revealed)s.add(k);}return s;}

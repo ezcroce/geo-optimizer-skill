@@ -944,7 +944,7 @@ function drawBlueprint(targetCanvas, state, me, detailed = false) {
   }
 
   // Draw Walls
-  ctx.strokeStyle = '#d4af37';
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.78)';
   ctx.lineWidth = detailed ? 2.4 : 1.4;
   for (const seg of WALL_SEGMENTS) {
     const [sx1, sy1] = toScreen(seg.x1, seg.z1);
@@ -1238,32 +1238,75 @@ function submitVote(targetId) {
   }
 }
 
+let activeGameoverClipIdx = 0;
+
 function renderGameoverModal(state) {
   const modal = document.getElementById('gameover-modal');
   modal.classList.remove('hidden');
 
+  const kicker = document.getElementById('gameover-kicker');
   const title = document.getElementById('gameover-title');
+  const showcase = document.getElementById('gameover-cctv-showcase');
+  const clipTabs = document.getElementById('gameover-clip-tabs');
+  const metaLabel = document.getElementById('gameover-cctv-meta');
+
+  activeGameoverClipIdx = 0;
+
   if (state.winner === 'thief') {
-    title.textContent = '💎 VITTORIA DEL LADRO!';
-    title.style.color = '#f87171';
+    kicker.textContent = 'COLPO RIUSCITO · IL LADRO È FUGGITO';
+    title.textContent = '💎 VITTORIA DEL LADRO';
+    title.style.color = '#fb7185';
+    showcase.classList.add('hidden');
   } else {
-    title.textContent = '🛡️ VITTORIA DEI CIVILI!';
+    kicker.textContent = 'COLPEVOLE SMASCHERATO · PROVA TELECAMERE ACQUISITA';
+    title.textContent = '🛡️ COLPEVOLE INCASTRATO!';
     title.style.color = '#38bdf8';
+
+    const moments = state.thiefCaughtMoments || [];
+    if (moments.length > 0) {
+      showcase.classList.remove('hidden');
+      const updateClipMeta = (idx) => {
+        activeGameoverClipIdx = idx;
+        const m = moments[idx] || moments[0];
+        metaLabel.textContent = `${m.camCode} · ${m.roomName.toUpperCase()}`;
+        Array.from(clipTabs.children).forEach((btn, bIdx) => {
+          btn.classList.toggle('active', bIdx === idx);
+        });
+      };
+
+      clipTabs.innerHTML = '';
+      if (moments.length > 1) {
+        moments.forEach((m, idx) => {
+          const pill = document.createElement('button');
+          pill.className = `clip-tab-pill${idx === 0 ? ' active' : ''}`;
+          const mins = String(Math.floor((m.time || 0) / 60)).padStart(2, '0');
+          const secs = String(Math.floor((m.time || 0) % 60)).padStart(2, '0');
+          pill.textContent = `📹 Ripresa ${idx + 1} · ${m.roomName} (${mins}:${secs})`;
+          pill.addEventListener('click', () => updateClipMeta(idx));
+          clipTabs.appendChild(pill);
+        });
+      }
+      updateClipMeta(0);
+    } else {
+      showcase.classList.add('hidden');
+    }
   }
 
   document.getElementById('gameover-reason').textContent = state.winReason;
 
   const rosterEl = document.getElementById('gameover-roster-reveal');
   rosterEl.innerHTML = '';
-  for (const p of state.players) {
+  // Sort so the Thief appears prominently first
+  const sortedPlayers = [...state.players].sort((a, b) => (b.role === 'thief') - (a.role === 'thief'));
+  for (const p of sortedPlayers) {
     const row = document.createElement('div');
-    row.className = 'room-slot-card';
     const isThief = p.role === 'thief';
+    row.className = `room-slot-card${isThief ? ' culprit-highlight' : ''}`;
     row.innerHTML = `
-      <span class="room-slot-dot" style="background:${isThief ? '#ef4444' : '#38bdf8'}"></span>
+      <span class="room-slot-dot" style="background:${isThief ? '#f43f5e' : '#38bdf8'};color:${isThief ? '#f43f5e' : '#38bdf8'}"></span>
       <strong>${p.name}</strong>
-      <span style="margin-left:auto;font-weight:700;color:${isThief ? '#f87171' : '#7dd3fc'}">
-        ${isThief ? '🕵️ LADRO' : 'Civile'}
+      <span style="margin-left:auto;font-weight:700;font-size:0.78rem;color:${isThief ? '#fda4af' : '#7dd3fc'}">
+        ${isThief ? (state.winner === 'civilians' ? '🕵️ LADRO (SGAMATO)' : '🕵️ LADRO') : 'Civile'}
       </span>
     `;
     rosterEl.appendChild(row);
@@ -1868,6 +1911,18 @@ function animate(now) {
     }
   } else if (state.phase === 'meeting') {
     renderMeetingModal(state, false);
+  } else if (state.phase === 'gameover' && state.winner === 'civilians') {
+    const thief = state.players.find((p) => p.role === 'thief');
+    const moments = state.thiefCaughtMoments || [];
+    const clip = moments[activeGameoverClipIdx] || moments[0];
+    if (thief && clip) {
+      villaScene.renderCaughtReplayToCanvas(
+        document.getElementById('gameover-replay-canvas'),
+        clip,
+        thief,
+        elapsedSec
+      );
+    }
   }
 }
 

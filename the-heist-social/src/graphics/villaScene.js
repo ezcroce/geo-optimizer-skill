@@ -1326,6 +1326,270 @@ export class VillaSceneManager {
     return { glitched: false, visiblePlayers, suspiciousActivity, camDef };
   }
 
+  /**
+   * Renders an animated 3D CCTV "Caught Red-Handed" replay loop onto a 2D canvas
+   * for the End-of-Match screen when the Thief is caught ("sgamato").
+   */
+  renderCaughtReplayToCanvas(canvas, moment, thiefPlayer, elapsedSec) {
+    if (!canvas || !moment || !thiefPlayer) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    if (!this.renderer) {
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(0, 0, w, h);
+      return;
+    }
+
+    if (!this._replayCam) {
+      this._replayCam = new THREE.PerspectiveCamera(58, 16 / 9, 0.2, 65);
+    }
+
+    const avatar = this.avatars.get(thiefPlayer.id);
+    // Save temporary states of all avatars so we can stage the exact replay cleanly
+    const savedStates = [];
+    for (const [id, av] of this.avatars.entries()) {
+      savedStates.push({
+        av,
+        visible: av.root.visible,
+        x: av.root.position.x,
+        z: av.root.position.z,
+        rotY: av.root.rotation.y,
+        labelVis: av.nameSprite ? av.nameSprite.visible : true,
+      });
+      if (id !== thiefPlayer.id) {
+        av.root.visible = false;
+      }
+    }
+
+    // 4.6-second crime replay choreography
+    const loopDuration = 4.6;
+    const loopT = elapsedSec % loopDuration;
+
+    // Determine security camera ceiling mount position
+    const camDef = CCTV_CAMERAS.find((c) => c.id === moment.camId) || CCTV_CAMERAS[0];
+    let camPosX = camDef.pos.x;
+    let camPosY = camDef.pos.y;
+    let camPosZ = camDef.pos.z;
+
+    if ((moment.useRoomDirectCam || Math.hypot(camPosX - moment.x, camPosZ - moment.z) > 9.5) && moment.roomBounds) {
+      const rb = moment.roomBounds;
+      const roomCenterX = (rb.x1 + rb.x2) * 0.5;
+      const roomCenterZ = (rb.z1 + rb.z2) * 0.5;
+      // Step ~4.4m from the crime spot toward the open interior of that zone so no wall blocks it and culprit is close!
+      const dirX = moment.x <= roomCenterX ? 1 : -1;
+      const dirZ = moment.z <= roomCenterZ ? 1 : -1;
+      camPosX = Math.max(rb.x1 + 0.85, Math.min(rb.x2 - 0.85, moment.x + dirX * 3.4));
+      camPosZ = Math.max(rb.z1 + 0.85, Math.min(rb.z2 - 0.85, moment.z + dirZ * 3.4));
+      camPosY = 2.95;
+    }
+
+    // Direction from crime spot toward camera
+    const toCamX = camPosX - moment.x;
+    const toCamZ = camPosZ - moment.z;
+    const toCamLen = Math.hypot(toCamX, toCamZ) || 1;
+    const perpX = -toCamZ / toCamLen;
+    const perpZ = toCamX / toCamLen;
+    const angleToCam = Math.atan2(toCamX, toCamZ);
+
+    let culpritX = moment.x;
+    let culpritZ = moment.z;
+    let culpritRotY = moment.rotY || 0;
+    let simSpeed = 0;
+    let simInteracting = false;
+
+    if (loopT < 1.35) {
+      // Phase 1: Thief sneaks up to the target
+      const u = loopT / 1.35;
+      const offset = (1 - u) * 1.15;
+      culpritX = moment.x - perpX * offset;
+      culpritZ = moment.z - perpZ * offset;
+      culpritRotY = Math.atan2(perpX, perpZ);
+      simSpeed = 3.6;
+    } else if (loopT < 3.15) {
+      // Phase 2: Committing the heist / hiding the diamond
+      culpritX = moment.x;
+      culpritZ = moment.z;
+      culpritRotY = angleToCam + Math.PI * 0.72;
+      simInteracting = true;
+    } else {
+      // Phase 3: Startled! Turns directly toward the CCTV lens — caught red-handed!
+      const turnU = Math.min(1, (loopT - 3.15) / 0.55);
+      const startAng = angleToCam + Math.PI * 0.72;
+      culpritX = moment.x;
+      culpritZ = moment.z;
+      culpritRotY = startAng + (angleToCam - startAng) * turnU;
+    }
+
+    if (avatar) {
+      avatar.root.visible = true;
+      avatar.setGhostStyle(false);
+      if (avatar.nameSprite) avatar.nameSprite.visible = false;
+      avatar.root.position.set(culpritX, 0, culpritZ);
+      avatar.root.rotation.y = culpritRotY;
+      avatar.updateAnimation(0.033, {
+        speed: simSpeed,
+        interacting: simInteracting,
+        usingCctv: false,
+      });
+    }
+
+    // Smooth PTZ zoom-in onto the culprit
+    const zoomFactor = loopT < 1.2 ? 0 : Math.min(1, (loopT - 1.2) / 2.2);
+    const fov = 58 - zoomFactor * 21; // Zooms from 58° to 37° (1.6x optical zoom)
+    this._replayCam.fov = fov;
+    this._replayCam.position.set(camPosX, camPosY, camPosZ);
+    this._replayCam.lookAt(culpritX, 1.12, culpritZ);
+    this._replayCam.updateProjectionMatrix();
+    this._replayCam.updateMatrixWorld();
+
+    // Ensure walls don't block ceiling lens if indoor lights were dimmed during sabotage
+    const prevFog = this.scene.fog;
+    this.scene.fog = null;
+    this.renderer.setRenderTarget(this.cctvRenderTarget);
+    this.renderer.render(this.scene, this._replayCam);
+    this.renderer.setRenderTarget(null);
+    this.scene.fog = prevFog;
+
+    // Project culprit 3D chest/head to 2D canvas coordinates BEFORE restoring avatar
+    const projHead = new THREE.Vector3(culpritX, 1.62, culpritZ).project(this._replayCam);
+    const projFeet = new THREE.Vector3(culpritX, 0.12, culpritZ).project(this._replayCam);
+
+    // Restore all avatars
+    for (const s of savedStates) {
+      s.av.root.visible = s.visible;
+      s.av.root.position.x = s.x;
+      s.av.root.position.z = s.z;
+      s.av.root.rotation.y = s.rotY;
+      if (s.av.nameSprite) s.av.nameSprite.visible = s.labelVis;
+    }
+
+    // Copy WebGL pixels to 2D canvas with crisp nocturnal CCTV grading
+    const width = this.cctvRenderTarget.width;
+    const height = this.cctvRenderTarget.height;
+    if (!this._pixelBuf || this._pixelBuf.length !== width * height * 4) {
+      this._pixelBuf = new Uint8Array(width * height * 4);
+      this._offCanvas = document.createElement('canvas');
+      this._offCanvas.width = width;
+      this._offCanvas.height = height;
+      this._offCtx = this._offCanvas.getContext('2d');
+      this._imgData = this._offCtx.createImageData(width, height);
+    }
+    this.renderer.readRenderTargetPixels(this.cctvRenderTarget, 0, 0, width, height, this._pixelBuf);
+
+    const dst = this._imgData.data;
+    for (let row = 0; row < height; row++) {
+      const srcRow = (height - 1 - row) * width * 4;
+      const dstRow = row * width * 4;
+      for (let col = 0; col < width * 4; col += 4) {
+        const r = this._pixelBuf[srcRow + col];
+        const g = this._pixelBuf[srcRow + col + 1];
+        const b = this._pixelBuf[srcRow + col + 2];
+        dst[dstRow + col] = Math.min(255, r * 0.96 + 10);
+        dst[dstRow + col + 1] = Math.min(255, g * 1.06 + 14);
+        dst[dstRow + col + 2] = Math.min(255, b * 1.04 + 16);
+        dst[dstRow + col + 3] = 255;
+      }
+    }
+    this._offCtx.putImageData(this._imgData, 0, 0);
+    ctx.drawImage(this._offCanvas, 0, 0, w, h);
+
+    // Subtle digital scanlines + vignette
+    ctx.fillStyle = 'rgba(4, 12, 24, 0.15)';
+    for (let y = 0; y < h; y += 3) {
+      ctx.fillRect(0, y, w, 1);
+    }
+
+    // Draw AI Motion/Suspect Tracking Reticle around the Culprit!
+    if (projHead.z < 1 && projFeet.z < 1) {
+      const cx = (projHead.x * 0.5 + 0.5) * w;
+      const topY = (-projHead.y * 0.5 + 0.5) * h - 14;
+      const botY = (-projFeet.y * 0.5 + 0.5) * h + 8;
+      const boxH = Math.max(70, Math.min(h * 0.72, botY - topY));
+      const boxW = boxH * 0.56;
+      const bx = cx - boxW / 2;
+      const by = topY;
+
+      const locked = loopT >= 1.35;
+      const col = locked ? '#f43f5e' : '#38bdf8';
+
+      ctx.save();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.2;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 10;
+
+      // Corner brackets
+      const brk = Math.min(18, boxW * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(bx, by + brk); ctx.lineTo(bx, by); ctx.lineTo(bx + brk, by);
+      ctx.moveTo(bx + boxW - brk, by); ctx.lineTo(bx + boxW, by); ctx.lineTo(bx + boxW, by + brk);
+      ctx.moveTo(bx, by + boxH - brk); ctx.lineTo(bx, by + boxH); ctx.lineTo(bx + brk, by + boxH);
+      ctx.moveTo(bx + boxW - brk, by + boxH); ctx.lineTo(bx + boxW, by + boxH); ctx.lineTo(bx + boxW, by + boxH - brk);
+      ctx.stroke();
+
+      // Scanning laser line inside reticle
+      const scanY = by + ((elapsedSec * 90) % boxH);
+      ctx.fillStyle = locked ? 'rgba(244, 63, 94, 0.35)' : 'rgba(56, 189, 248, 0.3)';
+      ctx.fillRect(bx + 2, scanY, boxW - 4, 2);
+
+      // Pill tag above suspect's head
+      const tagText = locked
+        ? `● COLPEVOLE: ${thiefPlayer.name.toUpperCase()}`
+        : `ANALISI VOLTO...`;
+      ctx.font = 'bold 11px "JetBrains Mono", monospace';
+      const tw = ctx.measureText(tagText).width + 16;
+      const tx = Math.max(8, Math.min(w - tw - 8, cx - tw / 2));
+      const ty = Math.max(40, by - 24);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = locked ? 'rgba(225, 29, 72, 0.92)' : 'rgba(14, 165, 233, 0.88)';
+      ctx.fillRect(tx, ty, tw, 19);
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'left';
+      ctx.fillText(tagText, tx + 8, ty + 13.5);
+      ctx.restore();
+    }
+
+    // DVR Rewind Glitch flash at the end of loop
+    if (loopT > loopDuration - 0.16) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.fillRect(0, (loopT * 900) % h, w, 26);
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+      ctx.fillRect(0, ((loopT * 500) + 80) % h, w, 12);
+    }
+
+    // Modern Top Telemetry Bar
+    ctx.fillStyle = 'rgba(7, 11, 20, 0.82)';
+    ctx.fillRect(0, 0, w, 34);
+    if (Math.floor(elapsedSec * 2.5) % 2 === 0) {
+      ctx.fillStyle = '#f43f5e';
+      ctx.beginPath();
+      ctx.arc(18, 17, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`REPLAY PROVA  ·  ${moment.camCode}`, 30, 21);
+
+    const mins = String(Math.floor((moment.time || 0) / 60)).padStart(2, '0');
+    const secs = String(Math.floor((moment.time || 0) % 60)).padStart(2, '0');
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillText(`ZOOM ${(58 / fov).toFixed(1)}x  ·  MIN ${mins}:${secs}`, w - 14, 21);
+
+    // Modern Bottom Crime Alert Bar
+    ctx.fillStyle = 'rgba(7, 11, 20, 0.88)';
+    ctx.fillRect(0, h - 38, w, 38);
+    ctx.fillStyle = '#f43f5e';
+    ctx.fillRect(0, h - 38, 4, 38);
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#fda4af';
+    ctx.fillText(`${moment.crimeTitle}: ${moment.detailLabel}`, 14, h - 14);
+  }
+
   screenToWorldOnGround(clientX, clientY) {
     const rect = this.canvas.getBoundingClientRect();
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;

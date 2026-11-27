@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/styles.css" />
@@ -468,13 +468,28 @@
     </div>
 
     <!-- =========================================================
-         7. GAMEOVER / POST-HEIST DEBRIEF
+         7. GAMEOVER / POST-HEIST DEBRIEF + CAUGHT ON CAMERA REPLAY
     ========================================================== -->
     <section id="gameover-modal" class="overlay-screen hidden">
       <div class="gameover-card glass-panel">
-        <div id="gameover-kicker" class="brand-kicker">FINE DELLA PARTITA</div>
+        <div id="gameover-kicker" class="brand-kicker">DOSSIER FINALE PARTITA</div>
         <h1 id="gameover-title">VITTORIA DEI CIVILI</h1>
         <p id="gameover-reason" class="gameover-reason"></p>
+
+        <!-- Shown when the Thief is caught ("sgamato"): Live 3D Security Camera Replay -->
+        <div id="gameover-cctv-showcase" class="gameover-cctv-showcase hidden">
+          <div class="gameover-cctv-header">
+            <span class="rec-live-badge">
+              <span class="rec-dot"></span> FILMATO DI SICUREZZA — IL MOMENTO IN CUI È STATO RIPRESO
+            </span>
+            <span id="gameover-cctv-meta" class="gameover-cctv-meta">CAM-01 · ATRIO</span>
+          </div>
+          <div class="gameover-cctv-frame">
+            <canvas id="gameover-replay-canvas" width="640" height="360"></canvas>
+          </div>
+          <div id="gameover-clip-tabs" class="gameover-clip-tabs"></div>
+        </div>
+
         <div id="gameover-roster-reveal" class="gameover-roster"></div>
         <div class="gameover-actions">
           <button id="btn-play-again" class="btn-gold-lg">🔄 Gioca Nuova Partita</button>

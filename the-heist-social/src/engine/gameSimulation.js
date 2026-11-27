@@ -225,6 +225,7 @@ export class GameSimulation {
       },
       players,
       recentCctvLogs: [],
+      thiefCaughtMoments: [],
       meeting: null,
       winner: null, // 'thief' | 'civilians'
       winReason: '',
@@ -389,9 +390,17 @@ export class GameSimulation {
     if (sab.cctvGlitchRemaining <= 0) {
       for (const cam of CCTV_CAMERAS) {
         for (const p of this.state.players) {
-          if (p.eliminated || p.hidden || !p.activeCrime) continue;
+          if (p.eliminated || p.hidden) continue;
           const dist = Math.hypot(p.x - cam.lookAt.x, p.z - cam.lookAt.z);
           if (p.currentRoom === cam.room || dist < cam.detectRadius * 0.7) {
+            if (p.role === 'thief' && this.state.matchTime > 5 && this.state.thiefCaughtMoments.length === 0) {
+              this._recordThiefMoment(
+                p,
+                'TRANSITO SOSPETTO SU TELECAMERA',
+                `Ripreso da ${cam.code} (${cam.name}) con La Stella di Venezia`
+              );
+            }
+            if (!p.activeCrime) continue;
             const recentSame = this.state.recentCctvLogs.find(
               (l) => l.suspectId === p.id && l.camId === cam.id && this.state.matchTime - l.time < 8
             );
@@ -717,17 +726,80 @@ export class GameSimulation {
     return true;
   }
 
+  _recordThiefMoment(thiefPlayer, crimeTitle, detailLabel, extraPos = null) {
+    if (!this.state || !thiefPlayer) return;
+    const tx = extraPos?.x ?? thiefPlayer.x;
+    const tz = extraPos?.z ?? thiefPlayer.z;
+    const roomObj = getRoomAt(tx, tz);
+    // Find exact room camera if present, else closest CCTV camera
+    let cam = CCTV_CAMERAS.find((c) => c.room === roomObj.id);
+    let isRoomCam = Boolean(cam);
+    if (!cam) {
+      let bestD = Infinity;
+      for (const c of CCTV_CAMERAS) {
+        const d = Math.hypot(c.lookAt.x - tx, c.lookAt.z - tz);
+        if (d < bestD) {
+          bestD = d;
+          cam = c;
+        }
+      }
+    }
+
+    const moment = {
+      id: `clip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      time: this.state.matchTime,
+      roomId: roomObj.id,
+      roomName: roomObj.name,
+      roomBounds: roomObj.bounds
+        ? { x1: roomObj.bounds.minX, z1: roomObj.bounds.minZ, x2: roomObj.bounds.maxX, z2: roomObj.bounds.maxZ }
+        : null,
+      camId: cam?.id || 'cam_foyer',
+      camCode: isRoomCam ? cam.code : `CAM-AUX (${roomObj.name.slice(0, 12).toUpperCase()})`,
+      camName: isRoomCam ? cam.name : roomObj.name,
+      useRoomDirectCam: !isRoomCam,
+      suspectId: thiefPlayer.id,
+      suspectName: thiefPlayer.name,
+      crimeTitle,
+      detailLabel,
+      x: tx,
+      z: tz,
+      rotY: thiefPlayer.rotY,
+    };
+
+    // Prioritize real crimes at the front of the list (replace passive transit clip if needed)
+    if (crimeTitle !== 'TRANSITO SOSPETTO SU TELECAMERA') {
+      this.state.thiefCaughtMoments = this.state.thiefCaughtMoments.filter(
+        (m) => m.crimeTitle !== 'TRANSITO SOSPETTO SU TELECAMERA'
+      );
+      this.state.thiefCaughtMoments.unshift(moment);
+    } else {
+      this.state.thiefCaughtMoments.push(moment);
+    }
+
+    if (this.state.thiefCaughtMoments.length > 6) {
+      this.state.thiefCaughtMoments.length = 6;
+    }
+  }
+
   completeJewelSteal(playerId, jewelId) {
     const p = this.state.players.find((x) => x.id === playerId);
     const js = this.state.jewels[jewelId];
     if (!p || p.role !== 'thief' || !js || js.stolen) return false;
 
+    const jewelDef = JEWELS.find((j) => j.id === jewelId);
     js.stolen = true;
     js.stolenBy = playerId;
     js.clueRemaining = 28; // Leaves forensic trace for 28s!
     this.state.stolenJewelsCount = Object.values(this.state.jewels).filter((j) => j.stolen).length;
     p.activeCrime = 'FURTO GIOIELLO';
     p.crimeTimer = 2.4;
+
+    this._recordThiefMoment(
+      p,
+      'FURTO RIPRESO IN FLAGRANTE',
+      jewelDef ? `Trafugamento di "${jewelDef.name}"` : 'Trafugamento gioiello in teca',
+      jewelDef ? { x: jewelDef.x, z: jewelDef.z + 0.55 } : null
+    );
 
     this.onEvent({ type: 'jewel_stolen', playerId, jewelId, count: this.state.stolenJewelsCount });
     this._checkRealtimeVictory();
@@ -738,6 +810,7 @@ export class GameSimulation {
     const p = this.state.players.find((x) => x.id === playerId);
     if (!p || p.role !== 'thief') return false;
     const md = this.state.mainDiamond;
+    const spotDef = DIAMOND_HIDING_SPOTS.find((s) => s.id === spotId);
 
     if (md.carrierId === playerId) {
       md.carrierId = null;
@@ -745,6 +818,11 @@ export class GameSimulation {
       md.recoveredByCivilians = false;
       p.activeCrime = 'OCCULTAMENTO DIAMANTE';
       p.crimeTimer = 2.0;
+      this._recordThiefMoment(
+        p,
+        'OCCULTAMENTO STELLA DI VENEZIA',
+        spotDef ? `Diamante nascosto in: ${spotDef.name}` : 'Diamante occultato nella stanza'
+      );
       this.onEvent({ type: 'diamond_stashed', spotId });
       return true;
     } else if (md.stashedAt === spotId || md.recoveredByCivilians) {
@@ -753,6 +831,11 @@ export class GameSimulation {
       md.recoveredByCivilians = false;
       p.activeCrime = 'TRAFUGAMENTO DIAMANTE';
       p.crimeTimer = 2.5;
+      this._recordThiefMoment(
+        p,
+        'RECUPERO FURTIVO STELLA DI VENEZIA',
+        spotDef ? `Diamante ripreso da: ${spotDef.name}` : 'Diamante recuperato dal nascondiglio'
+      );
       this.onEvent({ type: 'diamond_retrieved', spotId });
       return true;
     }
@@ -785,6 +868,11 @@ export class GameSimulation {
     p.currentRoom = dest.room;
     p.activeCrime = 'USO PASSAGGIO SEGRETO';
     p.crimeTimer = 2.6;
+    this._recordThiefMoment(
+      p,
+      'PASSAGGIO SEGRETO FILMATO',
+      `Uscita furtiva rilevata presso: ${dest.name}`
+    );
     this.onEvent({ type: 'secret_passage', playerId, fromSpId, toSpId });
     return true;
   }
@@ -1249,6 +1337,15 @@ export class GameSimulation {
 
   _finishMatch(winner, reason) {
     this.clearTimers();
+    const thief = this.state.players.find((p) => p.role === 'thief');
+    if (thief && this.state.thiefCaughtMoments.length === 0) {
+      this._recordThiefMoment(
+        thief,
+        'EFFRAZIONE TECA CENTRALE',
+        'Ripresa di sicurezza: furto iniziale de La Stella di Venezia nell’Atrio d’Onore',
+        { x: -7.0, z: 6.1 }
+      );
+    }
     this.state.phase = 'gameover';
     this.state.winner = winner;
     this.state.winReason = reason;

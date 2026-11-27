@@ -81,6 +81,7 @@ function serializeStateForPlayer(state, recipientId) {
     securityProgress: state.securityProgress,
     sabotage: state.sabotage,
     recentCctvLogs: state.recentCctvLogs,
+    thiefCaughtMoments: revealAll ? state.thiefCaughtMoments || [] : [],
     meeting: state.meeting,
     winner: state.winner,
     winReason: state.winReason,

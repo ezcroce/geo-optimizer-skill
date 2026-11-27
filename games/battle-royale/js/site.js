@@ -1,11 +1,11 @@
 // ═════════ Arena Royale 3D — logica del sito (landing page) ═════════
 import * as THREE from 'three';
-import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=37';
-import { buildCharacter, buildWeaponMesh } from './character.js?v=37';
-import { createCrosshair } from './crosshair.js?v=37';
+import { SKINS, WEAPONS, RARITIES, WEAPON_POOL } from './config.js?v=38';
+import { buildCharacter, buildWeaponMesh } from './character.js?v=38';
+import { createCrosshair } from './crosshair.js?v=38';
 // rarità più frequente di ogni arma (colore della scheda e dell'anteprima)
-const WEAPON_RAR = Object.fromEntries(WEAPON_POOL.map(e => [e.id, e.rar.indexOf(Math.max(...e.rar))]));
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=37';
+const WEAPON_RAR = { claws: 4, ...Object.fromEntries(WEAPON_POOL.map(e => [e.id, e.rar.indexOf(Math.max(...e.rar))])) };
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, armsSwing, poseHold, poseClimb, poseMantle } from './anim.js?v=38';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -509,12 +509,12 @@ const thumbs = renderThumbs();
     const stats = [
       ['Danno', w.dmg * w.pellets, Math.min(1, w.dmg * w.pellets / 110)],
       ['DPS', Math.round(dps), dps / maxDps],
-      ['Caricatore', w.mag, Math.min(1, w.mag / 30)],
+      w.melee ? ['Munizioni', '∞', 1] : ['Caricatore', w.mag, Math.min(1, w.mag / 30)],
       ['Gittata', w.range + 'm', Math.min(1, Math.sqrt(w.range / 600))],
     ];
     return `<article class="weapon reveal" style="--rc:${rc};--d:${(i % 3) * 0.08}s">
       <div class="pic"><img src="${thumbs.weapons[id]}" alt="${w.name}" loading="lazy" /></div>
-      <h3>${w.name}<small>${w.spin ? 'Rotante' : w.auto ? 'Automatica' : w.projectile ? 'Esplosiva' : w.burst ? `Raffica ×${w.burst}` : 'Semi-auto'}</small></h3>
+      <h3>${w.name}<small>${w.melee ? 'Corpo a corpo · bottino del boss' : w.spin ? 'Rotante' : w.auto ? 'Automatica' : w.projectile ? 'Esplosiva' : w.burst ? `Raffica ×${w.burst}` : 'Semi-auto'}</small></h3>
       ${w.desc ? `<p class="wdesc">${w.desc}</p>` : ''}
       ${stats.map(([n, v, k], j) => `<div class="stat"><span>${n}</span><div class="bar"><i style="--v:${(k * 100).toFixed(0)}%;--k:${j}"></i></div><b>${v}</b></div>`).join('')}
     </article>`;

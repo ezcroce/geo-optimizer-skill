@@ -5,34 +5,36 @@ import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=37';
-import * as PR from './progress.js?v=37';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=37';
-import { initMenu } from './menu.js?v=37';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=37';
-import { initSettingsUI } from './settings-ui.js?v=37';
+} from './config.js?v=38';
+import * as PR from './progress.js?v=38';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=38';
+import { initMenu } from './menu.js?v=38';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=38';
+import { initSettingsUI } from './settings-ui.js?v=38';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=29';
+import * as A from './audio.js?v=38';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
-} from './world.js?v=37';
+} from './world.js?v=38';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=37';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=37';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=37';
-import { buildChestMesh } from './models3d.js?v=19';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=38';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=38';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=38';
+import { buildChestMesh } from './models3d.js?v=38';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=33';
-import { createInventory } from './inventory.js?v=37';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=37';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=34';
+import { createInventory } from './inventory.js?v=38';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=38';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=38';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=37';
-import { buildPickaxe, heldConsumable } from './held.js?v=37';
-import { createCrosshair } from './crosshair.js?v=37';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=37';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=38';
+import { buildPickaxe, heldConsumable } from './held.js?v=38';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=38';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=38';
+import { createCrosshair } from './crosshair.js?v=38';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=38';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -363,8 +365,15 @@ class Character {
     this.heldKey = key;
     const gp = this.m.gunPivot;
     while (gp.children.length) gp.remove(gp.children[0]);
+    if (this._claws) { for (const g of this._claws) if (g.parent) g.parent.remove(g); this._claws = null; }
+    this.claw = null; this.clawQueue = null; this.pushX = this.pushZ = 0;
     let mesh;
     if (!s) mesh = buildPickaxe(this.skin.accColor || '#7fd0ff');
+    else if (s.kind === 'weapon' && WEAPONS[s.id] && WEAPONS[s.id].melee) {
+      // v38: Artigli del Gargoyle: un guanto per mano (le lame proseguono oltre le nocche)
+      mesh = new THREE.Group();
+      this._claws = [0, 1].map(i => { const g = buildClawGauntlet(); g.rotation.set(Math.PI / 2, 0, 0); g.position.y = -0.02; g.scale.setScalar(0.82); this.m.hands[i].add(g); return g; });
+    }
     else if (s.kind === 'weapon') mesh = buildWeaponMesh(s.id, s.rarity);
     else mesh = heldConsumable(s.id);
     gp.add(mesh);
@@ -393,6 +402,7 @@ function wallAhead(ch, dir, height = 1.0, reach = CHAR_R + 0.45) {
 function wallDir(ch, hit, dir) {
   const c = hit.collider;
   if (c.type === 'cyl') return _cd.set(c.x - ch.pos.x, 0, c.z - ch.pos.z).normalize();
+  if (c.type === 'ring') { const k = Math.hypot(ch.pos.x - c.x, ch.pos.z - c.z) > c.r1 ? 1 : -1; return _cd.set((c.x - ch.pos.x) * k, 0, (c.z - ch.pos.z) * k).normalize(); }
   const px = ch.pos.x + dir.x * hit.t, pz = ch.pos.z + dir.z * hit.t;
   const e = [Math.abs(px - c.minX), Math.abs(px - c.maxX), Math.abs(pz - c.minZ), Math.abs(pz - c.maxZ)];
   const m = Math.min(...e);
@@ -554,8 +564,8 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   }
   ch.vel.x += (mx * speed + sx - ch.vel.x) * Math.min(1, acc * dt);
   ch.vel.z += (mz * speed + sz - ch.vel.z) * Math.min(1, acc * dt);
-  ch.pos.x += ch.vel.x * dt;
-  ch.pos.z += ch.vel.z * dt;
+  ch.pos.x += (ch.vel.x + (ch.pushX || 0)) * dt;   // v38: push = scatto delle mosse degli Artigli
+  ch.pos.z += (ch.vel.z + (ch.pushZ || 0)) * dt;
   resolveCollisions(ch.pos, CHAR_R, CHAR_H);
   const lim = HALF - 4;
   ch.pos.x = clamp(ch.pos.x, -lim, lim);
@@ -1013,6 +1023,11 @@ function animateChar(ch, dt) {
   } else if (s.kind === 'cons') {
     // v32: bende, medikit e pozioni hanno ognuno la sua animazione d'uso (anim.js)
     poseUse(m, s.id, ch.using ? clamp(ch.using.t / ch.using.total, 0, 1) : -1, { mv, run, t });
+  } else if (WEAPONS[s.id] && WEAPONS[s.id].melee) {
+    // v38: Artigli: guardia, e le mosse del Gargoyle con tutto il corpo (anim.js)
+    m.gunPivot.visible = false;
+    const cl = ch.claw, cm = cl && CLAW_MOVES[cl.id];
+    poseClaws(m, { mv, run, sk, ck, phase: ch.walkPhase, t, move: cl ? cl.id : null, u: cl ? cl.t / cm.dur : 0 });
   } else {
     // arma: posa di mira, oppure "arma in sicurezza" mentre corri (v29: mani sull'arma con la IK)
     poseHold(m, p, sk, sw, lean);
@@ -1023,7 +1038,7 @@ function animateChar(ch, dt) {
     m.gunPivot.position.x += Math.sin(ph) * 0.007 * mv * wk * aimK;
     m.gunPivot.rotateZ(Math.sin(ph) * 0.028 * mv * wk * aimK);
   }
-  const holdingGun = s && s.kind === 'weapon';
+  const holdingGun = s && s.kind === 'weapon' && !(WEAPONS[s.id] && WEAPONS[s.id].melee);
   let reloadPh = -1;
   // ricarica: l'arma si inclina verso l'interno, la mano d'appoggio va al caricatore e alla tasca
   if (holdingGun && ch.reloading > 0) {
@@ -1106,6 +1121,9 @@ function rayAll(o, d, maxDist, ignore) {
   const w = rayWorld(o, d, maxDist);
   const lim = w ? w.t : maxDist;
   const c = rayChars(o, d, lim, ignore);
+  // v38: il Gargoyle
+  const bh = bossFight.ray(o, d, c ? c.t : lim);
+  if (bh) return { t: bh.t, boss: true, head: bh.head };
   return c || w;
 }
 const _u = new THREE.Vector3(), _v = new THREE.Vector3();
@@ -1131,7 +1149,7 @@ function startReload(ch) {
   const s = ch.weapon;
   if (!s || ch.reloading > 0) return;
   const def = WEAPONS[s.id];
-  if (s.mag >= def.mag || ch.ammo[def.ammo] <= 0) return;
+  if (def.melee || s.mag >= def.mag || ch.ammo[def.ammo] <= 0) return;
   ch.reloading = def.reload;
   ch.reloadSlot = ch.active;
   ch.using = null;
@@ -1142,6 +1160,7 @@ function fireWeapon(ch, aimFn, again = null) {
   const s = ch.weapon;
   if (!s) return false;
   const def = WEAPONS[s.id];
+  if (def.melee) return clawAttack(ch);
   if (ch.fireCd > 0 || ch.reloading > 0 || ch.using || ch.mode === 'climb' || ch.inWater) return false;   // a nuoto non si spara
   // minigun: le canne devono prima prendere giri
   if (def.spin) { ch.spinReq = G.time; if ((ch.spinK || 0) < 1) return false; }
@@ -1194,6 +1213,7 @@ function melee(ch) {
     if (!hit) return;
     const p = o.clone().addScaledVector(d, hit.t);
     if (hit.char) { damage(hit.char, 20, ch, false, 'Piccone'); emit(p, '#d02020', 6, 3, 0.4, 0.08); return; }
+    if (hit.boss) { bossFight.hurt(20, ch, false, p); emit(p, '#6a1a10', 6, 3, 0.4, 0.08); return; }
     if (hit.collider) {
       if (hit.collider.hp) damageWall(hit.collider, 50);
       if (hit.collider.spec || hit.collider.rock || hit.collider.special) structHit(hit.collider, p, 55, ch);
@@ -1315,7 +1335,8 @@ function kill(t, attacker, how) {
     const wk = Object.keys(WEAPONS).find(k => WEAPONS[k].name === how);
     const wr = wk && attacker.weapon && attacker.weapon.id === wk ? attacker.weapon.rarity : 1;
     text = `<b>${esc(attacker.name)}</b> ${wk ? weaponIconHTML(wk, wr, 'wi kfi', true) : `<span style="opacity:.7">[${esc(how)}]</span>`} ${esc(t.name)}`;
-  } else if (how === 'storm') text = `${esc(t.name)} è stato consumato dalla tempesta ⛈`;
+  } else if (how === 'Gargoyle') text = `${esc(t.name)} è stato sbranato dal Gargoyle 🦇`;
+  else if (how === 'storm') text = `${esc(t.name)} è stato consumato dalla tempesta ⛈`;
   else if (how === 'fall') text = `${esc(t.name)} è caduto da troppo in alto 🪂`;
   else text = `${esc(t.name)} si è eliminato da solo 💥`;
   addFeed(text, attacker === G.player || t === G.player);
@@ -1334,7 +1355,7 @@ function kill(t, attacker, how) {
   }
   if (t === G.player) {
     G.placement = place;
-    G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'storm' ? 'la tempesta' : how === 'fall' ? 'una brutta caduta' : 'te stesso');
+    G.killedBy = attacker && attacker !== t ? attacker.name : (how === 'Gargoyle' ? 'il Gargoyle' : how === 'storm' ? 'la tempesta' : how === 'fall' ? 'una brutta caduta' : 'te stesso');
     G.ads = false;
     const mate = mateToWatch();
     if (mate) {
@@ -1422,6 +1443,7 @@ function bulletImpact(b, hit, end, dist) {
   const def = b.def;
   const fall = dist > def.range * 0.5 ? Math.max(0.5, 1 - (dist - def.range * 0.5) / def.range) : 1;
   const near = end.distanceToSquared(camera.position) < 120 * 120;
+  if (hit.boss) { bossFight.hurt(b.dmg * fall, b.owner, hit.head, end); if (near) emit(end, '#6a1a10', 5, 3, 0.4, 0.08); return; }
   if (hit.char) {
     damage(hit.char, b.dmg * fall * (hit.head ? 2 : 1), b.owner, hit.head, def.name);
     if (near) emit(end, '#d02020', 5, 3, 0.4, 0.08);
@@ -1517,6 +1539,10 @@ function explode(at, owner, dmg, radius, how = 'Lanciarazzi') {
     if (!c.alive || c.mode === 'bus') continue;
     const dist = c.chest().distanceTo(at);
     if (dist < radius) damage(c, dmg * (1 - dist / radius * 0.7) * (c === owner ? 0.5 : 1), owner, false, how);
+  }
+  if (bossFight.active) {   // v38: il Gargoyle è grosso: lo prende anche un'esplosione vicina
+    const bc = bossFight.center(_p), dist = Math.max(0, bc.distanceTo(at) - 1.2);
+    if (dist < radius) bossFight.hurt(dmg * (1 - dist / radius * 0.7), owner, false, bc);
   }
   for (const b of world.barrels) {
     if (!b.explosive || b.dead) continue;
@@ -1812,7 +1838,7 @@ function pickupLoot(ch, L, allowSwap = true) {
   if (e >= 0) {
     ch.slots[e] = slotFromItem(it);
     removeLoot(L);
-    if (!ch.isPlayer && it.kind === 'weapon') ch.ammo[WEAPONS[it.id].ammo] += WEAPONS[it.id].mag * 2;
+    if (!ch.isPlayer && it.kind === 'weapon' && WEAPONS[it.id].ammo) ch.ammo[WEAPONS[it.id].ammo] += WEAPONS[it.id].mag * 2;
     ch.updateHeld();
     return true;
   }
@@ -2324,6 +2350,7 @@ function botThink(b) {
 }
 
 function botWants(b, it) {
+  if (it.kind === 'weapon' && WEAPONS[it.id].melee) return 0;   // v38: gli Artigli sono per i giocatori
   if (it.kind === 'ammo') return b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].ammo === it.id) ? 0.8 : 0.1;
   if (it.kind === 'mats') return 0.1;
   const empty = b.slots.includes(null);
@@ -2971,7 +2998,12 @@ function updatePlayer(dt) {
     else if (s.kind === 'cons') { if (mouse.leftPressed) startUse(p); }
     else {
       const def = WEAPONS[s.id];
-      if ((def.auto && mouse.left) || mouse.leftPressed) playerFire(p, def);
+      if (def.melee) {
+        // v38: Artigli: clic = mossa successiva della combo (in coda se ne stai già facendo una), tenendo premuto
+        // la combo continua; mirando (tasto destro) il clic è un balzo
+        if (mouse.leftPressed) clawAttack(p, G.ads ? 'pounce' : null);
+        else if (mouse.left && !p.claw) clawAttack(p, null);
+      } else if ((def.auto && mouse.left) || mouse.leftPressed) playerFire(p, def);
     }
   }
 }
@@ -3220,6 +3252,7 @@ function updateHUD(dt) {
   const sl = p.slot;
   let magHtml;
   if (!sl) magHtml = '<small>Piccone</small>';
+  else if (sl.kind === 'weapon' && WEAPONS[sl.id].melee) magHtml = `∞<div style="font-size:13px;color:${RARITIES[sl.rarity].color}">${WEAPONS[sl.id].name}</div>`;
   else if (sl.kind === 'weapon') { const def = WEAPONS[sl.id]; magHtml = `${sl.mag}<small> / ${p.ammo[def.ammo]}</small><div style="font-size:13px;color:${RARITIES[sl.rarity].color}">${def.name}</div>`; }
   else magHtml = `<small>${CONSUMABLES[sl.id].name} x${sl.count}</small>`;
   setHTML(hud.mag, 'mag', magHtml);
@@ -3281,7 +3314,7 @@ function updateHUD(dt) {
       sprint: (p.sprintK || 0) > 0.5,
       reload: p.reloading > 0 && cdef ? clamp(1 - p.reloading / cdef.reload, 0, 1) : -1,
       ready: cdef && cdef.rate >= 0.5 && !cdef.burst ? 1 - clamp(p.fireCd / cdef.rate, 0, 1) : -1,
-      mag: cdef ? w.mag / cdef.mag : -1,
+      mag: cdef && cdef.mag ? w.mag / cdef.mag : -1,
       use: p.using ? p.using.t / p.using.total : -1, useShield: !!(p.using && cons && CONSUMABLES[p.slot.id].shield),
       spin: cdef && cdef.spin ? p.spinK || 0 : 0, reach: !!G.xhReach,
     });
@@ -3522,6 +3555,7 @@ function makeBotNames(n) {
 }
 
 function clearMatch() {
+  bossFight.clear(); clawFX.reset();
   for (const o of G.debris) scene.remove(o.m);
   G.debris.length = 0;
   inventory.close();
@@ -3587,7 +3621,7 @@ async function startMatch() {
       const busAng = Math.random() * Math.PI * 2, busOff = rand(-50, 50) * SCALE;
       G.duel = duel ? pickDuelSpot() : null;
       const st = newStorm();
-      const start = { t: 'start', seed, random, mode, team: duel ? 'solo' : NET.team, duel: G.duel, vs: !!NET.vs, lootSeed: Math.floor(Math.random() * 2e9), players, bots, bus: [busAng, busOff], storm: stormState(st), diff: settings.difficulty };
+      const start = { t: 'start', seed, random, mode, team: duel ? 'solo' : NET.team, duel: G.duel, boss: !duel && bossRoll(), vs: !!NET.vs, lootSeed: Math.floor(Math.random() * 2e9), players, bots, bus: [busAng, busOff], storm: stormState(st), diff: settings.difficulty };
       NET.inMatch = true;
       // v34: si parte quando tutti hanno caricato l'isola (o dopo 45 s), così nessuno perde il bus o i primi messaggi
       const wait = new Set(NET.players.filter(p => !p.host).map(p => p.id));
@@ -3746,6 +3780,9 @@ function beginMatch(net) {
   $('#end').classList.add('hidden');
   $('#hud').classList.remove('hidden');
   scene.fog.far = 560;
+  // v38: il Gargoyle del Colosseo (solo in alcune partite, mai nei duelli)
+  G.bossOn = !G.duel && (net ? !!net.boss : bossRoll());
+  if (G.bossOn && bossFight.spawn()) addFeed('🦇 Nel Colosseo al centro dell\'isola dorme un <b>Gargoyle</b>… chi lo sconfigge prende i suoi Artigli', false);
   if (G.duel) startDuel();
   else showMsg('BENVENUTO NEL BATTLE BUS!', (G.mode === 'random' ? '🎲 Random Map: isola nuova! · ' : '') + tk('Premi SPAZIO per lanciarti · muovi il mouse per guardarti intorno', 'Tocca LANCIATI quando vuoi · trascina per guardarti intorno'), 6);
   $('#netInfo').classList.toggle('hidden', !G.net);
@@ -3761,8 +3798,11 @@ function beginMatch(net) {
 // ─────────────── v37: duello 1 contro 1 ───────────────
 /** punto dell'arena: una località a caso (case e ripari), lontano dall'acqua */
 function pickDuelSpot() {
+  // v38: metà dei duelli si combatte nell'arena dei gladiatori, sulla sabbia
+  const ar = TOWNS.find(t => t.arena);
+  if (ar && Math.random() < 0.5) return { x: r2(ar.x), z: r2(ar.z), a: r2(Math.random() * Math.PI * 2), r: 17 };   // fra la statua e le colonne (r 22)
   for (let i = 0; i < 40; i++) {
-    const t = pick(TOWNS);
+    const t = pick(TOWNS.filter(t => !t.arena));
     const x = t.x + rand(-0.3, 0.3) * t.r, z = t.z + rand(-0.3, 0.3) * t.r;
     if (terrainHeight(x, z) > WATER_LEVEL + 1 && Math.abs(x) < HALF - 90 && Math.abs(z) < HALF - 90) return { x: r2(x), z: r2(z), a: r2(Math.random() * Math.PI * 2) };
   }
@@ -3775,7 +3815,7 @@ function startDuel() {
   G.bus.t = G.bus.dur * 2;
   G.chars.forEach((c, i) => {
     const a = d.a + (i / n) * Math.PI * 2;
-    let x = d.x + Math.cos(a) * 28, z = d.z + Math.sin(a) * 28;
+    let x = d.x + Math.cos(a) * (d.r || 28), z = d.z + Math.sin(a) * (d.r || 28);
     // se il punto è in acqua o dentro un muro, ci si avvicina al centro
     for (let k = 0; k < 6 && (terrainHeight(x, z) < WATER_LEVEL + 0.5); k++) { x = lerp(x, d.x, 0.3); z = lerp(z, d.z, 0.3); }
     c.mode = 'ground'; c.onGround = true; c.vel.set(0, 0, 0);
@@ -4405,12 +4445,13 @@ function encodeChar(c) {
   const fl = (c.onGround ? 1 : 0) | (c.crouch ? 2 : 0) | (c.inWater ? 4 : 0) | (c.swing > 0.2 ? 8 : 0) | (c.using ? 16 : 0) | (c.reloading > 0 ? 32 : 0);
   return [c.idx, r2(c.pos.x), r2(c.pos.y), r2(c.pos.z), r2(c.yaw), r2(c.pitch), MODE_CODES.indexOf(c.mode), fl,
     r2(c.vel.x), r2(c.vel.y), r2(c.vel.z), heldCode(c),
-    c.mode === 'climb' ? r2(Math.atan2(c.climbDir.x, c.climbDir.z)) : 0, r2(c.climbPhase || 0), c.mantle ? r2(c.mantle.t) : -1, c.emote ? c.emote.id : 0];
+    c.mode === 'climb' ? r2(Math.atan2(c.climbDir.x, c.climbDir.z)) : 0, r2(c.climbPhase || 0), c.mantle ? r2(c.mantle.t) : -1, c.emote ? c.emote.id : 0,
+    c.claw ? CLAW_IDS.indexOf(c.claw.id) : -1, c.claw ? r2(c.claw.t) : 0];
 }
 function applyCharState(c, a) {
   const n = c.net || (c.net = {});
   n.x = a[1]; n.y = a[2]; n.z = a[3]; n.yaw = a[4]; n.pitch = a[5]; n.mode = MODE_CODES[a[6]] || 'ground'; n.fl = a[7];
-  n.vx = a[8]; n.vy = a[9]; n.vz = a[10]; n.held = a[11]; n.cy = a[12]; n.cp = a[13]; n.mt = a[14]; n.em = a[15]; n.t = performance.now();
+  n.vx = a[8]; n.vy = a[9]; n.vz = a[10]; n.held = a[11]; n.cy = a[12]; n.cp = a[13]; n.mt = a[14]; n.em = a[15]; n.cl = a[16] ?? -1; n.clt = a[17] || 0; n.t = performance.now();
 }
 function updatePuppet(c, dt) {
   const n = c.net;
@@ -4444,6 +4485,11 @@ function updatePuppet(c, dt) {
     if (kind === 'w' && WEAPONS[id]) c.slots[0] = { kind: 'weapon', id, rarity: +rar || 0, mag: 1 };
     else if (kind === 'c' && CONSUMABLES[id]) c.slots[0] = { kind: 'cons', id, count: 1 };
     c.updateHeld();
+  }
+  // v38: mosse degli Artigli
+  if (n.cl >= 0 && CLAW_IDS[n.cl]) {
+    const id = CLAW_IDS[n.cl];
+    if (!c.claw || c.claw.id !== id || c.claw.t > n.clt + 0.35 || (c.claw.t < n.clt - 0.35)) c.claw = { id, t: n.clt, hit: true };
   }
   if (n.em && (!c.emote || c.emote.id !== n.em)) startEmote(c, n.em);
   else if (!n.em && c.emote) stopEmote(c);
@@ -4521,7 +4567,7 @@ function onNetMessage(from, m) {
   if (m.t === 'abort') { if (G.netQueue) { G.netAborted = true; G.netGo = true; } if (G.state !== 'menu') { toMenu(); menuApi.toast("L'host ha terminato la partita"); } return; }
   if (m.t === 'ready') { if (G.netReady) G.netReady.delete(from); return; }
   if (m.t === 'go') { G.netGo = true; return; }
-  if (G.netQueue) { if (m.t !== 'snap' && m.t !== 'storm' && G.netQueue.length < 3000) G.netQueue.push([from, m]); return; }
+  if (G.netQueue) { if (m.t !== 'snap' && m.t !== 'storm' && m.t !== 'boss' && G.netQueue.length < 3000) G.netQueue.push([from, m]); return; }
   if (!G.net || G.state === 'menu') return;
   const C = G.chars;
   const sender = NET.role === 'host' ? G.net.byPeer.get(from) : null;
@@ -4534,6 +4580,7 @@ function onNetMessage(from, m) {
         if (G.bus && Math.abs(G.bus.t - m.bt) > 0.4 && G.bus.t < G.bus.dur * 1.3) G.bus.t = m.bt;
         break;
       case 'storm': if (G.storm) Object.assign(G.storm, m.s); break;
+      case 'boss': case 'bhit': case 'bdead': bossFight.onNet(m, sender); break;
       case 'shot': {
         const ch = C[m.i];
         if (!ch || ch === G.player) break;
@@ -4624,6 +4671,132 @@ PR.onProgress(e => {
 });
 
 // ─────────────── Ciclo principale ───────────────
+// ─────────────── v38: Gargoyle e Artigli ───────────────
+const clawFX = createClawFX(scene);
+const bossFight = createBossFight({
+  scene, G, camera, TOWNS, groundAt, damage, emit, spawnLoot, addFeed, showMsg, esc, A, fx: clawFX,
+  net: () => ({ on: !!G.net && NET.role !== 'off', host: !!G.net && NET.role === 'host', client: !!G.net && NET.role === 'client' }),
+  send: (m) => netSend(m),
+  shake: (k) => { G.shake = Math.max(G.shake, k); },
+  onPlayerHit: (amt, head, pos) => {
+    PR.track('damage', amt);
+    dmgNumber(new THREE.Vector3(pos.x + rand(-0.4, 0.4), pos.y + 0.4, pos.z + rand(-0.4, 0.4)), amt, head ? 'head' : '');
+    G.hitT = 0.15; $('#hitmarker').classList.toggle('head', head);
+    XH.hit(head ? 'head' : 'body');
+    A.playHit(head);
+  },
+});
+/** il boss c'è in questa partita? (?boss=1 lo forza, ?boss=0 lo toglie) */
+function bossRoll() {
+  const q = new URLSearchParams(location.search).get('boss');
+  if (q === '1') return true;
+  if (q === '0') return false;
+  return Math.random() < BOSS_CHANCE;
+}
+const CLAW_IDS = Object.keys(CLAW_MOVES);
+const CLAW_COMBO = ['swipeR', 'swipeL', 'spin', 'double'];
+const CLAW_SPEED = 1.2;          // il giocatore è più piccolo e un po' più rapido del Gargoyle
+const CLAW_SCALE = 0.72;         // portata delle mosse rispetto al boss
+/** inizia (o mette in coda) una mossa degli Artigli */
+function clawAttack(ch, special = null) {
+  if (ch.mode !== 'ground' || ch.using || ch.inWater) return false;
+  if (ch.claw) {
+    const cm = CLAW_MOVES[ch.claw.id];
+    if (ch.claw.t / cm.dur > 0.35) ch.clawQueue = special || true;
+    return false;
+  }
+  let id = special;
+  if (id === 'pounce' && ((ch.pounceCd || 0) > G.time || !ch.onGround)) id = null;
+  if (!id) {
+    const gap = G.time - (ch.clawLastT ?? -9);
+    ch.clawCombo = gap < 0.55 ? ((ch.clawCombo ?? -1) + 1) % CLAW_COMBO.length : 0;
+    id = CLAW_COMBO[ch.clawCombo];
+  }
+  if (id === 'pounce') { ch.pounceCd = G.time + 2.2; ch.clawCombo = -1; }
+  ch.claw = { id, t: 0, hit: false };
+  ch.emote = null; ch.lastShotT = G.time; ch.reloading = 0;
+  if (ch.isPlayer) XH.fire(0.6);
+  return true;
+}
+function updateClaw(c, dt) {
+  const cl = c.claw, mv = CLAW_MOVES[cl.id];
+  const prevU = cl.t / mv.dur;
+  cl.t += dt * CLAW_SPEED;
+  const u = cl.t / mv.dur, realDur = mv.dur / CLAW_SPEED;
+  if (!c.remote) {
+    const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw);
+    let push = 0;
+    if (cl.id === 'pounce') {
+      const [a, b] = mv.air;
+      if (prevU < a && u >= a && c.onGround) { c.vel.y = 6.2; c.onGround = false; }
+      if (u > a && u < b) push = 7.5 / ((b - a) * realDur);
+    } else {
+      const a = mv.hit - 0.2, b = mv.hit + 0.02;
+      if (u > a && u < b) push = mv.lunge * 0.8 / ((b - a) * realDur);
+    }
+    c.pushX = fx * push; c.pushZ = fz * push;
+    if (!cl.hit && u >= mv.hit) { cl.hit = true; clawStrike(c, cl.id, mv); }
+  }
+  if (prevU < mv.hit && u >= mv.hit) clawEffects(c, cl.id, mv);
+  if (u >= 1) {
+    c.claw = null; c.pushX = c.pushZ = 0; c.clawLastT = G.time;
+    if (c.clawQueue && !c.remote) { const q = c.clawQueue; c.clawQueue = null; clawAttack(c, q === true ? null : q); }
+  }
+}
+function clawStrike(c, id, mv) {
+  const mult = (c.weapon ? RARITIES[c.weapon.rarity].mult : 1) * (c.isPlayer || c.human ? 1 : botDiff(c).dmgMult);
+  const dmg = mv.pdmg * mult, reach = mv.reach * CLAW_SCALE + 0.35, name = WEAPONS.claws.name;
+  const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw);
+  const ix = c.pos.x + fx * 1.3, iz = c.pos.z + fz * 1.3, aoe = mv.aoe ? mv.aoe * 0.75 : 0;
+  let any = false;
+  for (const t of G.chars) {
+    if (t === c || !t.alive || t.mode === 'bus' || isMate(c, t)) continue;
+    const dx = t.pos.x - c.pos.x, dz = t.pos.z - c.pos.z, dy = t.pos.y - c.pos.y;
+    if (dy < -1.4 || dy > 2.2) continue;
+    const d = Math.hypot(dx, dz);
+    const ang = Math.abs(angDelta(Math.atan2(dx, dz), c.yaw));
+    if ((d <= reach && ang <= mv.arc) || (aoe && Math.hypot(t.pos.x - ix, t.pos.z - iz) <= aoe)) {
+      damage(t, dmg, c, false, name); any = true;
+      emit(t.chest(), '#d02020', 8, 3.5, 0.45, 0.09);
+    }
+  }
+  if (bossFight.active) {
+    const bc = bossFight.center(new THREE.Vector3()), dx = bc.x - c.pos.x, dz = bc.z - c.pos.z, dy = bc.y - c.pos.y;
+    const d = Math.max(0, Math.hypot(dx, dz) - 1.0), ang = Math.abs(angDelta(Math.atan2(dx, dz), c.yaw));
+    if (dy > -2 && dy < 4 && ((d <= reach && ang <= mv.arc + 0.3) || (aoe && Math.max(0, Math.hypot(bc.x - ix, bc.z - iz) - 1) <= aoe))) {
+      bossFight.hurt(dmg, c, false, bc); any = true; emit(bc, '#6a1a10', 8, 3.5, 0.45, 0.09);
+    }
+  }
+  // muri, auto e rocce davanti
+  const o = c.chest(), d = new THREE.Vector3(fx, 0, fz);
+  const hit = rayWorld(o, d, reach);
+  if (hit && hit.collider) {
+    const p = o.clone().addScaledVector(d, hit.t);
+    if (hit.collider.hp) damageWall(hit.collider, 90);
+    if (hit.collider.spec || hit.collider.rock || hit.collider.special) structHit(hit.collider, p, 80, c);
+    if (hit.collider.barrel) damageBarrel(hit.collider.barrel, 40, c);
+    emit(p, '#bbbbbb', 6, 3, 0.4, 0.08);
+  }
+  if (any && c.isPlayer) G.shake = Math.max(G.shake, 0.25);
+}
+function clawEffects(c, id, mv) {
+  const dist = c.isPlayer ? 0 : c.pos.distanceTo(camera.position);
+  if (dist > 140) return;
+  const y = c.pos.y + 1.15 * c.hScale;
+  const col = '#fff1c4';
+  const at = new THREE.Vector3(c.pos.x, y, c.pos.z);
+  if (id === 'swipeR' || id === 'swipeL') { clawFX.slash(at, c.yaw, id === 'swipeR' ? 1 : -1, 1.75, 0.4, col, 0.22); A.playGun('claw', dist); }
+  else if (id === 'spin') { clawFX.spin(at, c.yaw, 1.9, col); A.playGun('claw', dist); }
+  else {
+    const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw), x = c.pos.x + fx * 1.3, z = c.pos.z + fz * 1.3;
+    at.set(x, groundAt(x, z, c.pos.y + 1), z);
+    clawFX.ring(at, (mv.aoe || 3) * 0.95, '#ffe2a8');
+    emit(at, '#cbb89a', 14, 4.5, 0.7, 0.22, 0.3);
+    A.playGun('clawHeavy', dist);
+    if (c.isPlayer) G.shake = Math.max(G.shake, 0.35);
+  }
+}
+
 // eventi della mappa (decisi dall'host o dal gioco offline)
 const events = createEvents({
   scene, G, weather, sun, sunBase: SUN_BASE, sunGold: SUN_GOLD, TOWNS, HALF, WATER_LEVEL,
@@ -4657,6 +4830,7 @@ function update(dt) {
       c.tireT = Math.max(0, (c.tireT || 0) - dt);
       if (c.mode !== 'climb' && c.onGround && c.tireT <= 0) c.stamina = Math.min(100, c.stamina + dt * (c.inWater ? 6 : 15));
       c.swing = Math.max(0, c.swing - dt);
+      if (c.claw) updateClaw(c, dt); else if (c.pushX || c.pushZ) c.pushX = c.pushZ = 0;
       if (c.reloading > 0) {
         if (c.active !== c.reloadSlot || !c.weapon) c.reloading = 0;
         else {
@@ -4674,6 +4848,8 @@ function update(dt) {
     if (c.mode !== 'bus') updateCharVisual(c, dt);
     else if (c.mode !== 'bus') { c.m.root.position.copy(c.pos); c.m.root.rotation.y = c.yaw; }
   }
+  bossFight.update(dt);
+  clawFX.update(dt);
   updateLoot(dt);
   updateChests(dt);
   updateProjectiles(dt);
@@ -4782,6 +4958,6 @@ $('#loading').classList.add('hidden');
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, get stoves() { return stoves; } };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, bossFight, clawAttack, rayAll, get stoves() { return stoves; } };
 preloadIcons();
 setTimeout(() => preloadSkins([settings.skin]), 300);

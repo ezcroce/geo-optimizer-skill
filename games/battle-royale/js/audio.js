@@ -75,13 +75,25 @@ const GUN = {
   minigun: () => { noise(0.06, 2600, 0.8, 0.34); tone(170, 0.05, 0.16, 'sawtooth', 0, 90); },
   spin: () => { tone(90, 0.5, 0.12, 'sawtooth', 0, 420); noise(0.5, 1800, 4, 0.08, 'bandpass', 0, 0.5); },
   melee: () => { noise(0.12, 4000, 1.5, 0.25, 'bandpass'); },
+  // v38: Gargoyle e Artigli
+  claw: () => { noise(0.2, 3200, 1.1, 0.42, 'bandpass', 0, 0.2); noise(0.14, 6500, 2, 0.16, 'bandpass', 0.05, 0.12); tone(420, 0.12, 0.06, 'sawtooth', 0, 180); },
+  clawHeavy: () => { noise(0.32, 2200, 0.9, 0.55, 'bandpass', 0, 0.3); tone(160, 0.22, 0.18, 'sawtooth', 0, 70); },
+  slam: () => { noise(0.9, 320, 0.6, 0.9, 'lowpass', 0, 0.85); tone(55, 0.6, 0.6, 'sine', 0, 28); noise(0.25, 1600, 0.8, 0.3, 'bandpass', 0.02, 0.2); },
+  roar: () => {
+    noise(1.9, 520, 1.6, 0.55, 'bandpass', 0, 1.8); noise(1.6, 1300, 2.2, 0.25, 'bandpass', 0.1, 1.5);
+    tone(150, 1.7, 0.32, 'sawtooth', 0, 70); tone(112, 1.8, 0.28, 'sawtooth', 0.05, 52); tone(225, 1.2, 0.12, 'square', 0.08, 120);
+  },
+  growl: () => { tone(92, 0.7, 0.2, 'sawtooth', 0, 70); noise(0.7, 380, 2, 0.22, 'bandpass', 0, 0.7); },
+  flap: () => { noise(0.22, 260, 0.8, 0.5, 'lowpass', 0, 0.2); },
+  bossHurt: () => { tone(260, 0.25, 0.2, 'sawtooth', 0, 140); noise(0.25, 900, 1.5, 0.25, 'bandpass', 0, 0.22); },
+  bossDie: () => { tone(180, 2.4, 0.35, 'sawtooth', 0, 40); tone(130, 2.6, 0.3, 'sawtooth', 0.1, 32); noise(2.5, 600, 1.4, 0.45, 'bandpass', 0, 2.4); },
 };
 
 // volume in base alla distanza dall'ascoltatore
 let gunWin = 0, gunCount = 0;
 export function playGun(kind, dist = 0) {
   if (!ctx) return;
-  const att = Math.max(0, 1 - dist / 160);
+  const att = Math.max(0, 1 - dist / (kind === 'roar' || kind === 'bossDie' ? 320 : 160));
   if (att <= 0.02) return;
   // con 100 giocatori: al massimo 4 spari altrui ogni 60 ms (evita la saturazione)
   if (dist > 0) {

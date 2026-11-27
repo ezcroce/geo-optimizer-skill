@@ -523,59 +523,156 @@ function busExtras(g, M, { W, L, H, z0, z1, y1, ringY }) {
   g.userData.exhaust = new THREE.Vector3(1.05, -1.58, z0 - 0.35);
 }
 
-// ───────────── Forziere ─────────────
+// ───────────── Forziere (v38: assi scure, cornice di legno con borchie d'oro, cantonali d'avorio,
+//  lucchetto di ferro e fermaglio dorato a fiamma sul coperchio) ─────────────
+/** assi grigio-brune con venature, nodi e fughe scure (assi orizzontali lungo u) */
+const chestPlanks = once(() => {
+  const B = 256, A = canvas2d(B), g = A.g, rnd = mulberry(38);
+  g.fillStyle = '#4a4440'; g.fillRect(0, 0, B, B);
+  const rows = 6, rh = B / rows;
+  for (let r = 0; r < rows; r++) {
+    const y = r * rh, l = 26 + rnd() * 10;
+    g.fillStyle = `hsl(${22 + rnd() * 10},${15 + rnd() * 8}%,${l - 4}%)`; g.fillRect(0, y, B, rh);
+    for (let i = 0; i < 26; i++) {
+      const vy = y + 3 + rnd() * (rh - 6), amp = 0.6 + rnd() * 1.6, ph = rnd() * 6;
+      g.strokeStyle = `rgba(${rnd() < 0.5 ? '20,14,10' : '120,104,90'},${0.18 + rnd() * 0.25})`; g.lineWidth = 0.6 + rnd() * 1.1;
+      g.beginPath(); for (let x = 0; x <= B; x += 8) { const yy = vy + Math.sin(x / B * 6.28 * 2 + ph) * amp; x ? g.lineTo(x, yy) : g.moveTo(0, yy); } g.stroke();
+    }
+    if (rnd() < 0.6) { const kx = rnd() * B, ky = y + rh * (0.3 + rnd() * 0.4); for (let k = 7; k > 0; k -= 1.6) { g.strokeStyle = `rgba(25,16,10,${0.5 - k * 0.04})`; g.lineWidth = 1; g.beginPath(); g.ellipse(kx, ky, k * 2, k * 0.8, 0, 0, 6.28); g.stroke(); } }
+    const hl = g.createLinearGradient(0, y, 0, y + rh); hl.addColorStop(0, 'rgba(255,240,220,0.10)'); hl.addColorStop(0.5, 'rgba(0,0,0,0)'); hl.addColorStop(1, 'rgba(0,0,0,0.28)');
+    g.fillStyle = hl; g.fillRect(0, y, B, rh);
+    g.fillStyle = 'rgba(8,5,3,0.9)'; g.fillRect(0, y, B, 2.5);
+  }
+  const map = colorTex(A.c);
+  let normalMap = null;
+  if (NORMALS) { const H = canvas2d(B); H.g.fillStyle = '#a0a0a0'; H.g.fillRect(0, 0, B, B); for (let r = 0; r < rows; r++) { H.g.fillStyle = '#181818'; H.g.fillRect(0, r * rh, B, 3); H.g.fillStyle = '#7a7a7a'; H.g.fillRect(0, r * rh + 3, B, 2); } normalMap = normalFromHeight(H.c, 2.2); }
+  return { map, normalMap };
+});
+/** legno della cornice: bruno caldo, venatura lunga e bordi consumati */
+const chestFrameWood = once(() => {
+  const B = 128, A = canvas2d(B), g = A.g, rnd = mulberry(83);
+  g.fillStyle = '#6b3f1e'; g.fillRect(0, 0, B, B);
+  for (let i = 0; i < 60; i++) {
+    const vy = rnd() * B, amp = 0.5 + rnd() * 1.5, ph = rnd() * 6;
+    g.strokeStyle = `rgba(${rnd() < 0.5 ? '40,20,8' : '150,96,52'},${0.2 + rnd() * 0.3})`; g.lineWidth = 0.6 + rnd();
+    g.beginPath(); for (let x = 0; x <= B; x += 8) { const yy = vy + Math.sin(x / B * 6.28 + ph) * amp; x ? g.lineTo(x, yy) : g.moveTo(0, yy); } g.stroke();
+  }
+  for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(20,10,4,${rnd() * 0.25})`; g.fillRect(rnd() * B, rnd() * B, 1 + rnd() * 2, 1); }
+  return { map: colorTex(A.c) };
+});
 const chestMats = once(() => {
-  const w = chestWood();
+  const w = chestPlanks(), f = chestFrameWood();
   return {
-    wood: new THREE.MeshStandardMaterial({ map: w.map, normalMap: w.normalMap, roughness: 0.75 }),
-    dark: new THREE.MeshStandardMaterial({ color: '#3a2412', roughness: 0.9 }),
-    gold: new THREE.MeshStandardMaterial({ color: '#ffd24a', emissive: '#ffae00', emissiveIntensity: 0.55, metalness: 0.85, roughness: 0.28 }),
-    iron: new THREE.MeshStandardMaterial({ color: '#4a4c52', metalness: 0.8, roughness: 0.45 }),
+    wood: new THREE.MeshStandardMaterial({ map: w.map, normalMap: w.normalMap, roughness: 0.82 }),
+    frame: new THREE.MeshStandardMaterial({ map: f.map, roughness: 0.62, metalness: 0.05 }),
+    ivory: new THREE.MeshStandardMaterial({ color: '#ece0c2', roughness: 0.42, metalness: 0.18 }),
+    stud: new THREE.MeshStandardMaterial({ color: '#e0b04a', emissive: '#a86a00', emissiveIntensity: 0.25, metalness: 0.9, roughness: 0.3 }),
+    iron: new THREE.MeshStandardMaterial({ color: '#4a3a30', metalness: 0.75, roughness: 0.55 }),
+    dark: new THREE.MeshStandardMaterial({ color: '#0e0a08', roughness: 0.9 }),
+    flame: new THREE.MeshStandardMaterial({ vertexColors: true, emissive: '#8a5200', emissiveIntensity: 0.25, metalness: 0.75, roughness: 0.3 }),
+    // compatibilità (prima i pezzi d'oro si chiamavano gold)
+    get gold() { return this.stud; },
   };
 });
+/** fermaglio a fiamma: lingue sottili che salgono dal lucchetto e si aprono sul coperchio (colori oro → arancio → rosso) */
+function flameHasp(R) {
+  const shape = new THREE.Shape();
+  // contorno in (x, s): s = 1 sul retro del coperchio (cinghia stretta), s = 0 sul bordo davanti dove
+  // la cinghia si apre in lingue di fuoco che scendono verso il lucchetto
+  const L = [[0.035, 1], [0.035, 0.52], [0.06, 0.4], [0.05, 0.33], [0.095, 0.21], [0.07, 0.19], [0.118, 0.04], [0.068, 0.1], [0.05, 0.0], [0.024, 0.07], [0, -0.04]];
+  shape.moveTo(L[0][0], L[0][1]);
+  for (const [x, y] of L) shape.lineTo(x, y);
+  for (let i = L.length - 2; i >= 0; i--) { const [x, y] = L[i]; shape.lineTo(-x * (0.92 + (i % 3) * 0.06), y + (i % 2 ? 0.012 : -0.01)); }
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.018, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 1, curveSegments: 2 });
+  // piega sul coperchio: s → angolo sull'ellisse del coperchio (dal davanti verso la cima)
+  const P = geo.attributes.position, col = [];
+  const cA = new THREE.Color('#ffd75a'), cB = new THREE.Color('#ffa232'), cC = new THREE.Color('#b8321a');
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i), sN = P.getY(i), dz = P.getZ(i);
+    const a = 0.1 + sN * 1.8;                          // 0 = bordo davanti, π/2 = in cima, oltre = verso il retro
+    const r = R + 0.014 + dz;
+    P.setXYZ(i, x, Math.sin(a) * r * 0.62 + 0.004, R - 0.005 + Math.cos(a) * r);
+    const t = Math.min(1, Math.abs(x) / 0.12 + Math.max(0, 0.45 - sN) * 0.9);
+    const c = cA.clone().lerp(cB, Math.min(1, t * 1.1)).lerp(cC, Math.max(0, t - 0.6) * 1.6);
+    col.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
 const chestGeos = once(() => {
-  const W = 1, Hb = 0.55, D = 0.65, R = 0.33;
-  // cassa: scatola smussata con assi in rilievo e piedini
-  const base = merge([at(rbox(W, Hb, D, 0.05), 0, Hb / 2, 0), ...[-1, 1].flatMap(sx => [-1, 1].map(sz => at(new THREE.BoxGeometry(0.12, 0.06, 0.12), sx * (W / 2 - 0.08), 0.03, sz * (D / 2 - 0.08))))]);
-  { const P = base.attributes.position, U = base.attributes.uv; for (let i = 0; i < P.count; i++) U.setXY(i, (P.getX(i) + P.getZ(i)) * 0.9, P.getY(i) * 1.6); }
-  // coperchio a botte (mezzo cilindro) con fianchi pieni; perno sul bordo posteriore
-  const half = new THREE.CylinderGeometry(R, R, W - 0.02, 16, 1, false, -Math.PI / 2, Math.PI);
+  const W = 1, Hb = 0.55, D = 0.65, R = 0.33, T = 0.06;
+  // cassa: assi con piedini (le uv seguono le assi orizzontali)
+  const base = merge([at(rbox(W - 0.02, Hb - 0.04, D - 0.02, 0.03), 0, Hb / 2 + 0.01, 0)]);
+  { const P = base.attributes.position, U = base.attributes.uv, N = base.attributes.normal; for (let i = 0; i < P.count; i++) { const sideX = Math.abs(N.getX(i)) > 0.7; U.setXY(i, (sideX ? P.getZ(i) : P.getX(i)) * 0.9, P.getY(i) * 2.2); } }
+  // cornice: montanti agli angoli + traverse in alto e in basso su tutti e quattro i lati
+  const frame = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) frame.push(at(rbox(T + 0.02, Hb, T + 0.02, 0.012), sx * (W / 2 - T / 2 + 0.005), Hb / 2, sz * (D / 2 - T / 2 + 0.005)));
+  for (const y of [0.07, Hb - 0.03]) {
+    for (const sz of [-1, 1]) frame.push(at(rbox(W + 0.02, 0.07, 0.035, 0.012), 0, y, sz * (D / 2 + 0.008)));
+    for (const sx of [-1, 1]) frame.push(at(rbox(0.035, 0.07, D + 0.02, 0.012), sx * (W / 2 + 0.008), y, 0));
+  }
+  // traversa verticale centrale sul davanti e sul retro
+  for (const sz of [-1, 1]) frame.push(at(rbox(0.07, Hb - 0.1, 0.03, 0.01), 0, Hb / 2, sz * (D / 2 + 0.006)));
+  // piedini e cantonali d'avorio in basso (come nella foto: punte chiare agli angoli)
+  const ivoryBase = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    ivoryBase.push(at(rbox(0.16, 0.06, 0.16, 0.02), sx * (W / 2 - 0.04), 0.03, sz * (D / 2 - 0.04)));
+    ivoryBase.push(at(new THREE.BoxGeometry(0.11, 0.05, 0.018), sx * (W / 2 - 0.05), 0.085, sz * (D / 2 + 0.03)));
+  }
+  // borchie d'oro lungo le traverse
+  const studs = [], stud = (x, y, z) => studs.push(at(new THREE.SphereGeometry(0.013, 6, 4), x, y, z));
+  for (const y of [0.07, Hb - 0.03]) {
+    for (let x = -0.44; x <= 0.441; x += 0.088) for (const sz of [-1, 1]) stud(x, y, sz * (D / 2 + 0.028));
+    for (let z = -0.27; z <= 0.271; z += 0.09) for (const sx of [-1, 1]) stud(sx * (W / 2 + 0.028), y, z);
+  }
+  for (let y = 0.16; y < Hb - 0.08; y += 0.09) for (const sx of [-1, 1]) for (const sz of [-1, 1]) { stud(sx * (W / 2 + 0.012), y, sz * (D / 2 - 0.03)); stud(sx * (W / 2 - 0.03), y, sz * (D / 2 + 0.012)); }
+  // coperchio a botte con i fianchi pieni; perno sul bordo posteriore
+  const half = new THREE.CylinderGeometry(R, R, W - 0.1, 18, 1, false, 0, Math.PI);   // metà superiore (piatta sotto)
   at(half, 0, 0, R - 0.005, 0, 0, Math.PI / 2);
   half.scale(1, 0.62, 1);
-  { const P = half.attributes.position, U = half.attributes.uv; for (let i = 0; i < P.count; i++) U.setXY(i, P.getX(i) * 0.9, (P.getZ(i) + P.getY(i)) * 1.6); }
-  const lidRim = at(rbox(W, 0.08, D, 0.04), 0, 0.04, R - 0.005);
-  // fasce metalliche (base + coperchio), borchie agli angoli, serratura
-  const bandsBase = [], bandsLid = [];
-  for (const x of [-0.32, 0.32]) {
-    bandsBase.push(at(new THREE.BoxGeometry(0.09, Hb + 0.01, D + 0.025), x, Hb / 2, 0));
-    const arc = new THREE.CylinderGeometry(R + 0.012, R + 0.012, 0.09, 16, 1, true, -Math.PI / 2, Math.PI);
-    at(arc, x, 0, R - 0.005, 0, 0, Math.PI / 2); arc.scale(1, 0.62, 1);
-    bandsLid.push(arc);
+  { const P = half.attributes.position, U = half.attributes.uv; for (let i = 0; i < P.count; i++) U.setXY(i, P.getX(i) * 0.9, Math.atan2(P.getY(i) / 0.62, P.getZ(i) - R) * 0.55); }
+  // cantonali d'avorio alle due estremità del coperchio (fasce larghe a botte) + bordo bruno davanti
+  const ivoryLid = [];
+  for (const sx of [-1, 1]) {
+    const arc = new THREE.CylinderGeometry(R + 0.018, R + 0.018, 0.1, 18, 1, false, 0, Math.PI);
+    at(arc, sx * (W / 2 - 0.045), 0, R - 0.005, 0, 0, Math.PI / 2); arc.scale(1, 0.62, 1);
+    ivoryLid.push(arc);
   }
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    bandsBase.push(at(new THREE.BoxGeometry(0.1, 0.1, 0.1), sx * (W / 2 - 0.03), Hb - 0.05, sz * (D / 2 - 0.03)));
-    bandsBase.push(at(new THREE.BoxGeometry(0.1, 0.1, 0.1), sx * (W / 2 - 0.03), 0.09, sz * (D / 2 - 0.03)));
-  }
-  bandsBase.push(at(new THREE.BoxGeometry(W + 0.02, 0.07, D + 0.02), 0, Hb - 0.035, 0));
-  const lock = merge([at(rbox(0.2, 0.24, 0.05, 0.04), 0, -0.02, D + 0.0), at(new THREE.TorusGeometry(0.05, 0.015, 6, 12), 0, -0.17, D + 0.01)]);
-  const keyhole = merge([at(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 8), 0, 0.0, D + 0.03, Math.PI / 2), at(new THREE.BoxGeometry(0.016, 0.045, 0.02), 0, -0.03, D + 0.03)]);
-  // maniglie laterali
-  const handles = merge([-1, 1].map(sx => at(new THREE.TorusGeometry(0.07, 0.014, 6, 12, Math.PI), sx * (W / 2 + 0.02), 0.3, 0, 0, Math.PI / 2, Math.PI)));
-  return { base, half, lidRim, bandsBase: merge(bandsBase), bandsLid: merge(bandsLid), lock, keyhole, handles };
+  const lidFrame = [at(rbox(W + 0.02, 0.075, 0.04, 0.012), 0, 0.035, D - 0.005), at(rbox(W + 0.02, 0.075, 0.04, 0.012), 0, 0.035, 0.0)];
+  for (const sx of [-1, 1]) lidFrame.push(at(rbox(0.04, 0.075, D + 0.02, 0.012), sx * (W / 2 + 0.005), 0.035, R - 0.005));
+  const lidStuds = [];
+  for (const sx of [-1, 1]) for (let k = 0; k <= 6; k++) { const a = -Math.PI / 2 + k / 6 * Math.PI; lidStuds.push(at(new THREE.SphereGeometry(0.016, 6, 4), sx * (W / 2 - 0.045), Math.cos(a) * (R + 0.022) * 0.62, R - 0.005 + Math.sin(a) * (R + 0.022))); }
+  for (let x = -0.44; x <= 0.441; x += 0.088) lidStuds.push(at(new THREE.SphereGeometry(0.012, 6, 4), x, 0.035, D + 0.018));
+  // lucchetto di ferro (corpo arrotondato, arco spesso) appeso alla piastra
+  const lock = merge([
+    at(rbox(0.21, 0.23, 0.07, 0.06), 0, -0.22, D + 0.045),
+    at(new THREE.TorusGeometry(0.06, 0.017, 8, 14, Math.PI), 0, -0.1, D + 0.045),
+    at(rbox(0.12, 0.05, 0.03, 0.01), 0, -0.02, D + 0.01),
+  ]);
+  const keyhole = merge([at(new THREE.CylinderGeometry(0.018, 0.018, 0.02, 10), 0, -0.2, D + 0.082, Math.PI / 2), at(new THREE.BoxGeometry(0.014, 0.05, 0.02), 0, -0.235, D + 0.082)]);
+  const flame = flameHasp(R);
+  // maniglie laterali di ferro
+  const handles = merge([-1, 1].map(sx => at(new THREE.TorusGeometry(0.07, 0.014, 6, 12, Math.PI), sx * (W / 2 + 0.035), 0.3, 0, 0, Math.PI / 2, Math.PI)));
+  return { base, frame: merge(frame), ivoryBase: merge(ivoryBase), studs: merge(studs), half, ivoryLid: merge(ivoryLid), lidFrame: merge(lidFrame), lidStuds: merge(lidStuds), lock, keyhole, flame, handles };
 });
-/** forziere: cassa di assi con fasce dorate e coperchio a botte (lid ruota su x per aprirsi) */
+/** forziere: cassa di assi con cornice borchiata e coperchio a botte (lid ruota su x per aprirsi) */
 export function buildChestMesh() {
   const M = chestMats(), G = chestGeos();
   const g = new THREE.Group();
   mesh(G.base, M.wood, g);
-  mesh(G.bandsBase, M.gold, g, false);
+  mesh(G.frame, M.frame, g);
+  mesh(G.ivoryBase, M.ivory, g, false);
+  mesh(G.studs, M.stud, g, false);
   mesh(G.handles, M.iron, g, false);
   const lid = new THREE.Group();
   lid.position.set(0, 0.55, -0.325);
   mesh(G.half, M.wood, lid);
-  mesh(G.lidRim, M.wood, lid, false);
-  mesh(G.bandsLid, M.gold, lid, false);
-  mesh(G.lock, M.gold, lid, false);
+  mesh(G.ivoryLid, M.ivory, lid);
+  mesh(G.lidFrame, M.frame, lid, false);
+  mesh(G.lidStuds, M.stud, lid, false);
+  mesh(G.flame, M.flame, lid, false);
+  mesh(G.lock, M.iron, lid, false);
   mesh(G.keyhole, M.dark, lid, false);
   g.add(lid);
   return { g, lid };

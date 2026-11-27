@@ -1,7 +1,7 @@
 // Pose e animazioni dei personaggi articolati (anche, ginocchia, caviglie, spalle, gomiti).
 // Condivise tra il gioco (main.js) e il sito (site.js), così le animazioni sono identiche.
 import * as THREE from 'three';
-import { RIG } from './character.js?v=37';
+import { RIG } from './character.js?v=38';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -59,7 +59,7 @@ export function footContact(m) {
   }
   return lo;
 }
-const _ck = [0, 0, 0];
+const _cvk = [0, 0, 0];
 /** posa accovacciata di una gamba: da ferma mezzo inginocchiata (destra avanti, sinistra indietro sulle punte), in movimento passi bassi */
 function crouchLeg(i, phase, mv) {
   const ph = phase + i * Math.PI, s = Math.sin(ph), c = Math.cos(ph);
@@ -73,8 +73,8 @@ function crouchLeg(i, phase, mv) {
   const hI = i ? -0.42 : -1.3, upI = i ? 0.035 : 0;
   const kI = kneeFor(hI, D + upI), fI = -(hI + kI) + (i ? 0.75 : 0.02);
   const w = 1 - smooth(mv * 2.2);
-  _ck[0] = lerp(hW, hI, w); _ck[1] = lerp(kW, kI, w); _ck[2] = lerp(fW, fI, w);
-  return _ck;
+  _cvk[0] = lerp(hW, hI, w); _cvk[1] = lerp(kW, kI, w); _cvk[2] = lerp(fW, fI, w);
+  return _cvk;
 }
 // ───────────── v32: andatura con appoggio e volo veri ─────────────
 //  Ogni gamba ha una fase d'appoggio (frazione D del ciclo) e una di volo. In appoggio la coscia passa da
@@ -298,7 +298,9 @@ export function poseHold(m, pitch, sk = 0, sw = 0, lean = 0) {
   const e = smooth(sk);
   // torsione del busto (positiva = spalla destra avanti): pistola a una mano di profilo, armi pesanti con la spalla sinistra avanti
   // v37: busto di tre quarti come un tiratore vero (spalla sinistra avanti): la mano d'appoggio arriva al paramano col gomito piegato
-  const tw0 = one ? 0.3 : k === 'rifle' ? (cls === 'heavy' ? -0.32 : cls === 'light' ? -0.16 : -0.26) : 0;
+  // v38: da fermi il braccio d'appoggio attraversava il petto (spalla → paramano in diagonale dentro il pettorale):
+  //  busto più di tre quarti (posizione "a lama"), così il paramano finisce davanti alla spalla sinistra
+  const tw0 = one ? 0.3 : k === 'rifle' ? (cls === 'heavy' ? -0.5 : cls === 'light' ? -0.36 : -0.44) : 0;
   const tw = tw0 * (1 - e);
   m.torso.rotation.y += tw;
   // ── mira ── la rotazione compensa la torsione: la canna resta sulla linea di mira
@@ -401,7 +403,7 @@ export function handsToGun(m, reload = -1) {
   if (k === 'rifle') {
     // v37: punto del paramano più avanti che la mano raggiunge col gomito ancora piegato (prima: braccio teso al
     // limite e passi di 3 cm, così la mano saltellava lungo l'arma a ogni passo). Ricerca continua + smorzamento.
-    const zMin = h.main[1] + 0.12, lim = REACH * 0.9;
+    const zMin = h.main[1] + 0.12, lim = REACH * 0.84;   // v38: gomito più piegato (può uscire di lato invece di restare in linea col petto)
     const dAt = (z) => gunPoint(_t, P, Q, -0.04, h.fore[0] - 0.045, z - 0.06, s).distanceTo(S0);
     if (dAt(fz) > lim) {
       let lo = zMin, hi = fz;
@@ -427,7 +429,7 @@ export function handsToGun(m, reload = -1) {
     const toPouch = smooth((reload - 0.3) / 0.12) * (1 - smooth((reload - 0.5) / 0.12));
     _t.lerp(_t2, toMag).lerp(pouch, toPouch);
   }
-  _pole.set(-0.6, -1, k === 'hip' ? 0.2 : cls === 'heavy' ? -0.25 : -0.1);
+  _pole.set(-0.95, -1, k === 'hip' ? 0.2 : cls === 'heavy' ? -0.25 : -0.1);   // v38: gomito d'appoggio più in fuori
   ikM(m, 0, _t, _pole);
   // polsi: leggera rotazione verso l'impugnatura
   m.hands[MAIN].rotation.set(0.25, 0, 0);
@@ -794,4 +796,108 @@ export function poseDeath(m, k) {
   setLeg(m, 0, -0.3 * k, 0.5 * k, 0.3 * k);
   setLeg(m, 1, 0.15 * k, 0.2 * k, 0.3 * k);
   m.head.rotation.set(0.2 * k, 0.3 * k, 0);
+}
+
+// ───────────── v38: Artigli del Gargoyle ─────────────
+//  Le stesse mosse del boss (swipeR, swipeL, double, spin, pounce) su un corpo umano: le mani vanno
+//  sui bersagli con la IK, il busto si carica e ruota, il bacino segue, le gambe fanno il passo e si
+//  piegano negli schianti. Tappe: [u, polso destro xyz, polso sinistro xyz, torsione, inclinazione, abbassamento, passo]
+const CR = [-0.2, 0.24, 0.42], CL = [0.23, 0.2, 0.37];           // guardia: avambracci in avanti, artigli puntati al bersaglio
+const READY = [...CR, ...CL, 0, 0.06, 0.03, 0];
+const CLAW_KEYS = {
+  swipeR: [
+    [0, ...READY],
+    [0.36, -0.52, 0.62, -0.1, 0.22, 0.3, 0.34, -0.7, -0.04, 0.05, 0],
+    [0.47, -0.1, 0.4, 0.55, 0.27, 0.22, 0.14, 0.3, 0.26, 0.12, 0.8],
+    [0.58, 0.36, 0.2, 0.34, 0.3, 0.2, 0.06, 0.85, 0.36, 0.17, 1],
+    [0.74, 0.3, 0.22, 0.34, 0.3, 0.22, 0.12, 0.7, 0.3, 0.14, 0.9],
+    [1, ...READY],
+  ],
+  double: [
+    [0, ...READY],
+    [0.4, -0.17, 0.98, 0.03, 0.17, 0.98, 0.03, 0, -0.32, -0.03, 0],
+    [0.53, -0.13, -0.04, 0.5, 0.13, -0.04, 0.5, 0, 0.78, 0.4, 0.55],
+    [0.74, -0.14, -0.02, 0.48, 0.14, -0.02, 0.48, 0, 0.7, 0.36, 0.55],
+    [1, ...READY],
+  ],
+  spin: [
+    [0, ...READY],
+    [0.2, -0.42, 0.36, -0.12, 0.5, 0.44, 0.26, -0.55, 0.1, 0.1, 0],
+    [0.32, -0.78, 0.44, 0.12, 0.78, 0.44, 0.12, 0, 0.16, 0.14, 0],
+    [0.76, -0.78, 0.44, 0.12, 0.78, 0.44, 0.12, 0, 0.16, 0.14, 0],
+    [1, ...READY],
+  ],
+  pounce: [
+    [0, ...READY],
+    [0.22, -0.28, 0.14, 0.12, 0.28, 0.14, 0.12, 0, 0.5, 0.34, 0],
+    [0.32, -0.2, 0.62, 0.42, 0.2, 0.62, 0.42, 0, -0.12, 0, 0],
+    [0.62, -0.22, 0.5, 0.52, 0.22, 0.5, 0.52, 0, 0.22, 0, 0],
+    [0.79, -0.13, -0.04, 0.5, 0.13, -0.04, 0.5, 0, 0.75, 0.38, 0.4],
+    [0.9, -0.14, -0.02, 0.48, 0.14, -0.02, 0.48, 0, 0.65, 0.32, 0.4],
+    [1, ...READY],
+  ],
+};
+const _clk = new Array(12).fill(0), _cR = new THREE.Vector3(), _cL = new THREE.Vector3();
+const _cq = [new THREE.Quaternion(), new THREE.Quaternion()], _ce = [0, 0];
+const POLE_R = new THREE.Vector3(-0.55, -1, -0.15), POLE_L = new THREE.Vector3(0.55, -1, -0.15);
+/**
+ * o: { mv, run, sk (corsa), ck, phase, t, move: id | null, u: 0..1 }
+ * Restituisce la rotazione extra del corpo attorno a y (la giravolta), già applicata a m.body.
+ */
+export function poseClaws(m, o) {
+  const mv = o.mv || 0, phase = o.phase || 0, sk = o.move ? 0 : smooth(o.sk || 0);
+  const id = o.move, u = clamp(o.u || 0, 0, 1);
+  let vals;
+  if (id) {
+    const mirror = id === 'swipeL';
+    vals = track(CLAW_KEYS[mirror ? 'swipeR' : id] || CLAW_KEYS.swipeR, u, _clk);
+    if (mirror) {
+      // sinistra: si scambiano le braccia e si riflette tutto sul piano x = 0
+      const r = vals.slice(0, 3), l = vals.slice(3, 6);
+      vals[0] = -l[0]; vals[1] = l[1]; vals[2] = l[2]; vals[3] = -r[0]; vals[4] = r[1]; vals[5] = r[2];
+      vals[6] = -vals[6]; vals[9] = -vals[9];
+    }
+  } else { for (let i = 0; i < READY.length; i++) _clk[i] = READY[i]; vals = _clk; }
+  const [rx, ry, rz, lx, ly, lz, tw, lean, drop, step] = vals;
+  // in guardia gli artigli ondeggiano col passo e respirano
+  const bob = id ? 0 : Math.cos(phase * 2) * 0.018 * mv + Math.sin((o.t || 0) * 2) * 0.008;
+  _cR.set(rx, ry + bob + Math.sin(phase) * 0.02 * mv, rz);
+  _cL.set(lx, ly + bob - Math.sin(phase) * 0.02 * mv, lz);
+  // busto e bacino: la torsione parte dai fianchi, l'inclinazione si compensa con la testa
+  m.torso.rotation.y += tw;
+  m.body.rotation.y += tw * 0.35;
+  m.torso.rotation.x += lean;
+  m.head.rotation.x -= lean * 0.55;
+  m.head.rotation.y -= tw * 0.6;
+  let spinY = 0;
+  if (id === 'spin') { spinY = -Math.PI * 2 * smooth((u - 0.22) / 0.56); m.body.rotation.y += spinY; }
+  // gambe: affondo e passo in avanti (per l'artigliata destra avanza la sinistra)
+  if (drop > 0.001) {
+    const L = drop / 0.45;
+    for (let i = 0; i < 2; i++) { m.legs[i].rotation.x -= L * 1.5; m.knees[i].rotation.x += L * 3.0; m.feet[i].rotation.x -= L * 1.5; }
+    m.body.position.y -= drop;
+  }
+  if (Math.abs(step) > 0.001) {
+    const a = step > 0 ? 1 : 0, b = 1 - a, k = Math.abs(step);   // a = gamba che avanza
+    m.legs[a].rotation.x -= 0.5 * k; m.knees[a].rotation.x += 0.35 * k; m.feet[a].rotation.x += 0.15 * k;
+    m.legs[b].rotation.x += 0.28 * k; m.knees[b].rotation.x += 0.12 * k; m.feet[b].rotation.x -= 0.4 * k;
+    m.body.position.y -= 0.04 * k;
+  }
+  // braccia: in corsa oscillano come senza armi, altrimenti IK sui bersagli
+  if (sk > 0.001) {
+    armsSwing(m, phase, mv, o.run || 0, o.ck || 0);
+    for (let i = 0; i < 2; i++) { _cq[i].copy(m.arms[i].quaternion); _ce[i] = m.elbows[i].rotation.x; }
+  }
+  armIK(m, 0, _cR, POLE_R);
+  armIK(m, 1, _cL, POLE_L);
+  if (sk > 0.001) for (let i = 0; i < 2; i++) {
+    m.arms[i].quaternion.slerp(_cq[i], sk);
+    m.elbows[i].rotation.x = lerp(m.elbows[i].rotation.x, _ce[i], sk);
+  }
+  // polsi: artigli puntati in avanti, nel colpo seguono la traiettoria
+  const hit = id ? Math.sin(Math.PI * u) : 0;
+  m.hands[0].rotation.set(-0.25 - 0.35 * hit, 0, -0.1);
+  m.hands[1].rotation.set(-0.25 - 0.35 * hit, 0, 0.1);
+  grip(m, 1, 1);
+  return spinY;
 }

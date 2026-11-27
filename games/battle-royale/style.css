@@ -929,3 +929,12 @@ body.touch #spectate .spec-hint { display: none; }
 /* v37: terza modalità (1 contro 1) a tutta larghezza */
 .modes .mode:nth-child(3) { grid-column: span 2; }
 .teammodes.dim { opacity: .35; pointer-events: none; filter: grayscale(.6); }
+
+/* ── v38: barra della salute del Gargoyle ── */
+#bossBar { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); width: min(480px, 46vw); z-index: 40; pointer-events: none; text-align: center; font-family: inherit; transition: opacity .3s; }
+#bossBar.hidden { display: block !important; opacity: 0; }
+#bossBar .bn { color: #ffd88a; font-weight: 900; letter-spacing: .14em; font-size: 14px; text-shadow: 0 2px 0 #000, 0 0 12px rgba(255, 120, 40, .55); margin-bottom: 5px; }
+#bossBar .bb { position: relative; height: 14px; border-radius: 8px; background: rgba(20, 8, 6, .78); border: 2px solid #c99a3a; box-shadow: 0 0 0 2px rgba(0, 0, 0, .55), 0 6px 18px rgba(0, 0, 0, .45); overflow: hidden; }
+#bossBar .bb b { position: absolute; left: 0; top: 0; bottom: 0; background: #f4e0b0; opacity: .55; transition: none; }
+#bossBar .bb i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #ff7a4a, #c0261a 60%, #7a120c); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25); }
+body.spectating #bossBar { top: 96px; }

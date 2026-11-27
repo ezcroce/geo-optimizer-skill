@@ -986,8 +986,8 @@ export const houseAtlas = makeHouseAtlas();
  * v36: materiale delle casette: atlante 2×2 scelto per triangolo (attributo aTile = riquadro + 1, 0 = solo colore)
  * con ripetizione dentro il riquadro (fract + textureGrad: niente righe sulle giunte delle mipmap).
  */
-function makeAtlasMaterial(key) {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: houseAtlas, roughness: 0.88, metalness: 0.0, flatShading: true });
+export function makeAtlasMaterial(key, atlas = houseAtlas, opt = {}) {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: atlas, roughness: 0.88, metalness: 0.0, flatShading: true, ...opt });
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aTile;\nvarying float vTile;')
@@ -1007,6 +1007,77 @@ function makeAtlasMaterial(key) {
   return m;
 }
 export const shedMaterial = makeAtlasMaterial('shed');
+
+/**
+ * v38: atlante "civico" 2×2 per gli arredi di piazza:
+ *  0 · listelli di legno verniciato arancio (panchine), venatura lungo u
+ *  1 · marmo crema con venature sottili (fontane)
+ *  2 · acqua chiara con increspature e riflessi
+ *  3 · ghisa nera opaca con riflessi (fianchi delle panchine)
+ */
+function makeCivicAtlas() {
+  const S = 1024, H = 512, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d'), rnd = mulberry32(3838);
+  const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
+  // 0 · legno arancio: una tavola per riquadro (la venatura corre lungo u e si ripete senza giunte)
+  {
+    const ox = 0, oy = 0;
+    const gr = g.createLinearGradient(0, oy, 0, oy + H);
+    gr.addColorStop(0, '#e59a55'); gr.addColorStop(0.5, '#d7823c'); gr.addColorStop(1, '#c46d2c');
+    g.fillStyle = gr; g.fillRect(ox, oy, H, H);
+    for (let k = 0; k < 140; k++) {
+      const vy = oy + rnd() * H, amp = 2 + rnd() * 7, f = 1 + Math.floor(rnd() * 2), ph = rnd() * 6.28;
+      g.strokeStyle = hsl(22 + rnd() * 10, 55 + rnd() * 20, 30 + rnd() * 25, 0.18 + rnd() * 0.3); g.lineWidth = 0.6 + rnd() * 2.4;
+      g.beginPath(); for (let x = 0; x <= H; x += 8) { const yy = vy + Math.sin(x / H * 6.283 * f + ph) * amp; x ? g.lineTo(ox + x, yy) : g.moveTo(ox, yy); } g.stroke();
+    }
+    for (let k = 0; k < 5; k++) { const kx = ox + rnd() * H, ky = oy + rnd() * H; for (let r = 14; r > 1; r -= 2.6) { g.strokeStyle = hsl(20, 60, 22 + r, 0.4); g.lineWidth = 1.4; g.beginPath(); g.ellipse(kx, ky, r * 1.8, r * 0.6, 0, 0, 6.283); g.stroke(); } }
+    const sh = g.createLinearGradient(0, oy, 0, oy + H);          // vernice lucida: riflesso chiaro in alto, bordo scuro
+    sh.addColorStop(0, 'rgba(255,236,200,0.35)'); sh.addColorStop(0.18, 'rgba(255,236,200,0)'); sh.addColorStop(0.9, 'rgba(60,20,0,0)'); sh.addColorStop(1, 'rgba(60,20,0,0.35)');
+    g.fillStyle = sh; g.fillRect(ox, oy, H, H);
+  }
+  // 1 · marmo crema
+  {
+    const ox = H, oy = 0;
+    g.fillStyle = '#e9dfc9'; g.fillRect(ox, oy, H, H);
+    for (let k = 0; k < 900; k++) { g.fillStyle = hsl(38 + rnd() * 10, 25 + rnd() * 20, 78 + rnd() * 14, 0.25); const r = 2 + rnd() * 14; g.beginPath(); g.arc(ox + rnd() * H, oy + rnd() * H, r, 0, 6.283); g.fill(); }
+    for (let k = 0; k < 14; k++) {
+      let x = rnd() * H, y = rnd() * H, a = rnd() * 6.28;
+      g.strokeStyle = hsl(30, 18, 55 + rnd() * 15, 0.25 + rnd() * 0.25); g.lineWidth = 0.6 + rnd() * 1.4;
+      g.beginPath(); g.moveTo(ox + x, oy + y);
+      for (let s2 = 0; s2 < 40; s2++) { a += (rnd() - 0.5) * 0.7; x = (x + Math.cos(a) * 9 + H) % H; y = (y + Math.sin(a) * 9 + H) % H; if (s2 % 9 === 8) { g.stroke(); g.beginPath(); g.moveTo(ox + x, oy + y); } else g.lineTo(ox + x, oy + y); }
+      g.stroke();
+    }
+    // giunti dei blocchi (leggeri)
+    g.strokeStyle = 'rgba(120,104,80,0.35)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(ox, oy + H / 2); g.lineTo(ox + H, oy + H / 2); g.moveTo(ox + H / 2, oy); g.lineTo(ox + H / 2, oy + H / 2); g.moveTo(ox + 4, oy + H / 2); g.lineTo(ox + 4, oy + H); g.stroke();
+  }
+  // 2 · acqua
+  {
+    const ox = 0, oy = H;
+    const gr = g.createLinearGradient(0, oy, 0, oy + H); gr.addColorStop(0, '#9fdcf2'); gr.addColorStop(1, '#5fb8de');
+    g.fillStyle = gr; g.fillRect(ox, oy, H, H);
+    for (let k = 0; k < 220; k++) {
+      const x = rnd() * H, y = rnd() * H, w = 10 + rnd() * 50;
+      g.strokeStyle = `rgba(255,255,255,${0.15 + rnd() * 0.35})`; g.lineWidth = 1 + rnd() * 2.5;
+      g.beginPath(); g.moveTo(ox + x, oy + y); g.quadraticCurveTo(ox + x + w / 2, oy + y - 4 - rnd() * 4, ox + x + w, oy + y); g.stroke();
+    }
+    for (let k = 0; k < 80; k++) { g.fillStyle = `rgba(30,90,140,${rnd() * 0.18})`; g.beginPath(); g.ellipse(ox + rnd() * H, oy + rnd() * H, 10 + rnd() * 30, 3 + rnd() * 6, 0, 0, 6.283); g.fill(); }
+  }
+  // 3 · ghisa nera
+  {
+    const ox = H, oy = H;
+    g.fillStyle = '#1c1d20'; g.fillRect(ox, oy, H, H);
+    for (let k = 0; k < 2500; k++) { const v = 20 + rnd() * 40; g.fillStyle = `rgba(${v},${v},${v + 4},0.5)`; g.fillRect(ox + rnd() * H, oy + rnd() * H, 2, 2); }
+    const sh = g.createLinearGradient(ox, 0, ox + H, 0); sh.addColorStop(0, 'rgba(255,255,255,0)'); sh.addColorStop(0.45, 'rgba(255,255,255,0.08)'); sh.addColorStop(0.55, 'rgba(255,255,255,0.0)');
+    g.fillStyle = sh; g.fillRect(ox, oy, H, H);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+export const civicAtlas = makeCivicAtlas();
+export const civicMaterial = makeAtlasMaterial('civic', civicAtlas, { roughness: 0.5, metalness: 0.05 });
 
 export const SHED = {
   W: 4.2, D: 3.6, WH: 2.5, RH: 1.35, floor: 0.3,

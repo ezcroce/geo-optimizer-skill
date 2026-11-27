@@ -3,7 +3,7 @@
 //  statistiche dell'arma. Si riordina trascinando (mouse o dito) o con
 //  i tasti 1-5; si può equipaggiare e gettare a terra.
 // ─────────────────────────────────────────────────────────────
-import { WEAPONS, RARITIES, AMMO_TYPES, CONSUMABLES } from './config.js?v=37';
+import { WEAPONS, RARITIES, AMMO_TYPES, CONSUMABLES } from './config.js?v=38';
 
 const STAT_MAX = (() => {
   const m = { dmg: 0, dps: 0, range: 0, mag: 0 };
@@ -14,7 +14,7 @@ const STAT_MAX = (() => {
   }
   return m;
 })();
-const ROLE = { pistol: 'Pistola', smg: 'Mitraglietta', ar: 'Fucile', shotgun: 'Fucile a canna liscia', sniper: 'Precisione', rocket: 'Esplosivo', lmg: 'Mitragliatrice', minigun: 'Mitragliatrice' };
+const ROLE = { pistol: 'Pistola', smg: 'Mitraglietta', ar: 'Fucile', shotgun: 'Fucile a canna liscia', sniper: 'Precisione', rocket: 'Esplosivo', melee: 'Corpo a corpo', lmg: 'Mitragliatrice', minigun: 'Mitragliatrice' };
 
 /**
  * @param {object} api { G, weaponIconHTML, consIconHTML, swap(i,j), drop(i), dropAmmo(id, n), equip(i), onOpen(), onClose(), sound(kind) }
@@ -53,7 +53,8 @@ export function createInventory(api) {
       const d = WEAPONS[s.id], r = RARITIES[s.rarity];
       col = r.color; ic = api.weaponIconHTML(s.id, s.rarity); nm = d.name;
       const res = p.ammo[d.ammo];
-      sub = `<span class="mag ${s.mag === 0 ? 'zero' : ''}">${s.mag}/${d.mag}</span> <span class="am" style="color:${AMMO_TYPES[d.ammo].color}">● ${res}</span>`;
+      sub = d.melee ? '<span class="mag">∞</span> <span class="am">corpo a corpo</span>'
+        : `<span class="mag ${s.mag === 0 ? 'zero' : ''}">${s.mag}/${d.mag}</span> <span class="am" style="color:${AMMO_TYPES[d.ammo].color}">● ${res}</span>`;
     } else {
       const d = CONSUMABLES[s.id];
       col = RARITIES[d.rarity].color; ic = api.consIconHTML(s.id); nm = d.name;
@@ -81,6 +82,17 @@ export function createInventory(api) {
       const dmg = d.dmg * r.mult, tot = dmg * (d.pellets || 1);
       const dps = tot / d.rate, acc = 1 - Math.min(1, d.spread / 0.12);
       const res = p.ammo[d.ammo], at = AMMO_TYPES[d.ammo];
+      if (d.melee) return `<div class="dh" style="--rc:${r.color}"><div class="big w">${api.weaponIconHTML(s.id, s.rarity)}</div>
+          <div><h3>${d.name}</h3><div class="rar" style="color:${r.color}">${r.name} · ${ROLE[d.role] || ''}</div></div></div>
+        <p class="desc">${d.desc || ''}</p>
+        <div class="stats2">
+          ${bar('Danno', dmg / STAT_MAX.dmg, Math.round(dmg), r.color)}
+          ${bar('Danni/s', dps / STAT_MAX.dps, Math.round(dps), r.color)}
+          ${bar('Portata', d.range / 10, d.range + ' m')}
+          ${bar('Munizioni', 1, '∞', '#7fd0ff')}
+        </div>
+        <div class="ammoline" style="--ac:#ffcf2e">✦ Combo: artigliata destra → sinistra → giravolta → schianto · mira + attacco = balzo</div>
+        ${btns(equip)}`;
       return `<div class="dh" style="--rc:${r.color}"><div class="big w">${api.weaponIconHTML(s.id, s.rarity)}</div>
           <div><h3>${d.name}</h3><div class="rar" style="color:${r.color}">${r.name} · ${ROLE[d.role] || ''}</div></div></div>
         <p class="desc">${d.desc || ''}</p>

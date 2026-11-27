@@ -4,10 +4,11 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=37';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=38';
 import { carInstances } from './cars.js?v=25';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=38';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial } from './props.js?v=37';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=38';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -23,7 +24,8 @@ const EDGE = HALF + 60;               // il terreno continua un po' nel mare
 
 const DEFAULT_TOWNS = [
   // v24: città più grandi (reticolo di strade, palazzi, negozi)
-  { name: 'Centro Caos', x: 15, z: 0, r: 84, houses: 12 },
+  // v38: al centro della mappa c'è l'arena (Colosseo), al posto della città più grande
+  { name: 'Colosseo Caos', x: 0, z: 0, r: 70, houses: 0, arena: true },
   { name: 'Piazza Pulita', x: -315, z: -285, r: 54, houses: 7 },
   { name: 'Torri Tremanti', x: 300, z: -315, r: 50, houses: 4, towers: true },
   { name: 'Borgo Bottino', x: -330, z: 285, r: 54, houses: 7 },
@@ -285,7 +287,11 @@ function ensureFields() {
   makeRivers(mulberry32(MAP.seed ^ 0x5eed), MAP.random ? 1 + (MAP.seed % 3) : 2);
   buildHeightGrid();
   assignThemes(mulberry32(MAP.seed ^ 0x7e3a), MAP.random);
-  for (const t of TOWNS) planTown(t);
+  for (const t of TOWNS) { if (t.arena) { t.theme = 'arena'; t.plan = null; continue; } planTown(t); t.church = null; }
+  // v38: la chiesa barocca affaccia sulla piazza della città a reticolo più vicina al centro
+  let best = null;
+  for (const t of TOWNS) if (!t.arena && t.plan.layout === 'grid' && t.plan.hp >= 12 && /classic|castle|port|industrial/.test(t.theme) && (!best || Math.hypot(t.x, t.z) < Math.hypot(best.x, best.z))) best = t;
+  if (best) best.church = { x: best.x - 4, z: best.z - best.plan.hp + 10.4 };
 }
 
 /** altezza del terreno (griglia precalcolata da 2,5 m, interpolazione bilineare) */
@@ -343,7 +349,7 @@ const THEME_NAMES = {
   castle: [['Castello', 'Rocca', 'Fortezza', 'Torrione', 'Bastione', 'Maniero'], ['Cosmico', 'Ribelle', 'Antico', 'Fantasma', 'Reale', 'Oscuro']],
   classic: [P1, P2],
 };
-export const THEME_LABEL = { classic: 'Paese', alpine: 'Villaggio alpino', western: 'Città western', coastal: 'Borgo marinaro', farm: 'Fattoria', industrial: 'Zona industriale', castle: 'Castello', port: 'Porto' };
+export const THEME_LABEL = { arena: 'Arena dei gladiatori', classic: 'Paese', alpine: 'Villaggio alpino', western: 'Città western', coastal: 'Borgo marinaro', farm: 'Fattoria', industrial: 'Zona industriale', castle: 'Castello', port: 'Porto' };
 function assignThemes(r, random) {
   const used = new Set();
   for (const t of TOWNS) {
@@ -387,7 +393,7 @@ function configureMap(seed, random) {
     // città: una grande vicino al centro, le altre sparse con distanza minima
     const n = 14 + Math.floor(r() * 5), used = new Set();
     const name = () => { for (let k = 0; k < 50; k++) { const s = P1[Math.floor(r() * P1.length)] + ' ' + P2[Math.floor(r() * P2.length)]; if (!used.has(s)) { used.add(s); return s; } } return 'Paese ' + used.size; };
-    TOWNS.push({ name: name(), x: R(-120, 120), z: R(-120, 120), r: 80, houses: 12 });
+    TOWNS.push({ name: 'Colosseo ' + name().split(' ').pop(), x: R(-25, 25), z: R(-25, 25), r: 70, houses: 0, arena: true });
     for (let k = 0; TOWNS.length < n && k < 3000; k++) {
       const x = R(-HALF + 100, HALF - 100), z = R(-HALF + 100, HALF - 100);
       if (TOWNS.some(t => Math.hypot(t.x - x, t.z - z) < (t.r > 60 ? 200 : 172))) continue;
@@ -460,6 +466,10 @@ function cellKey(ix, iz) { return (ix + 2048) * 4096 + (iz + 2048); }
 export function addCollider(c) {
   if (c.type === 'cyl') {
     c.minX = c.x - c.r; c.maxX = c.x + c.r; c.minZ = c.z - c.r; c.maxZ = c.z + c.r;
+  } else if (c.type === 'ring') {
+    // v38: anello (gradinate e muri dell'arena): corona circolare fra r0 e r1, con varchi rettilinei (gates: {ax, az, w})
+    c.minX = c.x - c.r1; c.maxX = c.x + c.r1; c.minZ = c.z - c.r1; c.maxZ = c.z + c.r1;
+    c.gates = c.gates || [];
   }
   c._s = 0;
   colliders.push(c);
@@ -499,6 +509,12 @@ export function queryColliders(x, z, r) {
   return out;
 }
 
+/** v38: true se (x, z) cade in uno dei varchi dell'anello */
+export function ringGap(c, x, z, m = 0) {
+  const dx = x - c.x, dz = z - c.z;
+  for (const g of c.gates) if (dx * g.ax + dz * g.az > 0 && Math.abs(dz * g.ax - dx * g.az) < g.w - m) return true;
+  return false;
+}
 /** Altezza del suolo (terreno o cima di una cassa) sotto un punto */
 export function groundAt(x, z, feetY, radius = 0.35) {
   let g = terrainHeight(x, z);
@@ -509,6 +525,9 @@ export function groundAt(x, z, feetY, radius = 0.35) {
     if (c.maxY <= g) continue;
     if (c.type === 'box') {
       if (x > c.minX - radius * 0.6 && x < c.maxX + radius * 0.6 && z > c.minZ - radius * 0.6 && z < c.maxZ + radius * 0.6) g = c.maxY;
+    } else if (c.type === 'ring') {
+      const d = Math.hypot(x - c.x, z - c.z);
+      if (d > c.r0 - radius * 0.5 && d < c.r1 + radius * 0.5 && !ringGap(c, x, z)) g = c.maxY;
     } else if (Math.hypot(x - c.x, z - c.z) < c.r + radius * 0.5) g = c.maxY;
   }
   return g;
@@ -542,6 +561,12 @@ export function resolveCollisions(pos, radius, height) {
         }
         hit = true;
       }
+    } else if (c.type === 'ring') {
+      const dx = pos.x - c.x, dz = pos.z - c.z, d = Math.hypot(dx, dz);
+      if (d < c.r0 - radius || d > c.r1 + radius || d < 1e-6 || ringGap(c, pos.x, pos.z)) continue;
+      const to = d - c.r0 < c.r1 - d ? c.r0 - radius : c.r1 + radius;
+      pos.x = c.x + dx / d * to; pos.z = c.z + dz / d * to;
+      hit = true;
     } else {
       const dx = pos.x - c.x, dz = pos.z - c.z;
       const d = Math.hypot(dx, dz);
@@ -595,6 +620,27 @@ function rayCyl(o, d, c) {
   return t;
 }
 
+/** v38: raggio contro un anello (corona circolare in verticale, con i varchi) */
+function rayRing(o, d, c) {
+  const ox = o.x - c.x, oz = o.z - c.z, a = d.x * d.x + d.z * d.z, b = 2 * (ox * d.x + oz * d.z), cc0 = ox * ox + oz * oz;
+  const ok = (t) => {
+    if (t < 0) return false;
+    const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t, r = Math.hypot(x - c.x, z - c.z);
+    return y >= c.minY - 1e-3 && y <= c.maxY + 1e-3 && r >= c.r0 - 1e-3 && r <= c.r1 + 1e-3 && !ringGap(c, x, z);
+  };
+  if (ok(0)) return 0;
+  const cand = [];
+  if (a > 1e-9) for (const R of [c.r1, c.r0]) {
+    const disc = b * b - 4 * a * (cc0 - R * R);
+    if (disc < 0) continue;
+    const sq = Math.sqrt(disc);
+    cand.push((-b - sq) / (2 * a), (-b + sq) / (2 * a));
+  }
+  if (Math.abs(d.y) > 1e-9) cand.push((c.maxY - o.y) / d.y, (c.minY - o.y) / d.y);
+  cand.sort((p, q) => p - q);
+  for (const t of cand) if (ok(t)) return t;
+  return -1;
+}
 /** Raycast contro i collisori, attraversando solo le celle della griglia toccate dal raggio (DDA).
  *  Ritorna {t, collider} oppure null */
 export function rayColliders(o, d, maxDist, ignore = null) {
@@ -604,7 +650,7 @@ export function rayColliders(o, d, maxDist, ignore = null) {
     for (const c of arr) {
       if (c._s === stamp || c === ignore) continue;
       c._s = stamp;
-      const t = c.type === 'box' ? rayBox(o, d, c) : rayCyl(o, d, c);
+      const t = c.type === 'box' ? rayBox(o, d, c) : c.type === 'ring' ? rayRing(o, d, c) : rayCyl(o, d, c);
       if (t >= 0 && t < best) { best = t; hit = c; }
     }
   };
@@ -990,10 +1036,10 @@ const _gc = {
   // v27: strade delle città a tema
   dirtRoad: new THREE.Color('#9b7b53'), snowRoad: new THREE.Color('#d2d9e2'), sandRoad: new THREE.Color('#d9c18c'), plank: new THREE.Color('#8a6a44'), snowCobble: new THREE.Color('#c9d0d8'),
 };
-const TOWN_GROUND_K = { alpine: 0.8, western: 0.7, coastal: 0.72, farm: 0.6 };
+const TOWN_GROUND_K = { arena: 0.85, alpine: 0.8, western: 0.7, coastal: 0.72, farm: 0.6 };
 const SURF_GC = { asphalt: 'asphalt', cobble: 'cobble', dirt: 'dirtRoad', snow: 'snowRoad', sand: 'sandRoad' };
 const _bc = new THREE.Color();
-const TOWN_GROUND = { alpine: 'townSnow', western: 'townSand', coastal: 'townBeach', castle: 'townStone', farm: 'townDirt', industrial: 'townStone', port: 'townStone' };
+const TOWN_GROUND = { arena: 'townSand', alpine: 'townSnow', western: 'townSand', coastal: 'townBeach', castle: 'townStone', farm: 'townDirt', industrial: 'townStone', port: 'townStone' };
 // rumore liscio economico (somma di seni sfasati, deterministico)
 function patch(x, z, f, o) {
   return 0.5 + 0.25 * Math.sin(x * f + Math.sin(z * f * 0.7 + o) * 1.7) + 0.25 * Math.sin(z * f * 1.13 - Math.cos(x * f * 0.6 - o) * 1.9);
@@ -2001,12 +2047,38 @@ export function buildWorld(scene, opts = {}) {
     return dr;
   }
   const cityStats = buildCity({
-    TOWNS, addBox, addGeo, addCollider, special, houses, lootSpots, chestSpots, extraTrees, makeDoor, furnish, placeHouse, cgeo, chunkAt, addCrate,
+    TOWNS: TOWNS.filter(t => !t.arena), addBox, addGeo, addCollider, special, houses, lootSpots, chestSpots, extraTrees, makeDoor, furnish, placeHouse, cgeo, chunkAt, addCrate,
     rnd: () => srand(), gableRoofGeo, gableEndGeo, ridgeGeo, roofMatFor, terrainHeight, roadDist,
     M: { floorMat, trimMat, stoneMat, capMat, brickMat, crateMat, counterTopMat, blackMat, darkWoodMat, steelMat, potMat, leafMat, cabinetMats, sofaMats, blanketMats, furnWoodMats, screenMat, bookMats, snowMat, hayMat },
   });
+  // v38: monumenti (l'arena al centro, la chiesa barocca in piazza): mesh permanenti, si vedono da lontano
+  const landmarks = [];
+  for (const t of TOWNS) {
+    if (t.arena) {
+      const A = buildArena(t.x, t.h, t.z, MAP.seed);
+      const mm = new THREE.Mesh(A.geo, monumentMaterial);
+      mm.position.set(t.x, t.h, t.z); mm.castShadow = mm.receiveShadow = true;
+      scene.add(mm); landmarks.push(mm);
+      for (const c of A.colliders) addCollider(c);
+      lootSpots.push(...A.loot); chestSpots.push(...A.chests);
+      t.arenaR = ARENA.RF;
+    }
+    if (t.church) {
+      const { x, z } = t.church, y = t.h + 0.16;
+      const mm = new THREE.Mesh(churchGeo(), monumentMaterial);
+      mm.position.set(x, y, z); mm.castShadow = mm.receiveShadow = true;
+      scene.add(mm); landmarks.push(mm);
+      for (const c of churchColliders()) {
+        if (c.type === 'cyl') addCollider({ ...c, x: c.x + x, z: c.z + z, minY: c.minY + y, maxY: c.maxY + y });
+        else addCollider({ type: 'box', ...c, minX: c.minX + x, maxX: c.maxX + x, minZ: c.minZ + z, maxZ: c.maxZ + z, minY: c.minY + y - (c.minY ? 0 : 0.5), maxY: c.maxY + y });
+      }
+      lootSpots.push(new THREE.Vector3(x + 9.0, y + 9.8, z - 3.0), new THREE.Vector3(x - 1.8, y + 0.62, z + 2.0), new THREE.Vector3(x + 2.5, y + 8.75, z + 0.4), new THREE.Vector3(x + 3.2, y + 15.13, z + 0.2));
+      chestSpots.push({ pos: new THREE.Vector3(x + 11.6, y + 9.75, z - 6.0), rot: 0 });
+    }
+  }
   const freeOfCity = (t, x, z, w, d) => !overlapsHouse(x, z, w, d) && !onStreet(t, x, z, Math.max(w, d) / 2 + 0.5);
   for (const t of TOWNS) {
+    if (t.arena) continue;
     townExtras(t);
     if (t.towers && !t.wallS) {
       for (let i = 0; i < 4; i++) {
@@ -2268,6 +2340,7 @@ export function buildWorld(scene, opts = {}) {
   const barrelKinds = () => { const r = srand(); return r < 0.35 ? 'barrelRed' : r < 0.65 ? 'barrelBlue' : 'barrelWood'; };
   // nelle città
   for (const t of TOWNS) {
+    if (t.arena) continue;
     const nLogs = 1 + Math.floor(t.r / 18), nBricks = (t.containers ? 4 : 1) + Math.floor(srand() * 2), nBarrelGroups = Math.floor(t.r / 9) + (t.containers ? 4 : 0);
     const tryPlace = (n, r, fn) => {
       let placed = 0;
@@ -2635,7 +2708,7 @@ export function buildWorld(scene, opts = {}) {
   /** true se in (x,z) c'è un box a livello del suolo (pavimenti, casette, casse) */
   function underBox(x, z, h) {
     for (const c of queryColliders(x, z, 0.3)) {
-      if (c.type === 'cyl') continue;
+      if (c.type === 'cyl' || c.type === 'ring') continue;
       if (c.minY < h + 0.4 && x > c.minX - 0.2 && x < c.maxX + 0.2 && z > c.minZ - 0.2 && z < c.maxZ + 0.2) return true;
     }
     return false;
@@ -3067,9 +3140,9 @@ export function buildWorld(scene, opts = {}) {
         for (const im of carInstances(list[0].c || 0, list, (s) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); return mat4.compose(p, q, sc); }, scene.environment, (mt) => { clipMat(mt); return mt; })) group.add(im);
         continue;
       }
-      clipMat(propMaterial);
+      clipMat(propMaterial); clipMat(civicMaterial);
       const sg = specialGeo(list[0].type, list[0].c);
-      const im = new THREE.InstancedMesh(sg, sg.userData.rock ? rockMaterial : propMaterial, list.length);   // v33: colline di roccia vera
+      const im = new THREE.InstancedMesh(sg, sg.userData.rock ? rockMaterial : sg.userData.civic ? civicMaterial : propMaterial, list.length);   // v38: panchine e fontane con le texture   // v33: colline di roccia vera
       list.forEach((s, i) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); mat4.compose(p, q, sc); im.setMatrixAt(i, mat4); });
       im.castShadow = im.receiveShadow = true;
       im.computeBoundingSphere();
@@ -3505,6 +3578,7 @@ export function buildWorld(scene, opts = {}) {
 
   /** libera tutta la grafica di questa mappa (prima di generarne un'altra) */
   function dispose() {
+    for (const lm of landmarks) { scene.remove(lm); lm.geometry.dispose(); }
     scene.remove(water); water.geometry.dispose(); waterMat.dispose(); depthTex.dispose();
     for (const ch of chunkList) { if (ch.detail) unloadDetail(ch); if (ch.lod) { disposeGroup(ch.lod); ch.lod = null; } }
     for (const c of grassCells.values()) disposeGrassCell(c);

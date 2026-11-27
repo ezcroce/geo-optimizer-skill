@@ -154,7 +154,14 @@ export const WEAPONS = {
     spread: 0.036, range: 85, ammo: 'light', auto: true, zoom: 1.3,
     botRange: 26, sound: 'silenced', recoil: 0.005, muzzle: 0.64, role: 'smg', cross: 'tri', sight: 'holo',
     desc: 'Quasi non si sente: perfetta per chi gioca d\'astuzia.',
+  },  // ── v38: bottino del Gargoyle (non si trova nelle casse) ──
+  claws: {
+    name: 'Artigli del Gargoyle', melee: true, boss: true, speed: 0, drop: 0, dmg: 34, pellets: 1, rate: 0.6, mag: 0, reload: 0,
+    spread: 0, range: 3.2, ammo: null, auto: true, zoom: 1.1,
+    botRange: 3, sound: 'claw', recoil: 0, muzzle: 0, role: 'melee', cross: 'melee', sight: 'none',
+    desc: 'Gli artigli strappati al Gargoyle del Colosseo: artigliate, schianto, giravolta e balzo (mira + attacco). Nessuna munizione.',
   },
+
 };
 // le varianti usano la sagoma semplificata dell'arma di base (icona di riserva senza WebGL)
 for (const [id, base] of [['revolver', 'pistol'], ['compact', 'smg'], ['burst', 'ar'], ['heavyar', 'ar'], ['dmr', 'sniper'], ['tactical', 'shotgun'], ['drum', 'shotgun'], ['hunting', 'sniper'], ['minigun', 'rocket'], ['lmg', 'ar'], ['doublebarrel', 'shotgun'], ['handcannon', 'pistol'], ['crossbow', 'sniper'], ['grenade', 'rocket'], ['silenced', 'smg']]) WEAPONS[id].parts = WEAPONS[base].parts;

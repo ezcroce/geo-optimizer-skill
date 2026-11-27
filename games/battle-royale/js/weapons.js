@@ -4,8 +4,9 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { WEAPONS, RARITIES } from './config.js?v=37';
+import { WEAPONS, RARITIES } from './config.js?v=38';
 import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=19';
+import { buildClawsPair } from './boss.js?v=38';
 
 /** quante volte la texture si ripete in un metro di superficie */
 const UVK = 5;
@@ -968,6 +969,7 @@ export function holdSpec(id) {
 
 /** Modello dell'arma: la canna punta verso +Z */
 export function buildWeaponMesh(id, rarity = 0) {
+  if (id === 'claws') { const c = buildClawsPair(); c.userData.weapon = id; c.userData.claws = true; return c; }   // v38
   const g = new THREE.Group();
   if (!MODELS[id]) return g;
   const mats = weaponMats(Math.max(0, Math.min(4, rarity | 0)));
@@ -1032,6 +1034,7 @@ function iconTeardown() {
 export function cachedWeaponIcon(id, rarity = 0) { return ICONS.get(id + '|' + rarity); }
 /** immagine (data URL) dell'arma vista di lato, oppure null se WebGL non è disponibile */
 export function weaponIcon(id, rarity = 0) {
+  if (id === 'claws') return renderIcon('claws|' + rarity, () => buildClawsPair(), [0.2, -Math.PI / 2 + 0.3, 0.1], IW, IH);
   if (!MODELS[id]) return null;
   return renderIcon(id + '|' + rarity, () => buildWeaponMesh(id, rarity), [0.05, -Math.PI / 2 + 0.12, 0], IW, IH);   // canna verso destra
 }

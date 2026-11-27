@@ -6,13 +6,13 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { CAR_VARIANTS, CAR_DIMS, CAR_PAINTS } from './cars.js?v=25';
-import { mergeParts } from './props.js?v=37';
+import { mergeParts } from './props.js?v=38';
 import {
   facadeTexture, plainTexture, asphaltTexture, sidewalkTexture, cobbleTexture, roofFlatTexture, tileTexture,
   concreteTexture, corrugatedTexture, railTexture, awningTexture, AWNING_COLORS, signAtlas, signGeometry, SHOPS,
   productsTexture, booksTexture,
 } from './citytex.js?v=24';
-import { TOWN_SPECIALS, townBuilders } from './townkit.js?v=37';
+import { TOWN_SPECIALS, townBuilders } from './townkit.js?v=38';
 
 // ── reticolo stradale ──
 export const STREET = { RW: 3.3, SW: 2.0 };          // mezza carreggiata, marciapiede
@@ -91,15 +91,27 @@ export const CITY_SPECIALS = {
     P(new THREE.CylinderGeometry(0.26, 0.2, 0.08, 8), '#fff4c8', { y: 4.62, z: 1.0, noSky: true, jit: 0 }),
   ], 1101),
   bench: () => {
+    // v38: panchina da parco: listelli larghi di legno arancio verniciato e fianchi di ghisa nera a ricciolo
+    const W = { tile: 0, ts: 1.9, grain: true, jit: 0.03 }, IRON = { tile: 3, ts: 1, jit: 0 };
     const parts = [];
-    for (let i = 0; i < 3; i++) parts.push(P(new THREE.BoxGeometry(1.8, 0.05, 0.13), '#a8743f', { y: 0.46, z: -0.16 + i * 0.16, jit: 0.04 }));
-    for (let i = 0; i < 2; i++) parts.push(P(new THREE.BoxGeometry(1.8, 0.12, 0.04), '#a8743f', { y: 0.68 + i * 0.17, z: -0.27 - i * 0.03, rx: -0.15, jit: 0.04 }));
-    for (const x of [-0.75, 0.75]) {
-      parts.push(P(new THREE.BoxGeometry(0.07, 0.45, 0.5), '#2a2c2e', { x, y: 0.22 }));
-      parts.push(P(new THREE.BoxGeometry(0.07, 0.5, 0.06), '#2a2c2e', { x, y: 0.72, z: -0.28, rx: -0.15 }));
-      parts.push(P(new THREE.BoxGeometry(0.07, 0.05, 0.45), '#2a2c2e', { x, y: 0.66, z: -0.02 }));
+    for (let i = 0; i < 4; i++) parts.push(P(new THREE.BoxGeometry(1.86, 0.045, 0.115), '#ffffff', { ...W, y: 0.47 - i * 0.004, z: 0.2 - i * 0.135 }));
+    for (let i = 0; i < 3; i++) parts.push(P(new THREE.BoxGeometry(1.86, 0.115, 0.04), '#ffffff', { ...W, y: 0.64 + i * 0.15, z: -0.28 - i * 0.035, rx: -0.2 }));
+    const tube = (pts, r = 0.028) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(([y, z]) => new THREE.Vector3(0, y, z))), 18, r, 5, false);
+    for (const x of [-0.8, 0.8]) {
+      // gamba anteriore curva → bracciolo a ricciolo
+      parts.push(P(tube([[0.0, 0.3], [0.2, 0.27], [0.44, 0.24], [0.6, 0.27], [0.66, 0.2], [0.62, 0.12], [0.55, 0.14]], 0.03), '#ffffff', { ...IRON, x }));
+      // gamba posteriore → montante dello schienale
+      parts.push(P(tube([[0.0, -0.3], [0.25, -0.24], [0.45, -0.22], [0.7, -0.29], [0.98, -0.37], [1.0, -0.38]], 0.032), '#ffffff', { ...IRON, x }));
+      // traversa sotto il sedile e piedini
+      parts.push(P(new THREE.BoxGeometry(0.05, 0.05, 0.6), '#ffffff', { ...IRON, x, y: 0.43, z: -0.01 }));
+      parts.push(P(new THREE.BoxGeometry(0.09, 0.03, 0.12), '#ffffff', { ...IRON, x, y: 0.015, z: 0.3 }));
+      parts.push(P(new THREE.BoxGeometry(0.09, 0.03, 0.12), '#ffffff', { ...IRON, x, y: 0.015, z: -0.3 }));
+      // ricciolo decorativo fra le gambe
+      parts.push(P(new THREE.TorusGeometry(0.07, 0.014, 4, 12), '#ffffff', { ...IRON, x, y: 0.25, z: 0.0, ry: Math.PI / 2 }));
     }
-    return mergeParts(parts, 1102);
+    const g = mergeParts(parts, 1102);
+    g.userData.civic = true;
+    return g;
   },
   bin: () => mergeParts([
     P(new THREE.CylinderGeometry(0.27, 0.23, 0.85, 10), '#2f5a3a', { y: 0.43 }),
@@ -143,18 +155,37 @@ export const CITY_SPECIALS = {
     P(new THREE.CylinderGeometry(0.88, 0.88, 0.04, 14), '#4a6a2a', { y: 0.6 }),
   ], 1121),
   fountain2: () => {
+    // v38: fontana ottagonale di marmo crema: due gradini, vasca con bordo, fusto con due coppe, getti d'acqua
+    const M = { tile: 1, ts: 2.2, jit: 0.03 }, WT = { tile: 2, ts: 3, jit: 0, noSky: true };
+    const oct = (rt, rb, h, y, o = M) => P(new THREE.CylinderGeometry(rt, rb, h, 8), '#ffffff', { ...o, y, ry: Math.PI / 8 });
     const parts = [
-      P(new THREE.CylinderGeometry(3.5, 3.7, 0.75, 28), '#cfc6b4', { y: 0.37 }),
-      P(new THREE.CylinderGeometry(3.12, 3.12, 0.1, 28), '#4a9ccc', { y: 0.66, noSky: true, jit: 0 }),
-      P(new THREE.CylinderGeometry(0.55, 0.85, 1.7, 12), '#c2b9a6', { y: 1.2 }),
-      P(new THREE.CylinderGeometry(1.4, 0.45, 0.4, 18), '#cfc6b4', { y: 2.1 }),
-      P(new THREE.CylinderGeometry(1.22, 1.22, 0.08, 18), '#5aaedc', { y: 2.27, noSky: true, jit: 0 }),
-      P(new THREE.CylinderGeometry(0.16, 0.26, 0.9, 10), '#c2b9a6', { y: 2.7 }),
-      P(new THREE.SphereGeometry(0.28, 10, 8), '#c2b9a6', { y: 3.25 }),
-      P(new THREE.CylinderGeometry(0.12, 0.04, 0.5, 8), '#bfe4f8', { y: 3.6, noSky: true }),
+      oct(4.7, 4.75, 0.24, 0.12), oct(4.3, 4.3, 0.24, 0.36),
+      // vasca: parete ottagonale cava con bordo sporgente (l'acqua si vede dentro)
+      P(new THREE.LatheGeometry([[3.98, 0.48], [3.98, 1.16], [4.14, 1.2], [4.14, 1.36], [3.56, 1.36], [3.5, 1.3], [3.5, 0.6]].map(([r, y]) => new THREE.Vector2(r, y)), 8), '#ffffff', { ...M, ry: Math.PI / 8 }),
+      oct(3.5, 3.5, 0.1, 0.55),
+      P(new THREE.CylinderGeometry(3.52, 3.52, 0.06, 8), '#ffffff', { ...WT, y: 1.1, ry: Math.PI / 8 }),
+      oct(0.62, 0.8, 0.35, 1.25), oct(0.42, 0.55, 1.1, 1.95),
+      oct(1.75, 0.5, 0.42, 2.66), oct(1.85, 1.85, 0.07, 2.9),
+      P(new THREE.CylinderGeometry(1.62, 1.62, 0.05, 8), '#ffffff', { ...WT, y: 2.86, ry: Math.PI / 8 }),
+      oct(0.26, 0.34, 0.75, 3.25), oct(0.95, 0.3, 0.3, 3.75), oct(1.0, 1.0, 0.05, 3.92),
+      P(new THREE.CylinderGeometry(0.86, 0.86, 0.04, 8), '#ffffff', { ...WT, y: 3.9, ry: Math.PI / 8 }),
+      oct(0.16, 0.24, 0.4, 4.15), P(new THREE.SphereGeometry(0.22, 10, 8), '#ffffff', { ...M, y: 4.45 }),
+      P(new THREE.ConeGeometry(0.1, 0.35, 8), '#ffffff', { ...M, y: 4.73 }),
     ];
-    for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; parts.push(P(new THREE.CylinderGeometry(0.03, 0.06, 0.9, 5), '#bfe4f8', { x: Math.cos(a) * 1.25, y: 2.0, z: Math.sin(a) * 1.25, rx: Math.sin(a) * 0.5, rz: -Math.cos(a) * 0.5, noSky: true })); }
-    return mergeParts(parts, 1122);
+    // getti: uno alto al centro, otto archi dalla coppa piccola e otto grandi dalla coppa grande nella vasca
+    const arc = (r0, y0, r1, y1, up, a) => new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(Math.cos(a) * r0, y0, Math.sin(a) * r0), new THREE.Vector3(Math.cos(a) * (r0 + (r1 - r0) * 0.45), y0 + up, Math.sin(a) * (r0 + (r1 - r0) * 0.45)), new THREE.Vector3(Math.cos(a) * r1, y1, Math.sin(a) * r1)), 10, 0.022, 4, false);
+    parts.push(P(new THREE.CylinderGeometry(0.03, 0.07, 1.4, 6), '#ffffff', { ...WT, y: 5.4 }));
+    parts.push(P(new THREE.SphereGeometry(0.16, 6, 4), '#ffffff', { ...WT, y: 6.1 }));
+    for (let k = 0; k < 8; k++) {
+      const a = k / 8 * Math.PI * 2 + Math.PI / 8;
+      parts.push(P(arc(0.15, 4.85, 0.95, 3.95, 0.55, a), '#ffffff', WT));
+      parts.push(P(arc(1.0, 3.9, 1.7, 2.9, 0.35, a + Math.PI / 8), '#ffffff', WT));
+      parts.push(P(arc(1.85, 2.9, 3.0, 1.12, 0.6, a), '#ffffff', WT));
+    }
+    const g = mergeParts(parts, 1122);
+    g.userData.civic = true;
+    return g;
   },
   statue: () => mergeParts([
     P(new THREE.BoxGeometry(2.2, 0.3, 2.2), '#bdb4a2', { y: 0.15 }),
@@ -820,8 +851,10 @@ export function buildCity(C) {
     if (!hp) return;
     const th = t.theme, cross = pl.layout === 'cross';
     addBox(hp * 2, 0.22, hp * 2, t.x, y + 0.05, t.z, th === 'alpine' ? TB.mats.snowCobble : MAT.cobble, { cast: false });
-    const mon = th === 'castle' || th === 'industrial' ? 'statue' : th === 'alpine' ? 'xmasTree' : th === 'western' || th === 'farm' ? 'well' : 'fountain2';
-    if (mon === 'fountain2') { special('fountain2', t.x, t.z, y + 0.16, null, { rot: 0 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 3.55, minY: y - 1, maxY: y + 0.9 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.75, minY: y, maxY: y + 3.5, noStand: true }); lootSpots.push(new THREE.Vector3(t.x, y + 0.92, t.z + 2.0)); }
+    // v38: nella piazza con la chiesa barocca (lato nord, costruita in world.js) niente monumento centrale
+    const church = !!t.church;
+    const mon = church ? 'none' : th === 'castle' || th === 'industrial' ? 'statue' : th === 'alpine' ? 'xmasTree' : th === 'western' || th === 'farm' ? 'well' : 'fountain2';
+    if (mon === 'fountain2') { special('fountain2', t.x, t.z, y + 0.16, null, { rot: 0 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 4.6, minY: y - 1, maxY: y + 0.64 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 4.1, minY: y - 1, maxY: y + 1.5 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.75, minY: y, maxY: y + 4.8, noStand: true }); lootSpots.push(new THREE.Vector3(t.x, y + 1.22, t.z + 2.4)); }
     else if (mon === 'statue') { special('statue', t.x, t.z, y + 0.16, null, { rot: rnd() * 6.28 }); addCollider({ type: 'box', minX: t.x - 1.1, maxX: t.x + 1.1, minY: y, maxY: y + 2.2, minZ: t.z - 1.1, maxZ: t.z + 1.1 }); lootSpots.push(new THREE.Vector3(t.x + 2.2, y + 0.16, t.z)); }
     else if (mon === 'xmasTree') {
       // v27: abete addobbato al centro e campanile sul lato della piazzetta
@@ -833,10 +866,11 @@ export function buildCity(C) {
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) addCollider({ type: 'box', minX: t.x + sx * 1.4 - 0.23, maxX: t.x + sx * 1.4 + 0.23, minY: y + 8.2, maxY: y + 10.5, minZ: bz + sz * 1.4 - 0.23, maxZ: bz + sz * 1.4 + 0.23, noStand: true });
       lootSpots.push(new THREE.Vector3(t.x, y + 8.36, bz));
     }
-    else { special('well', t.x, t.z, y + 0.16, null, { rot: rnd() * 6.28 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 1.1, minY: y - 1, maxY: y + 1.0 }); lootSpots.push(new THREE.Vector3(t.x + 1.8, y + 0.16, t.z)); }
+    else if (mon === 'well') { special('well', t.x, t.z, y + 0.16, null, { rot: rnd() * 6.28 }); addCollider({ type: 'cyl', x: t.x, z: t.z, r: 1.1, minY: y - 1, maxY: y + 1.0 }); lootSpots.push(new THREE.Vector3(t.x + 1.8, y + 0.16, t.z)); }
     const trees = TREE_FOR[th] || TREE_FOR.classic;
     const k = hp - 3.2, lampT = pl.surf === 'asphalt' ? 'lamp' : 'lantern';
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      if (church && sz < 0) continue;
       if (!cross) {
         special('planter', t.x + sx * k, t.z + sz * k, y + 0.16, [1.0, 0.75, false], { rot: 0 });
         extraTrees.push({ x: t.x + sx * k, z: t.z + sz * k, k: pick(trees), y: y + 0.76 });
@@ -864,6 +898,7 @@ export function buildCity(C) {
     // panchine rivolte verso il monumento, cestini
     for (let i = 0; i < 4; i++) {
       const a = i * Math.PI / 2 + (cross ? Math.PI / 4 : 0), r = cross ? 5.6 : 6.2;
+      if (church && Math.sin(a) < -0.5) continue;
       for (const off of (cross ? [0] : [-1.4, 1.4])) {
         const bx = t.x + Math.cos(a) * r - Math.sin(a) * off, bz = t.z + Math.sin(a) * r + Math.cos(a) * off;
         special('bench', bx, bz, y + 0.16, null, { rot: Math.atan2(-Math.cos(a), -Math.sin(a)) });
@@ -872,7 +907,7 @@ export function buildCity(C) {
       if (!cross) special('bin', t.x + Math.cos(a) * r - Math.sin(a) * 3.0, t.z + Math.sin(a) * r + Math.cos(a) * 3.0, y + 0.16, [0.28, 0.9, false]);
     }
     // edicola, tavolini del bar
-    if (th === 'classic' || th === 'port' || th === 'castle') {
+    if ((th === 'classic' || th === 'port' || th === 'castle') && !church) {
       special('kiosk', t.x + hp - 2.2, t.z - hp + 2.0, y + 0.16, null, { rot: Math.PI / 2 * Math.round(rnd() * 3) });
       addCollider({ type: 'box', minX: t.x + hp - 3.6, maxX: t.x + hp - 0.8, minY: y, maxY: y + 2.5, minZ: t.z - hp + 0.6, maxZ: t.z - hp + 3.4 });
       for (let i = 0; i < (th === 'castle' ? 0 : 3); i++) {

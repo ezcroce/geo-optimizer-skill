@@ -1,9 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v37';
+export const NEWS_VERSION = 'v38';
 
 export const NEWS = [
+  {
+    v: 'v38', title: 'Il Colosseo, il Gargoyle e i suoi artigli', color: '#ffb347', icon: '🦇',
+    items: [
+      'Al centro della mappa c’è il Colosseo: gradinate, archi, tende a strisce e la statua dell’imperatore in mezzo all’arena, con due forzieri sulla sabbia',
+      'In alcune partite nell’arena dorme il Gargoyle, un mostro alato con la criniera: si sveglia quando scendi sulla sabbia e non esce mai dal Colosseo. Graffia, colpisce con due mani, gira su sé stesso, balza addosso da lontano e ruggisce contro chi resta sugli spalti. In alto compare la sua barra della salute',
+      'Sconfiggilo e lascia gli Artigli (leggendari): colpi infiniti, una combo di quattro attacchi (graffio destro, graffio sinistro, giravolta, doppio colpo) che muove tutto il corpo e, mirando, il balzo. Sono gli stessi attacchi del Gargoyle',
+      'Una chiesa barocca in una delle città: facciata con colonne, statue, orologio e due campanili',
+      'Forzieri nuovi in legno scuro con borchie di ottone, angoli color crema e la chiusura d’oro a fiamma con il lucchetto',
+      'Panchine con le assi arancioni e i fianchi in ghisa nera, fontane in marmo color crema a tre vasche con gli zampilli',
+      'Da fermo il braccio che regge l’arma non attraversa più il corpo',
+    ],
+  },
   {
     v: 'v37', title: '1 contro 1 con gli amici, cielo a pixel e gioco più fluido', color: '#ff6a5a', icon: '⚔️',
     items: [

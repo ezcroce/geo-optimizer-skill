@@ -10,7 +10,7 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="stylesheet" href="site.css?v=43" />
+<link rel="stylesheet" href="site.css?v=44" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -71,8 +71,22 @@
 <!-- ───────── TICKER ───────── -->
 <div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
 
-<!-- ───────── NOVITÀ v43 ───────── -->
+<!-- ───────── NOVITÀ v44 ───────── -->
 <section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v44</span>
+    <h2 class="h2 reveal">Grafica piena,<br /><em>FPS comunque alti.</em></h2>
+    <p class="lead33 reveal">Gli alleggerimenti della v43 restano, ma la qualità automatica ora è molto più delicata: niente più immagine sgranata, ombre spente o erba sparita per guadagnare qualche fotogramma.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🎨</div><h3>Qualità automatica gentile</h3><p>Sotto i 30 FPS toglie solo l'occlusione ambientale, passa a FXAA e, se serve, semplifica le ombre e dirada un po' l'erba. Ombre, bloom, distanza visiva e risoluzione restano.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🔍</div><h3>Immagine nitida</h3><p>La risoluzione dinamica interviene solo sotto i 40 FPS e non scende mai sotto il 75% (prima arrivava al 50%).</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">↩️</div><h3>Torna tutto da solo</h3><p>Sopra i 42 FPS la grafica torna piena, e ogni nuova partita riparte con la qualità completa. Le porte delle case lontane si rivedono.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v43 ───────── -->
+<section id="novita43" class="section news33">
   <div class="wrap">
     <span class="badge-new reveal">NOVITÀ · v43</span>
     <h2 class="h2 reveal">Più leggero,<br /><em>almeno 30 FPS.</em></h2>
@@ -377,7 +391,7 @@
 
 <div id="toast"></div>
 
-<script type="module" src="js/site.js?v=43"></script>
-<script src="js/transition.js?v=43"></script>
+<script type="module" src="js/site.js?v=44"></script>
+<script src="js/transition.js?v=44"></script>
 </body>
 </html>

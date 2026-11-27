@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v43';
+export const NEWS_VERSION = 'v44';
 
 export const NEWS = [
+  {
+    v: 'v44', title: 'Grafica di nuovo piena, FPS comunque alti', color: '#ffd166', icon: '🎨',
+    items: [
+      'La Qualità automatica era troppo aggressiva: abbassava la risoluzione fino a un terzo e spegneva ombre, bloom, erba e anti-aliasing. Ora toglie solo ciò che quasi non si nota (occlusione ambientale, MSAA → FXAA, ombre ultra → alte) e, se proprio serve, semplifica le ombre e dirada un po’ l’erba. Non spegne più ombre, bloom e distanza visiva e non tocca la risoluzione',
+      'La grafica torna piena appena il gioco supera i 42 FPS (prima servivano 50), e ogni nuova partita riparte con la grafica completa',
+      'Risoluzione dinamica più gentile: interviene solo sotto i 40 FPS (prima sotto i 48) e non scende mai sotto il 75% (prima fino al 50%), così l’immagine resta nitida',
+      'Le porte delle case lontane si vedono di nuovo fino a dove arriva il dettaglio delle case',
+      'Restano tutti gli alleggerimenti della v43 che non si vedono: personaggi fuori schermo non disegnati, dettagli ridotti solo da lontano, bot lontani più leggeri, icone preparate solo nei menu',
+    ],
+  },
   {
     v: 'v43', title: 'Più leggero: almeno 30 FPS', color: '#7dff9a', icon: '⚡',
     items: [

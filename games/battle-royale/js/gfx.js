@@ -105,7 +105,7 @@ export function createGfx(renderer, scene, camera, sun) {
 
   /** v37: cambia la risoluzione dinamica senza ricostruire gli effetti */
   function setDyn(k) {
-    k = THREE.MathUtils.clamp(k, 0.5, 1);
+    k = THREE.MathUtils.clamp(k, 0.75, 1);
     if (Math.abs(k - dyn) < 0.01) return;
     dyn = k;
     renderer.setPixelRatio(pixelRatio());

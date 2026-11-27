@@ -5,11 +5,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=43';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=44';
 import { carInstances } from './cars.js?v=25';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=43';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=44';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=43';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=44';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };

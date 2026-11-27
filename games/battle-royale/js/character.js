@@ -1,12 +1,12 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { REAL, attachReal, realKind } from './realchar.js?v=43';
+import { REAL, attachReal, realKind } from './realchar.js?v=44';
 import { normalFromHeight, NORMALS } from './texgen.js?v=19';
-import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=43';
+import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=44';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=43';
-import { mergeParts } from './props.js?v=43';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=44';
+import { mergeParts } from './props.js?v=44';
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -1903,8 +1903,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=43';
-import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=43';
+export { buildWeaponMesh } from './weapons.js?v=44';
+import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=44';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
@@ -2024,4 +2024,4 @@ export function buildGlider(glider) {
 }
 
 /** Il "Battle Bus" volante: modello in models3d.js */
-export { buildBus } from './models3d.js?v=43';
+export { buildBus } from './models3d.js?v=44';

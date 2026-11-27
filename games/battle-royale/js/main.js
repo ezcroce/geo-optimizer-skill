@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=43';
+import { EMOTES, poseEmote } from './emotes.js?v=44';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=43';
-import * as PR from './progress.js?v=43';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=43';
-import { initMenu } from './menu.js?v=43';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=43';
-import { initSettingsUI } from './settings-ui.js?v=43';
+} from './config.js?v=44';
+import * as PR from './progress.js?v=44';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=44';
+import { initMenu } from './menu.js?v=44';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=44';
+import { initSettingsUI } from './settings-ui.js?v=44';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=43';
+import * as A from './audio.js?v=44';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=43';
+} from './world.js?v=44';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=43';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=43';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=43';
-import { buildChestMesh } from './models3d.js?v=43';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=43';
-import { createInventory } from './inventory.js?v=43';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=43';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=43';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=44';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=44';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=44';
+import { buildChestMesh } from './models3d.js?v=44';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=44';
+import { createInventory } from './inventory.js?v=44';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=44';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=44';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=43';
-import { buildPickaxe, heldConsumable } from './held.js?v=43';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=43';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=43';
-import { createCrosshair } from './crosshair.js?v=43';
-import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=43';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=43';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=44';
+import { buildPickaxe, heldConsumable } from './held.js?v=44';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=44';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=44';
+import { createCrosshair } from './crosshair.js?v=44';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=44';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=44';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -3801,27 +3801,29 @@ let fogK = 1;
 //  (fino a 4): niente AO e MSAA → ombre basse e niente bloom → niente ombre, meno erba e distanza → minimo.
 //  Quando torna fluido (sopra ~50 FPS a lungo) risale piano. Le impostazioni scelte dal giocatore non cambiano.
 const AUTO = { lvl: 0, t0: 0, n: 0, sum: 0, prev: 0, low: 0, high: 0, coolT: 0, blockUpT: 0, downT: 0 };
-const AUTO_NAMES = ['', 'senza AO e MSAA', 'ombre basse, senza bloom', 'senza ombre, meno erba', 'minima, senza anti-aliasing'];
+// v44: la qualità automatica è delicata: non tocca mai risoluzione, distanza visiva e bloom, non spegne le ombre.
+//  Livello 1: niente AO, FXAA al posto di MSAA/SMAA, ombre ultra → alte (quasi invisibile).
+//  Livello 2: ombre basse ed erba un po' più rada.
+const AUTO_MAX = 2;
+const AUTO_NAMES = ['', 'senza occlusione ambientale, FXAA', 'ombre più semplici, erba più rada'];
 function effGfx() {
   const g = { ...settings.gfx }, L = g.autoQ === false ? 0 : AUTO.lvl;
-  if (L >= 1) { g.ao = false; if (g.shadows === 'ultra') g.shadows = 'high'; if (g.aa === 'msaa' || g.aa === 'smaa') g.aa = 'fxaa'; g.grass = Math.min(g.grass, 0.9); g.scale = Math.min(g.scale, 1); }
-  if (L >= 2) { if (g.shadows !== 'off') g.shadows = 'low'; g.bloom = false; g.view = Math.min(g.view, 0.9); g.scale = Math.min(g.scale, 0.9); }
-  if (L >= 3) { g.shadows = 'off'; g.grass = Math.min(g.grass, 0.4); g.view = Math.min(g.view, 0.8); g.scale = Math.min(g.scale, 0.8); }
-  if (L >= 4) { g.grass = Math.min(g.grass, 0.15); g.view = Math.min(g.view, 0.68); g.scale = Math.min(g.scale, 0.7); g.aa = 'off'; }   // niente post-processing: si disegna direttamente sullo schermo
+  if (L >= 1) { g.ao = false; if (g.shadows === 'ultra') g.shadows = 'high'; if (g.aa === 'msaa' || g.aa === 'smaa') g.aa = 'fxaa'; }
+  if (L >= 2) { if (g.shadows !== 'off') g.shadows = 'low'; g.grass = Math.min(g.grass, 0.6); }
   return g;
 }
 /** distanze di dettaglio (personaggi, bottino, porte, bot) in base alla grafica effettiva */
 function applyPerf(g) {
-  const sh = { off: 0, low: 16, high: 26, ultra: 40 }[g.shadows] ?? 26, v = g.view, L = g.autoQ === false ? 0 : AUTO.lvl;
-  PERF.charFull = clamp(85 * v, 45, 150) * (L >= 3 ? 0.8 : 1);
+  const sh = { off: 0, low: 16, high: 26, ultra: 40 }[g.shadows] ?? 26, v = g.view;
+  PERF.charFull = clamp(85 * v, 45, 150);
   PERF.charShadow = sh;
   PERF.smallNear = 12 + 10 * v;
-  PERF.anim2 = (18 + 10 * v) * (L >= 3 ? 0.75 : 1);
-  PERF.anim3 = (38 + 17 * v) * (L >= 3 ? 0.75 : 1);
+  PERF.anim2 = 18 + 10 * v;
+  PERF.anim3 = 38 + 17 * v;
   PERF.lootFull = clamp(28 + 18 * v, 30, 70);
   PERF.lootShadow = sh ? Math.min(22, sh) : 0;
-  PERF.botFar2 = L >= 3 ? 100 : 140; PERF.botFar3 = L >= 3 ? 200 : 280;
-  QUALITY.doorNear = 105 * v; QUALITY.hwNear = 26 * v;
+  PERF.botFar2 = 140; PERF.botFar3 = 280;
+  QUALITY.doorNear = 170 * v; QUALITY.hwNear = 30 * v;
 }
 function autoQualityTick(now) {
   const live = G.state === 'play' && !G.paused && !document.hidden && settings.gfx.autoQ !== false;
@@ -3832,19 +3834,19 @@ function autoQualityTick(now) {
   if (now - AUTO.t0 < 2000 || AUTO.n < 15) return;
   const avg = AUTO.sum / AUTO.n; AUTO.t0 = now; AUTO.n = 0; AUTO.sum = 0;
   if (now < AUTO.coolT) return;
-  const cap = settings.gfx.fpsCap, floorRes = !settings.gfx.dynRes || dynState.k <= 0.62;
-  if (avg > 1000 / 30 * 1.06) { AUTO.low++; AUTO.high = 0; } else if (avg < 1000 / 50 && !(cap > 0 && cap <= 50)) { AUTO.high++; AUTO.low = 0; } else { AUTO.low = 0; AUTO.high = 0; }
+  const cap = settings.gfx.fpsCap, floorRes = !settings.gfx.dynRes || dynState.k <= DYN_MIN + 0.02;
+  if (avg > 1000 / 30 * 1.06) { AUTO.low++; AUTO.high = 0; } else if (avg < 1000 / 42 && !(cap > 0 && cap <= 30)) { AUTO.high++; AUTO.low = 0; } else { AUTO.low = 0; AUTO.high = 0; }
   // sotto 30 per 2 finestre (4 s) con la risoluzione già al minimo (o per 3 finestre comunque) → un gradino giù
-  if (AUTO.lvl < 4 && ((AUTO.low >= 2 && floorRes) || AUTO.low >= 3)) {
+  if (AUTO.lvl < AUTO_MAX && ((AUTO.low >= 2 && floorRes) || AUTO.low >= 4)) {
     AUTO.lvl++; AUTO.low = 0; AUTO.coolT = now + 3500; AUTO.downT = now;
     applyAutoGfx();
     hudToast(`⚙️ Grafica alleggerita (${AUTO_NAMES[AUTO.lvl]}) per restare sopra i 30 FPS`);
-  } else if (AUTO.lvl > 0 && AUTO.high >= 6 && now > AUTO.blockUpT && (!settings.gfx.dynRes || dynState.k >= 0.99)) {
-    // risale solo se è fluido da 12 s; se poi ricade entro 20 s, per 3 minuti non ci riprova
+  } else if (AUTO.lvl > 0 && AUTO.high >= 4 && now > AUTO.blockUpT) {
+    // risale se va sopra i 42 FPS da 8 s; se poi ricade entro 20 s, per 1 minuto non ci riprova
     AUTO.lvl--; AUTO.high = 0; AUTO.coolT = now + 4000;
     AUTO.upT = now; applyAutoGfx();
   }
-  if (AUTO.upT && AUTO.downT > AUTO.upT && AUTO.downT - AUTO.upT < 20000) { AUTO.blockUpT = now + 180000; AUTO.upT = 0; }
+  if (AUTO.upT && AUTO.downT > AUTO.upT && AUTO.downT - AUTO.upT < 20000) { AUTO.blockUpT = now + 60000; AUTO.upT = 0; }
 }
 function applyAutoGfx() {
   const e = effGfx();
@@ -4834,6 +4836,10 @@ async function startMatch() {
   if (G.starting) return;
   if (NET.role === 'client') { menuApi && menuApi.toast("Aspetta: la partita la avvia l'host della lobby"); return; }
   G.starting = true;
+  // v44: ogni partita riparte con la grafica piena (la qualità automatica ricalcola da capo)
+  if (AUTO.lvl) { AUTO.lvl = 0; applyAutoGfx(); }
+  AUTO.low = AUTO.high = 0; AUTO.blockUpT = 0; AUTO.upT = AUTO.downT = 0;
+  dynState.ceil = 1; dynState.ceilT = 0; if (dynState.k !== 1) { dynState.k = 1; gfx.setDyn(1); }
   try {
     const mode = NET.role === 'host' ? NET.mode : settings.mode;
     const random = mode === 'random';
@@ -6166,6 +6172,8 @@ const _menuStream = new THREE.Vector3(0, 0, 0);
 //  a piccoli passi (fino al 55%), quando torna fluido la rialza piano. Ricorda il livello che faceva
 //  rallentare, così non oscilla avanti e indietro.
 let shadowTick = 0;
+// v44: scende solo sotto i 40 FPS e mai sotto il 75% (prima: sotto i 48 FPS, fino al 50%: immagine troppo sgranata)
+const DYN_MIN = 0.75;
 const dynState = { k: 1, t0: 0, n: 0, sum: 0, prev: 0, ceil: 1, ceilT: 0, coolT: 0 };
 function dynResTick(now) {
   const D = dynState;
@@ -6181,13 +6189,14 @@ function dynResTick(now) {
   const avg = D.sum / D.n; D.t0 = now; D.n = 0; D.sum = 0;
   const cap = settings.gfx.fpsCap;
   const target = 1000 / Math.min(cap > 0 ? cap : 60, 60);
+  const slow = Math.max(target * 1.25, 1000 / 40), fast = Math.max(target * 1.08, 1000 / 52);
   if (now < D.coolT) return;
   if (now > D.ceilT) D.ceil = 1;   // dopo un minuto riprova anche i livelli più alti
-  if (avg > target * 1.25 && D.k > 0.5) {
+  if (avg > slow && D.k > DYN_MIN) {
     D.ceil = Math.min(D.ceil, D.k - 0.05); D.ceilT = now + 60000;
-    D.k = Math.max(0.5, D.k - (avg > target * 1.8 ? 0.15 : 0.08));
+    D.k = Math.max(DYN_MIN, D.k - (avg > slow * 1.5 ? 0.1 : 0.05));
     gfx.setDyn(D.k); D.coolT = now + 1500;
-  } else if (avg < target * 1.08 && D.k < Math.min(1, D.ceil)) {
+  } else if (avg < fast && D.k < Math.min(1, D.ceil)) {
     D.k = Math.min(1, D.ceil, D.k + 0.05);
     gfx.setDyn(D.k); D.coolT = now + 4000;
   }

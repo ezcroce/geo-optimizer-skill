@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: the-heist-social
+    runtime: node
+    rootDir: the-heist-social
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: NODE_ENV=production node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production

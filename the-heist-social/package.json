@@ -1,0 +1,19 @@
+{
+  "name": "the-heist-social",
+  "version": "1.0.0",
+  "description": "THE HEIST SOCIAL: LA VILLA DEI SOSPETTI - Multiplayer Social Deduction & Heist Web Game",
+  "type": "module",
+  "scripts": {
+    "dev": "([ -d node_modules ] || npm install) && node server/index.js",
+    "start": "([ -d node_modules ] || npm install) && node server/index.js",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "three": "^0.170.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "vite": "^8.4.0"
+  }
+}

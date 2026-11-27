@@ -9,7 +9,7 @@
 //  Qui ci sono le texture delle strade, gli oggetti instanziati (colori per vertice) e i costruttori.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts } from './props.js?v=36';
+import { mergeParts } from './props.js?v=37';
 import { normalFromHeight, NORMALS, TEXQ, ANISO } from './texgen.js?v=19';
 
 const P = (geo, color, o = {}) => ({ geo, color, o });

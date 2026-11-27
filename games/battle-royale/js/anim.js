@@ -1,7 +1,7 @@
 // Pose e animazioni dei personaggi articolati (anche, ginocchia, caviglie, spalle, gomiti).
 // Condivise tra il gioco (main.js) e il sito (site.js), così le animazioni sono identiche.
 import * as THREE from 'three';
-import { RIG } from './character.js?v=36';
+import { RIG } from './character.js?v=37';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -232,7 +232,7 @@ export function armIK(m, i, target, pole) {
 
 // ───────────── arma in mano ─────────────
 /** scala delle armi impugnate: i modelli sono un po' "eroici", in mano li riduciamo alle proporzioni del corpo */
-export const HELD_SCALE = 0.86;
+export const HELD_SCALE = 0.8;   // v37: un po' più piccole (con 0.86 i fucili erano più lunghi delle braccia)
 const DEF_HOLD = { kind: 'rifle', cls: 'medium', main: [-0.1, -0.05], fore: [-0.05, 0.4], zmin: -0.45, zmax: 0.9, xmin: -0.06, xmax: 0.06, ymin: -0.25, ymax: 0.15 };
 export function holdOf(m) { const g = m.gunPivot.children[0]; return (g && g.userData.hold) || DEF_HOLD; }
 const _qa = new THREE.Quaternion(), _qs = new THREE.Quaternion(), _pa = new THREE.Vector3(), _ps = new THREE.Vector3();
@@ -297,7 +297,8 @@ export function poseHold(m, pitch, sk = 0, sw = 0, lean = 0) {
   const k = h.kind, cls = h.cls || 'medium', one = k === 'pistol' && h.one;
   const e = smooth(sk);
   // torsione del busto (positiva = spalla destra avanti): pistola a una mano di profilo, armi pesanti con la spalla sinistra avanti
-  const tw0 = one ? 0.3 : k === 'rifle' ? (cls === 'heavy' ? -0.17 : cls === 'light' ? 0.03 : -0.06) : 0;
+  // v37: busto di tre quarti come un tiratore vero (spalla sinistra avanti): la mano d'appoggio arriva al paramano col gomito piegato
+  const tw0 = one ? 0.3 : k === 'rifle' ? (cls === 'heavy' ? -0.32 : cls === 'light' ? -0.16 : -0.26) : 0;
   const tw = tw0 * (1 - e);
   m.torso.rotation.y += tw;
   // ── mira ── la rotazione compensa la torsione: la canna resta sulla linea di mira
@@ -317,12 +318,12 @@ export function poseHold(m, pitch, sk = 0, sw = 0, lean = 0) {
   } else {
     // calcio nella tasca della spalla; se l'arma è lunga la mano d'appoggio scivola indietro (vedi handsToGun).
     // Le armi corte (calcio ripiegato) stanno più avanti, a braccia tese.
-    _pa.copy(POCKET).sub(gunPoint(_t, ZERO, _qa, 0, -0.02, h.zmin + 0.04 - Math.max(0, -0.3 - h.zmin), s));
+    _pa.copy(POCKET).sub(gunPoint(_t, ZERO, _qa, 0, -0.02, h.zmin + 0.03, s));   // v37: calcio davvero nella spalla (prima i calci lunghi finivano 15 cm avanti)
     if (cls === 'light') { _pa.y += 0.02; _pa.z += 0.045 + Math.max(0, p) * 0.08; }  // compatta, più alta e più avanti: calcio corto, guancia sul calcio
     else if (cls === 'heavy') _pa.y -= 0.015;            // pesante: un po' più bassa, appoggiata
     // mirando in basso caricatore e impugnatura ruotano verso il ventre: se serve l'arma va più avanti
     const mz = gunPoint(_t, _pa, _qa, 0, h.ymin, h.main[1] + 0.12, s).z;
-    const mzMin = cls === 'light' ? 0.33 : 0.25;
+    const mzMin = cls === 'light' ? 0.24 : 0.15;   // v37: prima 0.33/0.25 spingevano il calcio fuori dalla spalla e tendevano le braccia
     if (mz < mzMin) _pa.z += mzMin - mz;
   }
   // ── corsa ──
@@ -347,39 +348,27 @@ export function poseHold(m, pitch, sk = 0, sw = 0, lean = 0) {
     _qs.setFromEuler(_eu.set(0.72 + bob, 0.1, 0, 'XYZ'));
     _ps.copy(POCKET).sub(gunPoint(_t, ZERO, _qs, 0, -0.02, h.zmin + 0.04, s));
     _ps.z += 0.07;                                                     // un po' più avanti: lontana da gambe e cappotti
-  } else if (cls === 'light') {
-    // mitraglietta: canna in su davanti alla spalla destra, gomiti stretti
-    _qs.setFromEuler(_ey.set(-1.12 + bob, -0.12, 0.1));
-    _t.set(0.2, 0.25 + bob * 0.5, 0.35);
-    pivotForWrist(_ps, _t, _qs, h, s, false);
-    // il calcio non deve entrare nel ventre
-    const bz = gunPoint(_t, _ps, _qs, 0, h.ymin * 0.5, h.zmin, s).z;
-    if (bz < 0.24) _ps.z += 0.24 - bz;
-  } else if (cls === 'heavy') {
-    // arma pesante portata bassa: canna in giù verso sinistra, calcio all'anca destra
-    _bz.set(-0.3, -0.34 + bob, 0.89).normalize();
-    _by.set(0.25, 1, 0); _by.addScaledVector(_bz, -_by.dot(_bz)).normalize();
-    _bx.crossVectors(_by, _bz);
-    _qs.setFromRotationMatrix(_m4.makeBasis(_bx, _by, _bz));
-    _t.set(0.25, 0.1 + bob * 0.4, 0.27);
-    pivotForWrist(_ps, _t, _qs, h, s, false);
-    const bz = gunPoint(_t, _ps, _qs, 0, 0, h.zmin, s);
-    if (bz.z < 0.2 && bz.x < 0.3) _ps.z += 0.2 - bz.z;
   } else {
-    // "port arms": l'arma di traverso davanti al petto, di piatto, canna in alto a sinistra.
-    // La posizione dipende dalla lunghezza: il centro dell'arma sta davanti allo sterno.
-    const a = 0.68 + sw * 0.05;                                       // inclinazione sull'orizzontale
-    _bz.set(-Math.cos(a), Math.sin(a), 0.32).normalize();             // asse della canna (un po' in avanti)
-    _by.set(Math.sin(a), Math.cos(a), 0).normalize();                 // "sopra" dell'arma, nel piano del petto
-    _by.addScaledVector(_bz, -_by.dot(_bz)).normalize();
+    // v37: tutte le armi lunghe a due mani in corsa: calcio appoggiato alla spalla destra, bocca verso il basso a
+    // sinistra, di traverso davanti al corpo ("low port"). Prima la canna puntava in alto a sinistra.
+    const len = (h.zmax - h.zmin) * s;
+    const dn = cls === 'heavy' ? 0.78 : cls === 'light' ? 0.62 : 0.7;      // quanto punta in basso
+    _bz.set(-0.9, -dn * 0.8 + bob * 0.6, 0.42 + sw * 0.04).normalize();           // asse della canna: in basso, a sinistra, un po' avanti
+    _by.set(0.55, 0.45, 0.7); _by.addScaledVector(_bz, -_by.dot(_bz)).normalize();   // il dorso dell'arma guarda in fuori e in avanti
     _bx.crossVectors(_by, _bz);
     _qs.setFromRotationMatrix(_m4.makeBasis(_bx, _by, _bz));
-    const zc = (h.zmin + h.zmax) * 0.5;
-    const depth = Math.max(0.07, -h.xmin) * s;                        // ingombro verso il petto
-    _ps.set(0.06, 0.32 + bob, 0.2 + depth).sub(gunPoint(_t, ZERO, _qs, 0, 0, zc, s));
-    // il calcio non deve rientrare nel fianco
-    const bz = gunPoint(_t, _ps, _qs, 0, 0, h.zmin, s).z;
-    if (bz < 0.17 + depth) _ps.z += 0.17 + depth - bz;
+    // calcio nella tasca della spalla destra, un po' avanti (per non entrare nel petto)
+    const front = Math.max(0.06, -h.xmin * s) + 0.05;
+    _t.set(0.17, 0.47 + bob * 0.4, front);
+    _ps.copy(_t).sub(gunPoint(_t2, ZERO, _qs, 0, h.ymax * 0.3, h.zmin + 0.03, s));
+    // le armi molto lunghe scendono un po' di meno (la bocca non deve toccare le ginocchia)
+    if (len > 1.05) _ps.y += (len - 1.05) * 0.25;
+    // niente pezzi dentro il busto: se un punto dell'arma rientra, si sposta in avanti
+    for (const zz of [h.main[1], (h.zmin + h.zmax) * 0.5]) {
+      const pt = gunPoint(_t2, _ps, _qs, 0, h.ymin * 0.6, zz, s);
+      const minZ = 0.17 + Math.max(0, 0.1 - Math.abs(pt.x)) * 0.5;
+      if (pt.z < minZ) _ps.z += minZ - pt.z;
+    }
   }
   // fusione mira ↔ corsa, poi riflessione sul lato destro
   _P.lerpVectors(_pa, _ps, e);
@@ -410,12 +399,17 @@ export function handsToGun(m, reload = -1) {
   const S0 = SH_SUP;
   let fz = h.fore[1];
   if (k === 'rifle') {
-    const zMin = h.main[1] + 0.12;
-    for (let n = 0; n < 24 && fz > zMin; n++) {
-      gunPoint(_t, P, Q, -0.04, h.fore[0] - 0.045, fz - 0.06, s);
-      if (_t.distanceTo(S0) <= REACH * 0.985) break;
-      fz -= 0.03;
+    // v37: punto del paramano più avanti che la mano raggiunge col gomito ancora piegato (prima: braccio teso al
+    // limite e passi di 3 cm, così la mano saltellava lungo l'arma a ogni passo). Ricerca continua + smorzamento.
+    const zMin = h.main[1] + 0.12, lim = REACH * 0.9;
+    const dAt = (z) => gunPoint(_t, P, Q, -0.04, h.fore[0] - 0.045, z - 0.06, s).distanceTo(S0);
+    if (dAt(fz) > lim) {
+      let lo = zMin, hi = fz;
+      if (dAt(lo) > lim) fz = lo;
+      else { for (let n = 0; n < 12; n++) { const mid = (lo + hi) * 0.5; if (dAt(mid) > lim) hi = mid; else lo = mid; } fz = lo; }
     }
+    if (m._fz != null && Math.abs(fz - m._fz) < 0.3) fz = m._fz + (fz - m._fz) * 0.3;
+    m._fz = fz;
   }
   if (pis) gunPoint(_t, P, Q, -0.045, h.fore[0] - 0.02, fz - 0.07, s);
   else gunPoint(_t, P, Q, -0.04, h.fore[0] - 0.045, fz - 0.06, s);

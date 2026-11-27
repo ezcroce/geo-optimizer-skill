@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=19';
-import { renderIcon } from './weapons.js?v=36';
+import { renderIcon } from './weapons.js?v=37';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -278,159 +278,223 @@ export function consIcon(id) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  v27: munizioni a terra — cassette di metallo verniciato con fascia colorata,
-//  scritte a stampino e qualche cartuccia sparsa; cartucce del fucile a pompa
-//  in una scatola di cartone aperta; razzi in una cassa di legno.
+//  v37: munizioni a terra come le scatole vere dei negozi di caccia:
+//   leggere  → scatola azzurra "Game-Shot" calibro 22 con la fascia bianca;
+//   medie    → scatola di cartone avana con la targa rossa e i disegni degli animali (20 cartucce);
+//   pesanti  → stessa serie, "Magnum", cartone più scuro e sigillo dorato;
+//   cartucce → scatola verde scuro del bosco nella nebbia "Privilege Game 34" con i bossoli verdi;
+//   razzi    → il razzo a fuso giallo con la gabbia di stecche (dalla foto), due appoggiati vicini.
+//  Accanto alle scatole qualche cartuccia, come nelle foto.
 // ─────────────────────────────────────────────────────────────
 const AMMO = {
-  light: { kind: 'can', size: [0.36, 0.2, 0.17], band: '#4aa8e8', cal: '9 MM', label: 'LEGGERE', paint: '#4a5236', bullets: [0.009, 0.03, '#c9a24a', '#b8743a'] },
-  medium: { kind: 'can', size: [0.42, 0.24, 0.2], band: '#4ec04a', cal: '5.56', label: 'MEDIE', paint: '#46512f', bullets: [0.011, 0.045, '#c9a24a', '#b8743a'] },
-  heavy: { kind: 'can', size: [0.46, 0.27, 0.22], band: '#e8603a', cal: '.50 BMG', label: 'PESANTI', paint: '#3e4630', bullets: [0.016, 0.07, '#c9a24a', '#8a8f96'] },
-  shells: { kind: 'box', size: [0.34, 0.14, 0.22], band: '#e8b830', cal: '12 GA', label: 'CARTUCCE', paint: '#b8262a' },
-  rockets: { kind: 'crate', size: [0.62, 0.2, 0.26], band: '#e83a3a', cal: 'HE 84', label: 'RAZZI', paint: '#8a6a40' },
+  light: { kind: 'box', size: [0.3, 0.17, 0.09], label: 'leggere' },
+  medium: { kind: 'box', size: [0.3, 0.2, 0.085], label: 'medie' },
+  heavy: { kind: 'box', size: [0.33, 0.22, 0.095], label: 'pesanti' },
+  shells: { kind: 'box', size: [0.26, 0.26, 0.11], label: 'cartucce' },
+  rockets: { kind: 'spindle', size: [0.78, 0.12, 0.2], label: 'razzi' },
 };
-/** fianco della cassetta: vernice graffiata, fascia colorata, scritte a stampino e disegno della cartuccia */
-function ammoSideTex(id) {
-  const d = AMMO[id], B = 256, A = canvas2d(B), g = A.g, rnd = mulberry(77 + id.length * 13);
-  const wood = d.kind === 'crate', card = d.kind === 'box';
-  g.fillStyle = d.paint; g.fillRect(0, 0, B, B);
-  if (wood) {
-    // assi di legno con venature e chiodi
-    for (let i = 0; i < 4; i++) { g.fillStyle = `rgba(${60 + rnd() * 30},${40 + rnd() * 20},20,0.25)`; g.fillRect(0, i * 64, B, 64); g.fillStyle = 'rgba(30,18,8,0.7)'; g.fillRect(0, i * 64, B, 3); }
-    for (let i = 0; i < 70; i++) { g.strokeStyle = `rgba(50,30,12,${0.08 + rnd() * 0.15})`; g.lineWidth = 1; const y = rnd() * B; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(B * 0.3, y + rnd() * 6 - 3, B * 0.6, y + rnd() * 6 - 3, B, y + rnd() * 4 - 2); g.stroke(); }
-    for (const x of [10, B - 10]) for (let i = 0; i < 4; i++) { g.fillStyle = '#3a3a3a'; g.beginPath(); g.arc(x, i * 64 + 32, 3, 0, 7); g.fill(); }
-  } else if (card) {
-    for (let i = 0; i < 600; i++) { g.fillStyle = `rgba(0,0,0,${rnd() * 0.06})`; g.fillRect(rnd() * B, rnd() * B, 2, 2); }
-    g.fillStyle = '#f4ead2'; g.fillRect(0, B * 0.3, B, B * 0.4);
-  } else {
-    // lamiera verniciata: macchie, graffi e bordi consumati
-    for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,230'},${0.03 + rnd() * 0.05})`; g.beginPath(); g.arc(rnd() * B, rnd() * B, 6 + rnd() * 30, 0, 7); g.fill(); }
-    for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(190,190,170,${0.2 + rnd() * 0.35})`; g.lineWidth = 0.6 + rnd(); const x = rnd() * B, y = rnd() * B; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rnd() * 30 - 15, y + rnd() * 8 - 4); g.stroke(); }
-    g.strokeStyle = 'rgba(20,22,16,0.6)'; g.lineWidth = 6; g.strokeRect(3, 3, B - 6, B - 6);
-    g.strokeStyle = 'rgba(200,200,180,0.35)'; g.lineWidth = 1.5; g.strokeRect(7, 7, B - 14, B - 14);
-  }
-  // fascia del colore del tipo di munizione
-  g.fillStyle = d.band; g.fillRect(0, B * 0.66, B, B * 0.14);
-  g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, B * 0.8, B, 3);
-  // scritte a stampino
-  g.fillStyle = card ? '#2a1a12' : wood ? '#1e1408' : '#e8e2c8';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = `bold ${card ? 44 : 50}px Impact, "Arial Black", sans-serif`;
-  g.fillText(d.label, B / 2, card ? B * 0.42 : B * 0.3);
-  g.font = 'bold 34px "Courier New", monospace';
-  g.fillText(d.cal, B / 2, card ? B * 0.58 : B * 0.52);
-  g.fillStyle = card ? '#2a1a12' : '#1a1a14';
-  g.font = 'bold 24px "Courier New", monospace';
-  g.fillText(id === 'rockets' ? '▲ ALTO ▲' : 'x' + (id === 'heavy' ? 8 : id === 'shells' ? 10 : 30), B / 2, B * 0.73);
-  // silhouette della cartuccia
-  if (!wood && !card) {
-    g.fillStyle = '#c9a24a'; g.fillRect(B * 0.12, B * 0.86, B * 0.5, B * 0.07);
-    g.fillStyle = '#b8743a'; g.beginPath(); g.moveTo(B * 0.62, B * 0.86); g.quadraticCurveTo(B * 0.8, B * 0.865, B * 0.86, B * 0.895); g.quadraticCurveTo(B * 0.8, B * 0.925, B * 0.62, B * 0.93); g.fill();
-  }
-  return colorTex(A.c, false);
+function cnv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return { c, g: c.getContext('2d') }; }
+function speckle(g, w, h, n, a, rnd) { for (let i = 0; i < n; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,255'},${rnd() * a})`; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); } }
+function spaced(g, txt, x, y, sp) { // testo spaziato centrato
+  const ws = [...txt].map((ch) => g.measureText(ch).width), tot = ws.reduce((a, b) => a + b, 0) + sp * (txt.length - 1);
+  let cx = x - tot / 2; g.textAlign = 'left';
+  [...txt].forEach((ch, i) => { g.fillText(ch, cx, y); cx += ws[i] + sp; });
+  g.textAlign = 'center';
 }
-/** coperchio: lamiera con nervature (o cartone/legno) */
-function ammoTopTex(id) {
-  const d = AMMO[id], B = 128, A = canvas2d(B), g = A.g, rnd = mulberry(311 + id.length);
-  g.fillStyle = d.paint; g.fillRect(0, 0, B, B);
-  if (d.kind === 'can') {
-    for (let i = 0; i < 5; i++) { const y = 18 + i * 23; g.fillStyle = 'rgba(255,255,230,0.12)'; g.fillRect(10, y, B - 20, 4); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(10, y + 4, B - 20, 3); }
-    g.strokeStyle = 'rgba(20,22,16,0.6)'; g.lineWidth = 5; g.strokeRect(2, 2, B - 4, B - 4);
-  } else if (d.kind === 'crate') {
-    for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(30,18,8,0.6)'; g.fillRect(0, i * 43, B, 2); }
-    for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(50,30,12,${0.1 + rnd() * 0.15})`; g.fillRect(0, rnd() * B, B, 1); }
-    g.fillStyle = d.band; g.font = 'bold 22px Impact, sans-serif'; g.textAlign = 'center'; g.fillText('PERICOLO', B / 2, B / 2 + 8);
+/** faccia stampata della scatola (fronte e retro) */
+function ammoFrontTex(id) {
+  const rnd = mulberry(500 + id.length * 31);
+  if (id === 'light') {
+    const W = 512, H = 300, { c, g } = cnv(W, H);
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#7aa0d8'); gr.addColorStop(0.45, '#3f66a8'); gr.addColorStop(1, '#16305e');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const rg = g.createRadialGradient(150, 120, 10, 150, 120, 260); rg.addColorStop(0, 'rgba(210,230,255,0.45)'); rg.addColorStop(1, 'rgba(210,230,255,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, W, H);
+    // venature tipo foto del cielo/acqua
+    for (let i = 0; i < 40; i++) { g.strokeStyle = `rgba(255,255,255,${0.03 + rnd() * 0.06})`; g.lineWidth = 2 + rnd() * 6; const y = rnd() * H; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(W * 0.3, y + rnd() * 30 - 15, W * 0.7, y + rnd() * 30 - 15, W, y + rnd() * 20 - 10); g.stroke(); }
+    speckle(g, W, H, 1500, 0.06, rnd);
+    g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.font = 'bold 58px "Arial Black", Impact, sans-serif'; g.fillText('ARENA', 26, 70);
+    g.font = 'bold 17px Arial, sans-serif'; spaced(g, 'AMMUNITION', 118, 94, 5);
+    // fascia bianca curva con la scritta
+    g.fillStyle = 'rgba(240,244,252,0.96)';
+    g.beginPath(); g.moveTo(0, 238); g.quadraticCurveTo(250, 128, W, 150); g.lineTo(W, 222); g.quadraticCurveTo(260, 196, 0, 300); g.closePath(); g.fill();
+    g.strokeStyle = '#9fb6dc'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, 238); g.quadraticCurveTo(250, 128, W, 150); g.stroke();
+    g.save(); g.translate(280, 208); g.rotate(-0.13);
+    g.fillStyle = '#1c346c'; g.font = 'italic bold 52px "Arial Black", Impact, sans-serif'; g.textAlign = 'center'; g.fillText('GAME-SHOT', 0, 0);
+    g.restore();
+    // bollino rosso del calibro
+    g.fillStyle = '#d0262a'; g.beginPath(); g.arc(452, 60, 34, 0, 7); g.fill();
+    g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(452, 60, 28, 0, 7); g.stroke();
+    g.fillStyle = '#fff'; g.font = 'bold 26px "Arial Black", sans-serif'; g.textAlign = 'center'; g.fillText('22', 452, 70);
+    g.font = 'bold 15px Arial, sans-serif'; g.textAlign = 'right'; g.fillText('50 CARTUCCE · CAL. 22 LR', W - 18, H - 14);
+    return colorTex(c, false);
   }
-  for (let i = 0; i < 300; i++) { g.fillStyle = `rgba(0,0,0,${rnd() * 0.08})`; g.fillRect(rnd() * B, rnd() * B, 1.5, 1.5); }
-  return colorTex(A.c, false);
+  if (id === 'medium' || id === 'heavy') {
+    const heavy = id === 'heavy', W = 512, H = 340, { c, g } = cnv(W, H);
+    g.fillStyle = heavy ? '#7a5636' : '#a37b50'; g.fillRect(0, 0, W, H);
+    speckle(g, W, H, 4000, 0.08, rnd);
+    for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(60,38,20,${rnd() * 0.06})`; g.fillRect(0, rnd() * H, W, 1 + rnd() * 2); }
+    // disegni a tratto degli animali (bufalo a destra, elefante dietro)
+    g.strokeStyle = 'rgba(55,35,18,0.42)'; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.ellipse(395, 120, 62, 46, 0, 0, 7); g.stroke();                               // testa del bufalo
+    g.beginPath(); g.moveTo(340, 95); g.bezierCurveTo(300, 40, 360, 30, 395, 78); g.bezierCurveTo(430, 30, 490, 40, 450, 95); g.stroke();   // corna
+    g.beginPath(); g.moveTo(375, 140); g.lineTo(385, 150); g.moveTo(415, 140); g.lineTo(405, 150); g.stroke();
+    g.beginPath(); g.moveTo(205, 300); g.bezierCurveTo(210, 220, 300, 200, 330, 250); g.bezierCurveTo(345, 280, 330, 320, 300, 330); g.stroke();   // elefante
+    g.beginPath(); g.moveTo(330, 250); g.bezierCurveTo(360, 280, 350, 320, 372, 330); g.stroke();   // proboscide
+    for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(55,35,18,${0.15 + rnd() * 0.2})`; g.lineWidth = 1.5; const x = 180 + rnd() * 320, y = 40 + rnd() * 280; g.beginPath(); g.moveTo(x, y); g.lineTo(x + rnd() * 30 - 15, y + rnd() * 16 - 8); g.stroke(); }
+    // targa rossa del marchio
+    g.fillStyle = heavy ? '#1b1715' : '#c21f1a'; g.fillRect(22, 26, 300, 94);
+    g.strokeStyle = heavy ? '#c9a14a' : '#f2e6d0'; g.lineWidth = 3; g.strokeRect(28, 32, 288, 82);
+    g.fillStyle = heavy ? '#c9a14a' : '#ffffff'; g.fillRect(40, 44, 54, 58);
+    g.fillStyle = heavy ? '#1b1715' : '#c21f1a'; g.font = 'bold 50px Georgia, serif'; g.textAlign = 'center'; g.fillText('A', 67, 92);
+    g.fillStyle = heavy ? '#e8c46a' : '#ffffff'; g.font = 'italic bold 56px Georgia, "Times New Roman", serif'; g.textAlign = 'left'; g.fillText('Arena', 106, 94);
+    g.fillStyle = '#f6efe2'; g.font = 'bold 21px Georgia, serif';
+    g.fillText(heavy ? 'SERIE CACCIA PERICOLOSA' : 'SERIE CACCIA GROSSA', 28, 156);
+    if (heavy) { g.fillStyle = '#e8c46a'; g.font = 'bold 34px Georgia, serif'; g.fillText('MAGNUM', 28, 196); }
+    g.fillStyle = 'rgba(250,244,232,0.92)'; g.font = 'italic 19px Georgia, serif';
+    g.fillText('Precise.', 28, 238); g.fillText('Letali.', 28, 262); g.fillText('Affidabili.', 28, 286);
+    // sigillo rotondo
+    const sx = 448, sy = 250;
+    g.fillStyle = heavy ? '#b08a36' : '#a81d18'; g.beginPath(); g.arc(sx, sy, 46, 0, 7); g.fill();
+    g.strokeStyle = '#f6efe2'; g.lineWidth = 2.5; g.beginPath(); g.arc(sx, sy, 40, 0, 7); g.stroke(); g.beginPath(); g.arc(sx, sy, 27, 0, 7); g.stroke();
+    for (let i = 0; i < 24; i++) { const a = i / 24 * 6.283; g.fillStyle = '#f6efe2'; g.fillRect(sx + Math.cos(a) * 33 - 1.5, sy + Math.sin(a) * 33 - 1.5, 3, 3); }
+    g.fillStyle = '#f6efe2'; g.font = 'bold 26px Georgia, serif'; g.textAlign = 'center'; g.fillText('A', sx, sy + 9);
+    g.font = 'bold 15px Arial, sans-serif'; g.textAlign = 'left'; g.fillText(heavy ? '10 CARTUCCE' : '20 CARTUCCE', 28, H - 16);
+    return colorTex(c, false);
+  }
+  if (id === 'shells') {
+    const W = 400, H = 400, { c, g } = cnv(W, H);
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#26332f'); gr.addColorStop(0.55, '#1a2421'); gr.addColorStop(1, '#0b0f0e');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    // bosco nella nebbia con la luce in fondo e un cacciatore solitario
+    const rg = g.createRadialGradient(200, 190, 5, 200, 190, 170); rg.addColorStop(0, 'rgba(215,222,212,0.75)'); rg.addColorStop(0.4, 'rgba(160,172,160,0.3)'); rg.addColorStop(1, 'rgba(120,130,120,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 26; i++) {
+      const x = rnd() * W, w = 3 + rnd() * 14, far = rnd();
+      g.fillStyle = `rgba(${12 + far * 40},${16 + far * 46},${14 + far * 42},${0.55 + (1 - far) * 0.4})`;
+      g.beginPath(); g.moveTo(x - w / 2, 0); g.lineTo(x + w / 2, 0); g.lineTo(x + w / 2 + (rnd() - 0.5) * 10, 250); g.lineTo(x - w / 2 + (rnd() - 0.5) * 10, 250); g.fill();
+      for (let k = 0; k < 3; k++) { g.strokeStyle = g.fillStyle; g.lineWidth = 1 + rnd() * 2; const y = 30 + rnd() * 150; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 60, y - 20 - rnd() * 30); g.stroke(); }
+    }
+    g.fillStyle = '#0d1211'; g.beginPath(); g.arc(200, 197, 4.5, 0, 7); g.fill(); g.fillRect(196, 201, 8, 22); g.fillRect(197, 222, 2.5, 12); g.fillRect(201, 222, 2.5, 12);
+    const fg = g.createLinearGradient(0, 220, 0, H); fg.addColorStop(0, 'rgba(10,14,13,0)'); fg.addColorStop(0.3, 'rgba(10,14,13,0.9)'); fg.addColorStop(1, '#0a0d0c');
+    g.fillStyle = fg; g.fillRect(0, 220, W, H - 220);
+    // marchio color bronzo
+    const bg = g.createLinearGradient(0, 40, 0, 110); bg.addColorStop(0, '#f0c9a0'); bg.addColorStop(0.5, '#b97a4c'); bg.addColorStop(1, '#7c4a2a');
+    g.fillStyle = bg; g.font = 'bold 74px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.fillText('A&R', 200, 108);
+    g.strokeStyle = 'rgba(40,20,10,0.6)'; g.lineWidth = 1.5; g.strokeText('A&R', 200, 108);
+    g.fillStyle = '#f2f2ee'; g.font = '44px Georgia, "Times New Roman", serif'; spaced(g, 'PRIVILEGE', 200, 284, 6);
+    g.font = '28px Georgia, serif'; spaced(g, 'GAME', 186, 316, 9);
+    g.fillStyle = '#7fb0a0'; g.font = 'bold 30px Georgia, serif'; g.textAlign = 'left'; g.fillText('34', 252, 316); g.textAlign = 'center';
+    g.fillStyle = '#e8e8e2'; g.font = 'bold 13px Arial, sans-serif'; g.fillText('FAI LA TUA SCELTA NATURALE', 200, 342);
+    g.fillStyle = '#163029'; g.fillRect(0, 356, W, 44);
+    g.strokeStyle = '#e8e8e2'; g.lineWidth = 2; g.beginPath(); g.arc(28, 378, 12, 0, 7); g.stroke(); g.beginPath(); g.arc(28, 378, 4, 0, 7); g.stroke();
+    g.fillStyle = '#e8e8e2'; g.font = 'bold 15px Arial, sans-serif'; g.textAlign = 'left'; g.fillText('12   70mm   2¾"   34   1¼"   GREEN CORE', 52, 384);
+    return colorTex(c, false);
+  }
+  return null;
+}
+/** fianchi e coperchio: tinta della scatola con una riga e il calibro */
+function ammoSideTex(id) {
+  const rnd = mulberry(900 + id.length * 7), W = 256, H = 128, { c, g } = cnv(W, H);
+  const col = { light: '#2a4d8c', medium: '#a37b50', heavy: '#7a5636', shells: '#16241f' }[id];
+  g.fillStyle = col; g.fillRect(0, 0, W, H); speckle(g, W, H, 900, 0.07, rnd);
+  const acc = { light: '#ffffff', medium: '#c21f1a', heavy: '#c9a14a', shells: '#b97a4c' }[id];
+  g.fillStyle = acc; g.fillRect(0, H * 0.7, W, 8);
+  g.fillStyle = id === 'shells' || id === 'light' ? '#e8e8e2' : '#f6efe2';
+  g.font = 'bold 26px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText({ light: '22 LR · 40 GR', medium: '.308 WIN · 165 GR', heavy: '.375 H&H · 300 GR', shells: '12/70 · 34 g' }[id], W / 2, H * 0.4);
+  return colorTex(c, false);
 }
 const ammoMat = (id, part) => {
-  const d = AMMO[id];
-  if (part === 'side') return std('aS' + id, { map: ammoSideTex(id), roughness: d.kind === 'can' ? 0.55 : 0.9, metalness: d.kind === 'can' ? 0.35 : 0 });
-  if (part === 'top') return std('aT' + id, { map: ammoTopTex(id), roughness: d.kind === 'can' ? 0.5 : 0.9, metalness: d.kind === 'can' ? 0.35 : 0 });
-  return std('aE' + id, { color: d.paint, roughness: 0.6, metalness: d.kind === 'can' ? 0.35 : 0 });
+  if (part === 'front') return std('aF37' + id, { map: ammoFrontTex(id), roughness: 0.78, metalness: 0 });
+  return std('aS37' + id, { map: ammoSideTex(id), roughness: 0.85, metalness: 0 });
 };
 /** cartuccia (bossolo d'ottone + ogiva) distesa lungo x */
 function cartridgeGeo(r, L) {
   return lathe([[0.001, 0], [r * 1.05, 0], [r * 1.05, L * 0.06], [r * 0.85, L * 0.08], [r, L * 0.1], [r, L * 0.62], [r * 0.95, L * 0.64], [r * 0.8, L * 0.8], [r * 0.45, L * 0.95], [0.001, L]], 10).rotateZ(-Math.PI / 2);
 }
+/** ogiva (punta morbida di rame/piombo) per le cartucce delle scatole */
+function tipGeo(r, L) {
+  return lathe([[r * 0.95, L * 0.64], [r * 0.8, L * 0.8], [r * 0.45, L * 0.95], [0.001, L]], 10).rotateZ(-Math.PI / 2);
+}
+/** cartuccia del fucile a pompa: bossolo di plastica verde e fondello alto argentato (in piedi, lungo y) */
+function shellGeos() {
+  const hull = geo('aHull37', () => new THREE.CylinderGeometry(0.0105, 0.0105, 0.05, 14).translate(0, 0.04, 0));
+  const base = geo('aBase37', () => lathe([[0.001, 0], [0.0122, 0], [0.0122, 0.003], [0.011, 0.004], [0.011, 0.016], [0.001, 0.016]], 14));
+  const crimp = geo('aCrimp37', () => new THREE.CylinderGeometry(0.004, 0.0105, 0.004, 14).translate(0, 0.067, 0));
+  return { hull, base, crimp };
+}
+/** v37: razzo a fuso con la gabbia di stecche gialle (lungo x) */
+function spindleGeo() {
+  return geo('aSpindle37', () => {
+    const parts = [];
+    parts.push(new THREE.CylinderGeometry(0.011, 0.011, 0.74, 8).rotateZ(Math.PI / 2));                        // asta
+    // punta avvolta dallo spago (elica) e coda
+    const hel = []; for (let i = 0; i <= 120; i++) { const t = i / 120, a = t * 44 * Math.PI; hel.push(new THREE.Vector3(0.12 + t * 0.24, Math.cos(a) * 0.0135 * (1 - t * 0.5), Math.sin(a) * 0.0135 * (1 - t * 0.5))); }
+    parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(hel), 240, 0.0035, 4, false));
+    parts.push(lathe([[0.001, 0], [0.016, 0.0], [0.014, 0.04], [0.001, 0.06]], 8).rotateZ(-Math.PI / 2).translate(0.34, 0, 0));
+    parts.push(lathe([[0.001, 0], [0.018, 0.01], [0.016, 0.05], [0.001, 0.055]], 8).rotateZ(Math.PI / 2).translate(-0.33, 0, 0));
+    // gabbia: 8 stecche a doppia pancia con l'anello in mezzo
+    const prof = [[-0.24, 0.012], [-0.17, 0.05], [-0.1, 0.03], [-0.03, 0.055], [0.05, 0.012]];
+    for (let k = 0; k < 8; k++) {
+      const a0 = k / 8 * Math.PI * 2;
+      const pts = prof.map(([x, r], i) => { const a = a0 + i * 0.12; return new THREE.Vector3(x, Math.cos(a) * r, Math.sin(a) * r); });
+      parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.0032, 4, false));
+    }
+    for (const [x, r] of [[-0.1, 0.03], [-0.17, 0.05], [-0.03, 0.055]]) parts.push(new THREE.TorusGeometry(r, 0.0035, 4, 18).rotateY(Math.PI / 2).translate(x, 0, 0));
+    return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal') g.deleteAttribute(n); return g; }));
+  });
+}
 export function buildAmmoMesh(id) {
   const d = AMMO[id];
   if (!d) return null;
   const g = new THREE.Group(), [w, h, dp] = d.size;
-  const side = ammoMat(id, 'side'), top = ammoMat(id, 'top'), end = ammoMat(id, 'end');
-  if (d.kind === 'box') {
-    // scatola di cartone aperta piena di cartucce rosse con fondello d'ottone
-    const wall = 0.008;
-    add(g, geo('abBase' + id, () => new THREE.BoxGeometry(w, 0.01, dp).translate(0, -h / 2 + 0.005, 0)), end);
-    for (const s of [-1, 1]) {
-      add(g, geo('abL' + id + s, () => new THREE.BoxGeometry(w, h, wall).translate(0, 0, s * (dp / 2 - wall / 2))), [end, end, end, end, side, side]);
-      add(g, geo('abW' + id + s, () => new THREE.BoxGeometry(wall, h, dp).translate(s * (w / 2 - wall / 2), 0, 0)), end);
-    }
-    // aletta del coperchio aperta all'indietro
-    const flap = add(g, geo('abF' + id, () => new THREE.BoxGeometry(w, 0.006, dp * 0.9).translate(0, 0, -dp * 0.45)), [end, end, side, end, end, end]);
-    flap.position.set(0, h / 2, -dp / 2); flap.rotation.x = -2.2;
-    const shell = geo('abShell', () => lathe([[0.001, 0], [0.0125, 0], [0.0125, 0.004], [0.0105, 0.006], [0.0105, 0.02], [0.0095, 0.022], [0.0095, 0.07], [0.007, 0.072], [0.001, 0.072]], 10));
-    const brass = geo('abBrass', () => new THREE.CylinderGeometry(0.0108, 0.0108, 0.02, 10).translate(0, 0.01, 0));
-    const red = std('aShellRed', { color: '#c02a26', roughness: 0.5 }), gold = std('aBrass', { color: '#d8b050', metalness: 0.85, roughness: 0.3 });
-    const nx = Math.floor((w - 0.02) / 0.024), nz = Math.floor((dp - 0.02) / 0.024);
-    const sm = new THREE.InstancedMesh(shell, red, nx * nz), bm = new THREE.InstancedMesh(brass, gold, nx * nz), m4 = new THREE.Matrix4();
-    let k = 0;
-    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
-      // ottone in alto (come nelle scatole vere), qualche cartuccia un po' più sporgente
-      const x = -w / 2 + 0.022 + i * 0.024, z = -dp / 2 + 0.022 + j * 0.024, up = (i * 3 + j * 5) % 7 === 2 ? 0.018 : 0;
-      m4.makeRotationX(Math.PI).setPosition(x, -h / 2 + 0.01 + 0.072 + 0.02 + up, z);
-      sm.setMatrixAt(k, m4); bm.setMatrixAt(k, m4); k++;
-    }
-    g.add(sm, bm);
+  const brassM = std('aBrass', { color: '#d8b050', metalness: 0.85, roughness: 0.3 });
+  if (d.kind === 'spindle') {
+    const m = std('aSpindleM37', { color: '#d9c63c', roughness: 0.55, metalness: 0.1 });
+    const s1 = add(g, spindleGeo(), m); s1.scale.setScalar(1.2); s1.rotation.set(0.5, 0, 0.35);   // un fuso solo, in diagonale come nella foto
+    g.userData.ammo = id;
     return g;
   }
-  // cassetta/cassa: corpo con fianchi stampati e coperchio
-  const body = add(g, geo('aBody' + id, () => new THREE.BoxGeometry(w, h * 0.86, dp).translate(0, -h * 0.07, 0)), [end, end, top, end, side, side]);
-  body.receiveShadow = true;
-  const lid = add(g, geo('aLid' + id, () => new THREE.BoxGeometry(w + 0.012, h * 0.14, dp + 0.012).translate(0, h * 0.43, 0)), [end, end, top, end, end, end]);
-  lid.receiveShadow = true;
-  const steel = mats.steel(), rubber = mats.rubber();
-  if (d.kind === 'can') {
-    // maniglia ribaltabile, chiusura a leva e cerniere
-    add(g, geo('aHandle' + id, () => merge([
-      at(new THREE.BoxGeometry(w * 0.42, 0.012, 0.022), 0, h / 2 + 0.024, 0),
-      at(new THREE.BoxGeometry(0.01, 0.026, 0.01), -w * 0.2, h / 2 + 0.011, 0), at(new THREE.BoxGeometry(0.01, 0.026, 0.01), w * 0.2, h / 2 + 0.011, 0),
-    ])), rubber);
-    add(g, geo('aLatch' + id, () => merge([
-      at(new THREE.BoxGeometry(0.012, h * 0.34, 0.05), -w / 2 - 0.008, h * 0.3, 0),
-      at(new THREE.BoxGeometry(0.016, 0.02, 0.06), -w / 2 - 0.01, h * 0.46, 0),
-    ])), steel);
-    add(g, geo('aHinge' + id, () => merge([0, 1].map(i => at(new THREE.CylinderGeometry(0.008, 0.008, w * 0.18, 8), (i ? 1 : -1) * w * 0.28, h * 0.36, -dp / 2 - 0.006, 0, 0, Math.PI / 2)))), steel);
-    // qualche cartuccia sparsa accanto alla cassetta
-    const [r, L, cb, ct] = d.bullets;
-    const cg = geo('aCart' + id, () => cartridgeGeo(r, L));
-    const brassM = std('aBrass', { color: '#d8b050', metalness: 0.85, roughness: 0.3 });
-    const rng = mulberry(901 + id.length);
-    for (let i = 0; i < 3; i++) {
-      const c = add(g, cg, brassM, false);
-      c.position.set(-w * 0.3 + i * w * 0.28 + (rng() - 0.5) * 0.04, -h / 2 + r, dp / 2 + 0.03 + rng() * 0.04);
-      c.rotation.y = (rng() - 0.5) * 1.2;
-    }
+  // scatola in piedi con il fronte stampato
+  const front = ammoMat(id, 'front'), side = ammoMat(id, 'side');
+  const box = add(g, geo('aBox37' + id, () => new THREE.BoxGeometry(w, h, dp)), [side, side, side, side, front, front]);
+  box.receiveShadow = true;
+  const base = -h / 2, rng = mulberry(77 + id.length);
+  if (id === 'shells') {
+    const S = shellGeos();
+    const green = std('aHullM37', { color: '#1f4a3a', roughness: 0.45 }), silver = std('aSilver37', { color: '#cfcfd2', metalness: 0.9, roughness: 0.25 });
+    const put = (x, z, lying) => {
+      const s = new THREE.Group();
+      add(s, S.hull, green); add(s, S.base, silver); add(s, S.crimp, green);
+      s.position.set(x, base + (lying ? 0.012 : 0), z); if (lying) { s.rotation.z = Math.PI / 2; s.rotation.y = rng() * 2; }
+      g.add(s);
+    };
+    put(w / 2 + 0.03, dp / 2 + 0.01, false); put(w / 2 + 0.06, dp / 2 - 0.03, true);
   } else {
-    // cassa di legno: listelli di rinforzo e maniglie di corda
-    const wood = std('aCrateDark', { color: '#5e4426', roughness: 0.9 });
-    add(g, geo('aSlats' + id, () => merge([-1, 1].flatMap(s => [
-      at(new THREE.BoxGeometry(0.03, h * 0.88, dp + 0.014), s * (w / 2 - 0.05), -h * 0.06, 0),
-      at(new THREE.BoxGeometry(w + 0.014, 0.025, 0.03), 0, -h * 0.4, s * (dp / 2 - 0.01)),
-    ]))), wood);
-    add(g, geo('aRope' + id, () => merge([-1, 1].map(s => at(new THREE.TorusGeometry(0.035, 0.007, 6, 12, Math.PI), s * (w / 2 + 0.004), h * 0.05, 0, 0, Math.PI / 2, 0)))), std('aRope', { color: '#b89a6a', roughness: 1 }));
-    // ogiva del razzo che spunta dal coperchio socchiuso
-    const tip = add(g, geo('aTip', () => lathe([[0.001, 0], [0.04, 0], [0.04, 0.05], [0.03, 0.1], [0.012, 0.14], [0.001, 0.15]], 14).rotateZ(-Math.PI / 2)), std('aTipM', { color: '#5a6240', roughness: 0.6, metalness: 0.3 }), false);
-    tip.position.set(w * 0.22, h * 0.53, 0.02);
-    tip.rotation.z = 0.12;
+    // cartucce accanto: una in piedi, due sdraiate (le leggere sono piccole)
+    const [r, L] = id === 'light' ? [0.0045, 0.03] : id === 'heavy' ? [0.0095, 0.09] : [0.0078, 0.07];
+    const cg = geo('aCart37' + id, () => cartridgeGeo(r, L)), tg = geo('aTip37' + id, () => tipGeo(r * 1.01, L * 1.002));
+    const tip = std(id === 'light' ? 'aLead37' : 'aCopper37', { color: id === 'light' ? '#8d8a86' : '#c56a3a', metalness: 0.7, roughness: 0.35 });
+    const put = (x, z, up, ry) => {
+      const s = new THREE.Group(); add(s, cg, brassM, false); add(s, tg, tip, false);
+      if (up) { s.rotation.z = Math.PI / 2; s.position.set(x, base, z); }
+      else { s.rotation.y = ry; s.position.set(x, base + r, z); }
+      g.add(s);
+    };
+    put(w / 2 + 0.03, 0.0, true, 0);
+    put(-w * 0.2, dp / 2 + 0.03, false, 0.3 + rng() * 0.4);
+    put(w * 0.15, dp / 2 + 0.045, false, -0.5 + rng() * 0.3);
   }
   g.userData.ammo = id;
   return g;
 }
-const AMMO_ICON_ROT = { light: [0.45, -0.55, 0], medium: [0.45, -0.55, 0], heavy: [0.45, -0.55, 0], shells: [0.6, -0.5, 0], rockets: [0.45, -0.45, 0] };
+const AMMO_ICON_ROT = { light: [0.25, -0.45, 0], medium: [0.25, -0.45, 0], heavy: [0.25, -0.45, 0], shells: [0.25, -0.45, 0], rockets: [0.35, 0.25, 0.1] };
 /** icona (data URL) delle munizioni, renderizzata dal modello */
 export function ammoIcon(id) {
   if (!AMMO[id]) return null;
-  return renderIcon('ammo|' + id, () => buildAmmoMesh(id), AMMO_ICON_ROT[id], 128, 128);
+  return renderIcon('ammo37|' + id, () => buildAmmoMesh(id), AMMO_ICON_ROT[id], 128, 128);
 }
+/** v37: il razzo in volo è lo stesso fuso giallo con la gabbia (asse lungo +z, punta avanti) */
+export function rocketProjectileGeo() { return geo('aSpindleZ37', () => spindleGeo().clone().rotateY(-Math.PI / 2).scale(1.25, 1.25, 1.25)); }

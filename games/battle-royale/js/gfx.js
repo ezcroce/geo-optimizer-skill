@@ -18,7 +18,7 @@ export const PRESETS = {
   alto: { scale: 1, shadows: 'high', texq: 'high', aniso: 8, aa: 'msaa', bloom: true, ao: false, view: 1, grass: 1 },
   ultra: { scale: 1.25, shadows: 'ultra', texq: 'high', aniso: 16, aa: 'smaa', bloom: true, ao: true, view: 1.4, grass: 1.4 },
 };
-export const GFX_DEFAULT = { preset: 'alto', ...PRESETS.alto, fpsShow: false, fpsCap: 0 };
+export const GFX_DEFAULT = { preset: 'alto', ...PRESETS.alto, fpsShow: false, fpsCap: 0, dynRes: true, shadowEvery: 2 };
 
 const SHADOW = {
   low: { size: 1024, radius: 1.5, ext: 55 },
@@ -31,9 +31,10 @@ export function createGfx(renderer, scene, camera, sun) {
   let composer = null, renderPass, bloomPass, gtaoPass, outputPass, aaPass;
   let usePost = false;
   let maxAniso = renderer.capabilities.getMaxAnisotropy();
+  let dyn = 1;   // v37: risoluzione dinamica (0.55–1, moltiplica la scala scelta)
 
   function pixelRatio() {
-    return THREE.MathUtils.clamp(Math.min(window.devicePixelRatio || 1, 1.5) * opts.scale, 0.4, 3);
+    return THREE.MathUtils.clamp(Math.min(window.devicePixelRatio || 1, 1.5) * opts.scale * dyn, 0.35, 3);
   }
 
   function disposeComposer() {
@@ -101,6 +102,16 @@ export function createGfx(renderer, scene, camera, sun) {
     if (want !== !!composer || postKey(prev) !== postKey(opts)) buildComposer();
   }
 
+  /** v37: cambia la risoluzione dinamica senza ricostruire gli effetti */
+  function setDyn(k) {
+    k = THREE.MathUtils.clamp(k, 0.55, 1);
+    if (Math.abs(k - dyn) < 0.01) return;
+    dyn = k;
+    renderer.setPixelRatio(pixelRatio());
+    renderer.setSize(innerWidth, innerHeight);
+    if (composer) { composer.setPixelRatio(pixelRatio()); composer.setSize(innerWidth, innerHeight); }
+  }
+
   function setSize(w, h) {
     renderer.setSize(w, h);
     if (composer) { composer.setPixelRatio(pixelRatio()); composer.setSize(w, h); }
@@ -117,7 +128,8 @@ export function createGfx(renderer, scene, camera, sun) {
 
   buildComposer();
   return {
-    apply, render, setSize,
+    apply, render, setSize, setDyn,
+    get dyn() { return dyn; },
     get opts() { return opts; },
     get maxAniso() { return maxAniso; },
     get usePost() { return usePost; },

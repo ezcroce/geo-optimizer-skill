@@ -264,6 +264,15 @@ export const BACKPACKS = [
 export const MODES = [
   { id: 'br', name: 'Battle Royale', icon: '👑', desc: "La classica isola con 18 località: l'ultimo sopravvissuto vince." },
   { id: 'random', name: 'Random Map', icon: '🎲', desc: 'Ogni partita un\'isola nuova: città, montagne e laghi generati a caso.' },
+  // v37: duello. Online: solo gli amici della lobby, niente bot (in 2 è un 1 contro 1). Da solo: contro un bot.
+  { id: 'duel', name: '1 contro 1', icon: '⚔️', desc: 'Sfida un amico in una piccola arena: armi già in mano, tempesta veloce, niente bot. Da solo, contro un bot.' },
+];
+/** v37: tempesta del duello: arena di 75 m che si chiude in circa 3 minuti */
+export const DUEL_PHASES = [
+  { wait: 35, shrink: 25, radius: 42, dps: 2 },
+  { wait: 25, shrink: 22, radius: 20, dps: 4 },
+  { wait: 20, shrink: 18, radius: 7, dps: 8 },
+  { wait: 12, shrink: 15, radius: 0, dps: 12 },
 ];
 
 /** Dimensione delle squadre (v23) */

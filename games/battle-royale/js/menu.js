@@ -2,10 +2,10 @@
 //  Menu principale: Gioca · Armadietto · Pass battaglia · Negozio · Missioni
 //  + lobby online (codice stanza, chat, compagni)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS, diffLabel } from './config.js?v=36';
-import { NEWS, NEWS_VERSION } from './news.js?v=36';
-import * as PR from './progress.js?v=36';
-import * as N from './net.js?v=36';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES, MODES, TEAM_MODES, teamSize, MATE_COLORS, diffLabel } from './config.js?v=37';
+import { NEWS, NEWS_VERSION } from './news.js?v=37';
+import * as PR from './progress.js?v=37';
+import * as N from './net.js?v=37';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -104,7 +104,7 @@ export function initMenu(api) {
         api.ui();
         S.mode = m.id; api.save();
         if (N.NET.role === 'host') N.setMode(m.id);
-        renderModes(); renderSummary();
+        renderModes(); renderTeamsAll(); renderSummary();
       };
       wrap.appendChild(b);
     }
@@ -130,10 +130,12 @@ export function initMenu(api) {
       };
       wrap.appendChild(b);
     }
-    $('#teamDesc').textContent = (TEAM_MODES.find(t => t.id === cur) || TEAM_MODES[0]).desc;
+    const duel = (N.NET.role === 'off' ? S.mode : N.NET.mode) === 'duel';   // v37: nel duello le squadre non contano
+    wrap.classList.toggle('dim', duel);
+    $('#teamDesc').textContent = duel ? 'Nel 1 contro 1 ognuno gioca da solo' : (TEAM_MODES.find(t => t.id === cur) || TEAM_MODES[0]).desc;
     // Squadra / Versus: solo in lobby e con squadre da 2+
     const vr = $('#vsRow');
-    vr.classList.toggle('hidden', N.NET.role === 'off' || teamSize(cur) === 1);
+    vr.classList.toggle('hidden', N.NET.role === 'off' || teamSize(cur) === 1 || duel);
     vr.querySelectorAll('button').forEach(b => {
       b.classList.toggle('on', (b.dataset.vs === '1') === curVs());
       b.classList.toggle('locked', locked);
@@ -189,8 +191,9 @@ export function initMenu(api) {
     const mp = MODES.find(m => m.id === (N.NET.role === 'off' ? S.mode : N.NET.mode)) || MODES[0];
     const humans = N.NET.role === 'off' ? 1 : Math.max(1, N.NET.players.length);
     const dl = diffLabel(S.difficulty, curTeam(), humans).toLowerCase();
-    const extra = N.NET.role === 'off' ? `${S.players} giocatori · ${dl}` : (tm.size > 1 ? (curVs() ? 'Versus' : 'Squadra con gli amici') : 'Online · 100 giocatori') + ` · ${dl}`;
-    $('#playSummary').innerHTML = `<b>${esc(tm.name.toUpperCase())}</b><i>·</i>${mp.icon} ${esc(mp.name)}<i>·</i><span>${esc(extra)}</span>`;
+    const duel = (N.NET.role === 'off' ? S.mode : N.NET.mode) === 'duel';
+    const extra = duel ? (N.NET.role === 'off' ? `contro un bot · ${dl}` : (N.NET.players.length === 2 ? 'contro il tuo amico' : `${N.NET.players.length} amici, niente bot`)) : N.NET.role === 'off' ? `${S.players} giocatori · ${dl}` : (tm.size > 1 ? (curVs() ? 'Versus' : 'Squadra con gli amici') : 'Online · 100 giocatori') + ` · ${dl}`;
+    $('#playSummary').innerHTML = duel ? `<b>⚔️ 1 CONTRO 1</b><i>·</i><span>${esc(extra)}</span>` : `<b>${esc(tm.name.toUpperCase())}</b><i>·</i>${mp.icon} ${esc(mp.name)}<i>·</i><span>${esc(extra)}</span>`;
     $('#optsSum').textContent = `${S.players} · ${S.difficulty}`;
   }
   // ── cartello delle novità ──
@@ -405,6 +408,7 @@ export function initMenu(api) {
   /** v23: riga di riepilogo sotto la lista dei giocatori online */
 function lobbyHint() {
   const NET = N.NET, n = NET.players.length, T = teamSize(NET.team);
+  if (NET.mode === 'duel') return n <= 1 ? 'duello: aspetta un amico (da solo giochi contro un bot)' : n === 2 ? 'duello 1 contro 1, niente bot' : `duello tutti contro tutti fra ${n} amici, niente bot`;
   if (T === 1) return `gli altri ${100 - n} posti sono bot`;
   const teams = Math.floor(100 / T);
   if (NET.vs) return `versus: ogni amico guida una squadra di bot · ${teams} squadre`;
@@ -445,7 +449,7 @@ function renderOnline() {
       N.setMode(S.mode); N.setTeam(S.team, !!S.vs);
       chatLog.innerHTML = '';
       addChat('', `Lobby creata! Dai il codice ${NET.code} ai tuoi amici.`);
-      status('Fino a 8 giocatori: gli altri posti sono riempiti dai bot. Tieni aperta questa scheda finché gli amici non sono entrati.');
+      status('Fino a 8 giocatori: gli altri posti sono riempiti dai bot (nel 1 contro 1 invece niente bot). Tieni aperta questa scheda finché gli amici non sono entrati.');
       renderOnline();
     } catch (e) { status(e.message || 'Errore', true); }
   };

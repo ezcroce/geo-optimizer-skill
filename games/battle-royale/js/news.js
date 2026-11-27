@@ -1,9 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v36';
+export const NEWS_VERSION = 'v37';
 
 export const NEWS = [
+  {
+    v: 'v37', title: '1 contro 1 con gli amici, cielo a pixel e gioco più fluido', color: '#ff6a5a', icon: '⚔️',
+    items: [
+      'Nuova modalità ⚔️ 1 contro 1: crea una lobby, scegli la modalità e sfida un amico. Niente bot, niente bus: partite subito in una piccola arena con fucile d’assalto, pompa, mitraglietta, mini scudi e bende, e la tempesta si chiude in pochi minuti. Da solo giochi contro un bot che viene a cercarti',
+      'Gioco più fluido: gli oggetti a terra lontani non vengono più disegnati pezzo per pezzo (prima costavano più della città intera), le ombre si ridisegnano a frame alterni e gli alberi dettagliati arrivano meno lontano. Fino a metà dei draw call in meno',
+      'Risoluzione dinamica (attiva di base, nelle impostazioni grafiche): se il gioco scende sotto i 48 FPS abbassa da sola la risoluzione e poi la rialza quando torna fluido',
+      'Cielo nuovo in stile pixel art: sfumatura di blu a bande, strisce di nuvole sottili e grandi nuvole 3D a fumetto con i riccioli e il bordo scuro',
+      'Munizioni con le scatole vere: leggere stile Game-Shot blu, medie e pesanti nelle scatole di cartone da caccia, cartucce nella scatola verde Privilege e razzi a fuso con la gabbia gialla (anche quando volano)',
+      'Armi impugnate meglio: il calcio sta sulla spalla destra e i gomiti si piegano in modo naturale, quando corri il fucile va in diagonale con la canna giù a sinistra. Niente più braccia “da zombie” che facevano ballare l’arma',
+      'Tolti i salici piangenti',
+    ],
+  },
   {
     v: 'v36', title: 'Borghi medievali, salici e deserto di dune', color: '#ffb84d', icon: '🏡',
     items: [

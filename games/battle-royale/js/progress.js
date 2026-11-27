@@ -2,7 +2,7 @@
 //  Progressi del giocatore: pass battaglia, negozio, missioni, monete
 //  (tutto salvato nel browser con localStorage)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=36';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=37';
 
 const KEY = 'arenaRoyaleProfile';
 export const XP_PER_TIER = 1000;
@@ -245,13 +245,15 @@ export function matchResult(r) {
   add(`Forzieri aperti ×${r.chests}`, r.chests * 20);
   add('Danni inflitti', Math.min(600, r.damage / 5));
   const frac = r.place / Math.max(2, r.total);
-  if (r.win) add('Vittoria Reale!', 600);
+  const duel = r.mode === 'duel';
+  if (duel) { if (r.win) add('Duello vinto!', 300); }
+  else if (r.win) add('Vittoria Reale!', 600);
   else if (r.place <= 10) add('Tra i primi 10', 250);
   else if (frac <= 0.25) add('Tra i primi 25%', 120);
   if (r.mode === 'random') add('Bonus Random Map', 100);
   if (r.online) add('Bonus partita online', 150);
   const xp = lines.reduce((s, l) => s + l.xp, 0);
-  const coins = 15 + r.kills * 5 + (r.win ? 100 : r.place <= 10 ? 30 : 0);
+  const coins = 15 + r.kills * 5 + (duel ? (r.win ? 50 : 0) : r.win ? 100 : r.place <= 10 ? 30 : 0);
   const tierBefore = tier(), xpBefore = profile.xp;
   profile.stats.matches++; profile.stats.kills += r.kills;
   if (r.win) profile.stats.wins++;

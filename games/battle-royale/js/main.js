@@ -4,34 +4,35 @@
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
-  DIFFICULTY, scaledDifficulty, STORM_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=36';
-import * as PR from './progress.js?v=36';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=36';
-import { initMenu } from './menu.js?v=36';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=34';
-import { initSettingsUI } from './settings-ui.js?v=36';
+  DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
+} from './config.js?v=37';
+import * as PR from './progress.js?v=37';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=37';
+import { initMenu } from './menu.js?v=37';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=37';
+import { initSettingsUI } from './settings-ui.js?v=37';
 import { applyAnisotropy } from './texgen.js?v=19';
 import * as A from './audio.js?v=29';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
-} from './world.js?v=36';
+} from './world.js?v=37';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=36';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=36';
-import { consIcon, ammoIcon } from './items.js?v=36';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=37';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=37';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=37';
 import { buildChestMesh } from './models3d.js?v=19';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=33';
-import { createInventory } from './inventory.js?v=36';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=36';
+import { createInventory } from './inventory.js?v=37';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=37';
 import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=34';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=36';
-import { buildPickaxe, heldConsumable } from './held.js?v=36';
-import { createCrosshair } from './crosshair.js?v=36';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse } from './anim.js?v=37';
+import { buildPickaxe, heldConsumable } from './held.js?v=37';
+import { createCrosshair } from './crosshair.js?v=37';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=37';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -136,7 +137,7 @@ function gradientMaterial(top, bottom) {
       }`,
   });
 }
-const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 20), gradientMaterial('#2f72d2', '#cfe6fb'));
+const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 32), skyMaterial(SUN_OFF));   // v37: cielo a fasce con striature (pixel art in 3D)
 sky.renderOrder = -1;
 scene.add(sky);
 // meteo e atmosfera: nebbia d'altezza, montagne all'orizzonte, neve/foglie/polvere locali
@@ -159,21 +160,17 @@ renderer.info.autoReset = false;   // con il post-processing si contano tutti i 
 const gfx = createGfx(renderer, scene, camera, sun);
 
 // Nuvole
+// v37: nuvole a sbuffi con i riccioli (come quelle disegnate a pixel, ma in 3D): una geometria per nuvola,
+// 8 forme diverse condivise, ognuna si gira verso la camera
 const clouds = [];
 {
-  const cm = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, roughness: 1, emissive: '#ffffff', emissiveIntensity: 0.35 });
-  const cg = new THREE.IcosahedronGeometry(1, 1);
-  for (let i = 0; i < 28; i++) {
-    const g = new THREE.Group();
-    const n = 3 + Math.floor(Math.random() * 4);
-    for (let j = 0; j < n; j++) {
-      const m = new THREE.Mesh(cg, cm);
-      const s = rand(6, 13);
-      m.scale.set(s * 1.3, s * 0.6, s);
-      m.position.set(j * rand(6, 10) - n * 4, rand(-2, 2), rand(-5, 5));
-      g.add(m);
-    }
-    g.position.set(rand(-400, 400), rand(150, 200), rand(-400, 400));
+  const cm = cloudMaterial();
+  const shapes = Array.from({ length: 8 }, () => buildCloudGeometry(Math.random, rand(80, 130)));
+  for (let i = 0; i < 30; i++) {
+    const g = new THREE.Mesh(shapes[i % shapes.length], cm);
+    g.position.set(rand(-900, 900), rand(180, 260), rand(-900, 900));
+    g.scale.setScalar(rand(1, 1.6));
+    g.frustumCulled = true;
     scene.add(g);
     clouds.push(g);
   }
@@ -1367,8 +1364,8 @@ function kill(t, attacker, how) {
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
 
 // ─────────────── Razzi ───────────────
-const rocketGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.6, 8).rotateX(Math.PI / 2);
-const rocketMat = new THREE.MeshStandardMaterial({ color: '#555', emissive: '#ff5020', emissiveIntensity: 0.3 });
+const rocketGeo = rocketProjectileGeo();   // v37: razzo a fuso giallo con la gabbia di stecche
+const rocketMat = new THREE.MeshStandardMaterial({ color: '#d9c63c', roughness: 0.5, emissive: '#ff8a20', emissiveIntensity: 0.18 });
 const grenadeGeo = new THREE.SphereGeometry(0.055, 10, 8).scale(1, 1, 1.35);
 const grenadeMat = new THREE.MeshStandardMaterial({ color: '#4a5a32', roughness: 0.6, metalness: 0.3, emissive: '#ffb030', emissiveIntensity: 0.12 });
 function spawnRocket(owner, pos, dir, dmg, def) {
@@ -1772,7 +1769,7 @@ function buildLootMesh(L) {
   if (rar >= 0) {
     const ring = new THREE.Mesh(ringGeo, lootMats[rar].ring);
     ring.position.y = 0.04;
-    g.add(ring);
+    g.add(ring); L.ring = ring;
     if (rar >= 2 && item.kind === 'weapon') { const beam = new THREE.Mesh(beamGeo, lootMats[rar].beam); g.add(beam); }
   }
   g.position.copy(pos);
@@ -1830,6 +1827,7 @@ function pickupLoot(ch, L, allowSwap = true) {
   return false;
 }
 
+const LOOT_FULL2 = 50 * 50;
 function updateLoot(dt) {
   const cp = camera.position;
   for (const L of G.loot) {
@@ -1838,6 +1836,11 @@ function updateLoot(dt) {
     if (near && !L.mesh) buildLootMesh(L);
     if (L.mesh) L.mesh.visible = near;
     if (!near) { if (L.pop > 0) L.pop -= dt; continue; }
+    // v37: oltre i 50 m il modello (6–10 pezzi) e l'anello spariscono, resta solo la colonna di luce delle
+    //  armi rare: prima centinaia di oggetti lontani costavano più draw call di tutta la città
+    const close = d2 < LOOT_FULL2;
+    if (L.model.visible !== close) { L.model.visible = close; if (L.ring) L.ring.visible = close; }
+    if (!close) { if (L.pop > 0) L.pop -= dt; L.mesh.position.y = L.pos.y; continue; }
     L.bob += dt;
     L.model.rotation.y += dt * 1.2;
     L.model.position.y = 0.45 + Math.sin(L.bob * 2) * 0.08;
@@ -2044,15 +2047,24 @@ stormWall.position.y = 90;
 stormWall.renderOrder = 2;
 scene.add(stormWall);
 
+/** v37: fasi della tempesta (quelle del duello sono brevi e strette) */
+const PH = () => (G.duel ? DUEL_PHASES : STORM_PHASES);
 function newStorm() {
+  if (G.duel) {
+    // duello: arena di 75 m attorno al punto scelto dall'host
+    const d = G.duel, R = 75;
+    const s = { phase: 0, state: 'wait', timer: DUEL_PHASES[0].wait, cx: d.x, cz: d.z, r: R, dps: 1, fx: d.x, fz: d.z, fr: R, tx: d.x, tz: d.z, tr: DUEL_PHASES[0].radius, tick: 0 };
+    pickNextCircle(s);
+    return s;
+  }
   const s = { phase: 0, state: 'wait', timer: STORM_PHASES[0].wait, cx: 0, cz: 0, r: 300 * SCALE, dps: 1, fx: 0, fz: 0, fr: 300 * SCALE, tx: 0, tz: 0, tr: 150 * SCALE, tick: 0 };
   pickNextCircle(s);
   return s;
 }
 function pickNextCircle(s) {
-  const ph = STORM_PHASES[s.phase];
+  const ph = PH()[s.phase];
   s.tr = ph.radius;
-  const maxOff = Math.max(0, Math.min(s.r, 190 * SCALE) - ph.radius) * 0.8;
+  const maxOff = Math.max(0, Math.min(s.r, 190 * SCALE) - ph.radius) * (G.duel ? 0.4 : 0.8);
   for (let i = 0; i < 30; i++) {
     const a = Math.random() * Math.PI * 2, d = Math.random() * maxOff;
     const x = s.cx + Math.cos(a) * d, z = s.cz + Math.sin(a) * d;
@@ -2065,18 +2077,18 @@ function updateStorm(dt) {
   if (s.state !== 'done') {
     s.timer -= dt;
     if (s.state === 'wait' && s.timer <= 0) {
-      s.state = 'shrink'; s.timer = STORM_PHASES[s.phase].shrink;
+      s.state = 'shrink'; s.timer = PH()[s.phase].shrink;
       s.fx = s.cx; s.fz = s.cz; s.fr = s.r;
-      s.dps = STORM_PHASES[s.phase].dps;
+      s.dps = PH()[s.phase].dps;
       if (G.player.alive) showMsg('LA TEMPESTA SI RESTRINGE!', 'Raggiungi la zona sicura', 3);
     } else if (s.state === 'shrink') {
-      const ph = STORM_PHASES[s.phase];
+      const ph = PH()[s.phase];
       const k = clamp(1 - s.timer / ph.shrink, 0, 1);
       s.cx = lerp(s.fx, s.tx, k); s.cz = lerp(s.fz, s.tz, k); s.r = lerp(s.fr, s.tr, k);
       if (s.timer <= 0) {
         s.phase++;
-        if (s.phase >= STORM_PHASES.length) { s.state = 'done'; }
-        else { s.state = 'wait'; s.timer = STORM_PHASES[s.phase].wait; pickNextCircle(s); }
+        if (s.phase >= PH().length) { s.state = 'done'; }
+        else { s.state = 'wait'; s.timer = PH()[s.phase].wait; pickNextCircle(s); }
       }
     }
   }
@@ -2256,6 +2268,16 @@ function botThink(b) {
     }
     ai.state = 'zone';
     return;
+  }
+  // v37: duello: niente giri per forzieri, il bot va a cercare l'avversario (sa più o meno dov'è, come se lo sentisse)
+  if (G.duel && hasWeapon) {
+    let foe = null, fd = Infinity;
+    for (const c of G.chars) { if (c === b || !c.alive || isMate(b, c)) continue; const d = dist0(b, c); if (d < fd) { fd = d; foe = c; } }
+    if (foe) {
+      if (ai.state !== 'chase' || !ai.goal || ai.goal.distanceTo(b.pos) < 4 || Math.random() < 0.1) ai.goal = new THREE.Vector3(foe.pos.x + rand(-6, 6), 0, foe.pos.z + rand(-6, 6));
+      ai.state = 'chase'; ai.goalLoot = ai.goalChest = null;
+      return;
+    }
   }
   // squadra: resta vicino al capogruppo (umano: molto vicino, bot: più libero)
   const L = leaderOf(b);
@@ -2729,7 +2751,7 @@ function applySettings(key = '*') {
   if (all || key === 'preset' || key === 'view' || key === 'grass') {
     const v = g.view;
     fogK = v;
-    QUALITY.detailIn = 240 * v; QUALITY.detailOut = 310 * v; QUALITY.treeHi = 110 * v; QUALITY.nearOnly = 150 * v;
+    QUALITY.detailIn = 240 * v; QUALITY.detailOut = 310 * v; QUALITY.treeHi = 80 * v; QUALITY.nearOnly = 150 * v;
     QUALITY.grassOn = g.grass > 0.01;
     QUALITY.grassDens = 0.8 * Math.max(0.1, g.grass);
     QUALITY.grassR = 64 * clamp(0.6 + g.grass * 0.4, 0.6, 1.25);
@@ -3550,11 +3572,12 @@ async function startMatch() {
     if (NET.role === 'host') {
       // la lista dei partecipanti e dei bot la decide l'host
       const players = NET.players.map(p => ({ id: p.id, name: p.name, skin: p.skin, cos: { hat: p.hat, back: p.back, glider: p.glider } }));
-      const total = 100;
+      const duel = mode === 'duel';
+      const total = duel ? (players.length > 1 ? players.length : 2) : 100;   // v37: duello senza bot (da solo: un bot)
       const names = makeBotNames(total - players.length);
       const bots = names.map(n => ({ name: n, skin: pick(SKINS).id, cos: randomCos() }));
       // v23: squadre. "Squadra" = gli amici insieme (a gruppi della dimensione scelta), "Versus" = ognuno nella sua squadra con i bot
-      const T = teamSize(NET.team), vs = NET.vs || T === 1;
+      const T = duel ? 1 : teamSize(NET.team), vs = NET.vs || T === 1;
       players.forEach((p, i) => { p.team = vs ? i : Math.floor(i / T); });
       const used = players.length ? Math.max(...players.map(p => p.team)) + 1 : 0;
       const fill = new Array(used).fill(0); players.forEach(p => fill[p.team]++);
@@ -3562,8 +3585,9 @@ async function startMatch() {
       for (let tm = 0; tm < used; tm++) for (let k = fill[tm]; k < T && bi < bots.length; k++) bots[bi++].team = tm;
       for (let k = 0; bi < bots.length; k++) bots[bi++].team = used + Math.floor(k / T);
       const busAng = Math.random() * Math.PI * 2, busOff = rand(-50, 50) * SCALE;
+      G.duel = duel ? pickDuelSpot() : null;
       const st = newStorm();
-      const start = { t: 'start', seed, random, mode, team: NET.team, vs: !!NET.vs, lootSeed: Math.floor(Math.random() * 2e9), players, bots, bus: [busAng, busOff], storm: stormState(st), diff: settings.difficulty };
+      const start = { t: 'start', seed, random, mode, team: duel ? 'solo' : NET.team, duel: G.duel, vs: !!NET.vs, lootSeed: Math.floor(Math.random() * 2e9), players, bots, bus: [busAng, busOff], storm: stormState(st), diff: settings.difficulty };
       NET.inMatch = true;
       // v34: si parte quando tutti hanno caricato l'isola (o dopo 45 s), così nessuno perde il bus o i primi messaggi
       const wait = new Set(NET.players.filter(p => !p.host).map(p => p.id));
@@ -3637,7 +3661,8 @@ function beginMatch(net) {
   A.setVolume(settings.vol);
   clearMatch();
   G.mode = net ? net.mode : settings.mode;
-  G.team = net ? (net.team || 'solo') : settings.team;
+  G.team = net ? (net.team || 'solo') : (G.mode === 'duel' ? 'solo' : settings.team);
+  G.duel = G.mode === 'duel' ? ((net && net.duel) || pickDuelSpot()) : null;
   G.teamSize = teamSize(G.team);
   G.teamWiped = false; G.killedBy = '';
   G.net = net ? { sendT: 0, snapT: 0, stormT: 0, byPeer: new Map() } : null;
@@ -3697,7 +3722,7 @@ function beginMatch(net) {
     G.player = player;
     G.chars.push(player);
     const T = G.teamSize;
-    const nb = clamp((Number(settings.players) || 100) - 1, T, 99);
+    const nb = G.duel ? 1 : clamp((Number(settings.players) || 100) - 1, T, 99);
     const names = makeBotNames(nb);
     for (let i = 0; i < nb; i++) {
       const b = new Character(names[i % names.length], pick(SKINS), false, randomCos());
@@ -3721,7 +3746,8 @@ function beginMatch(net) {
   $('#end').classList.add('hidden');
   $('#hud').classList.remove('hidden');
   scene.fog.far = 560;
-  showMsg('BENVENUTO NEL BATTLE BUS!', (G.mode === 'random' ? '🎲 Random Map: isola nuova! · ' : '') + tk('Premi SPAZIO per lanciarti · muovi il mouse per guardarti intorno', 'Tocca LANCIATI quando vuoi · trascina per guardarti intorno'), 6);
+  if (G.duel) startDuel();
+  else showMsg('BENVENUTO NEL BATTLE BUS!', (G.mode === 'random' ? '🎲 Random Map: isola nuova! · ' : '') + tk('Premi SPAZIO per lanciarti · muovi il mouse per guardarti intorno', 'Tocca LANCIATI quando vuoi · trascina per guardarti intorno'), 6);
   $('#netInfo').classList.toggle('hidden', !G.net);
   // personaggi delle skin in questa partita per primi
   preloadSkins([...new Set(G.chars.map(c => c.skin && c.skin.id).filter(Boolean))]);
@@ -3730,6 +3756,46 @@ function beginMatch(net) {
   cache.hot = null;
   if (settings.fs !== false && !isFullscreen()) toggleFullscreen(true);
   requestLock();
+}
+
+// ─────────────── v37: duello 1 contro 1 ───────────────
+/** punto dell'arena: una località a caso (case e ripari), lontano dall'acqua */
+function pickDuelSpot() {
+  for (let i = 0; i < 40; i++) {
+    const t = pick(TOWNS);
+    const x = t.x + rand(-0.3, 0.3) * t.r, z = t.z + rand(-0.3, 0.3) * t.r;
+    if (terrainHeight(x, z) > WATER_LEVEL + 1 && Math.abs(x) < HALF - 90 && Math.abs(z) < HALF - 90) return { x: r2(x), z: r2(z), a: r2(Math.random() * Math.PI * 2) };
+  }
+  return { x: 0, z: 0, a: 0 };
+}
+/** tutti a terra ai lati opposti dell'arena, con lo stesso equipaggiamento */
+function startDuel() {
+  const d = G.duel, n = G.chars.length;
+  if (busMesh) busMesh.visible = false;
+  G.bus.t = G.bus.dur * 2;
+  G.chars.forEach((c, i) => {
+    const a = d.a + (i / n) * Math.PI * 2;
+    let x = d.x + Math.cos(a) * 28, z = d.z + Math.sin(a) * 28;
+    // se il punto è in acqua o dentro un muro, ci si avvicina al centro
+    for (let k = 0; k < 6 && (terrainHeight(x, z) < WATER_LEVEL + 0.5); k++) { x = lerp(x, d.x, 0.3); z = lerp(z, d.z, 0.3); }
+    c.mode = 'ground'; c.onGround = true; c.vel.set(0, 0, 0);
+    c.pos.set(x, groundAt(x, z, terrainHeight(x, z) + 2), z);
+    c.yaw = Math.atan2(d.x - x, d.z - z);
+    c.m.root.visible = true;
+    c.slots[0] = { kind: 'weapon', id: 'ar', rarity: 3, mag: WEAPONS.ar.mag };
+    c.slots[1] = { kind: 'weapon', id: 'shotgun', rarity: 3, mag: WEAPONS.shotgun.mag };
+    c.slots[2] = { kind: 'weapon', id: 'smg', rarity: 2, mag: WEAPONS.smg.mag };
+    c.slots[3] = { kind: 'cons', id: 'minishield', count: 4 };
+    c.slots[4] = { kind: 'cons', id: 'bandage', count: 5 };
+    c.ammo = { light: 150, medium: 180, heavy: 0, shells: 36, rockets: 0 };
+    c.mats = 400; c.shield = 50;
+    c.active = -1; c.setActive(0);
+    if (c.ai) { c.ai.state = 'idle'; c.ai.dropTarget.set(d.x, 0, d.z); }
+  });
+  if (G.player) { G.camYaw = G.player.yaw; G.camPitch = -0.05; }
+  G.state = 'play';
+  const foes = G.chars.filter(c => c !== G.player).map(c => c.name);
+  showMsg('⚔️ 1 CONTRO 1', `contro ${foes.slice(0, 3).join(', ')}${foes.length > 3 ? '…' : ''} · la tempesta si chiude in fretta`, 4);
 }
 
 /** raggruppa i personaggi per squadra; le squadre di soli bot atterrano insieme */
@@ -3809,9 +3875,10 @@ function finishMatch(win) {
   $('#end').classList.toggle('win', win);
   $('#endPlace').textContent = '#' + place;
   const squad = G.teamSize > 1;
-  $('#endTitle').textContent = win ? 'VITTORIA REALE!' : (squad ? 'SQUADRA ELIMINATA' : 'ELIMINATO');
+  const duel = G.mode === 'duel';
+  $('#endTitle').textContent = win ? (duel ? 'DUELLO VINTO!' : 'VITTORIA REALE!') : (squad ? 'SQUADRA ELIMINATA' : duel ? 'DUELLO PERSO' : 'ELIMINATO');
   $('#endSub').textContent = win
-    ? (squad ? (p.alive ? 'La tua squadra è l\'ultima in piedi. Leggendari! 🏆' : 'I tuoi compagni hanno chiuso la partita: vittoria di squadra! 🏆') : 'Sei l\'ultimo sopravvissuto. Leggendario! 🏆')
+    ? (duel ? `Hai battuto ${G.chars.filter(c => c !== p).map(c => c.name).slice(0, 3).join(', ')} in 1 contro 1. ⚔️🏆` : squad ? (p.alive ? 'La tua squadra è l\'ultima in piedi. Leggendari! 🏆' : 'I tuoi compagni hanno chiuso la partita: vittoria di squadra! 🏆') : 'Sei l\'ultimo sopravvissuto. Leggendario! 🏆')
     : (squad ? `La tua squadra è caduta · ultimo colpo: ${G.killedBy}` : `Sei stato eliminato da ${G.killedBy}`);
   const surv = G.time;
   $('#endStats').innerHTML = `<div><b>${p.kills}</b><span>Uccisioni</span></div><div><b>${Math.round(p.damageDealt)}</b><span>Danni inflitti</span></div><div><b>${fmtTime(surv)}</b><span>Tempo</span></div><div><b>${G.chars.length}</b><span>Giocatori</span></div>`;
@@ -3827,7 +3894,7 @@ function showEndScreen(delay = 0) {
   exitSpectate();
   if (document.pointerLockElement) document.exitPointerLock();
   // si può tornare a guardare la partita finché c'è qualcuno in piedi
-  const can = G.player && !G.player.alive && G.chars.some(c => c.alive && c !== G.player);
+  const can = G.player && !G.player.alive && G.chars.some(c => c.alive && c !== G.player) && !(G.duel && aliveTeams() <= 1);
   $('#specBtn').classList.toggle('hidden', !can);
   setTimeout(() => { if (!G.specOn && G.state === 'end') $('#end').classList.remove('hidden'); }, delay);
 }
@@ -3836,7 +3903,7 @@ function endMatch(win) {
   if (!finishMatch(win)) return;
   showEndScreen(win ? 600 : 0);
   win ? A.playVictory() : A.playDefeat();
-  if (win) showMsg('#1 VITTORIA REALE!', '', 5);
+  if (win) showMsg(G.mode === 'duel' ? '⚔️ DUELLO VINTO!' : '#1 VITTORIA REALE!', '', 5);
 }
 
 // ─────────────── Spettatore (v33) ───────────────
@@ -3846,7 +3913,7 @@ function deathToSpectate(killer) {
   if (!finishMatch(false)) { if (!G.specOn) showEndScreen(); return; }
   A.playDefeat();
   const t = killer && killer.alive ? killer : nearestAlive(G.player && G.player.pos);
-  if (!t || aliveTeams() <= 0) { showEndScreen(); return; }
+  if (!t || aliveTeams() <= 0 || (G.duel && aliveTeams() <= 1)) { showEndScreen(G.duel ? 900 : 0); return; }   // v37: duello finito, niente spettatore
   enterSpectate(t, killer);
 }
 function enterSpectate(target, killer = G.specKiller) {
@@ -3938,7 +4005,7 @@ lobby.scene.onBeforeRender = syncAllReal;
   const L = lobby.scene;
   lobby.cam.far = 260; lobby.cam.updateProjectionMatrix();
   L.fog = new THREE.Fog('#d4e3ef', 34, 175);
-  L.add(new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), gradientMaterial('#3d86dc', '#ffe3bd')));
+  L.add(new THREE.Mesh(new THREE.SphereGeometry(200, 48, 24), skyMaterial(new THREE.Vector3(4, 8, 5), { top: '#2f6fd8', mid: '#5b9cf0', bottom: '#d6ecff' })));
   L.add(new THREE.HemisphereLight('#dcecff', '#56663a', 1.15));
   const key = new THREE.DirectionalLight('#fff0d8', 2.7); key.position.set(4, 8, 5); key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 0.5, far: 30 }); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.02;
@@ -4061,21 +4128,14 @@ lobby.scene.onBeforeRender = syncAllReal;
       const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.28, h * 0.28, 7), sm); cap.position.set(mo.position.x, h - 2 - h * 0.14 + 0.05, mo.position.z); cap.rotation.y = mo.rotation.y; L.add(cap);
     }
   }
-  // nuvole morbide
+  // v37: nuvole a sbuffi con i riccioli, come nel cielo della partita
   {
-    const cc = document.createElement('canvas'); cc.width = 256; cc.height = 128;
-    const cg = cc.getContext('2d');
-    for (let k = 0; k < 14; k++) {
-      const x = 40 + rnd() * 176, y = 50 + rnd() * 40, r = 22 + rnd() * 30;
-      const gr = cg.createRadialGradient(x, y, 2, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-      cg.fillStyle = gr; cg.beginPath(); cg.arc(x, y, r, 0, 7); cg.fill();
-    }
-    const ct = new THREE.CanvasTexture(cc); ct.colorSpace = THREE.SRGBColorSpace;
     lobby.clouds = [];
-    for (let k = 0; k < 9; k++) {
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ct, transparent: true, depthWrite: false, fog: false, opacity: 0.85, color: '#fff6ec' }));
-      sp.position.set((rnd() - 0.5) * 220, 24 + rnd() * 26, -90 - rnd() * 60); sp.scale.set(40 + rnd() * 30, 16 + rnd() * 10, 1);
-      L.add(sp); lobby.clouds.push(sp);
+    const cm = cloudMaterial();
+    for (let k = 0; k < 8; k++) {
+      const cl = new THREE.Mesh(buildCloudGeometry(rnd, 24 + rnd() * 14), cm);
+      cl.position.set((rnd() - 0.5) * 220, 26 + rnd() * 24, -95 - rnd() * 55);
+      L.add(cl); lobby.clouds.push(cl);
     }
   }
   // il bus della battaglia che attraversa il cielo
@@ -4254,7 +4314,7 @@ function renderLobby(dt) {
     if (c.glider) poseGlide(c, t);
     else {
       // posa da armadietto: fucile in mano, respiro e peso che si sposta
-      poseHold(c, -0.25 + Math.sin(t * 0.8) * 0.03, 0, 0, 0);
+      poseHold(c, -0.25, 1, Math.sin(t * 0.8) * 0.12, 0);   // v37: arma a riposo: calcio sulla spalla destra, bocca in basso a sinistra
       const br = Math.sin(t * 2) * 0.5 + 0.5;
       c.body.position.y = br * 0.012;
       c.torso.rotation.x = br * 0.02;
@@ -4272,7 +4332,7 @@ function renderLobby(dt) {
     m.root.scale.setScalar(Math.max(0.001, e * (1 + Math.sin(m.appear * Math.PI) * 0.08)));
     resetPose(m);
     const tt = t + m.phase;
-    poseHold(m, -0.3, 0, 0, 0);
+    poseHold(m, -0.3, 1, Math.sin(tt * 0.8) * 0.12, 0);
     m.body.position.y = (Math.sin(tt * 2) * 0.5 + 0.5) * 0.012;
     m.head.rotation.y = Math.sin(tt * 0.6) * 0.3;
     setLeg(m, 0, -0.04, 0.08, 0.04); setLeg(m, 1, 0.06, 0.12, -0.06);
@@ -4286,7 +4346,7 @@ function renderLobby(dt) {
     lobby.bus.position.set(x, 30 + Math.sin(t * 0.5) * 0.8, -95);
     lobby.bus.rotation.set(0, Math.PI / 2, Math.sin(t * 0.7) * 0.03);
   }
-  if (lobby.clouds) for (const cl of lobby.clouds) { cl.position.x += dt * 0.8; if (cl.position.x > 130) cl.position.x = -130; }
+  if (lobby.clouds) { for (const cl of lobby.clouds) { cl.position.x += dt * 0.8; if (cl.position.x > 130) cl.position.x = -130; } faceClouds(lobby.clouds, lobby.cam); }
   // personaggio centrato nello spazio libero tra i pannelli (metri per pixel alla distanza della camera)
   const tab = menuApi ? menuApi.tab() : 'play';
   // con la squadra la camera si allontana un po' per inquadrare tutti
@@ -4627,6 +4687,8 @@ function update(dt) {
   G.warm = stoves.update(dt, camera, G.chars);
   updateEffects(dt);
   for (const cl of clouds) { cl.position.x += dt * 2; if (cl.position.x > 450) cl.position.x = -450; }
+  faceClouds(clouds, camera);
+  sky.material.uniforms.uTime.value += dt;
   updateCamera(dt);
   weather.update(dt, G.time, camera, renderer, true);
   updateHUD(dt);
@@ -4634,6 +4696,37 @@ function update(dt) {
 }
 
 const _menuStream = new THREE.Vector3(0, 0, 0);
+// ─────────────── v37: risoluzione dinamica ───────────────
+//  misura il tempo medio dei frame in partita: se il gioco scende sotto ~48 FPS abbassa la risoluzione
+//  a piccoli passi (fino al 55%), quando torna fluido la rialza piano. Ricorda il livello che faceva
+//  rallentare, così non oscilla avanti e indietro.
+let shadowTick = 0;
+const dynState = { k: 1, t0: 0, n: 0, sum: 0, prev: 0, ceil: 1, ceilT: 0, coolT: 0 };
+function dynResTick(now) {
+  const D = dynState;
+  const live = (G.state === 'play' || G.state === 'bus') && !G.paused && !document.hidden;
+  if (!settings.gfx.dynRes || !live) {
+    if (!settings.gfx.dynRes && D.k !== 1) { D.k = 1; gfx.setDyn(1); }
+    D.prev = 0; D.n = 0; D.sum = 0; return;
+  }
+  if (D.prev) { const ft = now - D.prev; if (ft < 250) { D.sum += ft; D.n++; } }
+  D.prev = now;
+  if (!D.t0) D.t0 = now;
+  if (now - D.t0 < 1500 || D.n < 20) return;
+  const avg = D.sum / D.n; D.t0 = now; D.n = 0; D.sum = 0;
+  const cap = settings.gfx.fpsCap;
+  const target = 1000 / Math.min(cap > 0 ? cap : 60, 60);
+  if (now < D.coolT) return;
+  if (now > D.ceilT) D.ceil = 1;   // dopo un minuto riprova anche i livelli più alti
+  if (avg > target * 1.25 && D.k > 0.55) {
+    D.ceil = Math.min(D.ceil, D.k - 0.05); D.ceilT = now + 60000;
+    D.k = Math.max(0.55, D.k - (avg > target * 1.8 ? 0.15 : 0.08));
+    gfx.setDyn(D.k); D.coolT = now + 1500;
+  } else if (avg < target * 1.08 && D.k < Math.min(1, D.ceil)) {
+    D.k = Math.min(1, D.ceil, D.k + 0.05);
+    gfx.setDyn(D.k); D.coolT = now + 4000;
+  }
+}
 let last = performance.now();
 const fpsEl = $('#fps');
 let fpsN = 0, fpsT = 0;
@@ -4648,7 +4741,7 @@ function frame(now) {
   last = now;
   if (settings.gfx.fpsShow) {
     fpsN++; fpsT += dt;
-    if (fpsT >= 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsT)} FPS · ${lastCalls} draw`; fpsN = 0; fpsT = 0; }
+    if (fpsT >= 0.5) { fpsEl.textContent = `${Math.round(fpsN / fpsT)} FPS · ${lastCalls} draw` + (dynState.k < 0.99 ? ` · ris. ${Math.round(dynState.k * 100)}%` : ''); fpsN = 0; fpsT = 0; }
   }
   world.update(G.state === 'menu' ? _menuStream : camera.position, G.state === 'menu' ? 8 : 5);
   if (G.player && G.player.alive && G.state === 'play') GRASS_PLAYER.value.copy(G.player.pos); else GRASS_PLAYER.value.set(0, -9999, 0);
@@ -4656,9 +4749,15 @@ function frame(now) {
   document.body.classList.toggle('playing', G.state === 'play' || G.state === 'bus');
   // telefono girato in verticale durante la partita: metti in pausa finché non torna orizzontale
   if (touch.T.on && (G.state === 'play' || G.state === 'bus') && !G.paused && !G.net && innerHeight > innerWidth * 1.1) togglePause(true);
-  if (G.state === 'menu') { renderLobby(dt); pressed.clear(); return; }
+  if (G.state === 'menu') { renderer.shadowMap.autoUpdate = true; renderLobby(dt); pressed.clear(); return; }
   if (!G.paused) update(dt);
+  // v37: le ombre del sole si ridisegnano a frame alterni (metà dei draw call per la mappa delle ombre);
+  //  la matrice delle ombre si aggiorna solo quando la mappa viene ridisegnata, quindi restano ferme e precise
+  shadowTick++;
+  const se = settings.gfx.shadows === 'ultra' ? 1 : (dynState.k < 0.8 ? 3 : 2);
+  renderer.shadowMap.autoUpdate = se <= 1 || shadowTick % se === 0;
   gfx.render(scene, camera);
+  dynResTick(now);
   pressed.clear();
   mouse.leftPressed = false;
 }

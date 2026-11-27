@@ -17,6 +17,7 @@ const SCHEMA = [
     { key: 'ao', gfx: true, type: 'toggle', label: 'Occlusione ambientale (GTAO)', hint: 'Ombre di contatto negli angoli e sotto gli oggetti. Pesante.' },
     { key: 'view', gfx: true, type: 'range', label: 'Distanza visiva', min: 0.6, max: 1.8, step: 0.05, fmt: pct, hint: 'Distanza della nebbia, del dettaglio di case e alberi.' },
     { key: 'grass', gfx: true, type: 'range', label: 'Densità erba', min: 0, max: 1.5, step: 0.05, fmt: v => v <= 0 ? 'Off' : pct(v), hint: 'L\'erba alta per nascondersi resta sempre visibile.' },
+    { key: 'dynRes', gfx: true, type: 'toggle', label: 'Risoluzione dinamica', hint: 'Se il gioco rallenta abbassa da sola la risoluzione per tenere gli FPS alti, poi la rialza.' },
     { key: 'fpsCap', gfx: true, type: 'select', label: 'Limite FPS', options: [[0, 'Illimitati'], [30, '30'], [60, '60'], [120, '120'], [144, '144']], num: true },
   ] },
   { id: 'ctrl', label: 'Controlli', items: [

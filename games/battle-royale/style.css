@@ -926,3 +926,6 @@ body.touch #spectate .spec-hint { display: none; }
   #spectate kbd { display: none; }
   #spectate .spec-hint { bottom: 6px; font-size: 10px; }
 }
+/* v37: terza modalità (1 contro 1) a tutta larghezza */
+.modes .mode:nth-child(3) { grid-column: span 2; }
+.teammodes.dim { opacity: .35; pointer-events: none; filter: grayscale(.6); }

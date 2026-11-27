@@ -4,10 +4,10 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=36';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=37';
 import { carInstances } from './cars.js?v=25';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial } from './props.js?v=36';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial } from './props.js?v=37';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -2094,7 +2094,6 @@ export function buildWorld(scene, opts = {}) {
     else if (wS > pick && wS > 0.2) t.k = r < 0.93 ? 'snowPine' : 'deadTree';
     else if (wT > pick && wT > 0.2) t.k = r < 0.62 ? 'palm' : (r < 0.85 ? 'oak' : 'birch');
     else if (wA > pick && wA > 0.2) t.k = r < 0.5 ? 'autumnOak' : (r < 0.78 ? 'autumnBirch' : (r < 0.95 ? 'pine' : 'deadTree'));
-    else if (t.rot > 1.7 && t.rot < (h < WATER_LEVEL + 4.5 ? 3.6 : 2.05)) t.k = 'willow';   // v36: salici piangenti, soprattutto vicino all'acqua
     else t.k = r < (h > 12 ? 0.8 : 0.5) ? 'pine' : (t.rot > 4.4 ? 'birch' : (t.rot < 0.55 ? 'autumnOak' : (t.rot < 0.9 ? 'autumnBirch' : 'oak')));
     if (h > 34 && t.k !== 'cactus') t.k = h > 42 || wS > 0.3 ? 'snowPine' : 'pine';
     t.pine = t.k === 'pine' || t.k === 'snowPine';
@@ -2457,7 +2456,7 @@ export function buildWorld(scene, opts = {}) {
     return geo;
   }
 
-  const LOD_TREE = { pine: ['#2b5c30', 2.6, 6, 4], oak: ['#417f30', 2.8, 6, 4.7], birch: ['#82b23a', 2.2, 5, 5.5], snowPine: ['#9fb3ad', 2.5, 6, 4], autumnOak: ['#b2321f', 2.8, 5, 4.7], autumnBirch: ['#d8722a', 2.4, 5, 5.2], palm: ['#4a9a40', 3.2, 1.2, 6.2], cactus: ['#4a9a38', 0.9, 5, 2.4], deadTree: ['#6b5a4a', 0.6, 3.5, 1.8], willow: ['#9cb836', 3.2, 5, 4.9] };
+  const LOD_TREE = { pine: ['#2b5c30', 2.6, 6, 4], oak: ['#417f30', 2.8, 6, 4.7], birch: ['#82b23a', 2.2, 5, 5.5], snowPine: ['#9fb3ad', 2.5, 6, 4], autumnOak: ['#b2321f', 2.8, 5, 4.7], autumnBirch: ['#d8722a', 2.4, 5, 5.2], palm: ['#4a9a40', 3.2, 1.2, 6.2], cactus: ['#4a9a38', 0.9, 5, 2.4], deadTree: ['#6b5a4a', 0.6, 3.5, 1.8] };
   function buildLod(ch) {
     const group = new THREE.Group();
     const t = new THREE.Mesh(terrainGeo(ch, LSEG, 0.35), lodMat);

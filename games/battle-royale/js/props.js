@@ -577,45 +577,6 @@ function makeCactusLow() {
     part(new THREE.BoxGeometry(0.46, 1.6, 0.46), '#55a63e', { x: -0.9, y: 3.3, z: -0.32 }),
   ], 515);
 }
-/** v36: salice piangente: tronco arancio curvo, chioma giallo-verde e una tenda di rami penduli */
-function makeWillow() {
-  const bark = '#b8743a', parts = [];
-  let pts = [], rad = [];
-  for (let i = 0; i <= 10; i++) { const t = i / 10, y = -0.3 + t * 4.0; pts.push(new THREE.Vector3(Math.sin(t * 2.2) * 0.35, y, Math.sin(t * 1.3) * 0.12)); rad.push(0.55 - t * 0.2 + (i === 0 ? 0.12 : 0)); }
-  parts.push(part(ribTube(pts, rad, { seg: 9 }), bark, { jit: 0.1 }));
-  for (const [a, len, lift] of [[0.4, 2.2, 0.9], [2.0, 2.0, 1.0], [3.4, 2.3, 0.8], [4.9, 1.9, 1.1]]) {
-    const top = pts[pts.length - 1], b = [], br = [];
-    for (let k = 0; k <= 6; k++) { const t = k / 6; b.push(new THREE.Vector3(top.x * 0.9 + Math.cos(a) * len * t, 3.4 + lift * len * t * (1.2 - 0.5 * t), top.z * 0.9 + Math.sin(a) * len * t)); br.push(0.22 - t * 0.15); }
-    parts.push(part(ribTube(b, br, { seg: 6 }), bark, { jit: 0.1 }));
-  }
-  const B = leafBuf();
-  const pal = ['#a8c83a', '#bcd64a', '#94b830', '#c8dc5a'];
-  leafCanopy(B, { seed: 909, blobs: [[0, 6.3, 0, 2.0], [1.55, 5.75, 0.4, 1.45], [-1.45, 5.85, -0.4, 1.5], [0.4, 5.8, 1.55, 1.4], [-0.4, 5.7, -1.5, 1.4], [0.1, 7.3, 0, 1.3]], center: [0, 6.0, 0], palette: pal, deep: '#4a6418', top: '#f0f590', topK: 0.35, card: 1.7 });
-  // tenda di rami penduli tutto intorno
-  const rnd = mulberry32(919), palC = pal.map((c) => new THREE.Color(c));
-  for (let k = 0; k < 110; k++) {
-    const a = rnd() * 6.2832, R = 1.3 + Math.sqrt(rnd()) * 2.3;
-    const yTop = Math.max(4.7, 7.0 - 0.27 * R * R), len = 2.4 + rnd() * 1.7, bottom = Math.max(1.3, yTop - len), L = yTop - bottom;
-    const out = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
-    const ctr = new THREE.Vector3(out.x * R, (yTop + bottom) / 2, out.z * R);
-    const Vt = new THREE.Vector3(-out.x * 0.16, 1, -out.z * 0.16).normalize().multiplyScalar(L / 2);
-    const yaw = (rnd() - 0.5) * 1.0;
-    const Ua = new THREE.Vector3(-Math.sin(a + yaw), 0, Math.cos(a + yaw)).multiplyScalar(0.32 + rnd() * 0.12);
-    const base = palC[Math.floor(rnd() * palC.length)].clone().multiplyScalar(0.9 + rnd() * 0.18);
-    const kR = 0.62 + 0.38 * (R - 1.3) / 2.3;
-    leafCard(B, ctr, Ua, Vt, 4,
-      () => new THREE.Vector3(out.x, 0.35, out.z).normalize(),
-      (p) => _cA.copy(base).multiplyScalar(kR * (0.82 + 0.25 * (1 - (p.y - bottom) / L))).clone());
-  }
-  return { wood: mergeParts(parts, 919), leaf: B.build() };
-}
-function makeWillowLow() {
-  return mergeParts([
-    part(new THREE.CylinderGeometry(0.3, 0.5, 4.0, 5, 1, true), '#b8743a', { y: 1.8 }),
-    part(new THREE.IcosahedronGeometry(2.6, 0), '#9cb836', { y: 6.0, sy: 0.75, jit: 0.12 }),
-    part(new THREE.CylinderGeometry(3.0, 3.5, 3.4, 8, 1, true), '#8eaa30', { y: 3.9, jit: 0.12 }),
-  ], 929);
-}
 function makeDeadTree() {
   const c = '#6b5a4a', parts = trunkParts(3.6, 0.32, 0.14, c, 0.05);
   const br = [[0.6, 2.4, 0, -0.9, 1.6], [-0.55, 2.9, 0.2, 0.85, 1.5], [0.2, 3.3, -0.5, 0.6, 1.3], [-0.1, 3.7, 0.45, -0.5, 1.1], [0.45, 3.9, 0.1, -0.35, 0.9]];
@@ -1210,7 +1171,7 @@ function makeShed() {
 
 // ═════════════ catalogo ═════════════
 // v35: gli alberi a foglie hanno due geometrie: legno (materiale degli alberi) e fogliame (LEAVES, materiale delle foglie)
-const LEAFY = { pine: makePine(), oak: makeOak(), birch: makeBirch(), snowPine: makeSnowPine(), autumnOak: makeAutumnOak(), autumnBirch: makeAutumnBirch(), willow: makeWillow() };
+const LEAFY = { pine: makePine(), oak: makeOak(), birch: makeBirch(), snowPine: makeSnowPine(), autumnOak: makeAutumnOak(), autumnBirch: makeAutumnBirch() };
 const BUSHES = [makeBush(401), makeBush(433, null, ['#5aa83c', '#68b844', '#78c64c', '#509c38']), makeBush(467, ['#f2f2f2', '#ffe066']), makeBush(491, ['#e86fa8', '#c77dff'], ['#418a34', '#4e9a3c', '#5aa844', '#3c8031'])];
 export const LEAVES = { bushes: BUSHES.map((b) => b.leaf) };
 for (const [k, t] of Object.entries(LEAFY)) LEAVES[k] = t.leaf;
@@ -1219,7 +1180,7 @@ export const PROPS = {
   pineLow: makePineLow(), oakLow: makeOakLow(), birchLow: makeBirchLow(),
   snowPine: LEAFY.snowPine.wood, snowPineLow: makeSnowPineLow(), autumnOak: LEAFY.autumnOak.wood, autumnOakLow: makeAutumnOakLow(),
   autumnBirch: LEAFY.autumnBirch.wood, autumnBirchLow: makeAutumnBirchLow(), palm: makePalm(), palmLow: makePalmLow(),
-  cactus: makeCactus(), cactusLow: makeCactusLow(), willow: LEAFY.willow.wood, willowLow: makeWillowLow(), deadTree: makeDeadTree(), deadTreeLow: makeDeadTreeLow(),
+  cactus: makeCactus(), cactusLow: makeCactusLow(), deadTree: makeDeadTree(), deadTreeLow: makeDeadTreeLow(),
   rocks: [makeRock(5, 0), makeRock(17, 0), makeRock(29, 1), makeRock(41, 2), makeRock(53, 3)],
   pebbles: makePebbles(),
   bushes: BUSHES.map((b) => b.wood),
@@ -1232,7 +1193,7 @@ export const PROPS = {
 };
 // dimensioni di riferimento (per i collisori)
 /** tutti i tipi di albero (ognuno ha anche la versione Low) */
-export const TREE_KINDS = ['pine', 'oak', 'birch', 'snowPine', 'autumnOak', 'autumnBirch', 'palm', 'cactus', 'deadTree', 'willow'];
+export const TREE_KINDS = ['pine', 'oak', 'birch', 'snowPine', 'autumnOak', 'autumnBirch', 'palm', 'cactus', 'deadTree'];
 export const PROP_DIMS = {
   logs: { w: 2.35, h: 1.2, d: 1.75 },
   bricks: { w: 1.25, h: 0.75, d: 1.05 },

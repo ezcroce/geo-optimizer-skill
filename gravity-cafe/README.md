@@ -179,3 +179,12 @@ La navigazione in 0G è tridimensionale a sei gradi di libertà, ma le collision
 ### Reference alieno / astronauta
 
 La revisione `grey-alien-eva-v1` interpreta le reference fornite con asset procedurali originali: cranio alieno più ampio sulle tempie, mento affusolato, occhi scuri a mandorla, rilievi frontali; tuta pressurizzata avorio con pieghe scolpite, zaino, pannello toracico, raccordi e tubi d'ossigeno. L'archetipo astronauta indossa un casco completo con guarnizione e visiera scura. Nessuna foto, filigrana o insegna NASA viene incorporata. Il barista conserva grembiule e identità. `scripts/reference-details.mjs` genera equipaggiamento e volume della tuta; accessori e visiera seguono il rig e il pooling.
+
+### Pubblicazione Vercel
+
+- URL produzione: https://gravity-cafe-five.vercel.app
+- Progetto: `gravity-cafe` (team `acme-6428`).
+- Release del gioco: commit `72bdd89cf23c5af571820110373fe48ee0b5baab`.
+- Deployment riuscito: `dpl_6f2w4KZhRdrsiNRZR3ngdfnQ2e3X` (`READY`, alias assegnato; pagina pubblica verificata).
+
+Poiché il collegamento Vercel–GitHub non era configurato, il deployment usa un piccolo bootstrap di testo, non asset binari inline: scarica l'archivio pubblico del commit esatto da GitHub, esegue `npm ci` e la build Vite nel sottoprogetto, quindi pubblica solo `dist/`. Modello riutilizzabile: `scripts/vercel-source-build.mjs`. Nel payload del connector il bootstrap è salvato come `gravity-cafe/deploy.mjs`, rispettando la Root Directory del progetto. Comandi per **quel payload**: installazione `node deploy.mjs install`, build `node deploy.mjs build`, output `dist`. Aggiornare lo SHA di release per le pubblicazioni successive. Per tornare al deploy Git diretto, collegare GitHub e ripristinare `npm ci` / `npm run build` con root `gravity-cafe`.

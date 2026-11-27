@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Gravity Coffee — Cosmic Barista Simulator</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="hud-top">
+    <div class="hud-box" id="hud-credits">💰 <span>0</span> Cr</div>
+    <div class="hud-box" id="hud-rep">⭐ <span>3.0</span></div>
+    <div class="hud-box" id="hud-day">☀️ Giorno <span>1</span></div>
+    <div class="hud-box" id="hud-served">☕ <span>0</span> serviti</div>
+    <div class="hud-box combo" id="hud-combo">🔥 Combo x<span>0</span></div>
+    <div class="hud-box" id="hud-barista">👽 Alieno</div>
+  </div>
+  <div id="hud-goal">Obiettivo: <span id="goal-text">Servi 5 clienti</span> — <span id="goal-progress">0/5</span></div>
+</div>
+
+<!-- Orders -->
+<div id="orders-panel" class="hidden">
+  <div class="panel-title">📋 ORDINI</div>
+  <div id="orders-list"></div>
+</div>
+
+<!-- Recipe book -->
+<div id="recipe-panel" class="hidden">
+  <div class="panel-title">📖 RICETTARIO COSMICO <button id="recipe-close">✕</button></div>
+  <div id="recipe-list"></div>
+</div>
+
+<!-- Bottom bar -->
+<div id="bottom-bar" class="hidden">
+  <div id="ingredients-bar"></div>
+  <div id="action-bar">
+    <button id="btn-brew" class="action-btn primary">☕ Prepara</button>
+    <button id="btn-anchor" class="action-btn">🧲 Ancora: ON</button>
+    <button id="btn-switch" class="action-btn">🔄 Cambia Barista [TAB]</button>
+    <button id="btn-recipes" class="action-btn">📖 Ricette</button>
+    <button id="btn-help" class="action-btn">❓</button>
+    <button id="btn-sound" class="action-btn">🔊</button>
+  </div>
+  <div id="current-drink">Tazza vuota — seleziona ingredienti e premi Prepara</div>
+  <!-- Timing minigame -->
+  <div id="timing-game" class="hidden">
+    <div class="timing-label">⏱️ Premi SPAZIO / CLICCA nella zona verde!</div>
+    <div id="timing-track">
+      <div id="timing-zone"></div>
+      <div id="timing-perfect"></div>
+      <div id="timing-needle"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden"></div>
+
+<!-- Start screen -->
+<div id="start-screen">
+  <div class="start-card">
+    <div class="logo">☕✨</div>
+    <h1>GRAVITY COFFEE</h1>
+    <p class="subtitle">Cosmic Barista Simulator</p>
+    <p class="lore">Stazione <b>Orbita-7</b> · Microgravità · Anomalie magiche<br>
+    Servi il caffè più raro dell'universo a clienti alieni bizzarri.<br>
+    Gestisci il bancone con <b>l'Alieno Organico</b> e <b>l'Astronauta</b>.</p>
+    <div class="howto">
+      <div>🖱️ <b>Trascina</b> per ruotare · <b>Rotella</b> per zoom</div>
+      <div>👆 <b>Clicca</b> ingredienti, tazze e clienti</div>
+      <div>⏱️ Timing perfetto = mancia extra</div>
+      <div>🧲 Ancora magnetica = oggetti stabili</div>
+      <div>🔄 <b>TAB</b> = cambia barista (Alieno: timing facile · Astronauta: +mance)</div>
+    </div>
+    <button id="btn-start" class="big-btn">🚀 INIZIA IL TURNO</button>
+    <div class="start-foot">Three.js WebGL · PBR · Zero-G Physics</div>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div id="help-modal" class="modal hidden">
+  <div class="modal-card">
+    <h2>❓ Come si gioca</h2>
+    <p>1. Leggi l'ordine del cliente (icona sopra la testa).</p>
+    <p>2. Clicca gli ingredienti in basso per aggiungerli alla tazza (max 3).</p>
+    <p>3. Premi <b>Prepara</b> e ferma l'ago nella zona verde.</p>
+    <p>4. Clicca il cliente per servirlo. Veloce = più crediti!</p>
+    <p>5. Completa l'obiettivo per passare al giorno dopo.</p>
+    <p>💡 Alieno: zona verde più ampia. Astronauta: +25% mance.</p>
+    <p>🧲 Con ancora ON gli oggetti fluttuano poco; OFF fluttuano liberi (più rischioso ma +10% crediti).</p>
+    <button id="btn-help-close" class="big-btn small">CHIUDI</button>
+  </div>
+</div>
+
+<!-- Day summary -->
+<div id="summary-modal" class="modal hidden">
+  <div class="modal-card">
+    <h2 id="summary-title">🌙 Fine turno</h2>
+    <div id="summary-body"></div>
+    <button id="btn-next-day" class="big-btn small">☀️ GIORNO SUCCESSIVO</button>
+  </div>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>

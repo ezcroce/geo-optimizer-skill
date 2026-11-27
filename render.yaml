@@ -1,26 +1,14 @@
-# Render Blueprint — configurazione dichiarativa per deploy automatico
-# NOTA: deploy principale su server dedicato OVH. Render e' un'alternativa.
-# Docs: https://docs.render.com/blueprint-spec
-#
-# Per collegare: Dashboard → New → Blueprint → seleziona repo GitHub
-# Render legge questo file e crea i servizi automaticamente.
-
+# Distribuzione del sito e del server WebSocket sulla stessa origine.
 services:
   - type: web
-    name: geo-optimizer-web
-    runtime: docker
-    dockerfilePath: ./Dockerfile.web
+    name: infinite-alibi
+    runtime: node
     plan: free
-    region: frankfurt  # EU — più vicino a noi
-    healthCheckPath: /health
+    region: frankfurt
+    buildCommand: npm ci --prefix games/infinite-alibi
+    startCommand: node games/infinite-alibi/server/server.js
+    healthCheckPath: /healthz
+    autoDeployTrigger: off
     envVars:
-      - key: PORT
-        value: "8000"
-      - key: PYTHONDONTWRITEBYTECODE
-        value: "1"
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: GEO_STATS_API_URL
-        value: "https://agencypilot.it/api/geo-stats"
-      - key: GEO_STATS_API_KEY
-        sync: false  # da impostare manualmente nella dashboard Render
+      - key: NODE_VERSION
+        value: 22.22.3

@@ -45,6 +45,14 @@ function client(url) {
   try {
     assert.strictEqual(await getStatus('/'), 200);
     assert.strictEqual(await getStatus('/js/world.js'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi/index.html'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi/js/world.js'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi-tactical/index.html'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi-tactical/js/game.js'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi-tactical/tests/tactical.test.js'), 404);
+    assert.strictEqual(await getStatus('/infinite-alibi/server/server.js'), 404);
+    assert.strictEqual(await getStatus('/infinite-alibi-tactical/%2e%2e/infinite-alibi/server/server.js'), 404);
+    assert.strictEqual(await getStatus('/%zz'), 400);
     assert.strictEqual(await getStatus('/server/server.js'), 404);
     assert.strictEqual(await getStatus('/../../etc/passwd'), 404);
     step('file statici serviti, sorgenti del server e path traversal bloccati');

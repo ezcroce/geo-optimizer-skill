@@ -166,6 +166,7 @@
     S.playing = true;
     setSide(`<h2>Infinite Alibi</h2><p>Il filmato di sfondo è un caso dimostrativo. Scegli una modalità per iniziare.</p>`);
     openModal(`
+      <a class="site-menu-link" href="../index.html">← Tutti i giochi</a>
       <h1>INFINITE <b>ALIBI</b></h1>
       <p class="tagline">Deduzione sociale in 3 minuti. Il Colpevole monta i filmati di sorveglianza. Voi trovate il trucco.</p>
       <div class="modes">

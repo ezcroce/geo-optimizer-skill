@@ -142,3 +142,7 @@ a.button.primary { background: var(--amber); color: #111; border-color: var(--am
 .room-code { font-family: var(--mono); color: var(--amber); letter-spacing: 4px; background: #0b1016; padding: 2px 10px; border-radius: 8px; border: 1px solid var(--line); }
 #sayForm input { flex: 1; }
 #sayForm button { flex: 0 0 auto; }
+
+.site-home { display: inline-flex; align-items: center; text-decoration: none; padding: 0 10px; }
+
+.site-menu-link { display:inline-block; color:#a8bac2; font-size:12px; margin-bottom:12px; text-decoration:none; } .site-menu-link:hover { color:var(--amber); }

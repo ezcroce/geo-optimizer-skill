@@ -4,7 +4,7 @@ Prototipo giocabile di un gioco di deduzione sociale da circa 3 minuti. Il **Col
 filmati di sorveglianza di una villa (taglia e cuci, deepfake, glitch). Gli **investigatori** cercano
 i micro-indizi che ogni trucco lascia: timestamp incoerenti, continuità spaziale, ombre e oggetti.
 
-Il design e i numeri di bilanciamento sono in [DESIGN.md](DESIGN.md).
+Il design e i numeri di bilanciamento sono in [DESIGN.md](DESIGN.md). La [pagina dei giochi](../index.html) riunisce questo prototipo e Tactical Heist.
 
 ## Avvio
 
@@ -21,7 +21,7 @@ Per giocare **online** serve il server Node (≥ 18):
 ```bash
 cd games/infinite-alibi
 npm install
-npm start                     # http://localhost:8080, WebSocket su /ws (PORT=… per cambiarla)
+npm start                     # sito su http://localhost:8080, WebSocket su /ws (PORT=… per cambiarla)
 ```
 
 Ognuno apre l'indirizzo del server, sceglie **🌐 Online**, e uno crea la stanza e condivide il codice.

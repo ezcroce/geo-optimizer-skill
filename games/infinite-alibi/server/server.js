@@ -31,11 +31,27 @@ const REVEAL_PAUSE = Number(process.env.REVEAL_PAUSE || 4); // secondi per guard
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.md': 'text/markdown; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 function serveStatic(req, res) {
-  let url = decodeURIComponent((req.url || '/').split('?')[0]);
-  if (url === '/') url = '/index.html';
+  let url;
+  try { url = decodeURIComponent((req.url || '/').split('?')[0]); }
+  catch (_) { res.writeHead(400); res.end('bad request'); return; }
   if (url === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('ok'); return; }
-  const file = path.resolve(ROOT, '.' + url);
-  const rel = path.relative(ROOT, file);
+  // La homepage e i due giochi condividono la stessa origine, incluso /ws.
+  const GAMES = path.resolve(ROOT, '..');
+  if (url === '/infinite-alibi' || url === '/infinite-alibi-tactical') {
+    res.writeHead(302, { location: url + '/' }); res.end(); return;
+  }
+  let root, relative;
+  if (url === '/' || url === '/index.html') { root = GAMES; relative = 'index.html'; }
+  else if (url.startsWith('/infinite-alibi-tactical/')) {
+    root = path.join(GAMES, 'infinite-alibi-tactical');
+    relative = url.slice('/infinite-alibi-tactical/'.length) || 'index.html';
+  } else if (url.startsWith('/infinite-alibi/')) {
+    root = ROOT; relative = url.slice('/infinite-alibi/'.length) || 'index.html';
+  } else { // compatibilità con gli URL precedenti del gioco originale
+    root = ROOT; relative = url.slice(1);
+  }
+  const file = path.resolve(root, relative);
+  const rel = path.relative(root, file);
   if (rel.startsWith('..') || path.isAbsolute(rel) || /^(server|node_modules|tests)([\\/]|$)/.test(rel) || rel.startsWith('package')) {
     res.writeHead(404); res.end('not found'); return;
   }

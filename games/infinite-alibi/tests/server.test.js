@@ -47,6 +47,9 @@ function client(url) {
     assert.strictEqual(await getStatus('/js/world.js'), 200);
     assert.strictEqual(await getStatus('/infinite-alibi/index.html'), 200);
     assert.strictEqual(await getStatus('/infinite-alibi/js/world.js'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi-heist/index.html'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi-heist/js/engine.js'), 200);
+    assert.strictEqual(await getStatus('/infinite-alibi-heist/tests/heist.test.js'), 404);
     assert.strictEqual(await getStatus('/infinite-alibi-tactical/index.html'), 200);
     assert.strictEqual(await getStatus('/infinite-alibi-tactical/js/game.js'), 200);
     assert.strictEqual(await getStatus('/infinite-alibi-tactical/tests/tactical.test.js'), 404);

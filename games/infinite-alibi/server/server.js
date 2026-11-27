@@ -37,12 +37,15 @@ function serveStatic(req, res) {
   if (url === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('ok'); return; }
   // La homepage e i due giochi condividono la stessa origine, incluso /ws.
   const GAMES = path.resolve(ROOT, '..');
-  if (url === '/infinite-alibi' || url === '/infinite-alibi-tactical') {
+  if (url === '/infinite-alibi' || url === '/infinite-alibi-tactical' || url === '/infinite-alibi-heist') {
     res.writeHead(302, { location: url + '/' }); res.end(); return;
   }
   let root, relative;
   if (url === '/' || url === '/index.html') { root = GAMES; relative = 'index.html'; }
-  else if (url.startsWith('/infinite-alibi-tactical/')) {
+  else if (url.startsWith('/infinite-alibi-heist/')) {
+    root = path.join(GAMES, 'infinite-alibi-heist');
+    relative = url.slice('/infinite-alibi-heist/'.length) || 'index.html';
+  } else if (url.startsWith('/infinite-alibi-tactical/')) {
     root = path.join(GAMES, 'infinite-alibi-tactical');
     relative = url.slice('/infinite-alibi-tactical/'.length) || 'index.html';
   } else if (url.startsWith('/infinite-alibi/')) {

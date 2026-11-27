@@ -1,6 +1,6 @@
 # Infinite Alibi — sito dei giochi
 
-La pagina `index.html` raccoglie i due prototipi: **Tactical Heist** e **Infinite Alibi** (telecamere). Per usare entrambi in Chrome, compresa la modalità online del gioco originale, avvia il server Node:
+La pagina `index.html` raccoglie **The Heist** in tempo reale, **Infinite Alibi** (telecamere) e il precedente prototipo **Tactical Heist** a turni. Per usare entrambi in Chrome, compresa la modalità online del gioco originale, avvia il server Node:
 
 ```bash
 cd games/infinite-alibi
@@ -8,7 +8,7 @@ npm install
 npm start
 ```
 
-Apri **http://localhost:8080** in Chrome. Il server offre la homepage, entrambi i giochi e il WebSocket `/ws` dalla stessa porta. Per giocare online, gli altri partecipanti devono poter raggiungere l'indirizzo del computer che ospita il server (non il loro `localhost`); l'accessibilità dipende dalla rete e dalla configurazione del firewall. `PORT=...` cambia porta.
+Apri **http://localhost:8080** in Chrome. Il server offre la homepage, tutti i giochi e il WebSocket `/ws` dalla stessa porta. Per giocare online, gli altri partecipanti devono poter raggiungere l'indirizzo del computer che ospita il server (non il loro `localhost`); l'accessibilità dipende dalla rete e dalla configurazione del firewall. `PORT=...` cambia porta.
 
 Per giocare solo in locale è anche possibile aprire `games/index.html` direttamente in Chrome; la modalità online del gioco originale richiede comunque il server. Tactical Heist è un prototipo cooperativo sullo stesso dispositivo, non online. Le istruzioni specifiche sono nei README delle due cartelle.
 

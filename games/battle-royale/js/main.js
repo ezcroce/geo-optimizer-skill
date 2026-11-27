@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=41';
+import { EMOTES, poseEmote } from './emotes.js?v=42';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=41';
-import * as PR from './progress.js?v=41';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=41';
-import { initMenu } from './menu.js?v=41';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=41';
-import { initSettingsUI } from './settings-ui.js?v=41';
+} from './config.js?v=42';
+import * as PR from './progress.js?v=42';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=42';
+import { initMenu } from './menu.js?v=42';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=42';
+import { initSettingsUI } from './settings-ui.js?v=42';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=41';
+import * as A from './audio.js?v=42';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=41';
+} from './world.js?v=42';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=41';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=41';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=41';
-import { buildChestMesh } from './models3d.js?v=41';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=41';
-import { createInventory } from './inventory.js?v=41';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=41';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=41';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=42';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=42';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=42';
+import { buildChestMesh } from './models3d.js?v=42';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=42';
+import { createInventory } from './inventory.js?v=42';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=42';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=42';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=41';
-import { buildPickaxe, heldConsumable } from './held.js?v=41';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=41';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=41';
-import { createCrosshair } from './crosshair.js?v=41';
-import { createThrowables, buildThrowMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE } from './throwables.js?v=41';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=41';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=42';
+import { buildPickaxe, heldConsumable } from './held.js?v=42';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=42';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=42';
+import { createCrosshair } from './crosshair.js?v=42';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=42';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=42';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -119,6 +119,8 @@ sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.05;
 scene.add(sun, sun.target);
 const SUN_OFF = new THREE.Vector3(70, 130, 45);
+// v42: assi della camera delle ombre (guarda lungo -SUN_OFF con l'alto = +Y) per agganciare il centro ai texel
+const SUN_AZ = SUN_OFF.clone().normalize(), SUN_AX = new THREE.Vector3(0, 1, 0).cross(SUN_AZ).normalize(), SUN_AY = SUN_AZ.clone().cross(SUN_AX), _sunF = new THREE.Vector3();
 const flashLight = new THREE.PointLight('#ffb050', 0, 30, 2);
 scene.add(flashLight);
 
@@ -243,8 +245,8 @@ for (let i = 0; i < PMAX; i++) {
   particleMesh.setColorAt(i, _col.set('#ffffff'));
 }
 let pIdx = 0;
-function emit(pos, color, n = 6, speed = 4, life = 0.5, size = 0.12, g = 1) {
-  _col.set(color);
+function emit(pos, color, n = 6, speed = 4, life = 0.5, size = 0.12, g = 1, hdr = 1) {
+  _col.set(color); if (hdr !== 1) _col.multiplyScalar(hdr);   // v42: hdr > 1 → scintille che col bloom brillano
   for (let k = 0; k < n; k++) {
     pIdx = (pIdx + 1) % PMAX;
     const p = P[pIdx];
@@ -321,7 +323,29 @@ const booms = [];
   }
 }
 let bIdx = 0;
+// v42: lampo dei colpi critici (in HDR, sommato: col bloom fa un piccolo bagliore dorato)
+const crits = [];
+{
+  const cg = new THREE.IcosahedronGeometry(0.16, 1);
+  for (let i = 0; i < 6; i++) {
+    const m = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 4.6, 2.2), transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.visible = false; m.renderOrder = 5; scene.add(m);
+    crits.push({ m, life: 0 });
+  }
+}
+let cIdx = 0;
+function critFlash(pos) {
+  const f = crits[cIdx = (cIdx + 1) % crits.length];
+  f.m.position.copy(pos); f.life = 0.16; f.m.visible = true;
+  emit(pos, '#ffe28a', 7, 4.5, 0.25, 0.05, 0.1);
+  if (pos.distanceTo(camera.position) < 60) gfx.kick(0.55);
+}
 function updateEffects(dt) {
+  for (const f of crits) if (f.life > 0) {
+    f.life -= dt; const k = 1 - f.life / 0.16;
+    f.m.scale.setScalar(0.6 + k * 2.2); f.m.material.opacity = (1 - k) ** 1.5;
+    if (f.life <= 0) f.m.visible = false;
+  }
   for (const t of tracers) if (t.life > 0) { t.life -= dt; t.m.material.opacity = Math.max(0, t.life / t.max) * t.op; if (t.life <= 0) t.m.visible = false; }
   for (const f of flashes) if (f.life > 0) { f.life -= dt; if (f.life <= 0) f.m.visible = false; }
   for (const b of booms) if (b.life > 0) {
@@ -330,6 +354,7 @@ function updateEffects(dt) {
     b.m.scale.setScalar(b.r * (0.3 + k * 1.1));
     b.m.material.opacity = Math.max(0, 1 - k) * 0.9;
     if (b.blue) b.m.material.color.setHSL(0.55, 1, 0.65 - k * 0.2); else b.m.material.color.setHSL(0.08 - k * 0.06, 1, 0.6 - k * 0.3);
+    b.m.material.color.multiplyScalar(1 + 5 * (1 - k) ** 3);   // v42: palla di fuoco in HDR: col bloom brilla davvero
     if (b.life <= 0) { b.m.visible = false; b.blue = false; }
   }
   if (flashLight.intensity > 0) flashLight.intensity = Math.max(0, flashLight.intensity - dt * 200);
@@ -350,6 +375,7 @@ const G = {
 const SLOT_COUNT = 5;
 const GRAVITY = 22;
 const JUMP_V = 7.8;
+const JUMP_STAMINA = 7;   // v42
 const CHAR_R = 0.4, CHAR_H = 1.85;
 const BODY = [[0.45, 0.33], [0.95, 0.36], [1.35, 0.36]];
 
@@ -373,17 +399,18 @@ class Character {
     this.kills = 0; this.walkPhase = 0; this.moveAmt = 0; this.deadT = 0;
     this.glider = null; this.heldKey = ''; this.bloom = 0;
     this.damageDealt = 0;
-    this.throws = { frag: 0, smoke: 0, impulse: 0 }; this.throwSel = 'frag'; this.throwCd = 0; this.throwAnim = 0;   // v41
+    this.throws = { frag: 0, smoke: 0, impulse: 0, pad: 0, trap: 0 }; this.throwSel = 'frag'; this.throwCd = 0; this.throwAnim = 0;   // v41
     this.st = { shots: 0, hits: 0, heads: 0, healed: 0, built: 0, dist: 0, taken: 0, maxKillD: 0 };   // v41: statistiche
     this.crouch = false; this.crouchK = 0;           // abbassarsi
     this.stamina = 100; this.climbDir = new THREE.Vector3(); this.climbPhase = 0; this.mantle = null; // arrampicata
     this.equipT = 0; this.landT = 0;                  // animazioni
+    this.slide = null; this.slideCd = 0; this.slideK = 0; this.vault = null; this.hopN = 0; this.landAt = -9;   // v42: scivolata, scavalco, salti di fila
     this.m.root.visible = false;
     this.updateHeld();
   }
   get slot() { return this.slots[this.active]; }
   get weapon() { const s = this.slot; return s && s.kind === 'weapon' ? s : null; }
-  get hScale() { return 1 - 0.27 * this.crouchK; }
+  get hScale() { return Math.min(1 - 0.27 * this.crouchK, 1 - 0.42 * this.slideK); }   // v42: in scivolata la sagoma è bassa
   chest(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + 1.35 * this.hScale, this.pos.z); }
   eye(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + 1.65 * this.hScale, this.pos.z); }
   updateHeld() {
@@ -519,6 +546,124 @@ function updateClimb(ch, dt, up, down, jump) {
   }
 }
 
+// ─────────────── v42: scavalco automatico e scivolata ───────────────
+const _vq = new THREE.Vector3(), _vt = new THREE.Vector3();
+/**
+ * Scavalca (o sale sopra) un ostacolo basso davanti: muretti, staccionate, casse, gradoni del Colosseo.
+ * maxRel = quanto può essere alto il bordo sopra i piedi (in corsa 1,25 m, con SPAZIO 1,75 m, in volo 2,3 m).
+ * Se dietro il bordo c'è il vuoto (muro sottile) lo supera e ricade dall'altra parte mantenendo lo slancio.
+ */
+function tryVault(ch, dir, maxRel) {
+  if (ch.vault || ch.mode !== 'ground' || ch.inWater || ch.using) return false;
+  let hit = null;
+  for (const h of [0.35, 0.8, 1.3]) {
+    if (h > maxRel + 0.1) break;
+    _co.set(ch.pos.x, ch.pos.y + h, ch.pos.z);
+    const r = rayColliders(_co, dir, CHAR_R + 0.6);
+    if (r) { if (r.collider.tree || r.collider.type === 'ramp' || r.collider.noStand) return false; hit = r; break; }
+  }
+  if (!hit) return false;
+  const t = hit.t;
+  const px = ch.pos.x + dir.x * (t + 0.3), pz = ch.pos.z + dir.z * (t + 0.3);
+  const top = groundAt(px, pz, ch.pos.y + maxRel + 0.05, 0.1);
+  const rel = top - ch.pos.y;
+  if (rel < 0.45 || rel > maxRel) return false;
+  // sopra il bordo deve esserci spazio per passare (niente finestre basse o soffitti)
+  _co.set(px, top + 0.05, pz);
+  if (rayColliders(_co, _up, 1.25)) return false;
+  _co.set(ch.pos.x, top + 0.3, ch.pos.z);
+  if (rayColliders(_co, dir, t + 0.55)) return false;
+  // muro sottile (dietro c'è il vuoto) o ripiano su cui salire?
+  const qx = ch.pos.x + dir.x * (t + 1.05), qz = ch.pos.z + dir.z * (t + 1.05);
+  const beyond = groundAt(qx, qz, top + 0.3, 0.1);
+  const over = beyond < top - 0.5 && rel < 1.6;
+  if (over) { _co.set(px, top + 0.3, pz); if (rayColliders(_co, dir, 1.0)) return false; }
+  const to = over ? new THREE.Vector3(qx + dir.x * 0.15, top + 0.12, qz + dir.z * 0.15) : new THREE.Vector3(px + dir.x * 0.2, top, pz + dir.z * 0.2);
+  // il punto d'arrivo dev'essere libero
+  _vt.copy(to); resolveCollisions(_vt, CHAR_R, CHAR_H);
+  if (Math.hypot(_vt.x - to.x, _vt.z - to.z) > 0.2) return false;
+  if (!over && ceilingAt(to.x, to.z, to.y, CHAR_H, CHAR_R) < to.y + CHAR_H) return false;
+  const sp = Math.max(ch.moveAmt, 3.5);
+  ch.vault = { t: 0, dur: (0.2 + rel * 0.16) * (ch.onGround ? 1 : 1.15), from: ch.pos.clone(), to, over, top, sp: over ? Math.max(sp, 4.8) : sp, dx: dir.x, dz: dir.z, side: Math.random() < 0.5 ? -1 : 1 };
+  ch.slide = null; ch.crouch = false; ch.emote = null; ch.vel.set(0, 0, 0);
+  ch.stamina = Math.max(0, ch.stamina - 4); ch.tireT = Math.max(ch.tireT || 0, 0.3);
+  ch.yaw = ch.isPlayer ? ch.yaw : Math.atan2(dir.x, dir.z);
+  const d = ch.pos.distanceTo(camera.position);
+  if (d < 35) A.playVault(ch.isPlayer ? 0 : d);
+  if (ch.isPlayer) { G.matchStats.vaults = (G.matchStats.vaults || 0) + 1; touch.buzz(8); }
+  return true;
+}
+function updateVault(ch, dt) {
+  const V = ch.vault;
+  V.t = Math.min(1, V.t + dt / V.dur);
+  const k = V.t, peak = Math.max(V.from.y, V.top) + 0.2;
+  // sale in fretta fino al bordo, passa sopra, poi scende (o si appoggia) dall'altra parte
+  ch.pos.y = k < 0.5 ? lerp(V.from.y, peak, 1 - Math.pow(1 - k / 0.5, 2)) : lerp(peak, V.to.y, Math.pow((k - 0.5) / 0.5, 2));
+  const kx = smooth01(clamp((k - 0.12) / 0.88, 0, 1));
+  ch.pos.x = lerp(V.from.x, V.to.x, kx); ch.pos.z = lerp(V.from.z, V.to.z, kx);
+  ch.moveAmt = V.sp; ch.onGround = true;
+  ch.vel.set(V.dx * V.sp, 0, V.dz * V.sp);
+  if (k >= 1) {
+    ch.vault = null; ch.pos.copy(V.to);
+    if (V.over) { ch.vel.set(V.dx * V.sp, 0.5, V.dz * V.sp); ch.onGround = false; }
+    else { ch.vel.set(V.dx * V.sp * 0.7, 0, V.dz * V.sp * 0.7); ch.onGround = true; ch.landAt = G.time; }
+    ch.landT = 0.12;
+  }
+}
+/** v42: scivolata: si parte correndo (premendo C), si abbassa la sagoma e si mantiene lo slancio; in discesa accelera */
+const SLIDE = { minSpeed: 6.0, boost: 2.4, max: 13, friction: 5.2, cd: 0.9, stamina: 12 };
+function canSlide(ch) {
+  return ch.mode === 'ground' && ch.onGround && !ch.inWater && !ch.vault && !ch.slide && !ch.using && ch.moveAmt > SLIDE.minSpeed && G.time > ch.slideCd && ch.stamina >= SLIDE.stamina * 0.6;
+}
+function startSlide(ch) {
+  const sp = Math.hypot(ch.vel.x, ch.vel.z) || 1;
+  ch.slide = { t: 0, dx: ch.vel.x / sp, dz: ch.vel.z / sp, sp: Math.min(SLIDE.max, Math.max(sp + SLIDE.boost, 9.4)), air: 0 };
+  ch.crouch = false; ch.emote = null; ch.reloading = ch.reloading;   // si può ricaricare scivolando
+  ch.stamina = Math.max(0, ch.stamina - SLIDE.stamina); ch.tireT = Math.max(ch.tireT || 0, 0.6);
+  const d = ch.pos.distanceTo(camera.position);
+  if (d < 40) A.playSlide(surfaceUnder(ch), ch.isPlayer ? 0 : d);
+  if (ch.isPlayer) { G.matchStats.slides = (G.matchStats.slides || 0) + 1; touch.buzz(12); }
+}
+function endSlide(ch, crouch = false) {
+  ch.slide = null; ch.slideCd = G.time + SLIDE.cd;
+  ch.crouch = crouch;
+}
+/** un passo della scivolata; ritorna false se è finita (il movimento normale riprende) */
+function updateSlide(ch, dt, sx, sz, jump) {
+  const S = ch.slide;
+  S.t += dt;
+  // pendenza nella direzione della scivolata: in discesa accelera, in salita frena subito
+  terrainGrad(ch.pos.x, ch.pos.z, _tg);
+  const onTerrain = ch.pos.y - terrainHeight(ch.pos.x, ch.pos.z) < 0.35;
+  const down = onTerrain ? -(_tg[0] * S.dx + _tg[1] * S.dz) : 0;
+  S.sp = Math.min(SLIDE.max, S.sp + (down * 15 - SLIDE.friction * (S.t > 0.25 ? 1 : 0.4)) * dt);
+  // si può curvare appena
+  const sl = Math.hypot(sx, sz);
+  if (sl > 0.1) {
+    const k = Math.min(1, dt * 1.6);
+    S.dx += (sx / sl - S.dx) * k; S.dz += (sz / sl - S.dz) * k;
+    const l = Math.hypot(S.dx, S.dz) || 1; S.dx /= l; S.dz /= l;
+  }
+  S.air = ch.onGround ? 0 : S.air + dt;
+  if (jump && ch.onGround) {   // salto in scivolata: si conserva lo slancio
+    const sp = S.sp;
+    endSlide(ch);
+    groundMove(ch, S.dx, S.dz, sp, dt, true);
+    ch.vel.x = S.dx * sp; ch.vel.z = S.dz * sp;
+    return true;
+  }
+  if (S.sp < 3.8 || (S.t > 1.7 && down < 0.12) || S.air > 0.35 || ch.inWater) return false;
+  groundMove(ch, S.dx, S.dz, S.sp, dt, false);
+  // contro un muro si ferma
+  if (S.t > 0.12 && ch.moveAmt < S.sp * 0.45) S.sp = Math.max(0, ch.moveAmt);
+  // polvere (o spruzzi) dai piedi
+  if (ch.pos.distanceToSquared(camera.position) < 50 * 50 && Math.random() < dt * 30) {
+    const surf = surfaceUnder(ch), col = { snow: '#f2f6fa', sand: '#e0c890', stone: '#c9c2b4', wood: '#a88458', water: '#d8f0ff' }[surf] || '#a8946a';
+    emit(_p.set(ch.pos.x - S.dx * 0.3 + rand(-0.2, 0.2), ch.pos.y + 0.08, ch.pos.z - S.dz * 0.3 + rand(-0.2, 0.2)), col, 1, 1.6, 0.45, 0.16, 0.25);
+  }
+  return true;
+}
+
 function muzzlePos(ch, out = new THREE.Vector3()) {
   const s = ch.weapon;
   const z = s ? WEAPONS[s.id].muzzle : 0.6;
@@ -549,6 +694,7 @@ function terrainGrad(x, z, out) {
 }
 const _tg = [0, 0];
 function groundMove(ch, mx, mz, speed, dt, jump) {
+  if (ch.vault) { updateVault(ch, dt); return; }   // v42: scavalco in corso
   const prevY = ch.pos.y;
   // ── pendii di montagna: in salita si rallenta e ci si stanca, oltre ~45° non si sale e oltre ~49° si scivola ──
   let sx = 0, sz = 0;
@@ -600,7 +746,14 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   ch.pos.x = clamp(ch.pos.x, -lim, lim);
   ch.pos.z = clamp(ch.pos.z, -lim, lim);
   if (jump && ch.onGround) {
-    ch.vel.y = JUMP_V; ch.onGround = false;
+    // v42: contro lo "spam di salto": ogni salto costa resistenza e i salti a ripetizione (entro mezzo secondo
+    //  dall'atterraggio) sono sempre più bassi; la mira resta imprecisa in volo e appena atterrati (currentSpread)
+    const hop = G.time - ch.landAt < 0.5 ? Math.min(3, ch.hopN + 1) : 0;
+    ch.hopN = hop;
+    let jk = [1, 0.9, 0.8, 0.72][hop];
+    if (ch.stamina < JUMP_STAMINA) jk *= 0.8;
+    ch.stamina = Math.max(0, ch.stamina - JUMP_STAMINA * (1 + hop * 0.5)); ch.tireT = Math.max(ch.tireT || 0, 0.45);
+    ch.vel.y = JUMP_V * jk; ch.onGround = false;
     // v41: per l'animazione del salto: gamba che stacca e quanta rincorsa c'era
     ch.jumpLead = Math.sin(ch.walkPhase || 0) > 0 ? 0 : 1; ch.jumpRun = clamp(Math.hypot(ch.vel.x, ch.vel.z) / 5.5, 0, 1); ch.jumpT = 0;
   }
@@ -624,6 +777,7 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
     if (!ch.onGround && ch.vel.y < -7 && !ch.inWater) landFx(ch, ch.vel.y);
     // v27: danni da caduta (oltre ~4 m; in acqua o col deltaplano non ci si fa male)
     if (!ch.onGround && !ch.inWater && ch.vel.y < -FALL_SAFE_VY && ch.alive && !ch.impulseFly) fallDamage(ch, -ch.vel.y);
+    if (!ch.onGround) ch.landAt = G.time;   // v42: per la precisione dopo l'atterraggio e i salti di fila
     ch.pos.y = g; ch.vel.y = 0; ch.onGround = true; ch.impulseFly = false;
   }
   else if (ch.onGround && ch.vel.y <= 0 && ch.pos.y - g < 0.7) { ch.pos.y = g; ch.vel.y = 0; }
@@ -707,7 +861,8 @@ function airMove(ch, mx, mz, dt, deploy) {
     ch.vel.y = Math.max(ch.vel.y - 30 * dt, -40);
     ch.vel.x = lerp(ch.vel.x, mx * 24, Math.min(1, dt * 2));
     ch.vel.z = lerp(ch.vel.z, mz * 24, Math.min(1, dt * 2));
-    if (ch.pos.y - gh < 45 || (deploy && ch.pos.y - gh < 115)) {
+    const padUp = G.time - (ch.padAt ?? -9) < 3 && ch.vel.y > -3;   // v42: lanciati dal trampolino: il deltaplano si apre dopo il punto più alto
+    if (!padUp && (ch.pos.y - gh < 45 || (deploy && ch.pos.y - gh < 115))) {
       ch.mode = 'glide';
       showGlider(ch, true);
       if (ch.isPlayer) A.playUI();
@@ -993,6 +1148,34 @@ function animateChar(ch, dt) {
   // bacino/spalle: piccolo rollio opposto allo spostamento sulla gamba d'appoggio
   m.torso.rotation.z = Math.sin(t * 0.9) * 0.015 * idle - Math.cos(ch.walkPhase) * 0.03 * mv * (1 - ck) * (1 - spr * 0.5);
   m.torso.position.y = RIG.hip;
+  // v42: scivolata: gamba d'attacco tesa in avanti, l'altra piegata sotto, busto all'indietro, bacino quasi a terra
+  ch.slideK = lerp(ch.slideK, (ch.slide || ch.slideNet) && ch.mode === 'ground' ? 1 : 0, Math.min(1, dt * ((ch.slide || ch.slideNet) ? 14 : 8)));
+  if (ch.slideK > 0.01) {
+    const k = smooth01(ch.slideK), L = (o, v) => lerp(o, v, k);
+    m.legs[0].rotation.x = L(m.legs[0].rotation.x, -1.25); m.legs[0].rotation.z = L(m.legs[0].rotation.z, -0.04);
+    m.knees[0].rotation.x = L(m.knees[0].rotation.x, 0.15); m.feet[0].rotation.x = L(m.feet[0].rotation.x, 0.45);
+    m.legs[1].rotation.x = L(m.legs[1].rotation.x, -0.12); m.legs[1].rotation.z = L(m.legs[1].rotation.z, 0.32);
+    m.knees[1].rotation.x = L(m.knees[1].rotation.x, 2.05); m.feet[1].rotation.x = L(m.feet[1].rotation.x, -0.55);
+    m.body.rotation.x = L(m.body.rotation.x, 0); m.body.rotation.z = L(m.body.rotation.z, 0.05);
+    m.body.position.y = L(m.body.position.y, -0.5); m.body.position.z = L(m.body.position.z, 0.12);
+    m.torso.rotation.x = L(m.torso.rotation.x, -0.32); m.torso.rotation.z = L(m.torso.rotation.z, -0.06);
+  }
+  // v42: scavalco: si appoggia con le mani e passa le gambe raccolte di lato sopra il bordo
+  {
+    let vk = -1;
+    if (ch.vault) vk = ch.vault.t;
+    else if (ch.vaultNet) { ch._vnT = (ch._vnT ?? 0) + dt; vk = Math.min(1, ch._vnT / 0.42); } else ch._vnT = 0;
+    if (vk >= 0) {
+      const w = smooth01(Math.min(1, vk / 0.22)) * (1 - smooth01((vk - 0.72) / 0.28)), sd = ch.vault ? ch.vault.side : 1, L = (o, v) => lerp(o, v, w);
+      for (let i = 0; i < 2; i++) {
+        m.legs[i].rotation.x = L(m.legs[i].rotation.x, -1.15 - i * 0.2); m.legs[i].rotation.z = L(m.legs[i].rotation.z, sd * 0.45);
+        m.knees[i].rotation.x = L(m.knees[i].rotation.x, 1.75 - i * 0.3); m.feet[i].rotation.x = L(m.feet[i].rotation.x, -0.3);
+      }
+      m.body.rotation.z = L(m.body.rotation.z, -sd * 0.22); m.body.position.y = L(m.body.position.y, -0.12);
+      m.torso.rotation.x = L(m.torso.rotation.x, 0.42); m.torso.rotation.y = L(m.torso.rotation.y, sd * 0.25);
+      if (!(ch.slot && ch.slot.kind === 'weapon')) { setArm(m, sd > 0 ? 0 : 1, lerp(0, -0.55, w), (sd > 0 ? -1 : 1) * 0.15 * w, -0.1); }
+    }
+  }
 
   // la testa ogni tanto si guarda attorno quando sei fermo
   ch.lookT = (ch.lookT ?? rand(2, 5)) - dt;
@@ -1281,6 +1464,7 @@ function melee(ch) {
 }
 
 const BOT_VS_BOT = 0.2;
+const _cfp = new THREE.Vector3();
 function damage(t, amount, attacker, head = false, how = '', ignoreShield = false) {
   if (!t.alive || amount <= 0) return;
   // v23: niente fuoco amico fra compagni di squadra
@@ -1307,6 +1491,7 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
     touch.buzz(head ? 22 : 12);   // v40
     XH.hit(head ? 'head' : sh > 0 ? 'shield' : 'body');
     sh > 0 ? A.playShieldHit() : A.playHit(head);
+    if (head && t.m && t.m.head) critFlash(t.m.head.getWorldPosition(_cfp));   // v42
   }
   if (t === G.player) {
     G.hurtT = 0.4;
@@ -1496,6 +1681,55 @@ function spawnBullet(owner, origin, dir, def, dmg) {
   });
 }
 
+/** v42: di cosa è fatto quello che il proiettile ha colpito */
+function hitMaterial(hit, at) {
+  if (hit.terrain) {
+    const b = biomeAt(at.x, at.z), th = terrainHeight(at.x, at.z);
+    if (b[1] > 0.5) return 'snow';
+    if (b[2] > 0.5 || (b[4] > 0.5 && th < WATER_LEVEL + 2.2)) return 'sand';
+    return 'dirt';
+  }
+  const c = hit.collider;
+  if (!c) return 'stone';
+  if (c.surf) return c.surf === 'wood' ? 'wood' : c.surf;
+  if (c.built || c.door || c.tree || (c.prop && c.harvest) || (c.barrel && c.harvest)) return 'wood';
+  if (c.barrel || c.car || c.special) return 'metal';
+  return 'stone';
+}
+/** v42: particelle diverse per materiale: pietra = polvere chiara e schegge, terra = zolle che ricadono,
+ *  metallo = scintille brillanti, legno = schegge marroni, neve/sabbia = sbuffo */
+function impactFx(at, mat, d) {
+  if (d > 120) return;
+  const lod = d < 40 ? 1 : 0.5;
+  switch (mat) {
+    case 'metal':
+      emit(at, '#ffd27a', Math.ceil(7 * lod), 7, 0.22, 0.035, 1.6, 4.5);
+      emit(at, '#fff4d0', Math.ceil(3 * lod), 3, 0.06, 0.09, 0, 6);
+      emit(at, '#6e7278', 2, 1.2, 0.35, 0.06, -0.05);
+      break;
+    case 'wood':
+      emit(at, '#8a5a2e', Math.ceil(5 * lod), 3.6, 0.5, 0.06, 1.4);
+      emit(at, '#c8a070', Math.ceil(3 * lod), 1.4, 0.45, 0.1, -0.1);
+      break;
+    case 'dirt':
+      emit(at, '#5e4a30', Math.ceil(6 * lod), 3.2, 0.55, 0.075, 2.2);
+      emit(at, '#8a7656', Math.ceil(3 * lod), 1.1, 0.7, 0.16, -0.05);
+      if (Math.random() < 0.5) emit(at, '#5f7a34', 2, 2.4, 0.4, 0.05, 1.5);
+      break;
+    case 'sand':
+      emit(at, '#d8c08a', Math.ceil(7 * lod), 2.4, 0.6, 0.08, 1.6);
+      emit(at, '#e8d6a8', Math.ceil(3 * lod), 1, 0.8, 0.18, -0.05);
+      break;
+    case 'snow':
+      emit(at, '#f4f8ff', Math.ceil(8 * lod), 2.2, 0.7, 0.09, 0.9);
+      break;
+    default:   // pietra, intonaco, cemento
+      emit(at, '#d8d0c0', Math.ceil(4 * lod), 1.3, 0.75, 0.17, -0.12);
+      emit(at, '#a49a88', Math.ceil(4 * lod), 4, 0.35, 0.05, 1.8);
+      emit(at, '#ffd27a', 2, 5, 0.1, 0.03, 0.2, 2.5);
+  }
+  if (d < 30) A.playImpact(mat === 'dirt' || mat === 'sand' || mat === 'snow' ? 'soft' : mat, d);
+}
 function bulletImpact(b, hit, end, dist) {
   const def = b.def;
   const fall = dist > def.range * 0.5 ? Math.max(0.5, 1 - (dist - def.range * 0.5) / def.range) : 1;
@@ -1505,10 +1739,7 @@ function bulletImpact(b, hit, end, dist) {
     damage(hit.char, b.dmg * fall * (hit.head ? 2 : 1), b.owner, hit.head, def.name);
     if (near) emit(end, '#d02020', 5, 3, 0.4, 0.08);
   } else {
-    if (near) {
-      emit(end, hit.terrain ? '#7a6a4a' : '#d8d0c0', 4, 3, 0.35, 0.07);
-      if (!hit.terrain) emit(end, '#ffd27a', 2, 5, 0.12, 0.04, 0.2);   // scintille
-    }
+    if (near) impactFx(end, hitMaterial(hit, end), end.distanceTo(camera.position));
     if (hit.collider && hit.collider.hp) damageWall(hit.collider, b.dmg * fall);
     if (hit.collider && (hit.collider.spec || hit.collider.rock || hit.collider.special)) structHit(hit.collider, end, b.dmg * fall * (b.owner && !b.owner.human ? 0.5 : 1), b.owner);
     if (hit.collider && hit.collider.barrel) damageBarrel(hit.collider.barrel, b.dmg * fall, b.owner);
@@ -1591,6 +1822,7 @@ function explode(at, owner, dmg, radius, how = 'Lanciarazzi') {
   flashLight.position.copy(at); flashLight.intensity = 80;
   const d = at.distanceTo(camera.position);
   A.playExplosion(d);
+  if (d < 140) gfx.kick(clamp(1.25 - d / 110, 0.25, 1));   // v42: bagliore dell'esplosione
   G.shake = Math.max(G.shake, clamp(1 - d / 45, 0, 1));
   for (const c of G.chars) {
     if (!c.alive || c.mode === 'bus') continue;
@@ -1610,6 +1842,7 @@ function explode(at, owner, dmg, radius, how = 'Lanciarazzi') {
     if (Math.hypot(cx - at.x, cz - at.z) < radius + 1.5) damageWall(w, 400);
   }
   structBlast(at, radius * 0.75, dmg * 3, owner);
+  for (const q of [...G.placed]) if (q.pos.distanceTo(at) < radius * 0.6) removePlaced(q);   // v42: le esplosioni distruggono trappole e trampolini
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1718,6 +1951,133 @@ function cycleThrow(p) {
   }
   A.playUI();
 }
+// ─────────────── v42: oggetti da piazzare: trampolino di lancio e trappola a spuntoni ───────────────
+G.placed = [];
+const _pe = new THREE.Vector3(), _plD = new THREE.Vector3(), _ps = new THREE.Vector3();
+/** dove finirebbe l'oggetto: il punto guardato (fino a 7 m) se è un piano, altrimenti 2 m davanti ai piedi */
+function placeSpot(p, out) {
+  camera.getWorldDirection(_plD);
+  const o = camera.position, hit = rayWorld(o, _plD, 14);
+  let ok = false;
+  if (hit) {
+    _ps.copy(o).addScaledVector(_plD, hit.t);
+    const g = groundAt(_ps.x, _ps.z, _ps.y + 0.3, 0.1);
+    if (Math.abs(g - _ps.y) < 0.35 && Math.hypot(_ps.x - p.pos.x, _ps.z - p.pos.z) < 7 && Math.abs(g - p.pos.y) < 4) { out.set(_ps.x, g, _ps.z); ok = true; }
+  }
+  if (!ok) { const fx = Math.sin(p.yaw), fz = Math.cos(p.yaw); out.set(p.pos.x + fx * 2, 0, p.pos.z + fz * 2); out.y = groundAt(out.x, out.z, p.pos.y + 0.6, 0.1); }
+  // valido: non in acqua, non sopra un altro oggetto, spazio libero intorno
+  let valid = out.y > WATER_LEVEL - 0.3 && Math.abs(out.y - p.pos.y) < 4;
+  for (const q of G.placed) if (Math.hypot(q.pos.x - out.x, q.pos.z - out.z) < 1.5 && Math.abs(q.pos.y - out.y) < 1) valid = false;
+  if (valid) { _vt.set(out.x, out.y + 0.05, out.z); resolveCollisions(_vt, 0.55, 1.2); if (Math.hypot(_vt.x - out.x, _vt.z - out.z) > 0.12) valid = false; }
+  if (valid && hasLineToSpot(p, out) === false) valid = false;
+  return valid;
+}
+function hasLineToSpot(p, at) {
+  const o = p.eye(_pe), d = _plD.set(at.x - o.x, at.y + 0.3 - o.y, at.z - o.z), L = d.length();
+  d.divideScalar(L);
+  return !rayWorld(o, d, L - 0.2);
+}
+const placeGhost = new THREE.Group(); placeGhost.visible = false; scene.add(placeGhost);
+let placeGhostId = '';
+function showPlaceGhost(p, id) {
+  if (placeGhostId !== id) {
+    while (placeGhost.children.length) placeGhost.remove(placeGhost.children[0]);
+    const m = buildPlacedMesh(id);
+    m.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshBasicMaterial({ color: '#66ff88', transparent: true, opacity: 0.45, depthWrite: false }); o.castShadow = false; } });
+    if (m.userData.spikes) m.userData.spikes.position.y = 0;
+    placeGhost.add(m); placeGhostId = id;
+  }
+  const ok = placeSpot(p, placeGhost.position);
+  placeGhost.rotation.y = p.yaw;
+  placeGhost.traverse(o => { if (o.isMesh) o.material.color.set(ok ? '#66ff88' : '#ff5a5a'); });
+  placeGhost.visible = true;
+  return ok;
+}
+function placeItem(ch, id, x, y, z, yaw = ch.yaw, remote = false, key = null) {
+  if (!remote) {
+    if (!ch.alive || ch.mode !== 'ground' || (ch.throws[id] || 0) <= 0 || (ch.throwCd || 0) > G.time) return null;
+    ch.throws[id]--; ch.throwCd = G.time + 0.5;
+    key = ch.idx + ':' + (G.placeSeq = (G.placeSeq || 0) + 1);
+  }
+  // un massimo per giocatore: il più vecchio sparisce
+  const mine = G.placed.filter(q => q.owner === ch && q.id === id);
+  if (mine.length >= (id === 'pad' ? 2 : 3)) removePlaced(mine[0]);
+  const mesh = buildPlacedMesh(id);
+  mesh.position.set(x, y, z); mesh.rotation.y = yaw;
+  scene.add(mesh);
+  const P = { id, key, owner: ch, pos: new THREE.Vector3(x, y, z), mesh, t: 0, life: id === 'pad' ? PAD.life : TRAP.life, arm: id === 'pad' ? 0.25 : TRAP.arm, fired: 0, cd: new Map() };
+  G.placed.push(P);
+  ch.throwAnim = 0.001; ch.throwId = id; ch.emote = null;
+  const d = P.pos.distanceTo(camera.position);
+  if (d < 40) A.playPlace(d);
+  if (d < 60) emit(_p.set(x, y + 0.15, z), id === 'pad' ? '#ffb050' : '#c9ced6', 8, 2.5, 0.4, 0.1, 0.5);
+  if (ch.isPlayer) { G.matchStats.placed = (G.matchStats.placed || 0) + 1; touch.buzz(10); }
+  if (G.net && !remote && (ch === G.player || (NET.role === 'host' && !ch.remote && !ch.human))) netSend({ t: 'pl', v: ch.idx, id, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), r: +yaw.toFixed(2), k: key });
+  return P;
+}
+function removePlaced(P) {
+  const i = G.placed.indexOf(P);
+  if (i >= 0) G.placed.splice(i, 1);
+  scene.remove(P.mesh);
+}
+/** trampolino: su in alto e poi il deltaplano si apre da solo (come scendendo dal bus) */
+function launchFromPad(c, P) {
+  const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw);
+  c.mode = 'fall'; c.padAt = G.time; c.onGround = false;
+  c.vel.set(c.vel.x * 0.4 + fx * 5, PAD.vy, c.vel.z * 0.4 + fz * 5);
+  c.pos.y += 0.1; c.crouch = false; c.slide = null; c.vault = null; c.using = null; c.emote = null; c.impulseFly = false;
+  P.cd.set(c, G.time + 1.5);
+  if (c.ai) {
+    // i bot volano verso la zona sicura (o lontano da chi li insegue)
+    const st = safeTarget(), tg = c.ai.target;
+    let ux = st.x - c.pos.x, uz = st.z - c.pos.z;
+    if (Math.hypot(ux, uz) < st.r * 0.6 && tg) { ux = c.pos.x - tg.pos.x; uz = c.pos.z - tg.pos.z; }
+    const l = Math.hypot(ux, uz) || 1;
+    c.ai.dropTarget.set(c.pos.x + ux / l * 55, 0, c.pos.z + uz / l * 55); c.ai.fo = null;
+  }
+  const d = c.pos.distanceTo(camera.position);
+  A.playLaunch(c.isPlayer ? 0 : d);
+  if (d < 70) { emit(_p.copy(P.pos).setY(P.pos.y + 0.3), '#ffb050', 18, 6, 0.5, 0.14, -0.4); emit(_p.copy(P.pos).setY(P.pos.y + 0.2), '#ffffff', 10, 3, 0.6, 0.2, -0.2); }
+  if (c.isPlayer) { toggleBuild(false); G.throwAim = false; hideTrajectory(); placeGhost.visible = false; touch.buzz(30); showMsg('', '🚀 In volo! Il deltaplano si apre da solo', 1.6); G.matchStats.pads = (G.matchStats.pads || 0) + 1; }
+}
+function updatePlaced(dt) {
+  for (let i = G.placed.length - 1; i >= 0; i--) {
+    const P = G.placed[i];
+    P.t += dt;
+    const near = P.pos.distanceToSquared(camera.position) < 120 * 120;
+    P.mesh.visible = near;
+    if (P.t > P.life || (P.fired && G.time - P.fired > 1.6)) { removePlaced(P); continue; }
+    if (P.id === 'pad') {
+      if (near && P.mesh.userData.ring) P.mesh.userData.ring.material.emissiveIntensity = 1.2 + Math.sin(G.time * 5) * 0.6;
+      if (P.t < P.arm) continue;
+      for (const c of G.chars) {
+        if (!c.alive || c.remote || c.mode !== 'ground' || c.vault || (P.cd.get(c) || 0) > G.time) continue;
+        const dx = c.pos.x - P.pos.x, dz = c.pos.z - P.pos.z, dy = c.pos.y - P.pos.y;
+        if (dx * dx + dz * dz < PAD.r * PAD.r && dy > -0.3 && dy < 0.7) launchFromPad(c, P);
+      }
+    } else if (P.id === 'trap') {
+      const sp = P.mesh.userData.spikes;
+      if (P.fired) { const k = Math.min(1, (G.time - P.fired) / 0.08); sp.position.y = lerp(-0.36, 0.02, k); continue; }
+      if (P.t < P.arm) continue;
+      for (const c of G.chars) {
+        if (!c.alive || c.mode !== 'ground' || c === P.owner || isMate(P.owner, c)) continue;
+        const dx = c.pos.x - P.pos.x, dz = c.pos.z - P.pos.z, dy = c.pos.y - P.pos.y;
+        if (dx * dx + dz * dz < TRAP.r * TRAP.r && dy > -0.4 && dy < 0.6) {
+          P.fired = G.time;
+          // i danni li decide il cancello di rete come per i proiettili (chi ha piazzato la trappola)
+          damage(c, TRAP.dmg, P.owner && P.owner.alive !== undefined ? P.owner : null, false, 'Trappola');
+          c.trapSlowT = G.time + 1.2;
+          const d = P.pos.distanceTo(camera.position);
+          A.playTrap(d);
+          if (d < 60) { emit(_p.copy(P.pos).setY(P.pos.y + 0.5), '#d02020', 10, 3, 0.5, 0.09); emit(_p.copy(P.pos).setY(P.pos.y + 0.2), '#fff2c0', 8, 5, 0.15, 0.05, 0.2); }
+          if (c.isPlayer) { showMsg('', '🪤 Trappola!', 1.2); touch.buzz(40); }
+          break;
+        }
+      }
+    }
+  }
+}
+
 /** se il tipo scelto è finito passa a uno che hai ancora */
 function fixThrowSel(p) { if (p.throws[p.throwSel] > 0) return; const id = THROW_IDS.find(k => p.throws[k] > 0); if (id) p.throwSel = id; }
 
@@ -2161,7 +2521,7 @@ function randomCons() {
 }
 /** v41: oggetto da lancio a caso (fumogeni comuni, impulso raro) */
 function randomThrow() {
-  const r = Math.random(), id = r < 0.45 ? 'frag' : r < 0.82 ? 'smoke' : 'impulse';
+  const r = Math.random(), id = r < 0.36 ? 'frag' : r < 0.66 ? 'smoke' : r < 0.8 ? 'impulse' : r < 0.9 ? 'trap' : 'pad';   // v42: trappole e trampolini
   return { kind: 'throw', id, count: THROWABLES[id].pickup };
 }
 function ammoFor(id) {
@@ -2860,7 +3220,14 @@ function botTactics(b, tgt, los, hasWeapon, dist, inStorm) {
     if (ai.state === 'cover' && ai.goal) {
       ai.coverT = (ai.coverT || 0) + 0.3;
       const arrived = Math.hypot(ai.goal.x - b.pos.x, ai.goal.z - b.pos.z) < 1.4;
-      if (!los && (arrived || lostT > 0.8) && healI >= 0) { b.setActive(healI); startUse(b); ai.state = 'heal'; ai.goal = null; ai.healCd = 2; return true; }
+      if (!los && (arrived || lostT > 0.8) && healI >= 0) {
+        // v42: prima di curarsi piazza una trappola verso dove arriverà il nemico
+        if (b.throws.trap > 0 && Math.random() < T) {
+          const ux = ai.lastSeenPos.x - b.pos.x, uz = ai.lastSeenPos.z - b.pos.z, ul = Math.hypot(ux, uz) || 1, tx = b.pos.x + ux / ul * 1.8, tz = b.pos.z + uz / ul * 1.8, ty = groundAt(tx, tz, b.pos.y + 0.6, 0.1);
+          if (Math.abs(ty - b.pos.y) < 0.6 && !G.placed.some(q => q.pos.distanceTo(_cv.set(tx, ty, tz)) < 1.5)) placeItem(b, 'trap', tx, ty, tz, Math.atan2(ux, uz));
+        }
+        b.setActive(healI); startUse(b); ai.state = 'heal'; ai.goal = null; ai.healCd = 2; return true;
+      }
       if (!arrived && ai.coverT < 6) return true;
       ai.state = 'idle'; ai.goal = null;   // niente cure o riparo scoperto: torna a combattere
     }
@@ -2869,6 +3236,7 @@ function botTactics(b, tgt, los, hasWeapon, dist, inStorm) {
       ai.state = 'flee2'; ai.fleeT = G.time + rand(2.5, 4.5); ai.goal = null;
       // impulso sotto i piedi o fra te e lui per allontanarlo
       if (canThrow && dist < 9 && b.throws.impulse > 0 && Math.random() < 0.6) { _cv.copy(tgt.pos); botThrow(b, 'impulse', _cv, 4); }
+      else if (b.throws.pad > 0 && b.onGround && Math.random() < 0.7) placeItem(b, 'pad', b.pos.x, b.pos.y, b.pos.z);   // v42: trampolino sotto i piedi e via
       return true;
     }
   } else if (ai.state === 'cover') ai.state = 'idle';
@@ -2979,6 +3347,7 @@ function navPoint(b, goal) {
   if (hb) return lat < 0.7 && sN > -1.6 ? _nav.set(door.x + door.nx * 2.5, 0, door.z + door.nz * 2.5) : _nav.set(door.x - door.nx * 1.3, 0, door.z - door.nz * 1.3);
   return lat < 0.7 && sN < 2.8 ? _nav.set(door.x - door.nx * 1.5, 0, door.z - door.nz * 1.5) : _nav.set(door.x + door.nx * 2.2, 0, door.z + door.nz * 2.2);
 }
+const _bv = new THREE.Vector3();
 function updateBot(b, dt) {
   const ai = b.ai;
   if (!b.alive) return;
@@ -3003,6 +3372,7 @@ function updateBot(b, dt) {
     return;
   }
   if (b.mode === 'climb') { updateClimb(b, dt, true, false, false); return; }
+  if (b.vault) { groundMove(b, 0, 0, 0, dt, false); return; }   // v42
   ai.alert -= dt;
   ai.think -= dt;
   const gkey = ai.goalLoot || ai.goalChest || ai.goal;
@@ -3032,7 +3402,7 @@ function updateBot(b, dt) {
     if (ai.strafeT <= 0) {
       ai.strafeT = rand(0.5, 1.6); ai.strafe = pick([-1, 1, 1, -1, 0]);
       b.crouch = ai.strafe === 0 && Math.random() < 0.7;   // si abbassa quando sta fermo a sparare
-      if (!b.crouch && Math.random() < 0.25) jump = true;
+      if (!b.crouch && Math.random() < 0.1 && b.stamina > 40) jump = true;   // v42: saltare costa resistenza e precisione
     }
     const fwd = dist > pref * 1.25 ? 1 : dist < pref * 0.6 ? -0.7 : 0;
     mx = fx * fwd + rx * ai.strafe; mz = fz * fwd + rz * ai.strafe;
@@ -3052,7 +3422,7 @@ function updateBot(b, dt) {
         const lead = D.lead * rand(0.7, 1.15);
         const comp = 0.5 * BULLET_G * (def.drop ?? 1) * tFly * tFly * D.lead * rand(0.85, 1.1);
         const dir = new THREE.Vector3(tgt.pos.x + tgt.vel.x * tFly * lead, aimY + tgt.vel.y * tFly * lead * 0.4 + comp, tgt.pos.z + tgt.vel.z * tFly * lead).sub(origin).normalize();
-        const err = D.aimError * (1 + tgt.moveAmt * 0.07) * (b.moveAmt > 1 ? 1.25 : 1) + def.spread * 0.6;
+        const err = (D.aimError * (1 + tgt.moveAmt * 0.07) * (b.moveAmt > 1 ? 1.25 : 1) + def.spread * 0.6) * (b.onGround ? 1 + jumpPenalty(b) * 0.8 : 1.9) * (b.slide ? 1.25 : 1) * (tgt.slide ? 1.15 : 1);   // v42
         if (fireWeapon(b, () => ({ origin, dir: spreadDir(dir, err), max: def.range }))) {
           if (!def.auto) ai.pauseT = rand(0.1, 0.5);
           else if (++ai.burst > rand(4, 9) * D.burst) { ai.burst = 0; ai.pauseT = rand(0.3, 0.8) / D.burst; }
@@ -3100,9 +3470,19 @@ function updateBot(b, dt) {
   }
   if (ai.state !== 'fight') b.crouch = false;
   if (b.crouch) speed = Math.min(speed, 2.8);
+  if (G.time < (b.trapSlowT || 0)) speed *= 0.45;   // v42
   if (b.inWater) { speed *= 0.55; b.crouch = false; }
   if (ai.wantJump) { jump = true; ai.wantJump = false; }
-  groundMove(b, mx, mz, speed, dt, jump);
+  if (b.slide) { if (!updateSlide(b, dt, mx, mz, false)) { endSlide(b, false); groundMove(b, mx, mz, speed, dt, jump); } }
+  else {
+    // v42: scavalca gli ostacoli bassi senza fermarsi; correndo verso un riparo o scappando ogni tanto scivola
+    if ((mx || mz) && speed >= 5 && b.onGround && !b.inWater && G.time > (ai.vaultChk || 0)) {
+      ai.vaultChk = G.time + 0.2;
+      if (tryVault(b, _bv.set(mx, 0, mz).normalize(), 1.3)) return;
+    }
+    if (speed >= 7 && b.moveAmt > 6.2 && /cover|flee|zone/.test(ai.state) && Math.random() < dt * 0.35 && b.stamina > 40 && canSlide(b)) startSlide(b);
+    groundMove(b, mx, mz, speed, dt, jump);
+  }
   ai.stuckT -= dt;
   if (ai.stuckT <= 0) {
     const moved = Math.hypot(b.pos.x - ai.lastPos.x, b.pos.z - ai.lastPos.z);
@@ -3110,6 +3490,7 @@ function updateBot(b, dt) {
       ai.avoidT = rand(0.6, 1.2); ai.avoidSign = Math.random() < 0.5 ? -1 : 1; ai.wantJump = true;
       // ostacolo basso davanti (casse, container, muri costruiti)? arrampicati
       const md = new THREE.Vector3(mx, 0, mz).normalize();
+      if (tryVault(b, md, 1.75)) { ai.avoidT = 0; ai.lastPos.copy(b.pos); ai.stuckT = 0.5; return; }   // v42
       const ch = canStartClimb(b, md);
       if (ch && ch.collider.maxY - b.pos.y < 3.7 && Math.random() < 0.7) { startClimb(b, ch, md); ai.avoidT = 0; ai.lastPos.copy(b.pos); ai.stuckT = 0.5; return; }
       // muro costruito davanti? sparagli
@@ -3383,6 +3764,8 @@ function currentZoom() {
 function adsSpeed() { const w = G.player && G.player.weapon; return w ? ADS_SPEED[WEAPONS[w.id].role] || 12 : 12; }
 
 // ─────────────── Giocatore ───────────────
+/** v42: imprecisione residua dopo un atterraggio (0..1, svanisce in 0,4 s; di più dopo i salti a ripetizione) */
+function jumpPenalty(c) { const k = 1 - (G.time - (c.landAt ?? -9)) / 0.4; return k > 0 ? k * (0.9 + 0.3 * (c.hopN || 0)) : 0; }
 function currentSpread(p) {
   const w = p.weapon;
   if (!w) return 0;
@@ -3390,7 +3773,11 @@ function currentSpread(p) {
   let s = def.spread;
   if (G.ads) s = def.adsSpread !== undefined ? def.adsSpread : s * 0.45;
   if (p.moveAmt > 1) s *= 1.4;
-  if (!p.onGround) s *= 2;
+  // v42: in volo la mira è imprecisa (sempre di più con i salti di fila) e torna a posto in 0,4 s dopo l'atterraggio:
+  //  saltare a caso per non farsi colpire non conviene più
+  if (!p.onGround && !p.vault) s *= 2.2 + 0.35 * p.hopN;
+  else s *= 1 + jumpPenalty(p);
+  if (p.slide) s *= 1.3;
   if (p.crouchK > 0.5) s *= 0.65;   // accovacciato = più preciso
   return s + p.bloom;
 }
@@ -3491,16 +3878,29 @@ function updatePlayer(dt) {
     updateClimb(p, dt, fwdHeld, backHeld, pressed.has('Space'));
     return;
   }
+  // v42: scavalco in corso: niente azioni per quel mezzo secondo
+  if (p.vault) { groundMove(p, 0, 0, 0, dt, false); G.ads = false; G.interact = null; ghost.visible = false; return; }
   // arrampicata: SPAZIO contro un muro, oppure salta verso un muro tenendo W
   _v.set(fx, 0, fz);
   G.climbHint = null;
+  const sprintKey = !!(keys.ShiftLeft || keys.ShiftRight || TC.sprint);
+  // v42: scavalco automatico: correndo contro un ostacolo basso (fino a 1,25 m) lo si supera da soli; con SPAZIO
+  //  fino a 1,75 m; saltando verso un bordo (fino a 2 m sopra i piedi) ci si aggrappa e si sale in un attimo
+  if (fwdHeld && !G.build.on) {
+    const jumpP = pressed.has('Space');
+    const mr = !p.onGround ? (p.vel.y < 5 && !p.impulseFly ? 2.0 : 0) : jumpP ? 1.75 : (sprintKey || p.slide) && p.moveAmt > 4.8 ? 1.25 : 0;
+    if (mr && tryVault(p, _v, mr)) { p._noJumpUntilRelease = true; return; }
+  }
   if (fwdHeld && !G.build.on) {
     const hit = canStartClimb(p, _v);
     if (hit && (pressed.has('Space') || (!p.onGround && p.vel.y < 4))) { startClimb(p, hit, _v); return; }
     G.climbHint = hit;
   }
-  // abbassarsi
-  if (settings.crouchHold) {
+  // abbassarsi (v42: premendo C mentre corri parte la scivolata)
+  if (pressed.has('KeyC') && canSlide(p) && (sprintKey || p.moveAmt > 6.6)) { startSlide(p); pressed.delete('KeyC'); }
+  else if (p.slide) {
+    if (pressed.has('KeyC') || (settings.crouchHold && !keys.KeyC && p.slide.t > 0.25)) { endSlide(p, false); pressed.delete('KeyC'); }
+  } else if (settings.crouchHold) {
     const want = !!keys.KeyC && !p.inWater;
     if (want !== p.crouch) { p.crouch = want; if (want) A.playStep(); }
   } else if (pressed.has('KeyC')) { p.crouch = !p.crouch; if (p.crouch) A.playStep(); }
@@ -3522,11 +3922,19 @@ function updatePlayer(dt) {
   // v41: oggetti da lancio: tieni premuto G per vedere la traiettoria, rilascia per lanciare; H cambia tipo
   if (pressed.has('KeyH')) cycleThrow(p);
   fixThrowSel(p);
-  if (keys.KeyG && !G.invOpen && p.throws[p.throwSel] > 0 && !G.build.on && !p.inWater) { G.throwAim = true; G.throwAimT = G.time; showTrajectory(p, p.throwSel); }
-  else if (G.throwAim) {
-    G.throwAim = false; hideTrajectory();
-    if (!keys.KeyG && !G.build.on && !p.inWater) throwItem(p, p.throwSel, G.camYaw, G.camPitch);
+  const placing = !!THROWABLES[p.throwSel].place;   // v42: trampolino e trappola si piazzano a terra
+  if (keys.KeyG && !G.invOpen && p.throws[p.throwSel] > 0 && !G.build.on && !p.inWater) {
+    G.throwAim = true; G.throwAimT = G.time;
+    if (placing) { hideTrajectory(); G.placeOk = showPlaceGhost(p, p.throwSel); } else { placeGhost.visible = false; showTrajectory(p, p.throwSel); }
+  } else if (G.throwAim) {
+    G.throwAim = false; hideTrajectory(); placeGhost.visible = false;
+    if (!keys.KeyG && !G.build.on && !p.inWater) {
+      if (!placing) throwItem(p, p.throwSel, G.camYaw, G.camPitch);
+      else if (G.placeOk && placeSpot(p, _ps)) placeItem(p, p.throwSel, _ps.x, _ps.y, _ps.z, p.yaw);
+      else showMsg('', 'Qui non si può piazzare', 1.1);
+    }
   } else if (pressed.has('KeyG') && !p.throws[p.throwSel]) showMsg('', 'Non hai oggetti da lancio', 1.2);
+  if (!G.throwAim && placeGhost.visible) placeGhost.visible = false;
   if (pressed.has('KeyZ') || mouse.middlePressed) playerPing();
   mouse.middlePressed = false;
   const inter = nearestInteract(p);
@@ -3544,6 +3952,7 @@ function updatePlayer(dt) {
   if (G.ads) speed = Math.min(speed, 3.4);
   if (p.weapon && WEAPONS[p.weapon.id].moveMult) speed *= WEAPONS[p.weapon.id].moveMult;
   if (p.using) speed = Math.min(speed, 2.6);
+  if (G.time < (p.trapSlowT || 0)) speed *= 0.45;   // v42: piede nella trappola
   if (p.inWater) {
     // nuoto: lento, con lo sprint si nuota a stile libero ma si consuma la resistenza
     p.crouch = false;
@@ -3554,7 +3963,11 @@ function updatePlayer(dt) {
   }
   if (stoodUp) p._noJumpUntilRelease = true;
   if (!keys.Space) p._noJumpUntilRelease = false;
-  groundMove(p, mx, mz, speed, dt, keys.Space && !p._noJumpUntilRelease && !p.crouch);
+  const wantJump = keys.Space && !p._noJumpUntilRelease && !p.crouch;
+  if (p.slide) {
+    // v42: scivolata (finita: si resta abbassati, a meno di tenere premuto lo scatto)
+    if (!updateSlide(p, dt, mx, mz, wantJump && pressed.has('Space'))) { endSlide(p, settings.crouchHold ? !!keys.KeyC : !sprintKey); groundMove(p, mx, mz, speed, dt, false); }
+  } else groundMove(p, mx, mz, speed, dt, wantJump);
   // azioni
   touchAimTick(p, dt);   // v40: assistenza alla mira e fuoco automatico (solo touch)
   p.bloom = Math.max(0, p.bloom - dt * 0.12);
@@ -3690,11 +4103,12 @@ function updateCamera(dt) {
     pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, p.mode === 'glide' ? 3.3 : 1.5, 0));
     dist = p.mode === 'fall' ? 7 : 6.8; shoulder = 0; wantFov = p.mode === 'fall' ? F0 + 15 : F0 + 5;
   } else {
-    pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, 1.8 - 0.55 * p.crouchK, 0));
+    pivot = camTarget.copy(p.pos).add(new THREE.Vector3(0, 1.8 - 0.55 * p.crouchK - 0.7 * p.slideK, 0));
     dist = G.ads ? 2.2 : 3.8;
     shoulder = G.ads ? 0.75 : 1.0;
     if (G.ads) wantFov = F0 / currentZoom();
     if (p.moveAmt > 6.5) wantFov = F0 + 6;
+    if (p.slide && !G.ads) wantFov = F0 + 9;   // v42: la scivolata dà un colpo di velocità
   }
   // v31: l'altezza del punto guardato cambia con una transizione morbida (paracadute → deltaplano → a terra)
   if (p.alive && p.mode !== 'bus') {
@@ -3743,7 +4157,17 @@ function updateCamera(dt) {
   siEl.classList.toggle('hidden', !sighted);
   G.sighted = sighted;
   // ombre e cielo seguono la camera
-  const focus = p.alive && p.mode !== 'bus' ? p.pos : camera.position;
+  // v42: il quadrato delle ombre è spostato in avanti, dove guardi (più dettaglio sul visibile), e il centro è
+  //  agganciato alla griglia dei texel della shadow map: muovendosi i bordi delle ombre non tremolano più
+  const focus = _sunF.copy(p.alive && p.mode !== 'bus' ? p.pos : camera.position);
+  {
+    const sc = sun.shadow.camera, ext = sc.right, texel = (2 * ext) / sun.shadow.mapSize.x;
+    focus.x += Math.sin(G.camYaw) * ext * 0.3; focus.z += Math.cos(G.camYaw) * ext * 0.3;
+    const u = focus.dot(SUN_AX), v = focus.dot(SUN_AY), w = focus.dot(SUN_AZ);
+    focus.copy(SUN_AX).multiplyScalar(Math.round(u / texel) * texel).addScaledVector(SUN_AY, Math.round(v / texel) * texel).addScaledVector(SUN_AZ, w);
+    // bias proporzionato alla dimensione del texel: ombre nette senza "acne" né personaggi che fluttuano
+    sun.shadow.normalBias = texel * 0.9; sun.shadow.bias = -0.00012 - texel * 0.00006;
+  }
   sun.position.copy(focus).add(SUN_OFF);
   sun.target.position.copy(focus);
   sky.position.copy(camera.position);
@@ -3768,7 +4192,7 @@ const hud = {
   prompt: $('#prompt'), progress: $('#progress'), progFill: $('#progressFill'), progText: $('#progressText'),
   cross: $('#crosshair'), hit: $('#hitmarker'), center: $('#centerMsg'), sub: $('#subMsg'),
   smoke: $('#smokeVeil'), thr: $('#throwHud'),
-  vignette: $('#vignette'), stRow: $('#staminaRow'), stFill: $('#staminaFill'), crouch: $('#crouchBadge'), hidden: $('#hiddenBadge'), poi: $('#poiName'), evt: $('#eventBar'), dmg: $('#damageLayer'), feed: $('#killfeed'),
+  vignette: $('#vignette'), lowVig: $('#lowVig'), stRow: $('#staminaRow'), stFill: $('#staminaFill'), crouch: $('#crouchBadge'), hidden: $('#hiddenBadge'), poi: $('#poiName'), evt: $('#eventBar'), dmg: $('#damageLayer'), feed: $('#killfeed'),
 };
 const cache = {};
 function setHTML(el, key, html) { if (cache[key] !== html) { cache[key] = html; el.innerHTML = html; } }
@@ -3970,7 +4394,20 @@ function updateHUD(dt) {
   hud.hit.style.opacity = G.hitT > 0 ? 1 : 0;
   G.hurtT -= dt;
   const low = p.alive && p.hp < 30 ? 0.35 + Math.sin(G.time * 6) * 0.15 : 0;
-  hud.vignette.style.opacity = Math.max(low, G.hurtT > 0 ? G.hurtT * 1.5 : 0);
+  hud.vignette.style.opacity = Math.max(low * 0.6, G.hurtT > 0 ? G.hurtT * 1.5 : 0);
+  // v42: vita bassa: i bordi si scuriscono e si stringono (sotto 40 PS), il colore si spegne e batte il cuore
+  {
+    const lk = p.alive && p.mode !== 'bus' ? clamp((40 - p.hp) / 30, 0, 1) : 0;
+    G.lowK = lerp(G.lowK || 0, lk, Math.min(1, dt * 3));
+    const el = hud.lowVig;
+    if (G.lowK > 0.01) {
+      const beat = G.lowK * (0.92 + 0.08 * Math.max(0, Math.sin(G.time * (5 + G.lowK * 3)) ** 8));
+      el.style.opacity = beat.toFixed(3); el.style.setProperty('--lowR', (62 - G.lowK * 24).toFixed(1) + '%');
+      if (!el.classList.contains('on')) el.classList.add('on');
+      if (G.time > (G.beatT || 0)) { G.beatT = G.time + 1.15 - G.lowK * 0.4; A.playHeartbeat(G.lowK); }
+    } else if (el.classList.contains('on')) { el.classList.remove('on'); el.style.opacity = 0; }
+    $('#game').style.filter = G.lowK > 0.05 && !G.sighted ? `saturate(${(1 - G.lowK * 0.55).toFixed(2)})` : '';
+  }
   if (G.msgT > 0) { G.msgT -= dt; if (G.msgT <= 0) { hud.center.textContent = ''; hud.sub.textContent = ''; } }
   // luogo
   let poi = '';
@@ -4354,7 +4791,8 @@ function beginMatch(net) {
   G.time = 0; G.endShown = false; G.spectate = null; G.paused = false; G.ads = false;
   exitSpectate(); G.specKiller = null; G.specPitch = 0;
   G.lootSeq = 0; G.lootPrefix = ''; G.matchStats = { chests: 0, grass: 0, climb: 0, glide: 0, walk: 0, surv: 0 };
-  throwSys.clear(); hideTrajectory(); G.throwAim = false; for (const pg of G.pings) pg.el.remove(); G.pings.length = 0; G.dmgDirs.length = 0; G.teamPingT = 0;   // v41
+  throwSys.clear(); hideTrajectory(); G.throwAim = false; for (const q of [...G.placed]) removePlaced(q); placeGhost.visible = false;   // v42
+  for (const pg of G.pings) pg.el.remove(); G.pings.length = 0; G.dmgDirs.length = 0; G.teamPingT = 0;   // v41
   PR.resetMatchMax();
   toggleBuild(false);
   // bottino iniziale (online: uguale per tutti grazie al seme comune)
@@ -4369,10 +4807,10 @@ function beginMatch(net) {
       const a = ammoFor(w.id);
       const p2 = off(); p2.x += 0.8;
       spawnLoot(a, p2);
-    } else if (r < 0.76) spawnLoot(randomCons(), off());
-    else if (r < 0.85) spawnLoot(randomThrow(), off());   // v41
-    else if (r < 0.94) { const t = pick(Object.keys(AMMO_TYPES).filter(k => k !== 'rockets')); spawnLoot({ kind: 'ammo', id: t, count: AMMO_TYPES[t].pickup }, off()); }
-    else spawnLoot({ kind: 'mats', count: 30 }, off());
+    } else if (r < 0.8) spawnLoot(randomCons(), off());
+    else spawnLoot(randomThrow(), off());   // v41
+    // v42: niente più munizioni sparse di un tipo a caso né mucchietti di legna per terra: ogni oggetto deve servire
+    //  subito (le munizioni stanno accanto alla loro arma, la legna si raccoglie col piccone)
   }
   };
   G.lootInit = true;
@@ -4690,7 +5128,7 @@ function toMenu() {
   $('#bigmap').classList.add('hidden'); document.body.classList.remove('map-open'); G.mapOpen = false;
   $('#scope').classList.add('hidden');
   $('#stormTint').style.opacity = 0;
-  $('#vignette').style.opacity = 0;
+  $('#vignette').style.opacity = 0; $('#lowVig').style.opacity = 0; $('#lowVig').classList.remove('on'); $('#game').style.filter = ''; G.lowK = 0;
   A.setStormSound(0);
   $('#menu').classList.remove('hidden');
   if (menuApi) menuApi.refresh();
@@ -5102,7 +5540,7 @@ function heldCode(c) {
   return s.kind === 'weapon' ? `w:${s.id}:${s.rarity}` : `c:${s.id}`;
 }
 function encodeChar(c) {
-  const fl = (c.onGround ? 1 : 0) | (c.crouch ? 2 : 0) | (c.inWater ? 4 : 0) | (c.swing > 0.2 ? 8 : 0) | (c.using ? 16 : 0) | (c.reloading > 0 ? 32 : 0);
+  const fl = (c.onGround ? 1 : 0) | (c.crouch ? 2 : 0) | (c.inWater ? 4 : 0) | (c.swing > 0.2 ? 8 : 0) | (c.using ? 16 : 0) | (c.reloading > 0 ? 32 : 0) | (c.slide ? 64 : 0) | (c.vault ? 128 : 0);   // v42
   return [c.idx, r2(c.pos.x), r2(c.pos.y), r2(c.pos.z), r2(c.yaw), r2(c.pitch), MODE_CODES.indexOf(c.mode), fl,
     r2(c.vel.x), r2(c.vel.y), r2(c.vel.z), heldCode(c),
     c.mode === 'climb' ? r2(Math.atan2(c.climbDir.x, c.climbDir.z)) : 0, r2(c.climbPhase || 0), c.mantle ? r2(c.mantle.t) : -1, c.emote ? c.emote.id : 0,
@@ -5132,6 +5570,7 @@ function updatePuppet(c, dt) {
   c.vel.set(n.vx, n.vy, n.vz);
   c.moveAmt = c.mode === 'climb' ? Math.abs(n.vy) : Math.hypot(n.vx, n.vz);
   c.onGround = !!(n.fl & 1); c.crouch = !!(n.fl & 2); c.inWater = !!(n.fl & 4);
+  c.slideNet = !!(n.fl & 64); c.vaultNet = !!(n.fl & 128);   // v42
   if (n.fl & 8 && c.swing <= 0) c.swing = 0.45;
   c.using = n.fl & 16 ? (c.using || { t: 0, total: 1, slot: c.active }) : null;
   if (c.using) c.using.t = Math.min(c.using.total * 0.9, c.using.t + dt);
@@ -5277,6 +5716,12 @@ function onNetMessage(from, m) {
       case 'sdmg': {
         const at = new THREE.Vector3(m.p[0], m.p[1], m.p[2]);
         structEffects(m.r ? world.damageSphere(at, m.r, m.a) : world.damagePoint(at, m.a), null, true);
+        break;
+      }
+      case 'pl': {   // v42: trampolino o trappola piazzati da un altro giocatore (o da un bot dell'host)
+        const ch = C[m.v];
+        if (!ch || ch === G.player || !THROWABLES[m.id] || !THROWABLES[m.id].place) break;
+        if (!G.placed.some(q => q.key === m.k)) placeItem(ch, m.id, m.x, m.y, m.z, m.r || 0, true, m.k);
         break;
       }
       case 'thr': {   // v41: oggetto da lancio di un altro giocatore (o di un bot dell'host)
@@ -5525,6 +5970,7 @@ function update(dt) {
   clawFX.update(dt);
   // v41: oggetti da lancio, segnalazioni
   throwSys.update(dt);
+  updatePlaced(dt);   // v42: trampolini e trappole
   if (trajLine.visible && G.throwAimT !== G.time) { hideTrajectory(); G.throwAim = false; }
   updatePings(dt);
   updateLoot(dt);
@@ -5636,6 +6082,6 @@ setTimeout(() => $('#loading').classList.add('hidden'), 300);
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, bossFight, clawAttack, rayAll, throwSys, throwItem, impulseBlast, addPing, playerPing, hurtFrom, makeWall, placeWall, buildSpot, setPiece, toggleBuild, botTactics, findCover, finishMatch, surfaceUnder, currentZoom, get stoves() { return stoves; } };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, bossFight, clawAttack, rayAll, throwSys, throwItem, impulseBlast, addPing, playerPing, hurtFrom, makeWall, placeWall, buildSpot, setPiece, toggleBuild, botTactics, findCover, finishMatch, surfaceUnder, currentZoom, tryVault, startSlide, updateSlide, canSlide, currentSpread, jumpPenalty, placeItem, placeSpot, updatePlaced, hitMaterial, impactFx, critFlash, rayColliders, ARENA_INFO: () => world.arena, ceilingAt, addColliderT: addCollider, removeColliderT: removeCollider, get stoves() { return stoves; } };
 preloadIcons();
 setTimeout(() => preloadSkins([settings.skin]), 300);

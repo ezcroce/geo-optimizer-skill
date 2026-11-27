@@ -8,7 +8,7 @@
 //  2 intonaco chiaro della chiesa, 3 marmo bianco venato.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts, makeAtlasMaterial } from './props.js?v=41';
+import { mergeParts, makeAtlasMaterial } from './props.js?v=42';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -112,7 +112,10 @@ function sectorBlock(ra, rb, y0, y1, gA, gB, w, seg, faces = {}) {
   const T = new TriBuf(), F = { top: true, inner: true, outer: false, caps: true, innerY0: y0, ...faces };
   // F.bridge: settore che SCAVALCA un varco largo 2w centrato su gA (volta del corridoio sotto le gradinate)
   const ang = F.bridge ? (r, t) => gA + (t * 2 - 1) * Math.asin(Math.min(0.99, (w + 0.03) / r))
-    : (r, t) => { const s = w > 0 ? Math.asin(Math.min(0.99, w / r)) : 0; return (gA + s) + ((gB - s) - (gA + s)) * t; };
+    : (r, t) => {   // v42: F.wA / F.wB = taglio diverso all'inizio e alla fine (varco del corridoio da una parte, scalinata dall'altra)
+      const wa = F.wA ?? w, wb = F.wB ?? w, sa = wa > 0 ? Math.asin(Math.min(0.99, wa / r)) : 0, sb = wb > 0 ? Math.asin(Math.min(0.99, wb / r)) : 0;
+      return (gA + sa) + ((gB - sb) - (gA + sa)) * t;
+    };
   const pt = (r, a, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
   for (let k = 0; k < seg; k++) {
     const t0 = k / seg, t1 = (k + 1) / seg;
@@ -123,7 +126,8 @@ function sectorBlock(ra, rb, y0, y1, gA, gB, w, seg, faces = {}) {
     if (F.outer) T.quad(pt(rb, b0, y0), pt(rb, b1, y0), pt(rb, b1, y1), pt(rb, b0, y1), rout);
     if (F.bottom) T.quad(pt(ra, a0, y0), pt(ra, a1, y0), pt(rb, b1, y0), pt(rb, b0, y0), [0, -1, 0]);
   }
-  if (F.caps && w > 0 && !F.bridge) for (const [t, s] of [[0, -1], [1, 1]]) {
+  if (F.caps && (w > 0 || F.wA || F.wB) && !F.bridge) for (const [t, s] of [[0, -1], [1, 1]]) {
+    if ((t ? F.wB ?? w : F.wA ?? w) <= 0) continue;
     const aa = ang(ra, t), bb = ang(rb, t), tang = [-Math.sin(aa) * s, 0, Math.cos(aa) * s];   // v41: verso corretto (prima i fianchi dei corridoi erano rivolti all'interno e sembravano trasparenti)
     T.quad(pt(ra, aa, y0), pt(rb, bb, y0), pt(rb, bb, y1), pt(ra, aa, y1), tang);
   }
@@ -335,6 +339,8 @@ export const ARENA = {
   RW0: 50, RW1: 53, WALL_H: 22, GATE_H: 7,
   TUN_H: 3.6,             // v39: volta dei corridoi sotto le gradinate
   GATE_W: 2.6,            // mezza larghezza dei varchi (corridoi sugli assi)
+  AISLE_W: 1.05,          // v42: mezza larghezza delle scalinate sulle diagonali (dalla sabbia all'anello più alto)
+  SAND_STEPS: 8, STAIR_R0: 26.4,
 };
 const GATES = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 /**
@@ -346,7 +352,15 @@ export function buildArena(cx, cy, cz, seed = 1) {
   const TR = { tile: 0, ts: 2.6, jit: 0.035 }, SAND = { tile: 1, ts: 7, jit: 0 }, MB = { tile: 3, ts: 0.5, jit: 0.03 };
   const parts = [], colliders = [], loot = [], chests = [];
   const spans = [0, 1, 2, 3].map(k => [k * Math.PI / 2, (k + 1) * Math.PI / 2]);
+  // v42: 4 scalinate sulle diagonali (fra un corridoio e l'altro): nei collisori delle gradinate sono varchi
+  //  "morbidi" (senza muri di fianco: ai lati si sale o si scende sui sedili); i gradini sono settori d'anello
+  //  limitati alla striscia della scalinata
+  const AW = A.AISLE_W, AISLES = [1, 3, 5, 7].map(k => { const a = k * Math.PI / 4; return { a, ax: Math.cos(a), az: Math.sin(a) }; });
+  const aisleGates = AISLES.map(q => ({ ax: q.ax, az: q.az, w: AW - 0.38, soft: 1 }));
   const gatesW = GATES.map(([ax, az]) => ({ ax, az, w }));
+  const gatesT = [...gatesW, ...aisleGates];
+  // ogni quarto fra due corridoi diviso in due dalla scalinata
+  const halves = spans.flatMap(([gA, gB]) => { const m = (gA + gB) / 2; return [[gA, m, { wA: w, wB: AW }], [m, gB, { wA: AW, wB: w }]]; });
   const add = (geo, color, o = TR) => parts.push(P(geo, color, o));
   const box = (w2, h, d, x, y, z, color, o = TR) => parts.push(P(new THREE.BoxGeometry(w2, h, d), color, { ...o, x, y, z }));
   const cyl = (rt, rb, h, seg, x, y, z, color, o = TR) => parts.push(P(new THREE.CylinderGeometry(rt, rb, h, seg), color, { ...o, x, y, z }));
@@ -365,15 +379,15 @@ export function buildArena(cx, cy, cz, seed = 1) {
   add(new THREE.CylinderGeometry(A.RF + 0.4, A.RF + 0.4, 0.4, 64), '#ffffff', { ...SAND, y: -0.15 });
   for (const [ax, az] of GATES) box(ax ? 24 : w * 2, 0.1, az ? 24 : w * 2, ax * (A.RF + 12), 0.03, az * (A.RF + 12), '#cfc2a8', { ...TR, ts: 1.6 });
   // ── podio con parapetto e stendardi ──
-  for (const [gA, gB] of spans) {
-    add(sectorBlock(A.RF, A.POD, 0, A.POD_H, gA, gB, w, 24, { top: true }), '#d9c7a6');
-    add(sectorBlock(A.POD - 0.35, A.POD, A.POD_H, A.POD_H + 0.6, gA, gB, w, 24, { outer: true }), '#e8dcc4');
-    add(sectorBlock(A.RF - 0.05, A.RF + 0.02, 0.0, 0.5, gA, gB, w, 24, { top: false, caps: false }), '#9a8a70');   // zoccolo scuro
-    add(sectorBlock(A.RF - 0.12, A.RF, A.POD_H - 0.25, A.POD_H, gA, gB, w, 24, { top: true }), '#b04a2a', { tile: -1, jit: 0 });   // fascia rossa
+  for (const [gA, gB, cut] of halves) {
+    add(sectorBlock(A.RF, A.POD, 0, A.POD_H, gA, gB, w, 12, { top: true, ...cut }), '#d9c7a6');
+    add(sectorBlock(A.POD - 0.35, A.POD, A.POD_H, A.POD_H + 0.6, gA, gB, w, 12, { outer: true, ...cut }), '#e8dcc4');
+    add(sectorBlock(A.RF - 0.05, A.RF + 0.02, 0.0, 0.5, gA, gB, w, 12, { top: false, caps: false, ...cut }), '#9a8a70');   // zoccolo scuro
+    add(sectorBlock(A.RF - 0.12, A.RF, A.POD_H - 0.25, A.POD_H, gA, gB, w, 12, { top: true, ...cut }), '#b04a2a', { tile: -1, jit: 0 });   // fascia rossa
   }
-  colliders.push({ type: 'ring', x: cx, z: cz, r0: A.RF, r1: A.POD, minY: cy - 1, maxY: cy + A.POD_H + 0.6, gates: gatesW, arena: true });
+  colliders.push({ type: 'ring', x: cx, z: cz, r0: A.RF, r1: A.POD, minY: cy - 1, maxY: cy + A.POD_H + 0.6, gates: gatesT, arena: true });
   gateWalls(A.RF, A.POD, -1, A.POD_H + 0.6);
-  for (let k = 0; k < 4; k++) for (const f of [0.22, 0.5, 0.78]) {
+  for (let k = 0; k < 4; k++) for (const f of [0.2, 0.36, 0.64, 0.8]) {
     const a = (k + f) * Math.PI / 2, r = A.RF - 0.08, x = Math.cos(a) * r, z = Math.sin(a) * r, ry = Math.atan2(-Math.cos(a), -Math.sin(a));
     box(2.2, 2.4, 0.05, x, 1.75, z, '#8e1c16', { tile: -1, jit: 0.02, ry });
     box(2.3, 0.14, 0.07, x, 2.95, z, '#d9b44a', { tile: -1, jit: 0, ry });
@@ -385,11 +399,11 @@ export function buildArena(cx, cy, cz, seed = 1) {
   for (let i = 0; i < A.TIERS; i++) {
     const ra = A.POD + i * A.TW, rb = ra + A.TW, y1 = A.POD_H + (i + 1) * A.TH, yPrev = i ? A.POD_H + i * A.TH : A.POD_H;
     const tint = i % 2 ? '#dccaa8' : '#e6d6b6';
-    for (const [gA, gB] of spans) {
-      add(sectorBlock(ra, rb, 0, y1, gA, gB, w, 24, { innerY0: yPrev }), tint);
-      add(sectorBlock(ra - 0.02, ra + 0.5, y1, y1 + 0.06, gA, gB, w, 24, { inner: false, caps: false }), '#f0e6d2');   // bordo del sedile
+    for (const [gA, gB, cut] of halves) {
+      add(sectorBlock(ra, rb, 0, y1, gA, gB, w, 12, { innerY0: yPrev, ...cut }), tint);
+      add(sectorBlock(ra - 0.02, ra + 0.5, y1, y1 + 0.06, gA, gB, w, 12, { inner: false, caps: false, ...cut }), '#f0e6d2');   // bordo del sedile
     }
-    colliders.push({ type: 'ring', x: cx, z: cz, r0: ra, r1: rb, minY: cy - 1, maxY: cy + y1, gates: gatesW, arena: true });
+    colliders.push({ type: 'ring', x: cx, z: cz, r0: ra, r1: rb, minY: cy - 1, maxY: cy + y1, gates: gatesT, arena: true });
     gateWalls(ra, rb, -1, y1);
     // v39: sopra i varchi le gradinate continuano (volta a TUN_H): prima il taglio era a tutta altezza e
     // da dentro si vedeva attraverso il muro esterno (che dal lato interno è chiuso solo sopra le gradinate)
@@ -402,9 +416,73 @@ export function buildArena(cx, cy, cz, seed = 1) {
       colliders.push({ type: 'box', minX: xs[0], maxX: xs[1], minY: cy + A.TUN_H, maxY: cy + y1, minZ: zs[0], maxZ: zs[1], arena: true });
     }
     // bottino sparso sulle gradinate
-    if (i % 2 === 1) for (let k = 0; k < 2; k++) { const a = (Math.floor(rnd() * 4) + 0.15 + rnd() * 0.7) * Math.PI / 2, r = ra + A.TW / 2; loot.push(W(Math.cos(a) * r, y1 + 0.1, Math.sin(a) * r)); }
+    if (i % 2 === 1) for (let k = 0; k < 2; k++) { let f = 0.15 + rnd() * 0.7; if (Math.abs(f - 0.5) < 0.09) f += f < 0.5 ? -0.12 : 0.12; const a = (Math.floor(rnd() * 4) + f) * Math.PI / 2, r = ra + A.TW / 2; loot.push(W(Math.cos(a) * r, y1 + 0.1, Math.sin(a) * r)); }
   }
   const topY = A.POD_H + A.TIERS * A.TH;    // 15.6
+  // ── v42: scalinate sulle diagonali: 8 gradini dalla sabbia al podio, poi 4 per ogni gradinata fino in cima ──
+  {
+    const steps = [];   // [r0, r1, quota]
+    const n0 = A.SAND_STEPS, run0 = (A.RF - A.STAIR_R0) / n0;
+    for (let m = 0; m < n0; m++) steps.push([A.STAIR_R0 + m * run0, A.STAIR_R0 + (m + 1) * run0, (m + 1) * A.POD_H / n0]);
+    steps.push([A.RF, A.POD, A.POD_H]);   // pianerottolo sul podio (il parapetto qui è aperto)
+    for (let i = 0; i < A.TIERS; i++) for (let j = 0; j < 4; j++) {
+      const r0 = A.POD + i * A.TW + j * A.TW / 4;
+      steps.push([r0, r0 + A.TW / 4, A.POD_H + i * A.TH + (j + 1) * A.TH / 4]);
+    }
+    for (const q of AISLES) {
+      const ry = Math.PI / 2 - q.a;
+      steps.forEach(([r0, r1, top], idx) => {
+        const rm = (r0 + r1) / 2, yb = idx < n0 ? 0 : Math.max(0, top - 1.4), h = top - yb;
+        box(AW * 2, h, r1 - r0 + 0.02, q.ax * rm, yb + h / 2, q.az * rm, idx % 2 ? '#e2d3b4' : '#ebdec4', { ...TR, ry });
+        box(AW * 2 + 0.02, 0.05, 0.12, q.ax * (r0 + 0.06), top + 0.005, q.az * (r0 + 0.06), '#f4ecdc', { ...TR, ry });   // spigolo chiaro del gradino
+        colliders.push({ type: 'ring', x: cx, z: cz, r0, r1, minY: cy - 1, maxY: cy + top, gates: [], only: { ax: q.ax, az: q.az, w: AW }, arena: true });
+      });
+      // fianchi della rampa dalla sabbia al podio (muretti bassi con un cordolo)
+      for (const sd of [-1, 1]) {
+        const px = -q.az * sd * (AW + 0.15), pz = q.ax * sd * (AW + 0.15);
+        for (let m = 0; m < n0; m++) {
+          const [r0, r1, top] = steps[m], rm = (r0 + r1) / 2;
+          box(0.3, top + 0.35, r1 - r0 + 0.01, q.ax * rm + px, (top + 0.35) / 2, q.az * rm + pz, '#d4c29e', { ...TR, ry });
+        }
+      }
+    }
+    // i muretti della rampa: collisori (scatole sottili, solo dalla sabbia)
+    for (const q of AISLES) for (const sd of [-1, 1]) for (let m = 0; m < n0; m++) {
+      const [r0, r1, top] = steps[m], rm = (r0 + r1) / 2;
+      const x = cx + q.ax * rm - q.az * sd * (AW + 0.22), z = cz + q.az * rm + q.ax * sd * (AW + 0.22);
+      colliders.push({ type: 'cyl', x, z, r: 0.25, minY: cy - 1, maxY: cy + top + 0.35, noStand: true, arena: true });
+    }
+  }
+  // ── v42: scale di legno dall'anello più alto alla cima del muro esterno (una per corridoio, appoggiata al muro) ──
+  {
+    const U0 = 47.8, U1 = 49.0, V = 5, LAND = 1.6, N = 18, rise = A.WALL_H - topY;
+    for (const [ax, az] of GATES) {
+      // u = verso l'esterno lungo l'asse, v = di lato (la scala sale da v = -V a v = +V)
+      const sgn = ax + az > 0 ? 1 : -1;                 // verso di salita
+      const P2 = (u, v) => ax ? [ax * u, v * sgn] : [v * -sgn, az * u];
+      const ryS = ax ? 0 : Math.PI / 2;
+      for (let k = 0; k < N; k++) {
+        const v = -V + (k + 0.5) * (2 * V / N), y = topY + (k + 1) * rise / N;
+        const [x, z] = P2((U0 + U1) / 2, v);
+        box(ax ? U1 - U0 : 2 * V / N + 0.04, 0.09, ax ? 2 * V / N + 0.04 : U1 - U0, x, y - 0.045, z, k % 2 ? '#8a5a32' : '#7d5230', { tile: -1, jit: 0.05 });
+        box(ax ? U1 - U0 : 0.04, rise / N, ax ? 0.04 : U1 - U0, ...((p) => [p[0], y - rise / N / 2, p[1]])(P2((U0 + U1) / 2, v - V / N)), '#5e3b22', { tile: -1, jit: 0.04 });   // alzata
+      }
+      // cosciali e corrimano
+      for (const u of [U0 + 0.06, U1 - 0.06]) { const a = P2(u, -V), b = P2(u, V); add(rod(a[0], topY + 0.1, a[1], b[0], A.WALL_H - 0.05, b[1], 0.07, 4), '#5a3a20', { tile: -1, jit: 0.03 }); }
+      for (let k = 0; k <= 4; k++) { const v = -V + k * (2 * V / 4), y = topY + (k / 4) * rise, [x, z] = P2(U0 + 0.05, v); add(rod(x, y, z, x, y + 1.05, z, 0.045, 5), '#5a3a20', { tile: -1, jit: 0.03 }); }
+      { const a = P2(U0 + 0.05, -V), b = P2(U0 + 0.05, V); add(rod(a[0], topY + 1.05, a[1], b[0], A.WALL_H + 1.05, b[1], 0.04, 5), '#6e4526', { tile: -1, jit: 0.03 }); }
+      // pianerottolo in cima (fino al muro) con travi di sostegno
+      { const [x, z] = P2((U0 + A.RW0 + 0.6) / 2, V + LAND / 2), wu = A.RW0 + 0.6 - U0;
+        box(ax ? wu : LAND, 0.25, ax ? LAND : wu, x, A.WALL_H - 0.125, z, '#7d5230', { tile: -1, jit: 0.04 });
+        for (const u of [U0 + 0.15, U1]) { const [bx2, bz2] = P2(u, V + LAND / 2); add(rod(bx2, topY, bz2, bx2, A.WALL_H - 0.25, bz2, 0.09, 5), '#5a3a20', { tile: -1, jit: 0.03 }); } }
+      // collisori: rampa (si cammina sopra, i proiettili la colpiscono) e pianerottolo
+      const [ax0, az0] = P2(U0, -V), [ax1, az1] = P2(U1, V);
+      const dir = ax ? (sgn > 0 ? 'z+' : 'z-') : (sgn > 0 ? 'x-' : 'x+');
+      colliders.push({ type: 'ramp', minX: cx + Math.min(ax0, ax1), maxX: cx + Math.max(ax0, ax1), minZ: cz + Math.min(az0, az1), maxZ: cz + Math.max(az0, az1), minY: cy + topY, maxY: cy + A.WALL_H, dir, surf: 'wood', arena: true });
+      const [lx0, lz0] = P2(U0, V), [lx1, lz1] = P2(A.RW0 + 0.6, V + LAND);
+      colliders.push({ type: 'box', minX: cx + Math.min(lx0, lx1), maxX: cx + Math.max(lx0, lx1), minZ: cz + Math.min(lz0, lz1), maxZ: cz + Math.max(lz0, lz1), minY: cy + A.WALL_H - 0.25, maxY: cy + A.WALL_H, surf: 'wood', arena: true });
+    }
+  }
   // ── muro esterno: arcate su due ordini, attico, cornici; i varchi passano sotto ──
   for (const [gA, gB] of spans) add(sectorBlock(A.RW0, A.RW1, 0, A.GATE_H, gA, gB, w, 30, { outer: true, top: false, innerY0: 0 }), '#d6c09a');
   add(sectorBlock(A.RW0, A.RW1, A.GATE_H, A.WALL_H, 0, Math.PI * 2, 0, 120, { outer: true, inner: true, top: true, caps: false, innerY0: topY - 0.2 }), '#d6c09a');
@@ -500,7 +578,7 @@ export function buildArena(cx, cy, cz, seed = 1) {
   loot.push(W(Math.cos(0.4) * 51.5, A.WALL_H + 0.1, Math.sin(0.4) * 51.5), W(Math.cos(3.6) * 51.5, A.WALL_H + 0.1, Math.sin(3.6) * 51.5));
   chests.push({ pos: W(Math.cos(Math.PI / 6 + 0.25) * 24.5, 0.06, Math.sin(Math.PI / 6 + 0.25) * 24.5), rot: 0.7 });
   chests.push({ pos: W(Math.cos(Math.PI * 7 / 6 + 0.25) * 24.5, 0.06, Math.sin(Math.PI * 7 / 6 + 0.25) * 24.5), rot: 3.8 });
-  chests.push({ pos: W(Math.cos(Math.PI / 4) * (A.POD + A.TW * 7.5), topY + 0.02, Math.sin(Math.PI / 4) * (A.POD + A.TW * 7.5)), rot: Math.PI / 4 + Math.PI / 2 });
+  chests.push({ pos: W(Math.cos(Math.PI / 4 + 0.1) * (A.POD + A.TW * 7.5), topY + 0.02, Math.sin(Math.PI / 4 + 0.1) * (A.POD + A.TW * 7.5)), rot: Math.PI / 4 + 0.1 + Math.PI / 2 });   // v42: accanto alla scalinata
   const geo = mergeParts(parts, 3803);
   geo.userData.monument = true;
   return { geo, colliders, loot, chests };

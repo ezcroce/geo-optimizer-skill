@@ -3,7 +3,7 @@
 //  statistiche dell'arma. Si riordina trascinando (mouse o dito) o con
 //  i tasti 1-5; si può equipaggiare e gettare a terra.
 // ─────────────────────────────────────────────────────────────
-import { WEAPONS, RARITIES, AMMO_TYPES, CONSUMABLES } from './config.js?v=41';
+import { WEAPONS, RARITIES, AMMO_TYPES, CONSUMABLES } from './config.js?v=42';
 
 const STAT_MAX = (() => {
   const m = { dmg: 0, dps: 0, range: 0, mag: 0 };

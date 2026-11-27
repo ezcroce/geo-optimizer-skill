@@ -1077,3 +1077,8 @@ body.touch #throwHud { display: none; }
   #endStats div, #endStats div.big { grid-column: span 6; }
   #endStats div.big b { font-size: 20px; }
 }
+
+/* ── v42: vita bassa: bordi scuri che si stringono (sotto la vignetta rossa dei colpi) ── */
+#lowVig { position: fixed; inset: 0; pointer-events: none; z-index: 8; opacity: 0; --lowR: 60%;
+  background: radial-gradient(ellipse at center, transparent 0, transparent calc(var(--lowR) - 22%), rgba(8,0,0,.55) var(--lowR), rgba(0,0,0,.92) 100%); }
+#lowVig:not(.on) { display: none; }

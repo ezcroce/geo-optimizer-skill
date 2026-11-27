@@ -216,12 +216,12 @@ export function createTouch(api) {
     vis('build', ground && p.mode !== 'climb');
     vis('jump', alive && !bus && p.mode !== 'glide');
     vis('drop', ground && !!p.slot);
-    const thr = p.throws ? (p.throws.frag || 0) + (p.throws.smoke || 0) + (p.throws.impulse || 0) : 0;
+    const thr = p.throws ? Object.values(p.throws).reduce((a, b) => a + (b || 0), 0) : 0;
     vis('throw', ground && thr > 0 && !G.build.on && p.mode !== 'climb');
     vis('swap', ground && thr > 0 && (p.throws[p.throwSel] || 0) < thr);
     vis('piece', ground && G.build.on);
     vis('ping', alive && !bus);
-    if (thr > 0) { const l = $('#tThrowLbl'), tx = (({ frag: 'GRANATA', smoke: 'FUMO', impulse: 'IMPULSO' })[p.throwSel] || 'LANCIA') + ' ' + (p.throws[p.throwSel] || 0); if (l.textContent !== tx) l.textContent = tx; }
+    if (thr > 0) { const l = $('#tThrowLbl'), tx = (({ frag: 'GRANATA', smoke: 'FUMO', impulse: 'IMPULSO', pad: 'TRAMPOLINO', trap: 'TRAPPOLA' })[p.throwSel] || 'LANCIA') + ' ' + (p.throws[p.throwSel] || 0); if (l.textContent !== tx) l.textContent = tx; }
     if (G.build.on) { const l = $('#tPieceLbl'), tx = ({ wall: 'MURO', floor: 'PAVIMENTO', ramp: 'RAMPA' })[G.build.piece] || 'MURO'; if (l.textContent !== tx) l.textContent = tx; }
     vis('emote', ground);
     root.querySelector('.tbusjump').classList.toggle('hidden', !(alive && bus));

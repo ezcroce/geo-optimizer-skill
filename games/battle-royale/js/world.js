@@ -4,11 +4,11 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=41';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=42';
 import { carInstances } from './cars.js?v=25';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=41';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=42';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=41';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=42';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -470,8 +470,14 @@ export function addCollider(c) {
     c.minX = c.x - c.r; c.maxX = c.x + c.r; c.minZ = c.z - c.r; c.maxZ = c.z + c.r;
   } else if (c.type === 'ring') {
     // v38: anello (gradinate e muri dell'arena): corona circolare fra r0 e r1, con varchi rettilinei (gates: {ax, az, w})
-    c.minX = c.x - c.r1; c.maxX = c.x + c.r1; c.minZ = c.z - c.r1; c.maxZ = c.z + c.r1;
     c.gates = c.gates || [];
+    if (c.only) {
+      // v42: settore di anello limitato a una striscia rettilinea (gradini delle scalinate del Colosseo):
+      //  nella griglia occupa solo il suo rettangolo, non tutto l'anello
+      const g = c.only, px = -g.az, pz = g.ax, xs = [], zs = [];
+      for (const r of [c.r0, c.r1]) for (const s of [-1, 1]) { const a = Math.sqrt(Math.max(0, r * r - g.w * g.w)); xs.push(c.x + g.ax * a + px * g.w * s, c.x + g.ax * r + px * g.w * s); zs.push(c.z + g.az * a + pz * g.w * s, c.z + g.az * r + pz * g.w * s); }
+      c.minX = Math.min(...xs); c.maxX = Math.max(...xs); c.minZ = Math.min(...zs); c.maxZ = Math.max(...zs);
+    } else { c.minX = c.x - c.r1; c.maxX = c.x + c.r1; c.minZ = c.z - c.r1; c.maxZ = c.z + c.r1; }
   }
   c._s = 0;
   colliders.push(c);
@@ -514,6 +520,7 @@ export function queryColliders(x, z, r) {
 /** v38: true se (x, z) cade in uno dei varchi dell'anello */
 export function ringGap(c, x, z, m = 0) {
   const dx = x - c.x, dz = z - c.z;
+  if (c.only) { const g = c.only; if (!(dx * g.ax + dz * g.az > 0 && Math.abs(dz * g.ax - dx * g.az) < g.w)) return true; }   // v42: fuori dalla striscia
   for (const g of c.gates) if (dx * g.ax + dz * g.az > 0 && Math.abs(dz * g.ax - dx * g.az) < g.w - m) return true;
   return false;
 }
@@ -584,7 +591,16 @@ export function resolveCollisions(pos, radius, height) {
       const dx = pos.x - c.x, dz = pos.z - c.z, d = Math.hypot(dx, dz);
       if (d < c.r0 - radius || d > c.r1 + radius || d < 1e-6 || ringGap(c, pos.x, pos.z)) continue;
       const to = d - c.r0 < c.r1 - d ? c.r0 - radius : c.r1 + radius;
-      pos.x = c.x + dx / d * to; pos.z = c.z + dz / d * to;
+      // v42: vicino al bordo di un varco (scalinate, corridoi) si esce di lato, verso il varco, se è più vicino:
+      //  prima si veniva sbalzati in avanti o indietro di un gradino intero
+      let lat = Math.abs(to - d), gx = 0, gz = 0;
+      if (!c.only) for (const g of c.gates) {
+        if (!g.soft || dx * g.ax + dz * g.az <= 0) continue;   // solo i varchi senza muri di fianco (scalinate)
+        const cr = dz * g.ax - dx * g.az, e = Math.abs(cr) - g.w + 0.02;
+        if (e < lat) { lat = e; const sg = cr > 0 ? 1 : -1; gx = g.az * sg * e; gz = -g.ax * sg * e; }
+      }
+      if (gx || gz) { pos.x += gx; pos.z += gz; }
+      else { pos.x = c.x + dx / d * to; pos.z = c.z + dz / d * to; }
       hit = true;
     } else {
       const dx = pos.x - c.x, dz = pos.z - c.z;

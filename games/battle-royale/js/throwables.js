@@ -14,8 +14,13 @@ export const THROWABLES = {
   frag: { name: 'Granata a frammentazione', short: 'Granata', icon: '💣', color: '#6f7f3c', max: 6, pickup: 2, fuse: 2.5, rarity: 2 },
   smoke: { name: 'Fumogeno', short: 'Fumogeno', icon: '💨', color: '#9aa4ae', max: 4, pickup: 2, fuse: 1.4, rarity: 1 },
   impulse: { name: 'Granata a impulso', short: 'Impulso', icon: '🌀', color: '#38b6ff', max: 4, pickup: 2, fuse: 1.0, rarity: 3 },
+  // v42: oggetti da piazzare (G mostra dove finiscono, rilasciando si posano a terra)
+  pad: { name: 'Trampolino di lancio', short: 'Trampolino', icon: '🚀', color: '#ff8a1e', max: 2, pickup: 1, place: true, rarity: 3 },
+  trap: { name: 'Trappola a spuntoni', short: 'Trappola', icon: '🪤', color: '#c9ced6', max: 3, pickup: 1, place: true, rarity: 2 },
 };
-export const THROW_IDS = ['frag', 'smoke', 'impulse'];
+export const THROW_IDS = ['frag', 'smoke', 'impulse', 'pad', 'trap'];
+export const PAD = { vy: 34, life: 60, r: 0.9 };            // trampolino: spinta verso l'alto, durata, raggio
+export const TRAP = { dmg: 75, life: 150, r: 0.8, arm: 1.0 };   // trappola: danno, durata, raggio, tempo per armarsi
 export const THROW_G = 20;         // gravità dei lanci (m/s²)
 export const THROW_SPEED = 21;     // velocità iniziale (m/s)
 export const FRAG = { dmg: 95, radius: 6.5 };
@@ -28,8 +33,45 @@ function mat(key, color, o = {}) { return _mats[key] || (_mats[key] = new THREE.
 const _geos = {};
 function geo(key, f) { return _geos[key] || (_geos[key] = f()); }
 
+/** v42: modello piazzato a terra (trampolino Ø 1,7 m, trappola 1,1 m); base in y = 0 */
+export function buildPlacedMesh(id) {
+  const g = new THREE.Group();
+  if (id === 'pad') {
+    const base = new THREE.Mesh(geo('padB', () => new THREE.CylinderGeometry(0.86, 0.95, 0.16, 28)), mat('padB', '#2b2f36', { roughness: 0.6, metalness: 0.5 }));
+    base.position.y = 0.08; g.add(base);
+    const top = new THREE.Mesh(geo('padT', () => new THREE.CylinderGeometry(0.74, 0.74, 0.05, 28)), mat('padT', '#ff7a12', { emissive: '#ff5a00', emissiveIntensity: 0.35, roughness: 0.45 }));
+    top.position.y = 0.18; g.add(top);
+    const ring = new THREE.Mesh(geo('padR', () => new THREE.TorusGeometry(0.8, 0.045, 6, 32)), mat('padRing', '#ffd27a', { emissive: '#ffb030', emissiveIntensity: 1.6, toneMapped: false }).clone());
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.19; g.add(ring); g.userData.ring = ring;
+    // frecce verso l'alto (chevron)
+    for (let k = 0; k < 2; k++) {
+      const ch = new THREE.Mesh(geo('padC', () => { const sh = new THREE.Shape(); sh.moveTo(-0.32, 0); sh.lineTo(0, 0.26); sh.lineTo(0.32, 0); sh.lineTo(0.32, -0.1); sh.lineTo(0, 0.14); sh.lineTo(-0.32, -0.1); sh.closePath(); return new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2); }), mat('padCh', '#fff4d8', { emissive: '#ffe2a0', emissiveIntensity: 1.2, side: THREE.DoubleSide }));
+      ch.position.set(0, 0.21, -0.12 + k * 0.3); g.add(ch);
+    }
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, b = new THREE.Mesh(geo('padBolt', () => new THREE.CylinderGeometry(0.04, 0.04, 0.03, 8)), mat('steel', '#a9aeb4', { metalness: 0.7, roughness: 0.35 })); b.position.set(Math.cos(a) * 0.88, 0.165, Math.sin(a) * 0.88); g.add(b); }
+  } else if (id === 'trap') {
+    const plate = new THREE.Mesh(geo('trP', () => new THREE.BoxGeometry(1.1, 0.06, 1.1)), mat('trP', '#4a4f57', { roughness: 0.55, metalness: 0.6 }));
+    plate.position.y = 0.03; g.add(plate);
+    const frame = new THREE.Mesh(geo('trF', () => new THREE.BoxGeometry(1.16, 0.04, 1.16)), mat('trF', '#d8a21a', { roughness: 0.5, metalness: 0.4 }));
+    frame.position.y = 0.02; g.add(frame);
+    // spuntoni (nascosti nella piastra finché non scatta)
+    const spikes = new THREE.Group(); spikes.position.y = -0.36; g.add(spikes); g.userData.spikes = spikes;
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      const sp = new THREE.Mesh(geo('trS', () => new THREE.ConeGeometry(0.06, 0.42, 6)), mat('trS', '#c9ced6', { roughness: 0.3, metalness: 0.85 }));
+      sp.position.set(-0.39 + i * 0.26, 0.21, -0.39 + j * 0.26); spikes.add(sp);
+    }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      const h = new THREE.Mesh(geo('trH', () => new THREE.CylinderGeometry(0.05, 0.05, 0.01, 8)), mat('dark', '#222'));
+      h.position.set(-0.39 + i * 0.26, 0.065, -0.39 + j * 0.26); g.add(h);
+    }
+  }
+  g.traverse(o => { if (o.isMesh) { o.castShadow = o !== g.userData.ring; o.receiveShadow = true; } });
+  return g;
+}
+
 /** modello dell'oggetto (in mano, a terra, in volo): ~12 cm, con la base in y=0 */
 export function buildThrowMesh(id) {
+  if (id === 'pad' || id === 'trap') { const w = new THREE.Group(), m = buildPlacedMesh(id); m.scale.setScalar(id === 'pad' ? 0.11 : 0.13); w.add(m); return w; }
   const g = new THREE.Group();
   if (id === 'frag') {
     // corpo a "ananas" con le scanalature, leva e anello della sicura

@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=41" />
+<link rel="stylesheet" href="style.css?v=42" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -105,7 +105,7 @@
       <div class="controls keyhelp">
         <b>Comandi</b>
         <div><kbd>W A S D</kbd> muoviti · <kbd>Shift</kbd> corri · <kbd>Spazio</kbd> salta / paracadute</div>
-        <div><kbd>C</kbd> abbassati (nell'erba alta sei nascosto) · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
+        <div><kbd>C</kbd> abbassati (nell'erba alta sei nascosto), correndo: scivolata · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
         <div><kbd>Mouse</kbd> mira · <kbd>Click sx</kbd> spara/usa · <kbd>Click dx</kbd> mira di precisione</div>
         <div><kbd>1-5</kbd> / <kbd>Rotella</kbd> cambia slot · <kbd>R</kbd> ricarica · <kbd>E</kbd> raccogli / apri forziere</div>
         <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>TAB</kbd> inventario · <kbd>X</kbd> lascia oggetto · <kbd>G</kbd> (tieni premuto) lancia granata/fumogeno · <kbd>H</kbd> cambia oggetto da lancio · <kbd>Z</kbd> / <kbd>clic rotella</kbd> segnala · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>0</kbd> e <kbd>'</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
@@ -238,6 +238,7 @@
   <div class="spec-hint">Trascina il mouse per girare la visuale · ← → cambia giocatore</div>
 </div>
 <div id="smokeVeil"></div>
+<div id="lowVig"></div>
 <div id="vignette"></div>
 <div id="stormTint"></div>
 <div id="scope" class="hidden" data-s="scope"><div class="ring"><div class="ret"></div></div><div class="mag"></div></div>
@@ -305,9 +306,9 @@
 <div id="rotateHint"><div class="phone"></div><b>Ruota il telefono</b><span>Arena Royale si gioca in orizzontale</span></div>
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento del gioco…</p></div>
-<script src="js/loading.js?v=41"></script>
+<script src="js/loading.js?v=42"></script>
 
-<script type="module" src="js/main.js?v=41"></script>
-<script src="js/transition.js?v=41"></script>
+<script type="module" src="js/main.js?v=42"></script>
+<script src="js/transition.js?v=42"></script>
 </body>
 </html>

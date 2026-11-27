@@ -20,10 +20,11 @@ export const PRESETS = {
 };
 export const GFX_DEFAULT = { preset: 'alto', ...PRESETS.alto, fpsShow: false, fpsCap: 0, dynRes: true, shadowEvery: 2 };
 
+// v42: ombre più nette: filtro più stretto e quadrato un po' più piccolo (spostato in avanti verso dove guardi)
 const SHADOW = {
-  low: { size: 1024, radius: 1.5, ext: 55 },
-  high: { size: 2048, radius: 3, ext: 70 },
-  ultra: { size: 4096, radius: 4, ext: 95 },
+  low: { size: 1024, radius: 1, ext: 48 },
+  high: { size: 2048, radius: 1.4, ext: 62 },
+  ultra: { size: 4096, radius: 1.8, ext: 85 },
 };
 
 export function createGfx(renderer, scene, camera, sun) {
@@ -118,7 +119,11 @@ export function createGfx(renderer, scene, camera, sun) {
   }
 
   /** disegna la scena principale (con o senza post-processing) */
+  // v42: lampo di bloom (esplosioni, colpi critici): la forza sale per un istante e torna normale
+  let kickV = 0, kickT = 0;
+  function kick(v) { kickV = Math.max(kickV * Math.max(0, 1 - (performance.now() - kickT) / 450), v); kickT = performance.now(); }
   function render(sc = scene, cam = camera) {
+    if (bloomPass) { const k = kickV * Math.max(0, 1 - (performance.now() - kickT) / 450); bloomPass.strength = 0.26 + k * 0.55; bloomPass.radius = 0.5 + k * 0.15; }
     if (composer && usePost) {
       renderPass.scene = sc; renderPass.camera = cam;
       if (gtaoPass) gtaoPass.enabled = sc === scene;   // l'occlusione solo in partita
@@ -128,7 +133,7 @@ export function createGfx(renderer, scene, camera, sun) {
 
   buildComposer();
   return {
-    apply, render, setSize, setDyn,
+    apply, render, setSize, setDyn, kick,
     get dyn() { return dyn; },
     get opts() { return opts; },
     get maxAniso() { return maxAniso; },

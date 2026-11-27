@@ -1,9 +1,24 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v41';
+export const NEWS_VERSION = 'v42';
 
 export const NEWS = [
+  {
+    v: 'v42', title: 'Scivolate, scavalchi e il Colosseo in verticale', color: '#ff9a3c', icon: '🏃',
+    items: [
+      'Scivolata: mentre corri premi C. Ti abbassi quasi a terra, mantieni lo slancio (in discesa acceleri) e puoi curvare un po’; con SPAZIO salti via senza perdere velocità. Costa un po’ di resistenza',
+      'Scavalco automatico: correndo contro un muretto, una cassa o un gradone del Colosseo (fino a 1,25 m) lo superi da solo senza fermarti; con SPAZIO fino a 1,75 m, e saltando verso un bordo ti aggrappi e sali',
+      'Saltare a ripetizione non conviene più: ogni salto costa resistenza, i salti di fila sono più bassi, in volo la mira è molto imprecisa e torna normale 0,4 s dopo l’atterraggio. Vale anche per i bot',
+      'Colosseo: quattro scalinate diagonali portano dalla sabbia al podio e su per tutte le gradinate, e ad ogni ingresso una scala di legno sale dall’ultima gradinata fino in cima al muro. Lassù vedi tutta l’arena, ma ti vedono tutti',
+      'Nuovi oggetti tattici: Trampolino di lancio (piazzalo e saltaci sopra: vola in alto e il deltaplano si apre da solo) e Trappola a spuntoni (75 danni e rallenta chi ci passa sopra, invisibile da lontano). Tieni premuto G per vedere dove finiscono',
+      'Bottino a terra più utile: niente più munizioni sparse di un tipo a caso né mucchietti di legna. Solo armi con le loro munizioni, cure, scudi e oggetti tattici',
+      'Ombre del sole più nette e stabili: niente più bordi che tremolano camminando, e più dettaglio dove guardi',
+      'Le esplosioni e i colpi alla testa fanno un bagliore (con il bloom attivo, grafica Alta e Ultra)',
+      'Con poca vita i bordi dello schermo si scuriscono, i colori si spengono e si sente il battito del cuore',
+      'Proiettili diversi a seconda di cosa colpiscono: scintille sul metallo, polvere e schegge sulla pietra, zolle di terra, schegge di legno, sbuffi di sabbia e neve, ciascuno con il suo suono',
+    ],
+  },
   {
     v: 'v41', title: 'Granate, segnalazioni e case più grandi', color: '#6ad8ff', icon: '💣',
     items: [

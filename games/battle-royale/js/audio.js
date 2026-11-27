@@ -246,3 +246,41 @@ export function playWhiz() {
   else { src.connect(f); f.connect(g); g.connect(master); }
   src.start(t, Math.random() * 0.5, 0.25);
 }
+
+// ─────────────── v42: movimento, impatti per materiale, trappole e trampolini, rianimazioni ───────────────
+/** scivolata: strisciata sul terreno (più ruvida su pietra e legno) */
+export function playSlide(surf = 'grass', dist = 0) {
+  if (!ctx) return; const a = att3(dist, 40); if (a < 0.01) return;
+  const hard = surf === 'stone' || surf === 'wood' || surf === 'metal';
+  routed(a, 0, () => { noise(0.62, hard ? 2600 : 1300, 0.7, hard ? 0.24 : 0.3, hard ? 'bandpass' : 'lowpass', 0, 0.6); noise(0.3, 600, 0.8, 0.12, 'lowpass', 0.02, 0.28); });
+}
+/** scavalcamento: fruscio dei vestiti e mani che battono sul bordo */
+export function playVault(dist = 0) {
+  if (!ctx) return; const a = att3(dist, 35); if (a < 0.01) return;
+  routed(a, 0, () => { noise(0.07, 900, 1.2, 0.3, 'lowpass'); noise(0.25, 2400, 0.7, 0.12, 'bandpass', 0.04, 0.22); noise(0.06, 700, 1.4, 0.22, 'lowpass', 0.22); });
+}
+/** proiettile che colpisce una superficie: pietra (schiocco secco), metallo (rimbalzo che fischia), legno (tonfo), terra (soffice) */
+export function playImpact(mat = 'stone', dist = 0) {
+  if (!ctx) return; const a = att3(dist, 30); if (a < 0.02) return;
+  routed(a, 0, () => {
+    if (mat === 'metal') { tone(1800 + Math.random() * 900, 0.16, 0.12, 'triangle', 0, 900 + Math.random() * 500); noise(0.04, 5200, 2, 0.14, 'bandpass'); if (Math.random() < 0.35) tone(2600 + Math.random() * 1200, 0.32, 0.05, 'sine', 0.02, 1400); }
+    else if (mat === 'wood') { noise(0.07, 700, 1.5, 0.26, 'bandpass'); tone(210, 0.06, 0.1, 'triangle', 0, 140); }
+    else if (mat === 'stone') { noise(0.05, 3200, 1.4, 0.24, 'bandpass'); noise(0.18, 1200, 0.6, 0.07, 'lowpass', 0.02, 0.16); }
+    else if (mat === 'glass') { tone(3200, 0.12, 0.08, 'sine', 0, 2400); noise(0.15, 6000, 1, 0.14, 'highpass'); }
+    else noise(0.09, 600, 0.8, 0.2, 'lowpass');
+  });
+}
+/** trampolino di lancio: molla e sibilo verso l'alto */
+export function playLaunch(dist = 0) {
+  if (!ctx) return; const a = att3(dist, 70); if (a < 0.01) return;
+  routed(a, 0, () => { tone(120, 0.25, 0.4, 'sine', 0, 520); tone(320, 0.5, 0.16, 'sawtooth', 0.03, 1800); noise(0.7, 2200, 0.6, 0.2, 'bandpass', 0.05, 0.65); });
+}
+/** trappola che scatta: lame metalliche */
+export function playTrap(dist = 0) {
+  if (!ctx) return; const a = att3(dist, 50); if (a < 0.01) return;
+  routed(a, 0, () => { noise(0.05, 4200, 1.5, 0.35, 'bandpass'); tone(1400, 0.12, 0.14, 'square', 0, 500); tone(2600, 0.25, 0.06, 'triangle', 0.03, 2000); noise(0.2, 900, 0.8, 0.18, 'lowpass', 0.04, 0.18); });
+}
+/** oggetto piazzato (trampolino, trappola) */
+export function playPlace(dist = 0) { if (!ctx) return; const a = att3(dist, 40); if (a < 0.01) return; routed(a, 0, () => { noise(0.08, 1100, 1.2, 0.3, 'bandpass'); tone(260, 0.08, 0.14, 'square', 0.02, 180); tone(900, 0.06, 0.08, 'triangle', 0.09); }); }
+/** battito del cuore quando la salute è bassa */
+export function playHeartbeat(k = 1) { if (!ctx) return; tone(58, 0.11, 0.32 * k, 'sine', 0, 44); tone(52, 0.13, 0.24 * k, 'sine', 0.17, 40); }

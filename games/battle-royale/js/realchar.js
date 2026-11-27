@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { dressUp, HAS_COSTUME } from './costume.js?v=42';
+import { dressUp, HAS_COSTUME } from './costume.js?v=43';
 
 export const REAL = { ready: false, bases: {}, promise: null, prefix: 'models/chars/' };
 const FILES = { soldier: 'soldato.glb', woman: 'donna.glb' };
@@ -474,6 +474,7 @@ export function attachReal(m, skin, keep = {}) {
       ax: (base.fingerAxis && base.fingerAxis[side + f + k]) || new THREE.Vector3(1, 0, 0) });
   }
   m.real = { rg, B, base, Q: B.map(() => new THREE.Quaternion()), P: B.map(() => new THREE.Vector3()), fingers, grip: -1, want, skin, keep };
+  m._syncF = -1; m._ppT = 0;   // v43: nuovo modello: va sincronizzato e ricontato
   // v32: bocca e collo nello spazio del busto (per bere dalle pozioni)
   if (base.headFit && base.headPos) {
     const f = base.headFit, hr = base.hipsRest;
@@ -622,6 +623,8 @@ export function syncAllReal() {
         else R.want = null;
       } else loadSkinModel(R.want);
     }
+    // v43: se la posa non è cambiata da quando l'abbiamo copiata (personaggi lontani animati a frame alterni) si salta
+    if (m._animF !== undefined) { if (m._animF === m._syncF) continue; m._syncF = m._animF; }
     syncReal(m);
   }
 }

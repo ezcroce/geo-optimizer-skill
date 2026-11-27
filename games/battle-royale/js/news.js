@@ -1,9 +1,22 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v42';
+export const NEWS_VERSION = 'v43';
 
 export const NEWS = [
+  {
+    v: 'v43', title: 'Più leggero: almeno 30 FPS', color: '#7dff9a', icon: '⚡',
+    items: [
+      'Nuova opzione Qualità automatica (minimo 30 FPS), attiva di base in Impostazioni › Grafica: se il gioco scende sotto i 30 FPS abbassa da sola la risoluzione e poi, un passo alla volta, occlusione ambientale, antialiasing, ombre, bloom, erba e distanza visiva. Quando torni sopra i 50 FPS ripristina tutto. Le tue impostazioni non vengono toccate e un avviso ti dice cosa è cambiato',
+      'La risoluzione dinamica può scendere fino al 50% nei momenti più pesanti',
+      'I personaggi fuori dallo schermo non vengono più disegnati, quelli lontani hanno meno dettagli, non fanno ombra e si animano meno spesso. Il tuo personaggio e chi ti è vicino restano identici',
+      'Porte più leggere: maniglie e placche in un unico pezzo, e le porte lontane non vengono disegnate',
+      'Il bottino a terra fa ombra solo vicino a te',
+      'I bot lontani da tutti i giocatori pensano un po’ meno spesso, e la ricerca di case e tetti è molto più veloce',
+      'Le icone delle armi si preparano solo nei menu, mai durante la partita',
+      'Risultato in una partita con 100 giocatori: circa 3,5 volte meno oggetti disegnati per fotogramma (da circa 2700 a circa 760), 6 volte meno triangoli e metà del tempo di calcolo per fotogramma',
+    ],
+  },
   {
     v: 'v42', title: 'Scivolate, scavalchi e il Colosseo in verticale', color: '#ff9a3c', icon: '🏃',
     items: [

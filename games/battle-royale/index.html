@@ -10,7 +10,7 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="stylesheet" href="site.css?v=42" />
+<link rel="stylesheet" href="site.css?v=43" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -71,8 +71,24 @@
 <!-- ───────── TICKER ───────── -->
 <div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
 
-<!-- ───────── NOVITÀ v42 ───────── -->
+<!-- ───────── NOVITÀ v43 ───────── -->
 <section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v43</span>
+    <h2 class="h2 reveal">Più leggero,<br /><em>almeno 30 FPS.</em></h2>
+    <p class="lead33 reveal">Arena Royale ora gira molto più fluido anche su computer modesti: disegna solo quello che vedi, alleggerisce ciò che è lontano e, se serve, abbassa da solo la grafica per non scendere mai sotto i 30 FPS.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">⚡</div><h3>Qualità automatica</h3><p>Sotto i 30 FPS il gioco riduce prima la risoluzione (fino al 50%) e poi, un passo alla volta, antialiasing, ombre, bloom, erba e distanza visiva. Sopra i 50 FPS ripristina tutto. Si disattiva in <b>Impostazioni › Grafica</b>.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">👥</div><h3>Personaggi intelligenti</h3><p>Chi è fuori dallo schermo non viene disegnato; chi è lontano ha meno dettagli, niente ombra e animazioni meno frequenti. Tu e chi ti sta vicino restate identici.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🚪</div><h3>Mondo più leggero</h3><p>Porte con maniglie in un unico pezzo e nascoste da lontano, bottino che fa ombra solo vicino a te, icone delle armi preparate solo nei menu.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🤖</div><h3>Bot più efficienti</h3><p>I bot lontani da tutti pensano un po' meno spesso e trovano case e tetti molto più in fretta, senza cambiare il loro modo di giocare.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">📉</div><h3>I numeri</h3><p>Con 100 giocatori in partita: da circa 2700 a circa 760 oggetti disegnati per fotogramma, da 4,5 a 0,7 milioni di triangoli, metà del tempo di calcolo.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v42 ───────── -->
+<section id="novita42" class="section news33">
   <div class="wrap">
     <span class="badge-new reveal">NOVITÀ · v42</span>
     <h2 class="h2 reveal">Scivola, scavalca,<br /><em>sali in cima al Colosseo.</em></h2>
@@ -361,7 +377,7 @@
 
 <div id="toast"></div>
 
-<script type="module" src="js/site.js?v=42"></script>
-<script src="js/transition.js?v=42"></script>
+<script type="module" src="js/site.js?v=43"></script>
+<script src="js/transition.js?v=43"></script>
 </body>
 </html>

@@ -3,12 +3,13 @@
 // serve ai bot in tutta l'isola; la parte grafica è generata a CHUNK attorno alla telecamera,
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=42';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=43';
 import { carInstances } from './cars.js?v=25';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=42';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=43';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=42';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=43';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -19,7 +20,7 @@ export const WATER_LEVEL = -2.6;
 export const CHUNK = 100;             // lato di un chunk (m)
 /** qualità grafica regolabile dalle impostazioni (distanze di dettaglio, erba) */
 export const GRASS_FADE = { value: 1 };
-export const QUALITY = { detailIn: 240, detailOut: 310, grassR: 64, grassDens: 0.8, treeHi: 110, nearOnly: 150, grassOn: true, version: 0 };
+export const QUALITY = { detailIn: 240, detailOut: 310, grassR: 64, grassDens: 0.8, treeHi: 110, nearOnly: 150, doorNear: 110, hwNear: 28, grassOn: true, version: 0 };
 const EDGE = HALF + 60;               // il terreno continua un po' nel mare
 
 const DEFAULT_TOWNS = [
@@ -1548,6 +1549,21 @@ export function buildWorld(scene, opts = {}) {
   }
   const knobGeo = new THREE.SphereGeometry(0.045, 10, 8); knobGeo.userData.shared = true;
   const plateGeo = new THREE.BoxGeometry(0.06, 0.2, 0.01); plateGeo.userData.shared = true;
+  // v43: maniglie e placche delle due facce fuse in un solo pezzo (prima 4 draw call per anta, ora 1)
+  const hwCache = new Map();
+  function hardwareGeo(lw) {
+    const k = lw.toFixed(2);
+    if (!hwCache.has(k)) {
+      const parts = [];
+      for (const zs of [-1, 1]) {
+        parts.push(knobGeo.clone().translate(lw - 0.11, 1.0, zs * 0.07));
+        parts.push(plateGeo.clone().toNonIndexed().translate(lw - 0.11, 1.0, zs * 0.04));
+      }
+      const g = mergeGeometries(parts.map(q => q.index ? q.toNonIndexed() : q)); g.userData.shared = true;
+      hwCache.set(k, g);
+    }
+    return hwCache.get(k);
+  }
   /** costruisce le due ante (pivot sui cardini) quando il chunk diventa visibile */
   function buildDoorLeaves(dr, group) {
     const lw2 = dr.gap / 2 - 0.03, lh = dr.lh || 2.36;
@@ -1567,11 +1583,8 @@ export function buildWorld(scene, opts = {}) {
       const leaf = new THREE.Mesh(leafGeo(lw, lh), dr.mat);
       leaf.castShadow = true; leaf.receiveShadow = true;
       piv.add(leaf);
-      for (const zs of [-1, 1]) {
-        const kb = new THREE.Mesh(knobGeo, knobMat); kb.position.set(lw - 0.11, 1.0, zs * 0.07); piv.add(kb);
-        const pl = new THREE.Mesh(plateGeo, knobMat); pl.position.set(lw - 0.11, 1.0, zs * 0.04); piv.add(pl);
-      }
-      piv.userData = { base, into };
+      const hw = new THREE.Mesh(hardwareGeo(lw), knobMat); piv.add(hw);
+      piv.userData = { base, into, hw };
       group.add(piv);
       dr.leaves.push(piv);
     }
@@ -3120,6 +3133,8 @@ export function buildWorld(scene, opts = {}) {
     }
     // cespugli (4 varianti, due con fiori) ed erba media: visibili solo nei chunk vicini
     ch.nearOnly = [];
+    ch.doorPiv = [];   // v43: ante delle porte: spariscono da lontano (le maniglie ancora prima)
+    for (const dr of ch.doors) if (dr.leaves) ch.doorPiv.push(...dr.leaves);
     if (ch.bushes.length) {
       const lists = PROPS.bushes.map(() => []);
       for (const b of ch.bushes) lists[b.v].push(b);
@@ -3576,6 +3591,10 @@ export function buildWorld(scene, opts = {}) {
         const dx = Math.max(ch.x0 - camPos.x, 0, camPos.x - (ch.x0 + CHUNK)), dz = Math.max(ch.z0 - camPos.z, 0, camPos.z - (ch.z0 + CHUNK));
         const near = Math.hypot(dx, dz) < QUALITY.nearOnly;
         if (ch.nearOnly) for (const im of ch.nearOnly) im.visible = near;
+        if (ch.doorPiv) {
+          const dd = Math.hypot(dx, dz), dn = dd < QUALITY.doorNear, hn = dd < QUALITY.hwNear;
+          for (const pv of ch.doorPiv) { pv.visible = dn; if (pv.userData.hw) pv.userData.hw.visible = hn; pv.children[0].castShadow = dd < 50; }
+        }
         const dTree = Math.hypot(dx, dz) < QUALITY.treeHi;
         if (ch.treeHi) { for (const im of ch.treeHi) im.visible = dTree; for (const im of ch.treeLo) im.visible = !dTree; }
       }

@@ -18,7 +18,7 @@ export const PRESETS = {
   alto: { scale: 1, shadows: 'high', texq: 'high', aniso: 8, aa: 'msaa', bloom: true, ao: false, view: 1, grass: 1 },
   ultra: { scale: 1.25, shadows: 'ultra', texq: 'high', aniso: 16, aa: 'smaa', bloom: true, ao: true, view: 1.4, grass: 1.4 },
 };
-export const GFX_DEFAULT = { preset: 'alto', ...PRESETS.alto, fpsShow: false, fpsCap: 0, dynRes: true, shadowEvery: 2 };
+export const GFX_DEFAULT = { preset: 'alto', ...PRESETS.alto, fpsShow: false, fpsCap: 0, dynRes: true, autoQ: true, shadowEvery: 2 };
 
 // v42: ombre più nette: filtro più stretto e quadrato un po' più piccolo (spostato in avanti verso dove guardi)
 const SHADOW = {
@@ -105,7 +105,7 @@ export function createGfx(renderer, scene, camera, sun) {
 
   /** v37: cambia la risoluzione dinamica senza ricostruire gli effetti */
   function setDyn(k) {
-    k = THREE.MathUtils.clamp(k, 0.55, 1);
+    k = THREE.MathUtils.clamp(k, 0.5, 1);
     if (Math.abs(k - dyn) < 0.01) return;
     dyn = k;
     renderer.setPixelRatio(pixelRatio());

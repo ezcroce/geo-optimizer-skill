@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=42';
+import { EMOTES, poseEmote } from './emotes.js?v=43';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=42';
-import * as PR from './progress.js?v=42';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=42';
-import { initMenu } from './menu.js?v=42';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=42';
-import { initSettingsUI } from './settings-ui.js?v=42';
+} from './config.js?v=43';
+import * as PR from './progress.js?v=43';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=43';
+import { initMenu } from './menu.js?v=43';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=43';
+import { initSettingsUI } from './settings-ui.js?v=43';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=42';
+import * as A from './audio.js?v=43';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=42';
+} from './world.js?v=43';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=42';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=42';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=42';
-import { buildChestMesh } from './models3d.js?v=42';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=42';
-import { createInventory } from './inventory.js?v=42';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=42';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=42';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=43';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=43';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=43';
+import { buildChestMesh } from './models3d.js?v=43';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=43';
+import { createInventory } from './inventory.js?v=43';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=43';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=43';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=42';
-import { buildPickaxe, heldConsumable } from './held.js?v=42';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=42';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=42';
-import { createCrosshair } from './crosshair.js?v=42';
-import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=42';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=42';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=43';
+import { buildPickaxe, heldConsumable } from './held.js?v=43';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=43';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=43';
+import { createCrosshair } from './crosshair.js?v=43';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=43';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=43';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -930,12 +930,68 @@ function blink(c, dt) {
   if (c.blinkT < 0) { L.visible = c.blinkT > -0.12; if (c.blinkT <= -0.12) c.blinkT = 2 + Math.random() * 3; }
   else L.visible = false;
 }
+// ─────────────── v43: prestazioni dei personaggi ───────────────
+//  Con 100 giocatori i personaggi erano più di metà delle draw call (ognuno ~100 pezzi, disegnati due volte:
+//  scena e ombre, anche quelli alle spalle). Ora: fuori dall'inquadratura non si disegnano e si animano di rado;
+//  oltre PERF.charShadow non fanno ombra; i pezzettini (bottoni, fibbie, maniglie del piccone…) spariscono oltre
+//  PERF.smallNear; da PERF.anim2/anim3 m la posa si aggiorna a frame alterni (1 su 2 / 1 su 3).
+const PERF = { charFull: 80, charShadow: 26, smallNear: 22, anim2: 28, anim3: 55, lootFull: 45, lootShadow: 22, botFar2: 140, botFar3: 280 };
+const _frus = new THREE.Frustum(), _frusM = new THREE.Matrix4(), _frusS = new THREE.Sphere(), _ws = new THREE.Vector3();
+let frameN = 0;
+function perfFrame() {
+  frameN++;
+  camera.updateMatrixWorld();
+  _frusM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  _frus.setFromProjectionMatrix(_frusM);
+}
+/** elenco (rinfrescato ogni 2–3 s) dei pezzi di un personaggio: tutti, e quelli piccoli (< 7 cm) */
+function charParts(c) {
+  const m = c.m;
+  if (m._pp && G.time < m._ppT) return m._pp;
+  const all = [], small = [];
+  m.root.traverse(o => {
+    if (!o.isMesh || o === m.lod) return;
+    if (o.userData._cs === undefined) o.userData._cs = o.castShadow;
+    all.push(o);
+    if (!o.isSkinnedMesh && o.geometry) {
+      const g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+      o.getWorldScale(_ws);
+      if (g.boundingSphere.radius * Math.max(_ws.x, _ws.y, _ws.z) < 0.07) small.push(o);
+    }
+  });
+  m._pp = { all, small }; m._ppT = G.time + 2 + Math.random();
+  m._shOn = m._smOn = undefined;
+  return m._pp;
+}
+/** ombre e dettagli piccoli (i pezzi nascosti passano al layer 1: la camera non lo disegna, .visible resta libero) */
+function charDetail(c, shadow, small) {
+  const P = charParts(c), m = c.m;
+  if (m._shOn !== shadow) { m._shOn = shadow; for (const o of P.all) o.castShadow = shadow && o.userData._cs; }
+  if (m._smOn !== small) { m._smOn = small; for (const o of P.small) o.layers.set(small ? 0 : 1); }
+}
 function updateCharVisual(c, dt) {
   const m = c.m;
   blink(c, dt);
-  if (c.isPlayer || !c.alive) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
+  if (c.isPlayer) { m.body.visible = true; m.lod.visible = false; charDetail(c, true, true); animateChar(c, dt); return; }
   const d2 = c.pos.distanceToSquared(camera.position);
-  if (d2 < 120 * 120) { m.body.visible = true; m.lod.visible = false; animateChar(c, dt); return; }
+  if (d2 < PERF.charFull * PERF.charFull) {
+    c._animAcc = (c._animAcc || 0) + dt;
+    const inView = d2 < 100 || _frus.intersectsSphere(_frusS.set(_ws.set(c.pos.x, c.pos.y + 1, c.pos.z), 2.6));
+    if (!inView) {
+      // fuori dall'inquadratura: niente disegno; la posa si aggiorna ogni tanto (serve a mani, arma e altezza)
+      m.body.visible = false; m.lod.visible = false;
+      m.root.position.copy(c.pos);
+      if ((frameN + c.idx) % 6 === 0) { animateChar(c, Math.min(c._animAcc, 0.25)); c._animAcc = 0; }
+      return;
+    }
+    m.body.visible = true; m.lod.visible = false;
+    charDetail(c, c.alive && d2 < PERF.charShadow * PERF.charShadow, d2 < PERF.smallNear * PERF.smallNear);
+    const div = !c.alive || d2 < PERF.anim2 * PERF.anim2 ? 1 : d2 < PERF.anim3 * PERF.anim3 ? 2 : 3;
+    if (div === 1 || (frameN + c.idx) % div === 0) { animateChar(c, Math.min(c._animAcc, 0.25)); c._animAcc = 0; }
+    else m.root.position.copy(c.pos);
+    return;
+  }
+  if (!c.alive) { m.body.visible = false; m.lod.visible = false; m.root.position.copy(c.pos); return; }
   m.body.visible = false;
   m.root.position.copy(c.pos); m.root.rotation.set(0, c.yaw, 0);
   // v24: i nemici lontani restano visibili fin dentro la nebbia (prima sparivano di colpo a 480 m)
@@ -950,6 +1006,7 @@ function updateCharVisual(c, dt) {
 const smooth01 = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };
 function animateChar(ch, dt) {
   const m = ch.m;
+  m._animF = frameN;   // v43: posa nuova da copiare sul modello realistico
   m.root.position.copy(ch.pos);
   m.root.rotation.y = ch.yaw;
   m.root.rotation.z = 0;
@@ -2566,6 +2623,7 @@ function buildLootMesh(L) {
   L.mesh = g; L.model = model;
 }
 function removeLoot(L, remote = false) {
+  L.gone = true;   // v43
   const i = G.loot.indexOf(L);
   if (i >= 0) G.loot.splice(i, 1);
   if (G.net && !remote && i >= 0) netSend({ t: 'pick', id: L.id });
@@ -2635,9 +2693,12 @@ function updateLoot(dt) {
     if (!near) { if (L.pop > 0) L.pop -= dt; continue; }
     // v37: oltre i 50 m il modello (6–10 pezzi) e l'anello spariscono, resta solo la colonna di luce delle
     //  armi rare: prima centinaia di oggetti lontani costavano più draw call di tutta la città
-    const close = d2 < LOOT_FULL2;
+    const close = d2 < PERF.lootFull * PERF.lootFull;
     if (L.model.visible !== close) { L.model.visible = close; if (L.ring) L.ring.visible = close; }
     if (!close) { if (L.pop > 0) L.pop -= dt; L.mesh.position.y = L.pos.y; continue; }
+    // v43: l'ombra degli oggetti a terra solo da vicino (ognuno è fatto di 6–10 pezzi)
+    const sh = d2 < PERF.lootShadow * PERF.lootShadow;
+    if (L._sh !== sh) { L._sh = sh; L.model.traverse(o => { if (o.isMesh) { if (o.userData._cs === undefined) o.userData._cs = o.castShadow; o.castShadow = sh && o.userData._cs; } }); }
     L.bob += dt;
     L.model.rotation.y += dt * 1.2;
     L.model.position.y = 0.45 + Math.sin(L.bob * 2) * 0.08;
@@ -2645,21 +2706,34 @@ function updateLoot(dt) {
     else L.mesh.position.y = L.pos.y;
   }
   // raccolta automatica di munizioni e materiali
+  // v43: prima ogni personaggio controllava tutto il bottino della mappa (100 × ~1500 per frame): ora una griglia di 4 m
+  lootGrid.clear();
+  for (const L of G.loot) {
+    if (L.pop > 0 || (L.item.kind !== 'ammo' && L.item.kind !== 'mats' && L.item.kind !== 'throw')) continue;
+    const k = Math.floor(L.pos.x / 4) * 4096 + Math.floor(L.pos.z / 4);
+    const a = lootGrid.get(k); if (a) a.push(L); else lootGrid.set(k, [L]);
+  }
+  if (!lootGrid.size) return;
   for (const c of G.chars) {
     if (!c.alive || c.mode !== 'ground' || c.remote) continue;
-    for (let i = G.loot.length - 1; i >= 0; i--) {
-      const L = G.loot[i];
-      if (L.item.kind !== 'ammo' && L.item.kind !== 'mats' && L.item.kind !== 'throw') continue;
+    const gx = Math.floor(c.pos.x / 4), gz = Math.floor(c.pos.z / 4);
+    for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+    const cell = lootGrid.get((gx + ox) * 4096 + gz + oz);
+    if (!cell) continue;
+    for (const L of cell) {
+      if (L.gone) continue;
       if (L.item.kind === 'throw' && (c.throws[L.item.id] || 0) >= THROWABLES[L.item.id].max) continue;
-      if (L.pop > 0) continue;
       const dx = L.pos.x - c.pos.x, dz = L.pos.z - c.pos.z;
       if (dx * dx + dz * dz < 1.6 && Math.abs(L.pos.y - c.pos.y) < 1.5) {
         if (c.isPlayer) { dmgNumber(L.pos.clone().setY(L.pos.y + 1), '+' + Math.min(L.item.count, L.item.kind === 'throw' ? THROWABLES[L.item.id].max - (c.throws[L.item.id] || 0) : 999) + ' ' + (L.item.kind === 'mats' ? '🪵' : L.item.kind === 'throw' ? THROWABLES[L.item.id].icon : AMMO_TYPES[L.item.id].short), 'shield'); A.playPickup(); }
         pickupLoot(c, L);
       }
     }
+    }
   }
 }
+const lootGrid = new Map();
+const humansNow = [];
 
 // ─────────────── v34: pre-riscaldamento (shader, texture, icone) ───────────────
 // Le prime partite scattavano perché ogni materiale nuovo (armi, oggetti, forzieri, deltaplani…) veniva
@@ -3301,8 +3375,23 @@ function botTryPickup(b) {
 
 const _bd = new THREE.Vector3();
 const _nav = new THREE.Vector3();
+// v43: griglia delle case (celle di 16 m): prima ogni bot scorreva tutte le case della mappa 3 volte per frame
+const HG = { ref: null, n: -1, map: new Map() };
+const EMPTY = [];
+function housesNear(x, z) {
+  const W = world.houses;
+  if (HG.ref !== W || HG.n !== W.length) {
+    HG.ref = W; HG.n = W.length; HG.map.clear();
+    for (const h of W) {
+      const x0 = Math.floor((h.cx - h.w / 2 - 1) / 16), x1 = Math.floor((h.cx + h.w / 2 + 1) / 16);
+      const z0 = Math.floor((h.cz - h.d / 2 - 1) / 16), z1 = Math.floor((h.cz + h.d / 2 + 1) / 16);
+      for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) { const k = i * 4096 + j, a = HG.map.get(k); if (a) a.push(h); else HG.map.set(k, [h]); }
+    }
+  }
+  return HG.map.get(Math.floor(x / 16) * 4096 + Math.floor(z / 16)) || EMPTY;
+}
 function houseAt(x, z, y) {
-  for (const h of world.houses) {
+  for (const h of housesNear(x, z)) {
     if (h.collapsed) continue;
     if (Math.abs(x - h.cx) < h.w / 2 - 0.15 && Math.abs(z - h.cz) < h.d / 2 - 0.15 && (y === undefined || y < h.roofTop - 0.5)) return h;
   }
@@ -3311,7 +3400,7 @@ function houseAt(x, z, y) {
 // Navigazione semplice: passa dalle porte per entrare/uscire dalle case
 function navPoint(b, goal) {
   // sul tetto? scendi dal bordo più vicino
-  for (const h of world.houses) {
+  for (const h of housesNear(b.pos.x, b.pos.z)) {
     if (!h.collapsed && b.pos.y > h.roofTop - 0.6 && Math.abs(b.pos.x - h.cx) < h.w / 2 + 0.4 && Math.abs(b.pos.z - h.cz) < h.d / 2 + 0.4) {
       const ex = h.w / 2 - Math.abs(b.pos.x - h.cx), ez = h.d / 2 - Math.abs(b.pos.z - h.cz);
       if (ex < ez) return _nav.set(h.cx + Math.sign(b.pos.x - h.cx || 1) * (h.w / 2 + 2), 0, b.pos.z);
@@ -3443,7 +3532,12 @@ function updateBot(b, dt) {
     }
     if (goal) {
       const gd = Math.hypot(goal.x - b.pos.x, goal.z - b.pos.z);
-      const np = ai.state === 'flee' || ai.state === 'flee2' ? goal : navPoint(b, goal);
+      // v43: il punto di passaggio (porte, scale) si ricalcola 6–7 volte al secondo invece che a ogni frame
+      let np = goal;
+      if (ai.state !== 'flee' && ai.state !== 'flee2') {
+        if (ai.npGoal !== goal || G.time > (ai.npT || 0) || !ai.npV) { const r = navPoint(b, goal); ai.npV = (ai.npV || new THREE.Vector3()).set(r.x, r.y || 0, r.z); ai.npSame = r === goal; ai.npGoal = goal; ai.npT = G.time + 0.15; }
+        np = ai.npSame ? goal : ai.npV;
+      }
       const dx = np.x - b.pos.x, dz = np.z - b.pos.z;
       const d = Math.max(Math.hypot(dx, dz), 0.001);
       const gy = ai.goalLoot ? ai.goalLoot.pos.y : (ai.goalChest ? ai.goalChest.pos.y : b.pos.y);
@@ -3702,22 +3796,79 @@ $('#pause').addEventListener('click', e => { if (e.target.id === 'pause' || e.ta
 $('#quitBtn').onclick = () => { togglePause(false); toMenu(); };
 // ─────────────── Impostazioni (grafica, controlli, audio, interfaccia) ───────────────
 let fogK = 1;
+// ─────────────── v43: qualità automatica (minimo 30 FPS) ───────────────
+//  Se nonostante la risoluzione dinamica il gioco resta sotto i 30 FPS, si scende di un gradino alla volta
+//  (fino a 4): niente AO e MSAA → ombre basse e niente bloom → niente ombre, meno erba e distanza → minimo.
+//  Quando torna fluido (sopra ~50 FPS a lungo) risale piano. Le impostazioni scelte dal giocatore non cambiano.
+const AUTO = { lvl: 0, t0: 0, n: 0, sum: 0, prev: 0, low: 0, high: 0, coolT: 0, blockUpT: 0, downT: 0 };
+const AUTO_NAMES = ['', 'senza AO e MSAA', 'ombre basse, senza bloom', 'senza ombre, meno erba', 'minima, senza anti-aliasing'];
+function effGfx() {
+  const g = { ...settings.gfx }, L = g.autoQ === false ? 0 : AUTO.lvl;
+  if (L >= 1) { g.ao = false; if (g.shadows === 'ultra') g.shadows = 'high'; if (g.aa === 'msaa' || g.aa === 'smaa') g.aa = 'fxaa'; g.grass = Math.min(g.grass, 0.9); g.scale = Math.min(g.scale, 1); }
+  if (L >= 2) { if (g.shadows !== 'off') g.shadows = 'low'; g.bloom = false; g.view = Math.min(g.view, 0.9); g.scale = Math.min(g.scale, 0.9); }
+  if (L >= 3) { g.shadows = 'off'; g.grass = Math.min(g.grass, 0.4); g.view = Math.min(g.view, 0.8); g.scale = Math.min(g.scale, 0.8); }
+  if (L >= 4) { g.grass = Math.min(g.grass, 0.15); g.view = Math.min(g.view, 0.68); g.scale = Math.min(g.scale, 0.7); g.aa = 'off'; }   // niente post-processing: si disegna direttamente sullo schermo
+  return g;
+}
+/** distanze di dettaglio (personaggi, bottino, porte, bot) in base alla grafica effettiva */
+function applyPerf(g) {
+  const sh = { off: 0, low: 16, high: 26, ultra: 40 }[g.shadows] ?? 26, v = g.view, L = g.autoQ === false ? 0 : AUTO.lvl;
+  PERF.charFull = clamp(85 * v, 45, 150) * (L >= 3 ? 0.8 : 1);
+  PERF.charShadow = sh;
+  PERF.smallNear = 12 + 10 * v;
+  PERF.anim2 = (18 + 10 * v) * (L >= 3 ? 0.75 : 1);
+  PERF.anim3 = (38 + 17 * v) * (L >= 3 ? 0.75 : 1);
+  PERF.lootFull = clamp(28 + 18 * v, 30, 70);
+  PERF.lootShadow = sh ? Math.min(22, sh) : 0;
+  PERF.botFar2 = L >= 3 ? 100 : 140; PERF.botFar3 = L >= 3 ? 200 : 280;
+  QUALITY.doorNear = 105 * v; QUALITY.hwNear = 26 * v;
+}
+function autoQualityTick(now) {
+  const live = G.state === 'play' && !G.paused && !document.hidden && settings.gfx.autoQ !== false;
+  if (!live) { AUTO.prev = 0; AUTO.n = 0; AUTO.sum = 0; AUTO.t0 = 0; return; }
+  if (AUTO.prev) { const ft = now - AUTO.prev; if (ft < 400) { AUTO.sum += ft; AUTO.n++; } }
+  AUTO.prev = now;
+  if (!AUTO.t0) AUTO.t0 = now;
+  if (now - AUTO.t0 < 2000 || AUTO.n < 15) return;
+  const avg = AUTO.sum / AUTO.n; AUTO.t0 = now; AUTO.n = 0; AUTO.sum = 0;
+  if (now < AUTO.coolT) return;
+  const cap = settings.gfx.fpsCap, floorRes = !settings.gfx.dynRes || dynState.k <= 0.62;
+  if (avg > 1000 / 30 * 1.06) { AUTO.low++; AUTO.high = 0; } else if (avg < 1000 / 50 && !(cap > 0 && cap <= 50)) { AUTO.high++; AUTO.low = 0; } else { AUTO.low = 0; AUTO.high = 0; }
+  // sotto 30 per 2 finestre (4 s) con la risoluzione già al minimo (o per 3 finestre comunque) → un gradino giù
+  if (AUTO.lvl < 4 && ((AUTO.low >= 2 && floorRes) || AUTO.low >= 3)) {
+    AUTO.lvl++; AUTO.low = 0; AUTO.coolT = now + 3500; AUTO.downT = now;
+    applyAutoGfx();
+    hudToast(`⚙️ Grafica alleggerita (${AUTO_NAMES[AUTO.lvl]}) per restare sopra i 30 FPS`);
+  } else if (AUTO.lvl > 0 && AUTO.high >= 6 && now > AUTO.blockUpT && (!settings.gfx.dynRes || dynState.k >= 0.99)) {
+    // risale solo se è fluido da 12 s; se poi ricade entro 20 s, per 3 minuti non ci riprova
+    AUTO.lvl--; AUTO.high = 0; AUTO.coolT = now + 4000;
+    AUTO.upT = now; applyAutoGfx();
+  }
+  if (AUTO.upT && AUTO.downT > AUTO.upT && AUTO.downT - AUTO.upT < 20000) { AUTO.blockUpT = now + 180000; AUTO.upT = 0; }
+}
+function applyAutoGfx() {
+  const e = effGfx();
+  gfx.apply(e);
+  applyQuality(e);
+}
+function applyQuality(e) {
+  const v = e.view;
+  fogK = v;
+  QUALITY.detailIn = 240 * v; QUALITY.detailOut = 310 * v; QUALITY.treeHi = 80 * v; QUALITY.nearOnly = 150 * v;
+  QUALITY.grassOn = e.grass > 0.01;
+  QUALITY.grassDens = 0.8 * Math.max(0.1, e.grass);
+  QUALITY.grassR = 64 * clamp(0.6 + e.grass * 0.4, 0.6, 1.25);
+  GRASS_FADE.value = QUALITY.grassR / 64;
+  QUALITY.version++;
+  weather.setQuality(clamp(0.3 + e.grass * 0.6, 0.3, 1));
+  applyPerf(e);
+}
 function applySettings(key = '*') {
   const g = settings.gfx, all = key === '*';
-  if (all || ['preset', 'scale', 'shadows', 'aa', 'bloom', 'ao'].includes(key)) gfx.apply(g);
+  if (key === 'autoQ' && g.autoQ === false && AUTO.lvl) { AUTO.lvl = 0; }
+  if (all || ['preset', 'scale', 'shadows', 'aa', 'bloom', 'ao', 'autoQ'].includes(key)) gfx.apply(effGfx());
   if (all || key === 'preset' || key === 'aniso') applyAnisotropy(scene, Math.min(g.aniso, gfx.maxAniso || 1));
-  if (all || key === 'preset' || key === 'view' || key === 'grass') {
-    const v = g.view;
-    fogK = v;
-    QUALITY.detailIn = 240 * v; QUALITY.detailOut = 310 * v; QUALITY.treeHi = 80 * v; QUALITY.nearOnly = 150 * v;
-    QUALITY.grassOn = g.grass > 0.01;
-    QUALITY.grassDens = 0.8 * Math.max(0.1, g.grass);
-    QUALITY.grassR = 64 * clamp(0.6 + g.grass * 0.4, 0.6, 1.25);
-    GRASS_FADE.value = QUALITY.grassR / 64;
-    QUALITY.version++;
-    // particelle meteo (neve/foglie/polvere) in proporzione alla qualità dell'erba
-    weather.setQuality(clamp(0.3 + g.grass * 0.6, 0.3, 1));
-  }
+  if (all || ['preset', 'view', 'grass', 'shadows', 'autoQ'].includes(key)) applyQuality(effGfx());
   if (all || key === 'vol') A.setVolume(settings.vol);
   if (all || key === 'amb') A.setAmbience(settings.amb);
   if (all || key === 'shake') { if (!settings.shake) G.shake = 0; }
@@ -5925,13 +6076,28 @@ const events = createEvents({
 
 function update(dt) {
   G.time += dt;
+  perfFrame();   // v43
   if (pressed.has('KeyM')) toggleBigMap();
   updateBus(dt);
   updatePlayer(dt);
   netTick(dt);
   progressTick(dt);
+  // v43: i bot lontani da tutti i giocatori veri pensano e si muovono a frame alterni (con il tempo accumulato)
+  humansNow.length = 0;
+  for (const c of G.chars) if (c.alive && (c.isPlayer || c.human) && c.mode !== 'bus') humansNow.push(c.pos);
+  if (!humansNow.length) humansNow.push(camera.position);
   for (const c of G.chars) {
-    if (!c.isPlayer) { if (c.remote) updatePuppet(c, dt); else updateBot(c, dt); }
+    if (!c.isPlayer) {
+      if (c.remote) updatePuppet(c, dt);
+      else if (c.mode !== 'ground' || !c.alive) updateBot(c, dt);
+      else {
+        let d2 = Infinity;
+        for (const h of humansNow) { const dx = h.x - c.pos.x, dz = h.z - c.pos.z, q = dx * dx + dz * dz; if (q < d2) d2 = q; }
+        const div = d2 < PERF.botFar2 * PERF.botFar2 ? 1 : d2 < PERF.botFar3 * PERF.botFar3 ? 2 : 3;
+        c._botAcc = (c._botAcc || 0) + dt;
+        if (div === 1 || (frameN + c.idx) % div === 0) { updateBot(c, Math.min(c._botAcc, 0.1)); c._botAcc = 0; }
+      }
+    }
     c.hidden = c.alive && c.mode === 'ground' && c.crouch && !c.inWater && tallGrassAt(c.pos.x, c.pos.z);
     if (c.alive) {
       c.fireCd = Math.max(0, c.fireCd - dt);
@@ -6017,9 +6183,9 @@ function dynResTick(now) {
   const target = 1000 / Math.min(cap > 0 ? cap : 60, 60);
   if (now < D.coolT) return;
   if (now > D.ceilT) D.ceil = 1;   // dopo un minuto riprova anche i livelli più alti
-  if (avg > target * 1.25 && D.k > 0.55) {
+  if (avg > target * 1.25 && D.k > 0.5) {
     D.ceil = Math.min(D.ceil, D.k - 0.05); D.ceilT = now + 60000;
-    D.k = Math.max(0.55, D.k - (avg > target * 1.8 ? 0.15 : 0.08));
+    D.k = Math.max(0.5, D.k - (avg > target * 1.8 ? 0.15 : 0.08));
     gfx.setDyn(D.k); D.coolT = now + 1500;
   } else if (avg < target * 1.08 && D.k < Math.min(1, D.ceil)) {
     D.k = Math.min(1, D.ceil, D.k + 0.05);
@@ -6057,6 +6223,7 @@ function frame(now) {
   renderer.shadowMap.autoUpdate = se <= 1 || shadowTick % se === 0;
   gfx.render(scene, camera);
   dynResTick(now);
+  autoQualityTick(now);   // v43
   pressed.clear();
   mouse.leftPressed = false;
 }
@@ -6076,12 +6243,13 @@ setTimeout(() => $('#loading').classList.add('hidden'), 300);
   const q = [];
   for (const id of Object.keys(CONSUMABLES)) q.push([id, -1]);
   for (const id of Object.keys(WEAPONS)) for (let r = 0; r < RARITIES.length; r++) q.push([id, r]);
-  const tick = () => { if (!q.length) return; const [id, r] = q.shift(); if (r < 0) consIcon(id); else weaponIcon(id, r); setTimeout(tick, 40); };
+  // v43: in partita si ferma (ogni icona costa qualche millisecondo: niente scatti durante gli scontri)
+  const tick = () => { if (!q.length) return; if (G.state !== 'menu') { setTimeout(tick, 1000); return; } const [id, r] = q.shift(); if (r < 0) consIcon(id); else weaponIcon(id, r); setTimeout(tick, 40); };
   setTimeout(tick, 1200);
 }
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, bossFight, clawAttack, rayAll, throwSys, throwItem, impulseBlast, addPing, playerPing, hurtFrom, makeWall, placeWall, buildSpot, setPiece, toggleBuild, botTactics, findCover, finishMatch, surfaceUnder, currentZoom, tryVault, startSlide, updateSlide, canSlide, currentSpread, jumpPenalty, placeItem, placeSpot, updatePlaced, hitMaterial, impactFx, critFlash, rayColliders, ARENA_INFO: () => world.arena, ceilingAt, addColliderT: addCollider, removeColliderT: removeCollider, get stoves() { return stoves; } };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, bossFight, clawAttack, rayAll, throwSys, throwItem, impulseBlast, addPing, playerPing, hurtFrom, makeWall, placeWall, buildSpot, setPiece, toggleBuild, botTactics, findCover, finishMatch, surfaceUnder, currentZoom, tryVault, startSlide, updateSlide, canSlide, currentSpread, jumpPenalty, placeItem, placeSpot, updatePlaced, hitMaterial, impactFx, critFlash, rayColliders, ARENA_INFO: () => world.arena, ceilingAt, addColliderT: addCollider, removeColliderT: removeCollider, AUTO, PERF, effGfx, dynState, autoQualityTick, dynResTick, QUALITY_REF: QUALITY, get stoves() { return stoves; } };
 preloadIcons();
 setTimeout(() => preloadSkins([settings.skin]), 300);

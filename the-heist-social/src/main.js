@@ -1920,7 +1920,8 @@ function animate(now) {
         document.getElementById('gameover-replay-canvas'),
         clip,
         thief,
-        elapsedSec
+        elapsedSec,
+        avatarMeshes
       );
     }
   }

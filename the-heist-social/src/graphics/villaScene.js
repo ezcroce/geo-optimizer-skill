@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { updateHumanoidAnimation } from './humanoid.js';
 import {
   ESTATE_BOUNDS,
   ROOMS,
@@ -1330,8 +1331,8 @@ export class VillaSceneManager {
    * Renders an animated 3D CCTV "Caught Red-Handed" replay loop onto a 2D canvas
    * for the End-of-Match screen when the Thief is caught ("sgamato").
    */
-  renderCaughtReplayToCanvas(canvas, moment, thiefPlayer, elapsedSec) {
-    if (!canvas || !moment || !thiefPlayer) return;
+  renderCaughtReplayToCanvas(canvas, moment, thiefPlayer, elapsedSec, avatarMeshes) {
+    if (!canvas || !moment || !thiefPlayer || !avatarMeshes) return;
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
@@ -1346,20 +1347,21 @@ export class VillaSceneManager {
       this._replayCam = new THREE.PerspectiveCamera(58, 16 / 9, 0.2, 65);
     }
 
-    const avatar = this.avatars.get(thiefPlayer.id);
-    // Save temporary states of all avatars so we can stage the exact replay cleanly
+    const avatarMesh = avatarMeshes.get(thiefPlayer.id);
+    // Save temporary states of all avatar meshes so we can stage the exact replay cleanly
     const savedStates = [];
-    for (const [id, av] of this.avatars.entries()) {
+    for (const [id, mesh] of avatarMeshes.entries()) {
+      const nameplate = mesh.userData?.rig?.nameplate;
       savedStates.push({
-        av,
-        visible: av.root.visible,
-        x: av.root.position.x,
-        z: av.root.position.z,
-        rotY: av.root.rotation.y,
-        labelVis: av.nameSprite ? av.nameSprite.visible : true,
+        mesh,
+        visible: mesh.visible,
+        x: mesh.position.x,
+        z: mesh.position.z,
+        rotY: mesh.rotation.y,
+        labelVis: nameplate ? nameplate.visible : true,
       });
       if (id !== thiefPlayer.id) {
-        av.root.visible = false;
+        mesh.visible = false;
       }
     }
 
@@ -1422,17 +1424,25 @@ export class VillaSceneManager {
       culpritRotY = startAng + (angleToCam - startAng) * turnU;
     }
 
-    if (avatar) {
-      avatar.root.visible = true;
-      avatar.setGhostStyle(false);
-      if (avatar.nameSprite) avatar.nameSprite.visible = false;
-      avatar.root.position.set(culpritX, 0, culpritZ);
-      avatar.root.rotation.y = culpritRotY;
-      avatar.updateAnimation(0.033, {
-        speed: simSpeed,
-        interacting: simInteracting,
-        usingCctv: false,
-      });
+    if (avatarMesh) {
+      avatarMesh.position.set(culpritX, 0, culpritZ);
+      avatarMesh.rotation.y = culpritRotY;
+      updateHumanoidAnimation(
+        avatarMesh,
+        {
+          speed: simSpeed,
+          interacting: simInteracting,
+          usingCctv: false,
+          hidden: false,
+          eliminated: false,
+        },
+        0.033,
+        elapsedSec,
+        false
+      );
+      if (avatarMesh.userData?.rig?.nameplate) {
+        avatarMesh.userData.rig.nameplate.visible = false;
+      }
     }
 
     // Smooth PTZ zoom-in onto the culprit
@@ -1458,11 +1468,13 @@ export class VillaSceneManager {
 
     // Restore all avatars
     for (const s of savedStates) {
-      s.av.root.visible = s.visible;
-      s.av.root.position.x = s.x;
-      s.av.root.position.z = s.z;
-      s.av.root.rotation.y = s.rotY;
-      if (s.av.nameSprite) s.av.nameSprite.visible = s.labelVis;
+      s.mesh.visible = s.visible;
+      s.mesh.position.x = s.x;
+      s.mesh.position.z = s.z;
+      s.mesh.rotation.y = s.rotY;
+      if (s.mesh.userData?.rig?.nameplate) {
+        s.mesh.userData.rig.nameplate.visible = s.labelVis;
+      }
     }
 
     // Copy WebGL pixels to 2D canvas with crisp nocturnal CCTV grading

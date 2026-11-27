@@ -1,0 +1,15 @@
+# Distribuzione del sito e del server WebSocket sulla stessa origine.
+services:
+  - type: web
+    name: infinite-alibi
+    runtime: node
+    branch: arena/3042b535-geo-optimizer-skill
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --prefix games/infinite-alibi
+    startCommand: node games/infinite-alibi/server/server.js
+    healthCheckPath: /healthz
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.3

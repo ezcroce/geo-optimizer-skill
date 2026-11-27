@@ -8,7 +8,7 @@
 //  2 intonaco chiaro della chiesa, 3 marmo bianco venato.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts, makeAtlasMaterial } from './props.js?v=38';
+import { mergeParts, makeAtlasMaterial } from './props.js?v=39';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -110,7 +110,9 @@ class TriBuf {
  */
 function sectorBlock(ra, rb, y0, y1, gA, gB, w, seg, faces = {}) {
   const T = new TriBuf(), F = { top: true, inner: true, outer: false, caps: true, innerY0: y0, ...faces };
-  const ang = (r, t) => { const s = w > 0 ? Math.asin(Math.min(0.99, w / r)) : 0; return (gA + s) + ((gB - s) - (gA + s)) * t; };
+  // F.bridge: settore che SCAVALCA un varco largo 2w centrato su gA (volta del corridoio sotto le gradinate)
+  const ang = F.bridge ? (r, t) => gA + (t * 2 - 1) * Math.asin(Math.min(0.99, (w + 0.03) / r))
+    : (r, t) => { const s = w > 0 ? Math.asin(Math.min(0.99, w / r)) : 0; return (gA + s) + ((gB - s) - (gA + s)) * t; };
   const pt = (r, a, y) => [Math.cos(a) * r, y, Math.sin(a) * r];
   for (let k = 0; k < seg; k++) {
     const t0 = k / seg, t1 = (k + 1) / seg;
@@ -119,8 +121,9 @@ function sectorBlock(ra, rb, y0, y1, gA, gB, w, seg, faces = {}) {
     if (F.top) T.quad(pt(ra, a0, y1), pt(rb, b0, y1), pt(rb, b1, y1), pt(ra, a1, y1), [0, 1, 0]);
     if (F.inner) T.quad(pt(ra, a0, F.innerY0), pt(ra, a1, F.innerY0), pt(ra, a1, y1), pt(ra, a0, y1), rin);
     if (F.outer) T.quad(pt(rb, b0, y0), pt(rb, b1, y0), pt(rb, b1, y1), pt(rb, b0, y1), rout);
+    if (F.bottom) T.quad(pt(ra, a0, y0), pt(ra, a1, y0), pt(rb, b1, y0), pt(rb, b0, y0), [0, -1, 0]);
   }
-  if (F.caps && w > 0) for (const [t, s] of [[0, -1], [1, 1]]) {
+  if (F.caps && w > 0 && !F.bridge) for (const [t, s] of [[0, -1], [1, 1]]) {
     const aa = ang(ra, t), bb = ang(rb, t), tang = [-Math.sin(aa) * -s, 0, Math.cos(aa) * -s];
     T.quad(pt(ra, aa, y0), pt(rb, bb, y0), pt(rb, bb, y1), pt(ra, aa, y1), tang);
   }
@@ -330,6 +333,7 @@ export const ARENA = {
   POD: 31.2, POD_H: 3.2,  // podio
   TIERS: 8, TW: 2.35, TH: 1.55,
   RW0: 50, RW1: 53, WALL_H: 22, GATE_H: 7,
+  TUN_H: 3.6,             // v39: volta dei corridoi sotto le gradinate
   GATE_W: 2.6,            // mezza larghezza dei varchi (corridoi sugli assi)
 };
 const GATES = [[1, 0], [0, 1], [-1, 0], [0, -1]];
@@ -387,6 +391,16 @@ export function buildArena(cx, cy, cz, seed = 1) {
     }
     colliders.push({ type: 'ring', x: cx, z: cz, r0: ra, r1: rb, minY: cy - 1, maxY: cy + y1, gates: gatesW, arena: true });
     gateWalls(ra, rb, -1, y1);
+    // v39: sopra i varchi le gradinate continuano (volta a TUN_H): prima il taglio era a tutta altezza e
+    // da dentro si vedeva attraverso il muro esterno (che dal lato interno è chiuso solo sopra le gradinate)
+    for (const [ax, az] of GATES) {
+      const ga = Math.atan2(az, ax), last = i === A.TIERS - 1;
+      add(sectorBlock(ra, rb, A.TUN_H, y1, ga, ga, w, 3, { bridge: true, bottom: true, outer: last, innerY0: Math.max(A.TUN_H, yPrev) }), tint);
+      add(sectorBlock(ra - 0.02, ra + 0.5, y1, y1 + 0.06, ga, ga, w, 3, { bridge: true, inner: false }), '#f0e6d2');
+      const a0 = ra, a1 = rb, xs = ax ? [cx + Math.min(a0 * ax, a1 * ax), cx + Math.max(a0 * ax, a1 * ax)] : [cx - w - 0.05, cx + w + 0.05];
+      const zs = az ? [cz + Math.min(a0 * az, a1 * az), cz + Math.max(a0 * az, a1 * az)] : [cz - w - 0.05, cz + w + 0.05];
+      colliders.push({ type: 'box', minX: xs[0], maxX: xs[1], minY: cy + A.TUN_H, maxY: cy + y1, minZ: zs[0], maxZ: zs[1], arena: true });
+    }
     // bottino sparso sulle gradinate
     if (i % 2 === 1) for (let k = 0; k < 2; k++) { const a = (Math.floor(rnd() * 4) + 0.15 + rnd() * 0.7) * Math.PI / 2, r = ra + A.TW / 2; loot.push(W(Math.cos(a) * r, y1 + 0.1, Math.sin(a) * r)); }
   }

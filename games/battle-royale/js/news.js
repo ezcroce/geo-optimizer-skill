@@ -1,9 +1,18 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v38';
+export const NEWS_VERSION = 'v39';
 
 export const NEWS = [
+  {
+    v: 'v39', title: 'Balletti nuovi e un Gargoyle in carne e ossa', color: '#ff7ab6', icon: '💃',
+    items: [
+      'Balletti rifatti da zero: si muove tutto il corpo, a tempo di musica. Fianchi che ondeggiano, spalle, ginocchia che si piegano, piedi che restano piantati a terra, testa e mani che seguono il movimento con un attimo di ritardo',
+      'Sei balletti: Ballo disco, Saluto, Floss, Esultanza e i nuovi Robot (a scatti) e Running man. Con la tastiera: B li fa girare, oppure 6 7 8 9 0 e il tasto ’ per sceglierli',
+      'Il Gargoyle ha un corpo nuovo, scolpito: niente più palle e cilindri ma una pelle unica con muscoli, costole, addominali e tendini che si piega con le articolazioni. Muso da pipistrello con le orecchie lunghe, le sopracciglia, il naso a grugno e le zanne, mani con le dita e gli artigli ricurvi, una criniera folta a ciocche. Si comporta come prima',
+      'Colosseo: sopra ai quattro ingressi le gradinate ora sono chiuse, dall’arena non si vede più attraverso il muro',
+    ],
+  },
   {
     v: 'v38', title: 'Il Colosseo, il Gargoyle e i suoi artigli', color: '#ffb347', icon: '🦇',
     items: [

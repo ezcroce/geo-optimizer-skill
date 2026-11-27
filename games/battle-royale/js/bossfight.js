@@ -8,7 +8,7 @@
 //   · effetti condivisi con gli Artigli del giocatore: scie delle artigliate e onde d'urto.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { buildGargoyle, animateGargoyle, hitSpheres, MOVES } from './boss.js?v=38';
+import { buildGargoyle, warmGargoyle, animateGargoyle, hitSpheres, MOVES } from './boss.js?v=39';
 
 export const BOSS_HP = 2200;
 export const BOSS_CHANCE = 0.45;           // probabilità che una partita abbia il boss
@@ -109,6 +109,7 @@ export function createBossFight(ctx) {
   const { scene, G, camera, groundAt, damage, emit, spawnLoot, addFeed, A, fx } = ctx;
   let B = null;
   let R = null;                 // modello (riusato fra le partite)
+  setTimeout(warmGargoyle, 1500);   // v39: la scultura si prepara a pezzi mentre si è nel menu
   const hud = document.createElement('div');
   hud.id = 'bossBar';
   hud.className = 'hidden';

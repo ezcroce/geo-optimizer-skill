@@ -1,40 +1,42 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
+import { EMOTES, poseEmote } from './emotes.js?v=39';
+const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=38';
-import * as PR from './progress.js?v=38';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=38';
-import { initMenu } from './menu.js?v=38';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=38';
-import { initSettingsUI } from './settings-ui.js?v=38';
+} from './config.js?v=39';
+import * as PR from './progress.js?v=39';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=39';
+import { initMenu } from './menu.js?v=39';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=39';
+import { initSettingsUI } from './settings-ui.js?v=39';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=38';
+import * as A from './audio.js?v=39';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
-} from './world.js?v=38';
+} from './world.js?v=39';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=38';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=38';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=38';
-import { buildChestMesh } from './models3d.js?v=38';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=39';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=39';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=39';
+import { buildChestMesh } from './models3d.js?v=39';
 import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=33';
-import { createInventory } from './inventory.js?v=38';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=38';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=38';
+import { createInventory } from './inventory.js?v=39';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=39';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=39';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=38';
-import { buildPickaxe, heldConsumable } from './held.js?v=38';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=38';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=38';
-import { createCrosshair } from './crosshair.js?v=38';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=38';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=39';
+import { buildPickaxe, heldConsumable } from './held.js?v=39';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=39';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=39';
+import { createCrosshair } from './crosshair.js?v=39';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=39';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -698,12 +700,7 @@ function airMove(ch, mx, mz, dt, deploy) {
 }
 
 // ─────────────── Animazioni dei personaggi ───────────────
-const EMOTES = [
-  { id: 'ballo', name: 'Ballo disco', icon: '🕺', dur: 4.2 },
-  { id: 'saluto', name: 'Saluto', icon: '👋', dur: 2.4 },
-  { id: 'floss', name: 'Floss', icon: '💃', dur: 4.0 },
-  { id: 'tifo', name: 'Esultanza', icon: '🙌', dur: 2.6 },
-];
+// v39: i balletti (coreografie a fotogrammi chiave) stanno in emotes.js
 const easeOutBounce = x => {
   const n1 = 7.5625, d1 = 2.75;
   if (x < 1 / d1) return n1 * x * x;
@@ -724,44 +721,12 @@ function stopEmote(ch) { ch.emote = null; }
 
 
 function animateEmote(ch, m, dt) {
-  const e = ch.emote, T = ch.emoteT, k = Math.min(1, T * 4) * Math.min(1, (e.dur - T) * 4); // dissolvenza in entrata/uscita
+  const e = ch.emote, T = ch.emoteT, k = smooth01(T * 3.2) * smooth01((e.dur - T) * 3.2); // dissolvenza in entrata/uscita
   m.gunPivot.visible = false;
   // si gira verso la telecamera per farsi vedere
   if (ch.isPlayer) { ch.emoteYaw = ch.emoteYaw === undefined ? ch.yaw : ch.emoteYaw; m.root.rotation.y = ch.yaw + Math.PI * easeInOut(Math.min(1, T * 2.5)); }
-  const b = T * (e.id === 'ballo' ? 7.5 : e.id === 'floss' ? 9 : 6);
-  if (e.id === 'ballo') {
-    const s = Math.sin(b);
-    m.body.position.y = Math.abs(Math.sin(b)) * 0.12 * k;
-    m.body.rotation.z = s * 0.12 * k;
-    m.torso.rotation.y = s * 0.3 * k;
-    const up = Math.sin(b * 0.5) > 0;
-    m.arms[1].rotation.set(lerp(0, up ? -2.7 : -0.4, k), 0, lerp(0, up ? -0.5 : 0.3, k));
-    m.arms[0].rotation.set(lerp(0, up ? -0.4 : -2.7, k), 0, lerp(0, up ? -0.3 : 0.5, k));
-    m.legs[0].rotation.set(Math.max(0, s) * -0.5 * k, 0, 0);
-    m.legs[1].rotation.set(Math.max(0, -s) * -0.5 * k, 0, 0);
-    m.head.rotation.set(0, s * 0.25 * k, Math.sin(b * 2) * 0.08 * k);
-  } else if (e.id === 'saluto') {
-    m.arms[1].rotation.set(-2.6 * k, 0, (-0.35 + Math.sin(b * 1.6) * 0.45) * k);
-    m.arms[0].rotation.set(0, 0, 0.1 * k);
-    m.body.rotation.z = Math.sin(b * 0.8) * 0.04 * k;
-    m.head.rotation.set(0, 0, Math.sin(b * 1.6) * 0.12 * k);
-  } else if (e.id === 'floss') {
-    const s = Math.sin(b);
-    const front = Math.sin(b * 0.5) > 0 ? 1 : -1;
-    m.arms[0].rotation.set(front * 0.45 * k, 0, s * 0.7 * k);
-    m.arms[1].rotation.set(-front * 0.45 * k, 0, s * 0.7 * k);
-    m.body.rotation.z = -s * 0.14 * k;
-    m.body.position.x = -s * 0.08 * k;
-    m.legs[0].rotation.z = s * 0.1 * k; m.legs[1].rotation.z = s * 0.1 * k;
-  } else if (e.id === 'tifo') {
-    const hop = Math.abs(Math.sin(b));
-    m.body.position.y = hop * 0.35 * k;
-    m.arms[0].rotation.set(-2.9 * k, 0, (0.35 + hop * 0.2) * k);
-    m.arms[1].rotation.set(-2.9 * k, 0, (-0.35 - hop * 0.2) * k);
-    m.legs[0].rotation.x = -hop * 0.5 * k; m.legs[1].rotation.x = -hop * 0.3 * k;
-    m.head.rotation.x = -0.3 * k;
-  }
-  if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.15 + Math.abs(Math.sin(b)) * 0.3, Math.min(1, dt * 6));
+  const b = poseEmote(m, e.id, T, k);
+  if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.15 + Math.abs(Math.sin(b * Math.PI)) * 0.3, Math.min(1, dt * 6));
 }
 
 /** vicino: modello completo animato · lontano: modello semplificato · oltre la nebbia: nascosto */
@@ -2953,7 +2918,7 @@ function updatePlayer(dt) {
   for (let i = 0; i < SLOT_COUNT; i++) if (pressed.has('Digit' + (i + 1))) { p.setActive(i); if (G.build.on) toggleBuild(false); }
   if (pressed.has('KeyQ')) toggleBuild();
   if (pressed.has('KeyB')) { const i = ((p._emoteIdx ?? -1) + 1) % EMOTES.length; p._emoteIdx = i; startEmote(p, EMOTES[i].id); }
-  for (let i = 0; i < EMOTES.length; i++) if (pressed.has('Digit' + (6 + i))) startEmote(p, EMOTES[i].id);
+  for (let i = 0; i < EMOTES.length; i++) if (pressed.has(EMOTE_KEYS[i])) startEmote(p, EMOTES[i].id);
   if (pressed.has('KeyR')) startReload(p);
   if (pressed.has('KeyG') && p.slot) { dropAt(p, itemFromSlot(p.slot)); p.slots[p.active] = null; p.using = null; p.reloading = 0; p.updateHeld(); }
   const inter = nearestInteract(p);

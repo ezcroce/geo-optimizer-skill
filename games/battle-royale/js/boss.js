@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Sculpt, sculptMaterial } from './sculpt.js?v=39';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -50,9 +51,9 @@ function mats() {
   MATS = {
     skin: new THREE.MeshStandardMaterial({ map: skin, color: '#d6c2a6', roughness: 0.78, metalness: 0.0 }),
     dark: new THREE.MeshStandardMaterial({ map: skin, color: '#6a5646', roughness: 0.9 }),
-    mane: new THREE.MeshStandardMaterial({ color: '#7d6a58', roughness: 0.95, flatShading: true }),
+    mane: new THREE.MeshStandardMaterial({ color: '#9a8670', roughness: 0.95, vertexColors: true, side: THREE.DoubleSide }),
     horn: new THREE.MeshStandardMaterial({ color: '#efe3c8', roughness: 0.35, metalness: 0.1 }),
-    claw: new THREE.MeshStandardMaterial({ color: '#2a221e', roughness: 0.3, metalness: 0.2 }),
+    claw: new THREE.MeshStandardMaterial({ color: '#241c18', roughness: 0.28, metalness: 0.25 }),
     mouth: new THREE.MeshStandardMaterial({ color: '#5e1712', roughness: 0.6 }),
     eye: new THREE.MeshStandardMaterial({ color: '#ffe066', emissive: '#ffb300', emissiveIntensity: 2.2, roughness: 0.3 }),
     wing: new THREE.MeshStandardMaterial({ color: '#8a6452', roughness: 0.85, side: THREE.DoubleSide, map: skin }),
@@ -83,122 +84,245 @@ const T = (g, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz =
 const M = (list) => mergeGeometries(list.map(g => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (!['position', 'normal', 'uv'].includes(k)) n.deleteAttribute(k); if (!n.attributes.uv) n.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count * 2), 2)); return n; }));
 
 // ═════════════════════════ MODELLO ═════════════════════════
+//  v39: scolpito. Il corpo è UNA pelle continua (SkinnedMesh) ricavata da un campo di distanza:
+//  decine di muscoli (pettorali, deltoidi, bicipiti, quadricipiti, polpacci, costole, addominali…)
+//  fusi morbidamente sulle ossa; testa, mascella, mani e piedi sono sculture più fini attaccate al
+//  loro osso. Le ossa restano quelle di prima (stesse pose e animazioni).
+const PAL = { skin: '#c4a687', light: '#d8c2a0', belly: '#cfb795', dark: '#8f735a', darker: '#6c5442', pink: '#b27c6a', lip: '#6a4236', claw: '#2a221e' };
+let DETAIL = null;
+function detailTexture() {
+  if (DETAIL) return DETAIL;
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d'), r = mulberry(91);
+  g.fillStyle = '#c4c4c4'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 3200; i++) { const v = r(); g.fillStyle = v < 0.55 ? `rgba(40,30,25,${0.05 + r() * 0.1})` : `rgba(255,250,240,${0.05 + r() * 0.08})`; g.beginPath(); g.arc(r() * S, r() * S, 0.5 + r() * 2, 0, 6.283); g.fill(); }
+  for (let i = 0; i < 140; i++) {   // rughe e pieghe della pelle
+    let x = r() * S, y = r() * S, a = r() * 6.28; g.strokeStyle = `rgba(50,35,28,${0.1 + r() * 0.16})`; g.lineWidth = 0.5 + r() * 1.1; g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 10; k++) { a += (r() - 0.5) * 0.7; x += Math.cos(a) * 5; y += Math.sin(a) * 5; g.lineTo(x, y); } g.stroke();
+  }
+  for (let i = 0; i < 40; i++) {   // venature
+    let x = r() * S, y = r() * S, a = r() * 6.28; g.strokeStyle = `rgba(90,60,60,${0.08 + r() * 0.08})`; g.lineWidth = 1 + r() * 1.5; g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 14; k++) { a += (r() - 0.5) * 0.5; x += Math.cos(a) * 6; y += Math.sin(a) * 6; g.lineTo(x, y); } g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return (DETAIL = t);
+}
+let FLESH = null;
+const flesh = () => FLESH || (FLESH = sculptMaterial(detailTexture(), { scale: 1.6, amount: 0.7, roughness: 0.74 }));
+
+/** ciuffo della criniera: cono morbido, ricurvo, a più segmenti */
+function tuftGeo(len, r, bend, twist = 0) {
+  const g = new THREE.ConeGeometry(r, len, 6, 5, true); g.translate(0, len / 2, 0);
+  const P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) { const y = P.getY(i), t = y / len; P.setZ(i, P.getZ(i) * 0.55 - bend * len * t * t); P.setX(i, P.getX(i) + twist * len * t * t); }
+  g.computeVertexNormals();
+  return g;
+}
+
+let SCULPTED = null, SCULPT_GEN = null;
+/** scolpisce le parti (una volta sola: le ossa nella posa di riferimento sono sempre le stesse) */
+function sculptParts(R, bones) {
+  if (SCULPTED) return SCULPTED;
+  if (!SCULPT_GEN) SCULPT_GEN = sculptSteps(R, bones);
+  while (!SCULPTED) SCULPT_GEN.next();
+  return SCULPTED;
+}
+/** prepara la scultura a pezzi nei momenti liberi (menu): niente scatto quando il boss compare */
+export function warmGargoyle() {
+  if (SCULPTED || SCULPT_GEN) return;
+  const R = makeRig();
+  SCULPT_GEN = sculptSteps(R, rigBones(R));
+  const step = () => { if (SCULPTED) return; SCULPT_GEN.next(); if (!SCULPTED) (window.requestIdleCallback || setTimeout)(step, { timeout: 400 }); };
+  setTimeout(step, 0);
+}
+function* sculptSteps(R, bones) {
+  const t0 = performance.now();
+  const BI = new Map(bones.map((b, i) => [b, i]));
+  const W = (b) => b.matrixWorld;
+  const S = new Sculpt({ noise: 0.004, noiseF: 11 });
+  const at = (b) => S.at(W(b), BI.get(b));
+  // ── bacino e coda ──
+  at(R.hips);
+  S.ell([0, -0.02, -0.02], [0.38, 0.3, 0.33], null, { col: PAL.skin, k: 0.1 });
+  for (const s of [-1, 1]) S.ell([s * 0.17, -0.1, -0.19], [0.2, 0.22, 0.17], [0.2, 0, 0], { col: PAL.skin, k: 0.08 });   // glutei
+  S.ell([0, 0.12, 0.12], [0.3, 0.24, 0.26], null, { col: PAL.belly, k: 0.12 });
+  S.cone([0, -0.06, -0.28], [0, -0.42, -0.72], 0.13, 0.025, { col: PAL.dark, k: 0.08 });                               // coda
+  // ── busto (osso «chest», verso +y) ──
+  at(R.chest);
+  S.ell([0, 0.2, 0.05], [0.38, 0.36, 0.34], null, { col: PAL.belly, k: 0.12 });                                        // ventre
+  S.ell([0, 0.66, -0.03], [0.58, 0.45, 0.48], null, { col: PAL.skin, k: 0.12 });                                       // cassa toracica
+  for (const s of [-1, 1]) {
+    S.ell([s * 0.23, 0.76, 0.3], [0.26, 0.2, 0.13], [0.15, 0, s * 0.3], { col: PAL.light, k: 0.07 });                  // pettorali
+    S.ell([s * 0.37, 0.55, -0.16], [0.2, 0.38, 0.22], [0, 0, s * 0.15], { col: PAL.skin, k: 0.1 });                     // dorsali
+    S.ell([s * 0.3, 0.98, -0.12], [0.27, 0.16, 0.23], [0, 0, -s * 0.45], { col: PAL.skin, k: 0.1 });                   // trapezi
+    S.ell([s * 0.3, 0.86, -0.36], [0.14, 0.12, 0.14], null, { col: PAL.dark, k: 0.08 });                                // radice dell'ala
+    for (let k = 0; k < 3; k++) S.ell([s * 0.4, 0.47 - k * 0.11, 0.26 - k * 0.03], [0.1, 0.045, 0.07], [0, 0, s * 0.5], { col: PAL.skin, k: 0.04 });   // costole
+    for (let k = 0; k < 3; k++) S.ell([s * 0.085, 0.08 + k * 0.125, 0.355 - k * 0.012], [0.08, 0.055, 0.045], null, { col: PAL.light, k: 0.035 });   // addominali
+  }
+  S.cone([0, 0.18, -0.44], [0, 0.98, -0.38], 0.06, 0.07, { col: PAL.dark, k: 0.08 });                                  // spina dorsale
+  S.ell([0, 1.0, 0.1], [0.22, 0.17, 0.22], null, { col: PAL.skin, k: 0.1 });                                           // base del collo
+  // ── collo ──
+  at(R.neck);
+  S.cone([0, -0.05, 0], [0, 0.42, 0.05], 0.19, 0.15, { col: PAL.skin, k: 0.08 });
+  S.ell([0, 0.17, 0.1], [0.11, 0.2, 0.09], null, { col: PAL.light, k: 0.06 });                                         // gola
+  for (const s of [-1, 1]) S.cone([s * 0.1, -0.02, 0.12], [s * 0.04, 0.38, 0.05], 0.06, 0.045, { col: PAL.skin, k: 0.05 });
+  // ── gambe digitigrade ──
+  for (const L of R.legs) {
+    const s = L.s;
+    at(L.thigh);
+    S.cone([0, 0, 0], [0, -0.86, 0], 0.19, 0.095, { col: PAL.skin, k: 0.1 });
+    S.ell([0, -0.36, 0.07], [0.16, 0.35, 0.14], null, { col: PAL.skin, k: 0.08 });                                     // quadricipite
+    S.ell([0, -0.38, -0.08], [0.14, 0.33, 0.12], null, { col: PAL.skin, k: 0.08 });                                    // femorali
+    S.ell([s * 0.08, -0.28, 0], [0.12, 0.3, 0.14], null, { col: PAL.skin, k: 0.08 });
+    S.sphere([0, -0.84, 0.035], 0.088, { col: PAL.skin, k: 0.06 });                                                      // ginocchio
+    at(L.shin);
+    S.cone([0, 0, 0], [0, -0.78, 0], 0.1, 0.07, { col: PAL.skin, k: 0.08 });
+    S.ell([0, -0.22, -0.07], [0.11, 0.25, 0.105], null, { col: PAL.skin, k: 0.07 });                                   // polpaccio
+    S.cone([0, -0.06, 0.05], [0, -0.62, 0.03], 0.055, 0.035, { col: PAL.dark, k: 0.05 });
+    at(L.ankle);
+    S.sphere([0, 0, 0], 0.095, { col: PAL.dark, k: 0.06 });                                                             // garretto
+    S.cone([0, 0, 0], [0, -0.52, 0], 0.082, 0.066, { col: PAL.darker, k: 0.06 });
+    S.cone([0, -0.02, -0.055], [0, -0.44, -0.035], 0.04, 0.03, { col: PAL.darker, k: 0.04 });                           // tendine
+  }
+  // ── braccia ──
+  for (const A of R.arms) {
+    const s = A.s;
+    at(A.sh);
+    S.ell([s * 0.04, -0.06, 0], [0.24, 0.23, 0.23], null, { col: PAL.skin, k: 0.08 });                                // deltoide
+    S.cone([0, 0, 0], [0, -0.92, 0], 0.145, 0.105, { col: PAL.skin, k: 0.08 });
+    S.ell([0, -0.4, 0.07], [0.125, 0.27, 0.12], null, { col: PAL.skin, k: 0.07 });                                     // bicipite
+    S.ell([0, -0.38, -0.07], [0.135, 0.31, 0.12], null, { col: PAL.skin, k: 0.07 });                                   // tricipite
+    S.sphere([0, -0.92, -0.03], 0.1, { col: PAL.skin, k: 0.06 });
+    at(A.el);
+    S.cone([0, 0, 0], [0, -0.9, 0], 0.115, 0.068, { col: PAL.skin, k: 0.07 });
+    S.ell([0, -0.24, 0.03], [0.125, 0.27, 0.115], null, { col: PAL.skin, k: 0.07 });                                  // muscoli dell'avambraccio
+    S.ell([0, -0.3, -0.04], [0.095, 0.3, 0.095], null, { col: PAL.dark, k: 0.06 });
+    S.sphere([0, -0.88, 0], 0.072, { col: PAL.darker, k: 0.05 });
+  }
+  const tA = performance.now();
+  yield;
+  const body = S.mesh(0.03, { bones: bones.length, colorSharp: 0.03, weightSoft: 0.045 });
+  const tB = performance.now();
+  yield;
+
+  // ── testa (nello spazio dell'osso «head») ──
+  const H = new Sculpt({ noise: 0.0025, noiseF: 22 });
+  H.ell([0, 0.07, -0.03], [0.24, 0.22, 0.27], null, { col: PAL.skin, k: 0.06 });                                       // cranio
+  H.ell([0, 0.1, -0.19], [0.19, 0.17, 0.15], null, { col: PAL.skin, k: 0.06 });
+  H.ell([0, -0.04, 0.21], [0.145, 0.11, 0.17], null, { col: PAL.skin, k: 0.07 });                                      // muso
+  for (const s of [-1, 1]) {
+    H.ell([s * 0.08, -0.08, 0.26], [0.075, 0.065, 0.1], null, { col: PAL.dark, k: 0.04 });                              // labbra/guance
+    H.ell([s * 0.15, 0.0, 0.11], [0.07, 0.06, 0.11], [0, s * 0.3, 0], { col: PAL.skin, k: 0.05 });                      // zigomi
+    H.cone([0, 0.115, 0.25], [s * 0.19, 0.15, 0.15], 0.045, 0.035, { col: PAL.dark, k: 0.04 });                        // arcata sopraccigliare
+    H.sphere([s * 0.105, 0.072, 0.262], 0.044, { sub: true, k: 0.025 });                                              // orbite
+    // orecchie da pipistrello: lunghe, piatte, all'indietro e in fuori, con la conca scavata davanti
+    H.cone([s * 0.16, 0.15, -0.03], [s * 0.5, 0.6, -0.3], 0.12, 0.008, { flat: [1, 0.28], ref: [0, 0, 1], col: PAL.skin, k: 0.05 });
+    H.cone([s * 0.19, 0.2, 0.0], [s * 0.47, 0.57, -0.24], 0.085, 0.004, { flat: [1, 0.22], ref: [0, 0, 1], sub: true, k: 0.02 });
+    H.cone([s * 0.18, 0.18, -0.02], [s * 0.46, 0.56, -0.27], 0.07, 0.006, { flat: [1, 0.1], ref: [0, 0, 1], col: PAL.pink, k: 0.0, w: 0.4 });
+  }
+  H.ell([0, 0.02, 0.375], [0.075, 0.055, 0.05], null, { col: PAL.darker, k: 0.04 });                                   // naso a grugno
+  for (const s of [-1, 1]) H.sphere([s * 0.03, 0.005, 0.418], 0.019, { sub: true, k: 0.012 });                         // narici
+  H.cone([0, 0.2, 0.1], [0, 0.06, 0.32], 0.03, 0.02, { col: PAL.dark, k: 0.04 });                                      // cresta sul naso
+  const head = H.mesh(0.0135, { colorSharp: 0.02, aoStep: 0.02 });
+  const tC = performance.now();
+  yield;
+  // mascella (osso «jaw»)
+  const J = new Sculpt({ noise: 0.002, noiseF: 22 });
+  J.ell([0, -0.045, 0.13], [0.125, 0.05, 0.17], null, { col: PAL.dark, k: 0.05 });
+  J.ell([0, -0.06, 0.26], [0.065, 0.048, 0.06], null, { col: PAL.dark, k: 0.04 });
+  for (const s of [-1, 1]) J.ell([s * 0.1, -0.02, 0.0], [0.05, 0.07, 0.08], null, { col: PAL.skin, k: 0.04 });
+  const jaw = J.mesh(0.012, { colorSharp: 0.02, aoStep: 0.02 });
+  yield;
+  // mani (osso «hand»): palmo, quattro dita a due falangi piegate in avanti, pollice
+  const hands = [-1, 1].map(s => {
+    const M = new Sculpt({ noise: 0.0015, noiseF: 30 });
+    M.ell([0, -0.07, 0.015], [0.095, 0.085, 0.05], null, { col: PAL.dark, k: 0.04 });
+    M.cone([0, 0.02, 0], [0, -0.08, 0.01], 0.07, 0.075, { col: PAL.darker, k: 0.04 });
+    const tips = [];
+    for (let k = 0; k < 4; k++) {
+      const fx = (k - 1.5) * 0.052, len = k === 0 || k === 3 ? 0.88 : 1;
+      const a = [fx, -0.13, 0.03], b = [fx * 1.12, -0.13 - 0.12 * len, 0.065], c = [fx * 1.2, -0.13 - 0.2 * len, 0.125];
+      M.cone(a, b, 0.032, 0.027, { col: PAL.darker, k: 0.02 }); M.cone(b, c, 0.027, 0.021, { col: PAL.darker, k: 0.015 });
+      M.sphere(a, 0.034, { col: PAL.dark, k: 0.02 });
+      tips.push([c, [c[0] - b[0], c[1] - b[1], c[2] - b[2]]]);
+    }
+    const ta = [-s * 0.07, -0.05, 0.05], tb = [-s * 0.12, -0.11, 0.11], tc = [-s * 0.14, -0.17, 0.165];
+    M.cone(ta, tb, 0.034, 0.028, { col: PAL.darker, k: 0.025 }); M.cone(tb, tc, 0.028, 0.021, { col: PAL.darker, k: 0.015 });
+    tips.push([tc, [tc[0] - tb[0], tc[1] - tb[1], tc[2] - tb[2]]]);
+    return { geo: M.mesh(0.011, { colorSharp: 0.015, aoStep: 0.016 }), tips };
+  });
+  yield;
+  // piedi (osso «toe»): pianta, tre dita in avanti, sperone dietro
+  const feet = [-1, 1].map(s => {
+    const M = new Sculpt({ noise: 0.0015, noiseF: 30 });
+    M.ell([0, -0.035, 0.04], [0.12, 0.065, 0.14], null, { col: PAL.darker, k: 0.04 });
+    M.cone([0, 0.05, -0.02], [0, -0.03, 0.03], 0.075, 0.08, { col: PAL.darker, k: 0.04 });
+    const tips = [];
+    for (let k = -1; k <= 1; k++) {
+      const a = [k * 0.055, -0.04, 0.1], b = [k * 0.085, -0.065, 0.22 - Math.abs(k) * 0.02], c = [k * 0.1, -0.09, 0.3 - Math.abs(k) * 0.03];
+      M.cone(a, b, 0.045, 0.036, { col: PAL.darker, k: 0.025 }); M.cone(b, c, 0.036, 0.028, { col: PAL.darker, k: 0.02 });
+      tips.push([c, [c[0] - b[0], c[1] - b[1], c[2] - b[2]]]);
+    }
+    M.cone([0, -0.02, -0.06], [0, -0.06, -0.13], 0.04, 0.026, { col: PAL.darker, k: 0.025 });
+    tips.push([[0, -0.06, -0.13], [0, -0.3, -0.7]]);
+    return { geo: M.mesh(0.012, { colorSharp: 0.015, aoStep: 0.016 }), tips };
+  });
+  SCULPTED = { body, head, jaw, hands, feet, ms: [tA - t0, tB - tA, tC - tB, performance.now() - tC].map(Math.round).join('/') + ' v' + [body, head, jaw, hands[0].geo, feet[0].geo].map(g => g.attributes.position.count).join('/') };
+  return SCULPTED;
+}
+
+const _yAxis = new THREE.Vector3(0, -1, 0);
+/** artiglio ricurvo con la punta lungo dir (piegato verso «curl») */
+function talonAt(parent, base, dir, len, r, bend, mat, curl = [0, 0, 1]) {
+  const g = talonGeo(len, r, bend);
+  const d = new THREE.Vector3().fromArray(dir).normalize();
+  // orienta: −y → dir, e il piegamento (+z) verso «curl» (ortogonalizzato)
+  const c = new THREE.Vector3().fromArray(curl); c.addScaledVector(d, -c.dot(d)).normalize();
+  const x = new THREE.Vector3().crossVectors(c, d.clone().negate());
+  const m = new THREE.Matrix4().makeBasis(x, d.clone().negate(), c).setPosition(new THREE.Vector3().fromArray(base));
+  g.applyMatrix4(m);
+  return add(parent, g, mat);
+}
+
 /** costruisce il gargoyle (alto ~3,3 m, apertura alare ~8 m); l'origine è fra i piedi, guarda verso +z */
-export function buildGargoyle() {
-  const MT = mats(), rnd = mulberry(4242);
+function makeRig() {
+  const MT = mats();
   const root = new THREE.Group();
   const R = { root, legs: [], arms: [], wings: [] };
+  // ── ossa (le stesse di prima) ──
   const hips = R.hips = bone(root, 0, 1.6, 0);
-  add(hips, T(new THREE.SphereGeometry(0.42, 14, 10), 0, 0, -0.02, 0, 0, 0, 1, 0.8, 0.95), MT.skin);
-  add(hips, T(new THREE.ConeGeometry(0.16, 0.9, 7), 0, -0.05, -0.55, -2.1, 0, 0), MT.dark);           // moncone di coda
-  // gambe digitigrade: coscia → stinco (all'indietro) → metatarso → piede con tre artigli
   for (const s of [-1, 1]) {
-    const thigh = bone(hips, s * 0.34, -0.06, 0);
-    add(thigh, limbGeo(0.86, 0.24, 0.13, 0.25), MT.skin);
-    const shin = bone(thigh, 0, -0.86, 0);
-    add(shin, limbGeo(0.78, 0.13, 0.08, 0.1), MT.skin);
-    add(shin, T(new THREE.ConeGeometry(0.05, 0.22, 5), 0, -0.05, -0.12, -2.2, 0, 0), MT.horn);        // sperone sul ginocchio
-    const ankle = bone(shin, 0, -0.78, 0);
-    add(ankle, limbGeo(0.52, 0.085, 0.065, 0.05, 7), MT.dark);
-    const toe = bone(ankle, 0, -0.52, 0);
-    add(toe, T(new THREE.SphereGeometry(0.13, 8, 6), 0, -0.02, 0.06, 0, 0, 0, 1, 0.55, 1.3), MT.dark);
-    for (const k of [-1, 0, 1]) add(toe, T(talonGeo(0.3, 0.035, 0.6), k * 0.07, -0.02, 0.18, -1.45, k * 0.25, 0), MT.claw);
-    add(toe, T(talonGeo(0.18, 0.03, 0.5), 0, 0.0, -0.08, 1.9, 0, 0), MT.claw);
+    const thigh = bone(hips, s * 0.34, -0.06, 0), shin = bone(thigh, 0, -0.86, 0), ankle = bone(shin, 0, -0.78, 0), toe = bone(ankle, 0, -0.52, 0);
     R.legs.push({ thigh, shin, ankle, toe, s });
   }
-  // busto ingobbito (ossa lungo +y), criniera, spine sul dorso
   const chest = R.chest = bone(hips, 0, 0.1, 0.02);
-  add(chest, T(new THREE.SphereGeometry(0.5, 16, 12), 0, 0.2, 0.04, 0, 0, 0, 0.9, 0.75, 0.82), MT.skin);   // ventre
-  add(chest, T(new THREE.SphereGeometry(0.62, 16, 12), 0, 0.68, -0.02, 0, 0, 0, 1.12, 0.78, 0.86), MT.skin); // cassa toracica
-  for (const s of [-1, 1]) {
-    add(chest, T(new THREE.SphereGeometry(0.3, 10, 8), s * 0.26, 0.74, 0.33, 0, 0, 0, 1, 0.8, 0.55), MT.skin);  // pettorali
-    add(chest, T(new THREE.SphereGeometry(0.3, 10, 8), s * 0.52, 0.86, -0.1, 0, 0, 0, 1, 0.85, 1), MT.skin);    // trapezi/spalle
-    for (let k = 0; k < 3; k++) add(chest, T(new THREE.SphereGeometry(0.1, 6, 5), s * 0.42, 0.42 - k * 0.12, 0.3 - k * 0.02, 0, 0, 0, 1.4, 0.6, 0.7), MT.skin);   // costole
-  }
-  {
-    const tufts = [];
-    for (let i = 0; i < 46; i++) {
-      // criniera folta su spalle, collo e alto dorso: ciocche piatte stese all'indietro, che ricadono sul dorso
-      const a = (rnd() - 0.5) * Math.PI * 1.35 + Math.PI, h = 0.7 + rnd() * 0.5, rr = 0.42 + rnd() * 0.18;
-      const x = Math.sin(a) * rr * 1.2, z = Math.cos(a) * rr * 0.85, len = 0.4 + rnd() * 0.4;
-      const cg = new THREE.ConeGeometry(0.1 + rnd() * 0.07, len, 5, 2); cg.translate(0, len / 2, 0);
-      { const P = cg.attributes.position; for (let k = 0; k < P.count; k++) { const t = P.getY(k) / len; P.setZ(k, P.getZ(k) * 0.45 - t * t * 0.12); } }
-      T(cg, x, h, z, -1.25 - rnd() * 0.5, 0, -x * 0.7 + (rnd() - 0.5) * 0.35);
-      tufts.push(cg);
-    }
-    for (let i = 0; i < 14; i++) {   // collare attorno al collo
-      const a = (i / 14) * Math.PI * 2, len = 0.3 + rnd() * 0.2, cg = new THREE.ConeGeometry(0.09, len, 5, 1); cg.translate(0, len / 2, 0);
-      T(cg, Math.sin(a) * 0.3, 1.05, Math.cos(a) * 0.22 + 0.08, -0.5 + Math.cos(a) * 0.3, 0, -Math.sin(a) * 0.9); tufts.push(cg);
-    }
-    for (let i = 0; i < 18; i++) {   // frangia sul petto
-      const x = (rnd() - 0.5) * 0.8, len = 0.25 + rnd() * 0.3, cg = new THREE.ConeGeometry(0.06, len, 4, 1); cg.translate(0, -len / 2, 0);
-      T(cg, x, 0.98 + rnd() * 0.12, 0.34 + rnd() * 0.08, 0.3 + rnd() * 0.3, 0, (rnd() - 0.5) * 0.5); tufts.push(cg);
-    }
-    add(chest, M(tufts), MT.mane);
-    const spikes = [];
-    for (let k = 0; k < 5; k++) { const sp = new THREE.ConeGeometry(0.05, 0.28 - k * 0.03, 5); sp.translate(0, 0.14, 0); T(sp, 0, 0.5 - k * 0.14, -0.5 + k * 0.02, -0.7, 0, 0); spikes.push(sp); }
-    add(chest, M(spikes), MT.horn);
-  }
-  // collo e testa da pipistrello (cranio allungato, muso, orecchie a punta, mascella mobile, zanne)
   const neck = R.neck = bone(chest, 0, 1.05, 0.18);
-  add(neck, T(limbGeo(0.36, 0.17, 0.2, 0.05, 8), 0, 0.36, 0, Math.PI, 0, 0), MT.skin);
   const head = R.head = bone(neck, 0, 0.38, 0.06);
-  add(head, T(new THREE.SphereGeometry(0.26, 14, 10), 0, 0.06, -0.02, 0, 0, 0, 1, 0.92, 1.12), MT.skin);
-  add(head, T(new THREE.SphereGeometry(0.17, 12, 8), 0, -0.04, 0.24, 0, 0, 0, 0.95, 0.75, 1.0), MT.skin);   // muso
-  add(head, T(new THREE.BoxGeometry(0.44, 0.08, 0.14), 0, 0.13, 0.2, 0.25, 0, 0), MT.dark);                  // arcata sopraccigliare
-  add(head, T(new THREE.SphereGeometry(0.06, 8, 6), 0, 0.0, 0.4, 0, 0, 0, 1.3, 0.8, 0.9), MT.dark);        // naso
-  for (const s of [-1, 1]) {
-    add(head, T(new THREE.SphereGeometry(0.045, 8, 6), s * 0.11, 0.07, 0.29), MT.eye, false);
-    // orecchie lunghe e appuntite, verso dietro e in fuori
-    const ear = new THREE.ConeGeometry(0.11, 0.62, 5, 2); ear.translate(0, 0.31, 0);
-    { const P = ear.attributes.position; for (let i = 0; i < P.count; i++) P.setZ(i, P.getZ(i) * 0.35); }
-    add(head, T(ear, s * 0.2, 0.18, -0.05, -0.75, 0, -s * 0.95), MT.skin);
-    add(head, T(new THREE.ConeGeometry(0.035, 0.12, 4), s * 0.08, -0.12, 0.33, Math.PI, 0, 0), MT.horn);     // zanne superiori
-    add(head, T(new THREE.ConeGeometry(0.06, 0.3, 5), s * 0.16, 0.24, -0.12, -0.9, 0, -s * 0.4), MT.horn);   // cornetti
-  }
-  add(head, T(new THREE.BoxGeometry(0.2, 0.05, 0.16), 0, -0.13, 0.25), MT.mouth);
   const jaw = R.jaw = bone(head, 0, -0.1, 0.08);
-  add(jaw, T(new THREE.SphereGeometry(0.15, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 0, 0.0, 0.14, 0, 0, 0, 0.95, 0.6, 1.1), MT.skin);
-  add(jaw, T(new THREE.BoxGeometry(0.18, 0.04, 0.2), 0, -0.01, 0.15), MT.mouth);
-  for (const s of [-1, 1]) add(jaw, T(new THREE.ConeGeometry(0.032, 0.11, 4), s * 0.08, 0.04, 0.24), MT.horn);
-  // braccia lunghe con mani a quattro artigli
   for (const s of [-1, 1]) {
-    const sh = bone(chest, s * 0.64, 0.84, 0.0);
-    add(sh, T(new THREE.SphereGeometry(0.24, 10, 8), 0, -0.02, 0), MT.skin);
-    add(sh, limbGeo(0.92, 0.19, 0.13, 0.3), MT.skin);
-    const el = bone(sh, 0, -0.92, 0);
-    add(el, limbGeo(0.9, 0.13, 0.085, 0.25), MT.skin);
-    add(el, T(new THREE.ConeGeometry(0.05, 0.3, 5), 0, 0.0, -0.1, -2.5, 0, 0), MT.horn);                  // sperone del gomito
-    const hand = bone(el, 0, -0.9, 0);
-    add(hand, T(new THREE.SphereGeometry(0.12, 8, 6), 0, -0.07, 0.02, 0, 0, 0, 1.15, 1, 0.75), MT.dark);
-    const cl = [];
-    for (let k = 0; k < 4; k++) {
-      const fx = (k - 1.5) * 0.055, fz = 0.05 - Math.abs(k - 1.5) * 0.02;
-      const f = limbGeo(0.18, 0.035, 0.028, 0, 5); T(f, fx, -0.14, fz, 0.35, 0, 0); cl.push(f);
-      cl.push(T(talonGeo(0.3, 0.03, 0.7), fx, -0.29, fz + 0.06, 0.35, 0, 0));
-    }
-    const thumb = talonGeo(0.22, 0.03, 0.6); T(thumb, s * -0.1, -0.08, 0.1, 0.4, 0, s * 0.9); cl.push(thumb);
-    add(hand, M(cl), MT.claw);
+    const sh = bone(chest, s * 0.64, 0.84, 0.0), el = bone(sh, 0, -0.92, 0), hand = bone(el, 0, -0.9, 0);
     R.arms.push({ sh, el, hand, s });
   }
   // ali: omero → avambraccio → tre dita; la membrana è una geometria dinamica
   for (const s of [-1, 1]) {
     const wr = bone(chest, s * 0.28, 0.86, -0.36);
     const arm = bone(wr, 0, 0, 0);
-    add(arm, T(limbGeo(1.05, 0.09, 0.06, 0.2, 7), 0, 0, 0, 0, 0, s * Math.PI / 2), MT.dark);
+    add(arm, T(limbGeo(1.05, 0.085, 0.055, 0.25, 10), 0, 0, 0, 0, 0, s * Math.PI / 2), MT.dark);
     const fore = bone(arm, s * 1.05, 0, 0);
-    add(fore, T(limbGeo(1.45, 0.065, 0.045, 0.1, 6), 0, 0, 0, 0, 0, s * Math.PI / 2), MT.dark);
+    add(fore, T(new THREE.SphereGeometry(0.075, 10, 8), 0, 0, 0), MT.dark);
+    add(fore, T(limbGeo(1.45, 0.06, 0.04, 0.12, 9), 0, 0, 0, 0, 0, s * Math.PI / 2), MT.dark);
     const wrist = bone(fore, s * 1.45, 0, 0);
+    add(wrist, T(new THREE.SphereGeometry(0.05, 8, 6), 0, 0, 0), MT.dark);
     add(wrist, T(talonGeo(0.24, 0.035, 0.5), 0, 0.04, 0, 0, 0, Math.PI), MT.claw);                             // artiglio del pollice
     const fingers = [];
     for (const [len, base] of [[2.0, 0], [2.15, 0], [1.75, 0]]) {
       const f = bone(wrist, 0, 0, 0);
-      add(f, T(limbGeo(len, 0.04, 0.012, 0, 5), 0, 0, 0, 0, 0, s * Math.PI / 2), MT.dark);
+      add(f, T(limbGeo(len, 0.038, 0.01, 0.04, 7), 0, 0, 0, 0, 0, s * Math.PI / 2), MT.dark);
+      add(f, T(talonGeo(0.16, 0.02, 0.4), s * len, 0, 0, 0, 0, s * Math.PI / 2), MT.claw);                    // uncino in punta
       fingers.push({ b: f, len, base });
     }
     R.wings.push({ wr, arm, fore, wrist, fingers, s });
   }
-  // membrane (una per ala): ventaglio dal polso alle punte delle dita, poi fino al fianco
   R.membranes = R.wings.map(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(MEM_TRIS * 9), 3));
@@ -208,6 +332,77 @@ export function buildGargoyle() {
   });
   R.pose = defaultPose();
   R.prev = null;
+  applyPose(R, R.pose);
+  R.root.updateMatrixWorld(true);
+  return R;
+}
+function rigBones(R) {
+  const bones = [R.hips, R.chest, R.neck, R.head];
+  for (const L of R.legs) bones.push(L.thigh, L.shin, L.ankle, L.toe);
+  for (const A of R.arms) bones.push(A.sh, A.el, A.hand);
+  return bones;
+}
+export function buildGargoyle() {
+  const MT = mats(), rnd = mulberry(4242);
+  const R = makeRig(), { root, chest, head, jaw } = R;
+  // ── scultura (nella posa di riferimento) ──
+  const bones = rigBones(R);
+  const SP = sculptParts(R, bones);
+  R.sculptMs = SP.ms;
+  const skin = new THREE.SkinnedMesh(SP.body, flesh());
+  skin.castShadow = true; skin.receiveShadow = true; skin.frustumCulled = false;
+  root.add(skin);
+  skin.bind(new THREE.Skeleton(bones), new THREE.Matrix4());
+  R.skin = skin;
+  const rigid = (parent, geo) => { const m = new THREE.Mesh(geo, flesh()); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
+  rigid(head, SP.head); rigid(jaw, SP.jaw);
+  R.arms.forEach((A, i) => {
+    const H = SP.hands[i]; rigid(A.hand, H.geo);
+    H.tips.forEach(([p, d], k) => talonAt(A.hand, p, d, k === 4 ? 0.2 : 0.27, 0.027, 0.75, MT.claw, [0, -0.3, 1]));
+    add(A.el, T(talonGeo(0.26, 0.045, 0.3), 0, -0.02, -0.1, -2.5, 0, 0), MT.horn);                                   // sperone del gomito
+  });
+  R.legs.forEach((L, i) => {
+    const F = SP.feet[i]; rigid(L.toe, F.geo);
+    F.tips.forEach(([p, d], k) => talonAt(L.toe, p, d, k === 3 ? 0.16 : 0.24, 0.032, 0.6, MT.claw, k === 3 ? [0, 1, 0] : [0, -1, 0.3]));
+  });
+  // ── testa: occhi, denti, corna ──
+  for (const s of [-1, 1]) {
+    add(head, T(new THREE.SphereGeometry(0.036, 12, 8), s * 0.105, 0.072, 0.258), MT.eye, false);
+    talonAt(head, [s * 0.11, 0.25, -0.06], [s * 0.35, 0.55, -1], 0.34, 0.05, 0.55, MT.horn, [0, 1, 0]);            // cornetti all'indietro
+    talonAt(head, [s * 0.075, -0.12, 0.31], [0, -1, 0.1], 0.13, 0.022, 0.15, MT.horn, [0, 0, 1]);                    // zanne superiori
+    talonAt(jaw, [s * 0.065, -0.02, 0.26], [0, 1, 0.05], 0.09, 0.018, 0.1, MT.horn, [0, 0, 1]);                       // zanne inferiori
+    for (let k = 0; k < 3; k++) talonAt(head, [s * (0.05 - k * 0.012) , -0.125, 0.29 - k * 0.04 - (k ? 0 : 0.0)], [0, -1, 0], 0.045, 0.012, 0, MT.horn);
+  }
+  add(head, T(new THREE.BoxGeometry(0.17, 0.03, 0.2), 0, -0.13, 0.22), MT.mouth);
+  add(jaw, T(new THREE.BoxGeometry(0.15, 0.03, 0.2), 0, -0.01, 0.15), MT.mouth);
+  // ── criniera: ciocche morbide e ricurve su spalle, collo e alto dorso, collare e frangia sul petto ──
+  {
+    const tufts = [];
+    const tint = (g, v) => { const n = g.attributes.position.count, c = new Float32Array(n * 3); for (let i = 0; i < n; i++) { c[i * 3] = v; c[i * 3 + 1] = v * 0.94; c[i * 3 + 2] = v * 0.86; } g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g; };
+    for (let i = 0; i < 170; i++) {
+      // a strati: quelli interni più corti e scuri, gli esterni lunghi e chiari, ricadono sul dorso
+      const layer = rnd(), a = (rnd() - 0.5) * Math.PI * 1.5 + Math.PI, h = 0.66 + rnd() * 0.52, rr = 0.36 + layer * 0.2;
+      const x = Math.sin(a) * rr * 1.25, z = Math.cos(a) * rr * 0.92, len = 0.3 + layer * 0.45 + rnd() * 0.15;
+      const g = tuftGeo(len, 0.085 + rnd() * 0.06, 0.3 + rnd() * 0.3, (rnd() - 0.5) * 0.5);
+      T(g, x, h, z, -1.2 - rnd() * 0.55, (rnd() - 0.5) * 0.5, -x * 0.8 + (rnd() - 0.5) * 0.4);
+      tufts.push(tint(g, 0.55 + layer * 0.35 + rnd() * 0.12));
+    }
+    for (let i = 0; i < 22; i++) {   // collare attorno al collo
+      const a = (i / 22) * Math.PI * 2, len = 0.26 + rnd() * 0.2, g = tuftGeo(len, 0.06, 0.2, 0);
+      T(g, Math.sin(a) * 0.29, 1.03, Math.cos(a) * 0.22 + 0.08, -0.5 + Math.cos(a) * 0.3, 0, -Math.sin(a) * 0.9);
+      tufts.push(tint(g, 0.8 + rnd() * 0.3));
+    }
+    for (let i = 0; i < 26; i++) {   // frangia sul petto
+      const x = (rnd() - 0.5) * 0.75, len = 0.22 + rnd() * 0.26, g = tuftGeo(len, 0.045, -0.25, (rnd() - 0.5) * 0.3); g.rotateX(Math.PI);
+      T(g, x, 1.0 + rnd() * 0.1, 0.32 + rnd() * 0.08, 0.3 + rnd() * 0.3, 0, (rnd() - 0.5) * 0.5);
+      tufts.push(tint(g, 0.85 + rnd() * 0.25));
+    }
+    const geo = mergeGeometries(tufts.map(g => { const n = g.index ? g.toNonIndexed() : g; n.deleteAttribute('uv'); return n; }));
+    add(chest, geo, MT.mane);
+    const spikes = [];
+    for (let k = 0; k < 6; k++) { const sp = talonGeo(0.3 - k * 0.035, 0.045, 0.5); T(sp, 0, 0.42 - k * 0.12, -0.48 + k * 0.015, 2.1, 0, 0); spikes.push(sp); }
+    add(chest, M(spikes), MT.horn);
+  }
   root.traverse(o => { if (o.isMesh) o.userData.boss = true; });
   return R;
 }

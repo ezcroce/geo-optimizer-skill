@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Infinite Alibi — deduzione sociale in 3 minuti</title>
+  <meta name="description" content="Infinite Alibi: un gioco di deduzione sociale da 3 minuti. Il Colpevole manipola i filmati di sorveglianza, gli investigatori cercano i micro-indizi." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="rec-dot"></span>INFINITE <b>ALIBI</b></div>
+    <div class="phase" id="phase">MENU</div>
+    <div class="timer" id="timer">--:--</div>
+    <div class="top-actions">
+      <button class="ghost" id="btnClip" title="Registra una clip del canvas (WebM)">⏺ Clip</button>
+      <button class="ghost" id="btnHelp" title="Regole">?</button>
+      <button class="ghost" id="btnMenu" title="Torna al menu">☰</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage">
+      <div class="canvas-wrap">
+        <canvas id="cctv" aria-label="Telecamere di sorveglianza della villa"></canvas>
+      </div>
+      <div class="hint" id="hint"></div>
+      <div class="transport">
+        <button id="btnPlay" class="play" title="Play/Pausa (spazio)">▶</button>
+        <button id="btnBack" class="ghost small" title="Indietro di un fotogramma (←)">⏮</button>
+        <button id="btnFwd" class="ghost small" title="Avanti di un fotogramma (→)">⏭</button>
+        <div class="clock" id="clock">23:14:00</div>
+        <canvas id="timeline" height="54"></canvas>
+        <div class="speeds">
+          <button data-speed="0.25" class="ghost small">¼×</button>
+          <button data-speed="0.5" class="ghost small">½×</button>
+          <button data-speed="1" class="ghost small on">1×</button>
+          <button data-speed="2" class="ghost small">2×</button>
+        </div>
+      </div>
+    </section>
+    <aside class="side" id="side"></aside>
+  </main>
+
+  <div class="modal-back hidden" id="modalBack"><div class="modal" id="modal"></div></div>
+  <a id="clipLink" class="clip-link hidden" download="infinite-alibi-clip.webm">⬇ Scarica la clip</a>
+
+  <script src="js/world.js"></script>
+  <script src="js/footage.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

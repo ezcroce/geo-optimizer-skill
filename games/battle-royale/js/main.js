@@ -1,42 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=40';
+import { EMOTES, poseEmote } from './emotes.js?v=41';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=40';
-import * as PR from './progress.js?v=40';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=40';
-import { initMenu } from './menu.js?v=40';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=40';
-import { initSettingsUI } from './settings-ui.js?v=40';
+} from './config.js?v=41';
+import * as PR from './progress.js?v=41';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=41';
+import { initMenu } from './menu.js?v=41';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=41';
+import { initSettingsUI } from './settings-ui.js?v=41';
 import { applyAnisotropy } from './texgen.js?v=19';
-import * as A from './audio.js?v=40';
+import * as A from './audio.js?v=41';
 import {
-  buildWorld, terrainHeight, groundAt, resolveCollisions, rayWorld, rayColliders,
+  buildWorld, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
-  biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32,
-} from './world.js?v=40';
+  biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
+} from './world.js?v=41';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=40';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=40';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=40';
-import { buildChestMesh } from './models3d.js?v=40';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=40';
-import { createInventory } from './inventory.js?v=40';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=40';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=40';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=41';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=41';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=41';
+import { buildChestMesh } from './models3d.js?v=41';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=41';
+import { createInventory } from './inventory.js?v=41';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=41';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=41';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=40';
-import { buildPickaxe, heldConsumable } from './held.js?v=40';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=40';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=40';
-import { createCrosshair } from './crosshair.js?v=40';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=40';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=41';
+import { buildPickaxe, heldConsumable } from './held.js?v=41';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=41';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=41';
+import { createCrosshair } from './crosshair.js?v=41';
+import { createThrowables, buildThrowMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE } from './throwables.js?v=41';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=41';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -70,7 +71,9 @@ function rollRarity(weights) {
 const SETTINGS_DEFAULT = () => ({
   name: 'Giocatore', skin: 'recluta', glider: 'classico', difficulty: 'normale', players: 100, sens: 1, vol: 0.5, mode: 'br', team: 'solo', hat: 'none', back: 'none',
   // controlli, audio e interfaccia
-  adsSens: 1, invertY: false, fov: 70, crouchHold: false, shake: true, amb: 1, chColor: '#ffffff', chSize: 1, minimap: 'normal',
+  adsSens: 1, invertY: false, fov: 70,
+  adsK_pistol: 1, adsK_smg: 1, adsK_shotgun: 1, adsK_ar: 1, adsK_sniper: 1, adsK_rocket: 1,   // v41: zoom in mira per classe d'arma
+  crouchHold: false, shake: true, amb: 1, chColor: '#ffffff', chSize: 1, minimap: 'normal',
   touch: 'auto', touchSens: 1, touchSize: 1,
   touchAlpha: 0.9, autoFire: 'on', aimAssist: 'on', haptics: true, touchLayout: {},   // v40
   gfx: { ...GFX_DEFAULT },
@@ -326,10 +329,11 @@ function updateEffects(dt) {
     const k = 1 - b.life / 0.55;
     b.m.scale.setScalar(b.r * (0.3 + k * 1.1));
     b.m.material.opacity = Math.max(0, 1 - k) * 0.9;
-    b.m.material.color.setHSL(0.08 - k * 0.06, 1, 0.6 - k * 0.3);
-    if (b.life <= 0) b.m.visible = false;
+    if (b.blue) b.m.material.color.setHSL(0.55, 1, 0.65 - k * 0.2); else b.m.material.color.setHSL(0.08 - k * 0.06, 1, 0.6 - k * 0.3);
+    if (b.life <= 0) { b.m.visible = false; b.blue = false; }
   }
   if (flashLight.intensity > 0) flashLight.intensity = Math.max(0, flashLight.intensity - dt * 200);
+  if (G.flashBlueT > 0 && (G.flashBlueT -= dt) <= 0) flashLight.color.set('#ffb050');
 }
 
 // ─────────────── Stato di gioco ───────────────
@@ -369,6 +373,8 @@ class Character {
     this.kills = 0; this.walkPhase = 0; this.moveAmt = 0; this.deadT = 0;
     this.glider = null; this.heldKey = ''; this.bloom = 0;
     this.damageDealt = 0;
+    this.throws = { frag: 0, smoke: 0, impulse: 0 }; this.throwSel = 'frag'; this.throwCd = 0; this.throwAnim = 0;   // v41
+    this.st = { shots: 0, hits: 0, heads: 0, healed: 0, built: 0, dist: 0, taken: 0, maxKillD: 0 };   // v41: statistiche
     this.crouch = false; this.crouchK = 0;           // abbassarsi
     this.stamina = 100; this.climbDir = new THREE.Vector3(); this.climbPhase = 0; this.mantle = null; // arrampicata
     this.equipT = 0; this.landT = 0;                  // animazioni
@@ -387,7 +393,7 @@ class Character {
     this.heldKey = key;
     const gp = this.m.gunPivot;
     while (gp.children.length) gp.remove(gp.children[0]);
-    if (this._claws) { for (const g of this._claws) if (g.parent) g.parent.remove(g); this._claws = null; }
+    if (this._claws) { for (const g of this._claws) if (g.parent) g.parent.remove(g); this._claws = null; this.m._clawG = null; }
     this.claw = null; this.clawQueue = null; this.pushX = this.pushZ = 0;
     let mesh;
     if (!s) mesh = buildPickaxe(this.skin.accColor || '#7fd0ff');
@@ -395,6 +401,7 @@ class Character {
       // v38: Artigli del Gargoyle: un guanto per mano (le lame proseguono oltre le nocche)
       mesh = new THREE.Group();
       this._claws = [0, 1].map(i => { const g = buildClawGauntlet(); g.rotation.set(Math.PI / 2, 0, 0); g.position.y = -0.02; g.scale.setScalar(0.82); this.m.hands[i].add(g); return g; });
+      this.m._clawG = this._claws;   // v41: realchar.js li tiene attaccati al polso del modello vero
     }
     else if (s.kind === 'weapon') mesh = buildWeaponMesh(s.id, s.rarity);
     else mesh = heldConsumable(s.id);
@@ -417,7 +424,7 @@ const _co = new THREE.Vector3(), _cd = new THREE.Vector3(), _up = new THREE.Vect
 function wallAhead(ch, dir, height = 1.0, reach = CHAR_R + 0.45) {
   _co.set(ch.pos.x, ch.pos.y + height, ch.pos.z);
   const h = rayColliders(_co, dir, reach);
-  if (!h || h.collider.tree) return null;
+  if (!h || h.collider.tree || h.collider.type === 'ramp') return null;   // v41: sulle rampe si cammina
   return h;
 }
 /** Direzione "verso il muro" allineata alla faccia colpita */
@@ -578,7 +585,7 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   }
   // ── nuoto: inerzia, galleggiamento, bracciate lente, niente salti in acqua alta ──
   const swimY = WATER_LEVEL - 1.25;
-  let acc = ch.onGround ? 14 : 3;
+  let acc = ch.onGround ? 14 : ch.impulseFly ? 0.7 : 3;   // v41: spinti dall'impulso si vola davvero
   if (ch.inWater) {
     acc = 2.4;
     const raw = groundAt(ch.pos.x, ch.pos.z, ch.pos.y + 0.5);
@@ -592,9 +599,18 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   const lim = HALF - 4;
   ch.pos.x = clamp(ch.pos.x, -lim, lim);
   ch.pos.z = clamp(ch.pos.z, -lim, lim);
-  if (jump && ch.onGround) { ch.vel.y = JUMP_V; ch.onGround = false; }
+  if (jump && ch.onGround) {
+    ch.vel.y = JUMP_V; ch.onGround = false;
+    // v41: per l'animazione del salto: gamba che stacca e quanta rincorsa c'era
+    ch.jumpLead = Math.sin(ch.walkPhase || 0) > 0 ? 0 : 1; ch.jumpRun = clamp(Math.hypot(ch.vel.x, ch.vel.z) / 5.5, 0, 1); ch.jumpT = 0;
+  }
   ch.vel.y -= GRAVITY * (G.gravK ?? 1) * dt;
   ch.pos.y += ch.vel.y * dt;
+  // v41: soffitto: saltando si sbatte la testa e si ricade (prima si veniva spinti fuori dai muri)
+  if (ch.vel.y > 0) {
+    const cy = ceilingAt(ch.pos.x, ch.pos.z, prevY, CHAR_H, CHAR_R);
+    if (ch.pos.y + CHAR_H > cy) { ch.pos.y = Math.max(prevY, cy - CHAR_H); ch.vel.y = 0; }
+  }
   let g = groundAt(ch.pos.x, ch.pos.z, Math.max(prevY, ch.pos.y));
   const wasWater = ch.inWater;
   ch.inWater = g < swimY + 0.05;
@@ -607,8 +623,8 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   if (ch.pos.y <= g) {
     if (!ch.onGround && ch.vel.y < -7 && !ch.inWater) landFx(ch, ch.vel.y);
     // v27: danni da caduta (oltre ~4 m; in acqua o col deltaplano non ci si fa male)
-    if (!ch.onGround && !ch.inWater && ch.vel.y < -FALL_SAFE_VY && ch.alive) fallDamage(ch, -ch.vel.y);
-    ch.pos.y = g; ch.vel.y = 0; ch.onGround = true;
+    if (!ch.onGround && !ch.inWater && ch.vel.y < -FALL_SAFE_VY && ch.alive && !ch.impulseFly) fallDamage(ch, -ch.vel.y);
+    ch.pos.y = g; ch.vel.y = 0; ch.onGround = true; ch.impulseFly = false;
   }
   else if (ch.onGround && ch.vel.y <= 0 && ch.pos.y - g < 0.7) { ch.pos.y = g; ch.vel.y = 0; }
   else ch.onGround = false;
@@ -886,9 +902,9 @@ function animateChar(ch, dt) {
   // v32: la frequenza dei passi viene dalla lunghezza dell'appoggio: il piede a terra non pattina
   ch.walkPhase += dt * gaitRate(spd, mv, run, spr, ck) * (1 - ch.backK * 0.12) * (mv > 0.05 ? 1 : 0) * dirSign;
   const sw = Math.sin(ch.walkPhase) * mv;
-  if (ch.isPlayer && mv > 0.3 && ch.onGround) {
+  if (mv > 0.3 && ch.onGround && (ch.isPlayer || ch.alive)) {
     const step = Math.floor((ch.walkPhase - Math.PI / 2) / Math.PI);   // un passo a ogni appoggio
-    if (step !== ch._lastStep) { ch._lastStep = step; A.playStep(); }
+    if (step !== ch._lastStep) { ch._lastStep = step; footstep(ch); }   // v41: per superficie, anche i nemici
   }
   // inclinazioni morbide: avanti quando corri, di lato quando ti sposti o giri
   ch.leanFwd = lerp(ch.leanFwd || 0, clamp(fwd * 0.012, -0.06, 0.07) + run * 0.05 + spr * 0.1, Math.min(1, dt * 8));
@@ -915,8 +931,11 @@ function animateChar(ch, dt) {
   // i saltini di un attimo, scendendo da un marciapiede, non cambiano posa)
   ch.airT = ch.onGround || ch.inWater ? 0 : (ch.airT || 0) + dt;
   const airborne = !ch.onGround && !ch.inWater && (ch.airT > 0.12 || ch.vel.y > 1.5);
-  ch.airK = lerp(ch.airK || 0, airborne ? 1 : 0, Math.min(1, dt * (airborne ? 10 : 18)));
-  if (ch.airK > 0.001) { legsAirBlend(m, ch.vel.y / 6, smooth01(ch.airK)); bodyY *= 1 - ch.airK; }
+  ch.airK = lerp(ch.airK || 0, airborne ? 1 : 0, Math.min(1, dt * (airborne ? (ch.vel.y > 3 ? 16 : 10) : 18)));
+  // v41: salto animato: stacco con la gamba tesa, ginocchia raccolte in salita, falcata in corsa, gambe che cercano il suolo
+  ch.jumpT = (ch.jumpT ?? 9) + dt;
+  const airO = _airO; airO.run = ch.jumpRun ?? smooth01(ch.moveAmt / 5.5); airO.lead = ch.jumpLead || 0; airO.t = ch.airT; airO.push = ch.vel.y > 2 ? clamp(1 - ch.jumpT / 0.16, 0, 1) : 0;
+  if (ch.airK > 0.001) { legsAirBlend(m, ch.vel.y / 6, smooth01(ch.airK), airO); bodyY *= 1 - ch.airK; }
   if (ch.onGround && !ch.inWater) {
     // passo laterale: falcata in avanti più corta, le gambe si aprono e chiudono di lato
     const sk2 = ch.strafeK * mv;
@@ -1063,6 +1082,50 @@ function animateChar(ch, dt) {
     m.torso.rotation.x -= h * 0.12;
     m.head.rotation.z = h * 0.25 * (ch.hitDir || 1);
   }
+  // v41: busto e braccia seguono il salto (in salita il petto si apre, in discesa ci si raccoglie e si guarda giù)
+  if (ch.airK > 0.01 && !ch.inWater) {
+    const ak = smooth01(ch.airK), up = clamp(ch.vel.y / 6, -1.3, 1), k = Math.max(0, up), dn = Math.min(1, Math.max(0, -up));
+    const run = airO.run, side = airO.lead ? 1 : -1, fall = clamp((ch.airT - 0.55) / 0.45, 0, 1) * dn;
+    m.torso.rotation.x += (-0.1 * k + 0.12 * dn + 0.1 * run * k) * ak;
+    m.torso.rotation.y += side * 0.14 * run * ak * (1 - dn * 0.5);
+    m.body.rotation.x += (0.06 * run * k - 0.05 * dn) * ak;
+    if (!holdingGun && !(s && WEAPONS[s.id] && WEAPONS[s.id].melee)) {
+      // braccia libere: si alzano con lo slancio e si aprono per l'equilibrio scendendo (dondolano nelle cadute lunghe)
+      for (let i = 0; i < 2; i++) {
+        const sd = i ? 1 : -1, opp = (i === (airO.lead || 0)) ? -1 : 1;
+        const wob = Math.sin(ch.airT * 7 + i * 2) * 0.25 * fall;
+        m.arms[i].rotation.x += (-(0.75 * k + 0.25) - opp * 0.45 * run * (1 - dn) + 0.35 * dn + wob) * ak * (s ? 0.35 : 1);
+        m.arms[i].rotation.z += sd * (0.12 + 0.45 * dn) * ak * (s ? 0.35 : 1);
+        m.elbows[i].rotation.x = Math.min(0, m.elbows[i].rotation.x - 0.25 * ak * k);
+      }
+    } else {
+      // arma in mano: si solleva appena con lo slancio e si abbassa ricadendo
+      m.gunPivot.position.y += (0.035 * k - 0.03 * dn) * ak;
+      m.gunPivot.rotateX(0.06 * dn * ak - 0.04 * k * ak);
+    }
+    m.head.rotation.x += 0.18 * dn * ak - 0.05 * k * ak;
+  }
+  // v41: lancio (granata, fumogeno): mentre miri il braccio destro è caricato dietro la testa, poi la frustata in avanti
+  const aimThr = ch.isPlayer && G.throwAim;
+  if (ch.throwAnim > 0) { ch.throwAnim += dt; if (ch.throwAnim > 0.6) ch.throwAnim = 0; }
+  ch.throwHoldK = lerp(ch.throwHoldK || 0, aimThr ? 1 : 0, Math.min(1, dt * 12));
+  if (ch.throwAnim > 0 || ch.throwHoldK > 0.02) {
+    const u = ch.throwAnim > 0 ? ch.throwAnim / 0.6 : 0;
+    // carica (0) → rilascio (0.25) → accompagnamento (0.6) → ritorno
+    const cock = ch.throwAnim > 0 ? Math.max(0, 1 - u / 0.22) : ch.throwHoldK;
+    const swing = ch.throwAnim > 0 ? smooth01(clamp((u - 0.05) / 0.35, 0, 1)) * (1 - smooth01(clamp((u - 0.6) / 0.4, 0, 1))) : 0;
+    const w = Math.max(cock, swing, ch.throwAnim > 0 ? 1 - smooth01(clamp((u - 0.7) / 0.3, 0, 1)) : ch.throwHoldK);
+    const ax = -2.7 * cock + (-0.9) * swing * (1 - cock), el = -1.7 * cock - 0.25 * swing;
+    m.arms[1].rotation.x = lerp(m.arms[1].rotation.x, ax, w);
+    m.arms[1].rotation.z = lerp(m.arms[1].rotation.z, 0.35 * cock - 0.15 * swing, w);
+    m.elbows[1].rotation.x = lerp(m.elbows[1].rotation.x, el, w);
+    m.arms[0].rotation.x = lerp(m.arms[0].rotation.x, -1.2 * cock - 0.2 * swing, w * 0.8);   // l'altro braccio indica il bersaglio
+    m.elbows[0].rotation.x = lerp(m.elbows[0].rotation.x, -0.3, w * 0.8);
+    m.torso.rotation.y += (0.42 * cock - 0.38 * swing) * w;
+    m.torso.rotation.x += 0.12 * swing * w - 0.06 * cock * w;
+    if (w >= 0.4 && m.gunPivot.visible) { m.gunPivot.visible = false; ch._thrHid = true; }   // l'arma sparisce durante il lancio
+    else if (w < 0.4 && ch._thrHid) { ch._thrHid = false; if (!(s && WEAPONS[s.id] && WEAPONS[s.id].melee)) m.gunPivot.visible = true; }
+  } else if (ch._thrHid) { ch._thrHid = false; if (!(s && WEAPONS[s.id] && WEAPONS[s.id].melee)) m.gunPivot.visible = true; }
   if (!m._headLock) m.head.rotation.x += -p * 0.5 - m.torso.rotation.x * 0.6;   // bevendo la testa la decide la posa
   m.head.rotation.y = ch.lookCur - m.torso.rotation.y - ch.hipYaw;
   // canne della minigun che girano
@@ -1071,6 +1134,7 @@ function animateChar(ch, dt) {
   if (m.cape) m.cape.rotation.x = lerp(m.cape.rotation.x, 0.08 + mv * 0.55 + run * 0.25 + Math.sin(t * 6) * 0.04 * mv + (ch.onGround ? 0 : 0.5), Math.min(1, dt * 6));
 }
 
+const _airO = { run: 0, lead: 0, t: 0, push: 0 };
 // ─────────────── Raycast su personaggi ───────────────
 function raySphere(o, d, cx, cy, cz, r) {
   const ox = o.x - cx, oy = o.y - cy, oz = o.z - cz;
@@ -1123,6 +1187,7 @@ function spreadDir(dir, s) {
 }
 function hasLOS(a, b) {
   const o = a.eye(), t = b.chest();
+  if (throwSys.clouds.length && throwSys.smokeBlocks(o, t)) return false;   // v41: il fumo nasconde
   const d = t.sub(o);
   const len = d.length();
   d.divideScalar(len);
@@ -1165,7 +1230,7 @@ function fireWeapon(ch, aimFn, again = null) {
   }
   ch.emote = null;
   ch.recoilT = 0.14; ch.recoilK = def.pellets > 1 || def.projectile ? 1.6 : def.rate > 0.5 ? 1.3 : def.spin ? 0.35 : 0.7;
-  if (ch.isPlayer) XH.fire(def.pellets > 1 || def.projectile ? 1.4 : def.rate > 0.5 ? 1.1 : def.spin ? 0.25 : 0.6);
+  if (ch.isPlayer) { XH.fire(def.pellets > 1 || def.projectile ? 1.4 : def.rate > 0.5 ? 1.1 : def.spin ? 0.25 : 0.6); ch.st.shots += def.pellets || 1; }
   const mult = RARITIES[s.rarity].mult * (ch.isPlayer ? 1 : botDiff(ch).dmgMult);
   const muzzle = muzzlePos(ch);
   A.playGun(def.sound, ch.isPlayer ? 0 : muzzle.distanceTo(camera.position));
@@ -1234,6 +1299,7 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
     attacker.damageDealt += amount;
   }
   if (attacker === G.player && t !== G.player) {
+    attacker.st.hits++; if (head) attacker.st.heads++;   // v41
     PR.track('damage', amount);
     if (head) PR.track('headshot', 1);
     dmgNumber(new THREE.Vector3(t.pos.x + rand(-0.3, 0.3), t.pos.y + 2.1, t.pos.z), amount, head ? 'head' : (sh > 0 ? 'shield' : ''));
@@ -1245,6 +1311,9 @@ function damage(t, amount, attacker, head = false, how = '', ignoreShield = fals
   if (t === G.player) {
     G.hurtT = 0.4;
     if (attacker) { A.playHurt(); touch.buzz(35); }
+    t.st.taken += amount;
+    if (attacker && attacker !== t) hurtFrom(attacker, amount);   // v41: arco rosso verso chi ti colpisce + scossa
+    else G.shake = Math.max(G.shake, clamp(amount / 120, 0.04, 0.3));
   }
   if (!t.isPlayer && attacker && attacker !== t && attacker.alive && t.ai) {
     if (!t.ai.target || Math.random() < 0.6) { t.ai.target = attacker; t.ai.lastSeen = G.time; t.ai.lastSeenPos.copy(attacker.pos); }
@@ -1308,6 +1377,7 @@ function kill(t, attacker, how) {
   if (!t.remote) for (const s of t.slots) if (s) drops.push(s.kind === 'weapon' ? { kind: 'weapon', id: s.id, rarity: s.rarity, mag: s.mag } : { kind: 'cons', id: s.id, count: s.count });
   if (!t.remote) for (const [k, v] of Object.entries(t.ammo)) if (v > 0) drops.push({ kind: 'ammo', id: k, count: Math.min(v, 60) });
   if (t.mats > 0 && !t.remote) drops.push({ kind: 'mats', count: Math.min(t.mats, 200) });
+  if (!t.remote && t.throws) for (const k of THROW_IDS) if (t.throws[k] > 0) drops.push({ kind: 'throw', id: k, count: t.throws[k] });   // v41
   drops.forEach((it, i) => {
     const a = (i / drops.length) * Math.PI * 2;
     const x = t.pos.x + Math.cos(a) * 1.3, z = t.pos.z + Math.sin(a) * 1.3;
@@ -1318,6 +1388,7 @@ function kill(t, attacker, how) {
   let text;
   if (attacker && attacker !== t) {
     attacker.kills++;
+    if (attacker.st) attacker.st.maxKillD = Math.max(attacker.st.maxKillD, attacker.pos.distanceTo(t.pos));   // v41
     const wk = Object.keys(WEAPONS).find(k => WEAPONS[k].name === how);
     const wr = wk && attacker.weapon && attacker.weapon.id === wk ? attacker.weapon.rarity : 1;
     text = `<b>${esc(attacker.name)}</b> ${wk ? weaponIconHTML(wk, wr, 'wi kfi', true) : `<span style="opacity:.7">[${esc(how)}]</span>`} ${esc(t.name)}`;
@@ -1514,7 +1585,7 @@ function damageBarrel(pr, dmg, owner) {
 
 function explode(at, owner, dmg, radius, how = 'Lanciarazzi') {
   const b = booms[bIdx = (bIdx + 1) % booms.length];
-  b.m.position.copy(at); b.r = radius; b.life = 0.55; b.m.visible = true;
+  b.m.position.copy(at); b.r = radius; b.life = 0.55; b.m.visible = true; b.blue = false; flashLight.color.set('#ffb050'); G.flashBlueT = 0;
   emit(at, '#ff8a20', 26, 9, 0.8, 0.25, 0.6);
   emit(at, '#444444', 18, 5, 1.2, 0.35, -0.1);
   flashLight.position.copy(at); flashLight.intensity = 80;
@@ -1539,6 +1610,282 @@ function explode(at, owner, dmg, radius, how = 'Lanciarazzi') {
     if (Math.hypot(cx - at.x, cz - at.z) < radius + 1.5) damageWall(w, 400);
   }
   structBlast(at, radius * 0.75, dmg * 3, owner);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  v41: oggetti da lancio, segnalazioni (ping), indicatore dei danni, passi per superficie
+// ═══════════════════════════════════════════════════════════════
+const throwSys = createThrowables({
+  scene, rayWorld, terrainHeight,
+  onDetonate(g) {
+    if (g.id === 'frag') explode(g.pos.clone().setY(g.pos.y + 0.15), g.owner, FRAG.dmg, FRAG.radius, 'Granata');
+    else impulseBlast(g.pos.clone(), g.owner);
+  },
+  onBounce(g, speed) { const d = g.pos.distanceTo(camera.position); if (d < 45) A.playBounce(d, Math.min(1, speed / 14)); },
+  onSmoke(c) { const d = c.pos.distanceTo(camera.position); A.playSmoke(d); emit(c.pos.clone().setY(c.pos.y + 0.4), '#d8dde2', 16, 4, 0.9, 0.5, -0.2); },
+});
+const THROW_CD = 0.7;
+/** v41: soluzione balistica: con che angolo (e forza) lanciare da `from` per arrivare in `to` */
+function aimThrow(from, to) {
+  const dx = to.x - from.x, dz = to.z - from.z, dy = to.y - from.y, d = Math.max(0.5, Math.hypot(dx, dz));
+  const g = THROW_G;
+  let v = THROW_SPEED, disc = v ** 4 - g * (g * d * d + 2 * dy * v * v);
+  if (disc < 0) { v = Math.sqrt(g * (dy + Math.hypot(d, dy))) * 1.01; disc = Math.max(0, v ** 4 - g * (g * d * d + 2 * dy * v * v)); }
+  const th = Math.atan((v * v - Math.sqrt(disc)) / (g * d));   // traiettoria bassa
+  return { yaw: Math.atan2(dx, dz), pitch: th - 0.2, speed: Math.min(THROW_SPEED, v) };
+}
+const _thv = new THREE.Vector3(), _tho = new THREE.Vector3();
+/** origine del lancio: sopra la spalla destra */
+function throwOrigin(ch, out) {
+  const fx = Math.sin(ch.yaw), fz = Math.cos(ch.yaw);
+  return out.set(ch.pos.x + fx * 0.35 - fz * 0.25, ch.pos.y + 1.75 * ch.hScale, ch.pos.z + fz * 0.35 + fx * 0.25);
+}
+function throwItem(ch, id, yaw = ch.yaw, pitch = ch.pitch, speed = THROW_SPEED, remote = false) {
+  if (!remote) {
+    if (!ch.alive || ch.mode !== 'ground' || (ch.throws[id] || 0) <= 0 || (ch.throwCd || 0) > G.time) return false;
+    ch.throws[id]--; ch.throwCd = G.time + THROW_CD;
+  }
+  const o = throwOrigin(ch, _tho);
+  throwVelocity(yaw, pitch, _thv, speed).addScaledVector(ch.vel, 0.45);
+  throwSys.spawn(id, ch, o, _thv);
+  ch.throwAnim = 0.001; ch.throwId = id; ch.emote = null;
+  ch.lastShotT = G.time;
+  const d = o.distanceTo(camera.position);
+  if (d < 60) A.playThrow(d);
+  if (ch.isPlayer) { G.matchStats.thrown = (G.matchStats.thrown || 0) + 1; touch.buzz(10); }
+  if (G.net && !remote && (ch === G.player || (NET.role === 'host' && !ch.remote && !ch.human))) netSend({ t: 'thr', v: ch.idx, id, y: +yaw.toFixed(3), p: +pitch.toFixed(3), s: +speed.toFixed(2) });
+  return true;
+}
+/** v41: granata a impulso: spinta senza danni; sotto i piedi di chi l'ha lanciata è una catapulta verso dove guarda */
+function impulseBlast(at, owner) {
+  const d0 = at.distanceTo(camera.position);
+  emit(at, '#5ad0ff', 34, 11, 0.45, 0.2, 0.15); emit(at, '#ffffff', 14, 7, 0.3, 0.12, 0.2);
+  const b = booms[bIdx = (bIdx + 1) % booms.length];
+  b.m.position.copy(at); b.r = IMPULSE.radius * 0.7; b.life = 0.4; b.m.visible = true; b.blue = true;
+  flashLight.position.copy(at); flashLight.color.set('#6ad8ff'); flashLight.intensity = 50; G.flashBlueT = 0.25;
+  A.playImpulse(d0);
+  G.shake = Math.max(G.shake, clamp(1 - d0 / 30, 0, 0.45));
+  for (const c of G.chars) {
+    if (!c.alive || (c.mode !== 'ground' && c.mode !== 'climb') || c.remote) continue;
+    const dx = c.pos.x - at.x, dz = c.pos.z - at.z, dy = c.pos.y + 0.9 - at.y, hd = Math.hypot(dx, dz);
+    const d = Math.hypot(hd, dy);
+    if (d > IMPULSE.radius) continue;
+    const k = 1 - d / IMPULSE.radius;
+    const under = c === owner && hd < 2.6 && dy > -0.8 && dy < 2.4;
+    let vx, vz, vy;
+    if (under) { const sp = 9 + 3 * Math.min(1, c.moveAmt / 5); vx = Math.sin(c.yaw) * sp; vz = Math.cos(c.yaw) * sp; vy = 17.5; }
+    else { const h = 7 + 13 * k, ux = hd > 0.05 ? dx / hd : Math.sin(c.yaw), uz = hd > 0.05 ? dz / hd : Math.cos(c.yaw); vx = ux * h; vz = uz * h; vy = 6 + 8 * k; }
+    if (c.mode === 'climb') { c.mode = 'ground'; c.mantle = null; }
+    c.vel.set(vx, Math.max(c.vel.y, vy), vz);
+    c.onGround = false; c.impulseFly = true; c.pos.y += 0.05; c.emote = null; c.using = null;
+    if (c.ai) c.ai.alert = 2;
+    if (c.isPlayer) { touch.buzz(25); if (under) showMsg('', '🌀 Lanciato in aria!', 1.2); }
+  }
+}
+// ── anteprima della traiettoria (tenendo premuto G) ──
+const TRAJ_N = 90;
+const trajGeo = new THREE.BufferGeometry();
+trajGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAJ_N * 3), 3));
+const trajLine = new THREE.Line(trajGeo, new THREE.LineDashedMaterial({ color: '#ffffff', dashSize: 0.35, gapSize: 0.22, transparent: true, opacity: 0.9, depthTest: false }));
+trajLine.frustumCulled = false; trajLine.visible = false; trajLine.renderOrder = 20;
+scene.add(trajLine);
+const trajEnd = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, depthTest: false, side: THREE.DoubleSide }));
+trajEnd.visible = false; trajEnd.renderOrder = 21;
+scene.add(trajEnd);
+const _trajPts = [], _trajUp = new THREE.Vector3(0, 1, 0);
+function showTrajectory(p, id) {
+  const o = throwOrigin(p, _tho);
+  throwVelocity(G.camYaw, G.camPitch, _thv).addScaledVector(p.vel, 0.45);
+  const nrm = throwSys.predict(o, _thv, _trajPts, 2.6);
+  const arr = trajGeo.attributes.position.array, n = Math.min(TRAJ_N, _trajPts.length);
+  for (let i = 0; i < TRAJ_N; i++) { const q = _trajPts[Math.min(i, n - 1)]; arr[i * 3] = q.x; arr[i * 3 + 1] = q.y; arr[i * 3 + 2] = q.z; }
+  trajGeo.attributes.position.needsUpdate = true;
+  trajGeo.setDrawRange(0, n);
+  trajLine.computeLineDistances();
+  const col = id === 'frag' ? '#ffb347' : id === 'smoke' ? '#e8eef2' : '#6ad8ff';
+  trajLine.material.color.set(col); trajEnd.material.color.set(col);
+  trajLine.visible = true;
+  const last = _trajPts[n - 1];
+  trajEnd.visible = !!nrm;
+  if (nrm) { trajEnd.position.copy(last).addScaledVector(nrm, 0.04); trajEnd.quaternion.setFromUnitVectors(_trajUp, nrm); const s = id === 'frag' ? 1.7 : id === 'impulse' ? 1.5 : 1.2; trajEnd.scale.setScalar(s); }
+}
+function hideTrajectory() { trajLine.visible = false; trajEnd.visible = false; }
+/** prossimo tipo di oggetto da lancio che hai (H) */
+function cycleThrow(p) {
+  for (let k = 1; k <= THROW_IDS.length; k++) {
+    const id = THROW_IDS[(THROW_IDS.indexOf(p.throwSel) + k) % THROW_IDS.length];
+    if (p.throws[id] > 0 || k === THROW_IDS.length) { p.throwSel = id; break; }
+  }
+  A.playUI();
+}
+/** se il tipo scelto è finito passa a uno che hai ancora */
+function fixThrowSel(p) { if (p.throws[p.throwSel] > 0) return; const id = THROW_IDS.find(k => p.throws[k] > 0); if (id) p.throwSel = id; }
+
+// ── segnalazioni rapide (ping) per la squadra: Z o rotellina del mouse ──
+G.pings = [];
+const PING_KIND = {
+  enemy: { icon: '⚠', label: 'Nemico', color: '#ff4a4a', life: 6 },
+  loot: { icon: '📦', label: 'Bottino', color: '#ffd23a', life: 10 },
+  go: { icon: '📍', label: 'Andiamo qui', color: '#4ad8ff', life: 10 },
+  danger: { icon: '❗', label: 'Pericolo', color: '#ff9a3a', life: 8 },
+};
+function addPing(kind, pos, owner, target = null, label = null, remote = false) {
+  const K = PING_KIND[kind];
+  // una segnalazione per giocatore (la nuova sostituisce la vecchia)
+  for (let i = G.pings.length - 1; i >= 0; i--) if (G.pings[i].owner === owner) { G.pings[i].el.remove(); G.pings.splice(i, 1); }
+  const el = document.createElement('div');
+  el.className = 'ping ping-' + kind;
+  el.style.setProperty('--pc', K.color);
+  el.innerHTML = `<i><u>${K.icon}</u></i><b>${esc(label || K.label)}</b><small></small>`;
+  $('#pingLayer').appendChild(el);
+  const pg = { kind, pos: pos.clone(), owner, target, t: 0, life: K.life, el };
+  G.pings.push(pg);
+  if (owner && G.player && (owner === G.player || owner.team === G.player.team)) {
+    A.playPing(kind);
+    if (owner !== G.player) addFeed(`<span style="color:${K.color}">${K.icon} <b>${esc(owner.name)}</b>: ${esc(label || K.label)}</span>`, false);
+  }
+  // i compagni bot reagiscono: attaccano il nemico segnalato o vanno dove hai indicato
+  if (owner && G.teamSize > 1) for (const m of teamOf(owner)) {
+    if (m === owner || !m.alive || !m.ai || m.remote || m.mode !== 'ground') continue;
+    if (kind === 'enemy' && target && target.alive) { m.ai.target = target; m.ai.lastSeen = G.time; m.ai.lastSeenPos.copy(target.pos); m.ai.alert = 4; }
+    else if (kind === 'go' || kind === 'loot') { m.ai.pingGoal = pos.clone(); m.ai.pingT = G.time + 14; }
+  }
+  if (G.net && !remote && owner === G.player) netSend({ t: 'ping', o: owner.idx, k: kind, p: [+pos.x.toFixed(1), +pos.y.toFixed(1), +pos.z.toFixed(1)], tg: target ? target.idx : -1, l: label || '' });
+  return pg;
+}
+const _pd = new THREE.Vector3();
+function playerPing() {
+  const p = G.player;
+  if (!p || !p.alive || p.mode === 'bus') return;
+  if ((G.pingCd || 0) > G.time) return;
+  G.pingCd = G.time + 0.35;
+  camera.getWorldDirection(_pd);
+  const h = rayAll(camera.position, _pd, 400, p);
+  const at = h ? camera.position.clone().addScaledVector(_pd, h.t) : camera.position.clone().addScaledVector(_pd, 120);
+  if (!h && at.y < terrainHeight(at.x, at.z)) at.y = terrainHeight(at.x, at.z);
+  // doppio tocco veloce = pericolo
+  const dbl = G.time - (G.lastPingT || -9) < 0.45;
+  G.lastPingT = G.time;
+  if (h && h.char && h.char.alive && !(G.teamSize > 1 && h.char.team === p.team)) { addPing('enemy', h.char.pos, p, h.char, `Nemico: ${h.char.name}`); return; }
+  let best = null, bd = 2.2 * 2.2;
+  for (const L of G.loot) { const d = L.pos.distanceToSquared(at); if (d < bd) { bd = d; best = L; } }
+  if (best) { addPing('loot', best.pos, p, null, lootPingLabel(best.item)); return; }
+  addPing(dbl ? 'danger' : 'go', at, p);
+}
+function lootPingLabel(it) {
+  if (it.kind === 'weapon') return `${WEAPONS[it.id].name} (${RARITIES[it.rarity].name})`;
+  if (it.kind === 'cons') return CONSUMABLES[it.id].name;
+  if (it.kind === 'throw') return THROWABLES[it.id].short;
+  if (it.kind === 'ammo') return AMMO_TYPES[it.id].name;
+  return 'Materiali';
+}
+function updatePings(dt) {
+  const W = innerWidth, H = innerHeight;
+  for (let i = G.pings.length - 1; i >= 0; i--) {
+    const pg = G.pings[i];
+    pg.t += dt;
+    if (pg.target && pg.target.alive && pg.t < 3.5) pg.pos.copy(pg.target.pos);
+    if (pg.t > pg.life || (pg.target && !pg.target.alive && pg.kind === 'enemy') || G.state === 'menu') { pg.el.remove(); G.pings.splice(i, 1); continue; }
+    _proj.set(pg.pos.x, pg.pos.y + (pg.kind === 'enemy' ? 2.3 : 1.2), pg.pos.z).project(camera);
+    let x = (_proj.x + 1) / 2 * W, y = (1 - _proj.y) / 2 * H;
+    const behind = _proj.z > 1;
+    // fuori dallo schermo: resta sul bordo, nella direzione giusta
+    if (behind) { x = W - x; y = H - 30; }
+    const off = behind || x < 30 || x > W - 30 || y < 40 || y > H - 40;
+    x = clamp(x, 30, W - 30); y = clamp(y, 40, H - 40);
+    pg.el.style.transform = `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`;
+    pg.el.classList.toggle('edge', off);
+    pg.el.style.opacity = Math.min(1, (pg.life - pg.t) * 1.5).toFixed(2);
+    const d = G.player ? Math.round(G.player.pos.distanceTo(pg.pos)) : 0;
+    const sm = pg.el.lastChild; if (sm._d !== d) { sm._d = d; sm.textContent = d + ' m'; }
+  }
+}
+/** i bot compagni segnalano da soli i nemici che avvistano (al massimo uno ogni 6 s per squadra) */
+function botAutoPing(b, tgt) {
+  if (G.teamSize <= 1 || !G.player || b.team !== G.player.team || !tgt) return;
+  G.teamPingT = G.teamPingT || 0;
+  if (G.time < G.teamPingT) return;
+  if (G.pings.some(pg => pg.target === tgt)) return;
+  G.teamPingT = G.time + 6;
+  addPing('enemy', tgt.pos, b, tgt, `Nemico: ${tgt.name}`);
+}
+
+// ── indicatore di direzione dei danni subiti (archi rossi attorno al mirino) ──
+G.dmgDirs = [];
+const dmgDirCv = document.createElement('canvas');
+dmgDirCv.id = 'dmgDir';
+$('#hud').appendChild(dmgDirCv);
+const dmgDirG = dmgDirCv.getContext('2d');
+function hurtFrom(attacker, amount) {
+  if (!attacker || !G.player) return;
+  const p = G.player, a = Math.atan2(attacker.pos.x - p.pos.x, attacker.pos.z - p.pos.z);
+  const k = clamp(amount / 35, 0.35, 1);
+  const old = G.dmgDirs.find(d => d.src === attacker && d.t > 0.6);
+  if (old) { old.a = a; old.t = 1.5; old.k = Math.min(1, old.k + k * 0.5); }
+  else { G.dmgDirs.push({ a, t: 1.5, k, src: attacker }); if (G.dmgDirs.length > 6) G.dmgDirs.shift(); }
+  G.shake = Math.max(G.shake, clamp(amount / 85, 0.07, 0.5));   // scossa proporzionale al danno
+}
+function drawDmgDirs(dt) {
+  const S = Math.min(innerWidth, innerHeight) * 0.62, dpr = Math.min(2, devicePixelRatio || 1);
+  if (dmgDirCv._s !== S) { dmgDirCv._s = S; dmgDirCv.width = dmgDirCv.height = Math.round(S * dpr); dmgDirCv.style.width = dmgDirCv.style.height = S + 'px'; }
+  const g = dmgDirG, C = S / 2;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, S, S);
+  if (!G.dmgDirs.length) { dmgDirCv.style.display = 'none'; return; }
+  dmgDirCv.style.display = 'block';
+  const R = S * 0.36, camYaw = G.camYaw;
+  for (let i = G.dmgDirs.length - 1; i >= 0; i--) {
+    const d = G.dmgDirs[i];
+    d.t -= dt;
+    if (d.t <= 0 || !G.player || !G.player.alive) { G.dmgDirs.splice(i, 1); continue; }
+    if (d.src && d.src.alive && G.player) d.a = Math.atan2(d.src.pos.x - G.player.pos.x, d.src.pos.z - G.player.pos.z);
+    // angolo sullo schermo: 0 = davanti (in alto), positivo = a destra
+    const rel = angDiff(camYaw, d.a);
+    const sa = -Math.PI / 2 - rel;
+    const fade = Math.min(1, d.t / 0.6), half = 0.32 + 0.12 * d.k;
+    const gr = g.createRadialGradient(C, C, R - 26, C, C, R + 10);
+    gr.addColorStop(0, 'rgba(255,40,30,0)');
+    gr.addColorStop(0.65, `rgba(255,40,30,${(0.85 * fade).toFixed(3)})`);
+    gr.addColorStop(1, 'rgba(255,40,30,0)');
+    g.strokeStyle = gr; g.lineWidth = 22 + 12 * d.k; g.lineCap = 'round';
+    g.beginPath(); g.arc(C, C, R - 8, sa - half, sa + half); g.stroke();
+    // punta della freccia verso l'attaccante
+    g.fillStyle = `rgba(255,70,60,${(0.95 * fade).toFixed(3)})`;
+    const tx = C + Math.cos(sa) * (R + 16), ty = C + Math.sin(sa) * (R + 16), nx = Math.cos(sa), ny = Math.sin(sa);
+    g.beginPath(); g.moveTo(tx + nx * 12, ty + ny * 12); g.lineTo(tx - ny * 10, ty + nx * 10); g.lineTo(tx + ny * 10, ty - nx * 10); g.closePath(); g.fill();
+  }
+}
+
+// ── passi: suono diverso per superficie, posizionato a destra/sinistra, per tutti i personaggi vicini ──
+const _cr = new THREE.Vector3();
+function surfaceUnder(ch) {
+  if (ch.inWater) return 'water';
+  const x = ch.pos.x, z = ch.pos.z, th = terrainHeight(x, z);
+  if (ch.pos.y > th + 0.1) {
+    for (const c of queryColliders(x, z, 0.45)) {
+      if (c.type === 'ramp') { if (x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ && Math.abs(rampTop(c, x, z) - ch.pos.y) < 0.3) return 'wood'; continue; }
+      if (Math.abs(c.maxY - ch.pos.y) > 0.3) continue;
+      if (c.type === 'box' && (x < c.minX - 0.35 || x > c.maxX + 0.35 || z < c.minZ - 0.35 || z > c.maxZ + 0.35)) continue;
+      if (c.type === 'cyl' && Math.hypot(x - c.x, z - c.z) > c.r + 0.35) continue;
+      if (c.built || c.door) return 'wood';
+      if (c.surf) return c.surf;
+      if (c.barrel || c.car) return 'metal';
+      return c.arena || c.rock || c.type === 'ring' ? 'stone' : 'wood';
+    }
+  }
+  const b = biomeAt(x, z);   // meadow, snow, desert, autumn, tropic
+  if (b[1] > 0.5) return 'snow';
+  if (b[2] > 0.5 || (b[4] > 0.5 && th < WATER_LEVEL + 2.2)) return 'sand';
+  return 'grass';
+}
+function footstep(ch) {
+  const cam = camera.position;
+  const dx = ch.pos.x - cam.x, dz = ch.pos.z - cam.z, d = ch.isPlayer ? 0 : Math.hypot(dx, dz, ch.pos.y - cam.y);
+  if (d > 38) return;
+  _cr.set(-Math.cos(G.camYaw), 0, Math.sin(G.camYaw));   // destra della camera (come in updateCamera)
+  const pan = ch.isPlayer ? 0 : clamp((dx * _cr.x + dz * _cr.z) / Math.max(4, d), -1, 1);
+  const loud = (ch.crouch ? 0.45 : 1) * (ch.moveAmt > 6.2 ? 1.3 : 1) * (ch.isPlayer ? 0.8 : 1.15);
+  A.playStep(surfaceUnder(ch), d, pan, loud);
 }
 
 // ─────────────── v33: strutture distruttibili (effetti, macerie, materiali) ───────────────
@@ -1630,40 +1977,102 @@ function structBlast(at, r, amount, src) {
   if (G.net && (src === G.player || (NET.role === 'host' && src && !src.remote && !src.human))) netSend({ t: 'sdmg', p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)], a: Math.round(amount), r: +r.toFixed(2) });
 }
 
-// ─────────────── Muri costruiti ───────────────
+// ─────────────── Costruzioni: muri, pavimenti e rampe (v41) ───────────────
 const wallGeoX = new THREE.BoxGeometry(4, 3.6, 0.25);
+const floorGeo = new THREE.BoxGeometry(4, 0.22, 4);
+const RAMP_RISE = 3.5, RAMP_LEN = Math.hypot(4, RAMP_RISE);
+const rampGeo = new THREE.BoxGeometry(4, 0.22, RAMP_LEN);
+const BUILD_PIECES = ['wall', 'floor', 'ramp'];
+const PIECE_NAME = { wall: 'Muro', floor: 'Pavimento', ramp: 'Rampa' };
+const PIECE_COST = 10;
 const ghostMat = new THREE.MeshBasicMaterial({ color: '#4aa0ff', transparent: true, opacity: 0.35, depthWrite: false });
 const ghost = new THREE.Mesh(wallGeoX, ghostMat);
 ghost.visible = false;
 scene.add(ghost);
-function buildSpot(p) {
+G.build.piece = 'wall';
+/** dove va il pezzo: muro davanti a te; pavimento e rampa nella casella di 4 m davanti (guardando in alto: un piano più su) */
+function buildSpot(p, piece = G.build.piece || 'wall') {
   const yawSnap = Math.round(p.yaw / (Math.PI / 2)) * (Math.PI / 2);
   const fx = Math.round(Math.sin(yawSnap)), fz = Math.round(Math.cos(yawSnap));
-  const x = Math.round((p.pos.x + fx * 2.4) * 2) / 2, z = Math.round((p.pos.z + fz * 2.4) * 2) / 2;
-  const g = Math.max(groundAt(x, z, p.pos.y + 1), WATER_LEVEL - 1.2);
-  return { x, z, g, yawSnap, alongX: fz !== 0 };
+  const feet = p.onGround ? p.pos.y : groundAt(p.pos.x, p.pos.z, p.pos.y + 0.5);
+  if (piece === 'wall') {
+    const x = Math.round((p.pos.x + fx * 2.4) * 2) / 2, z = Math.round((p.pos.z + fz * 2.4) * 2) / 2;
+    let g = Math.max(groundAt(x, z, p.pos.y + 1), WATER_LEVEL - 1.2);
+    if (feet - g > 1.2) g = feet;   // in cima a pavimenti e rampe: il muro va al tuo livello, non giù a terra
+    return { k: 'wall', x, z, g, yawSnap, alongX: fz !== 0 };
+  }
+  const x = Math.round((p.pos.x + fx * 2.6) * 2) / 2, z = Math.round((p.pos.z + fz * 2.6) * 2) / 2;
+  const dir = (fx ? 'x' : 'z') + ((fx || fz) > 0 ? '+' : '-');
+  if (piece === 'floor') {
+    const up = G.camPitch > 0.3 ? RAMP_RISE : 0;
+    const g = Math.max(feet + up, groundAt(x, z, feet + up + 0.6), WATER_LEVEL - 1.0);
+    return { k: 'floor', x, z, g, yawSnap, dir, alongX: fz !== 0 };
+  }
+  // rampa: parte dal livello dei tuoi piedi (o dal terreno sotto il bordo vicino) e sale di un piano
+  const nx = x - fx * 2, nz = z - fz * 2;
+  const g = Math.max(feet, groundAt(nx, nz, feet + 0.6), WATER_LEVEL - 1.0);
+  return { k: 'ramp', x, z, g, yawSnap, dir, alongX: fz !== 0 };
+}
+/** mostra la sagoma del pezzo che stai per costruire */
+function showGhost(p) {
+  const s = buildSpot(p);
+  ghost.visible = true;
+  ghost.rotation.set(0, 0, 0);
+  if (s.k === 'wall') { ghost.geometry = wallGeoX; ghost.position.set(s.x, s.g + 1.7, s.z); ghost.rotation.y = s.alongX ? 0 : Math.PI / 2; }
+  else if (s.k === 'floor') { ghost.geometry = floorGeo; ghost.position.set(s.x, s.g - 0.11, s.z); }
+  else { ghost.geometry = rampGeo; placeRampMesh(ghost, s); }
+  ghostMat.color.set(p.mats >= PIECE_COST ? '#4aa0ff' : '#ff4a4a');
+  return s;
+}
+function placeRampMesh(mesh, s) {
+  const ang = Math.atan2(RAMP_RISE, 4);
+  mesh.position.set(s.x, s.g + RAMP_RISE / 2 - 0.1, s.z);
+  // la lastra (lunga lungo z) si inclina verso la direzione in cui sale
+  const yaw = s.dir === 'z+' ? 0 : s.dir === 'z-' ? Math.PI : s.dir === 'x+' ? Math.PI / 2 : -Math.PI / 2;
+  mesh.rotation.set(-ang, yaw, 0, 'YXZ');
 }
 function placeWall(p) {
-  if (p.mats < 10) { showMsg('', 'Materiali insufficienti! Colpisci alberi e rocce col piccone', 1.6); A.playEmpty(); return; }
+  if (p.mats < PIECE_COST) { showMsg('', 'Materiali insufficienti! Colpisci alberi e rocce col piccone', 1.6); A.playEmpty(); return; }
   const s = buildSpot(p);
-  const hw = s.alongX ? 2 : 0.125, hd = s.alongX ? 0.125 : 2;
-  for (const c of G.chars) {
-    if (c.alive && (c.mode === 'ground' || c.mode === 'climb') && Math.abs(c.pos.x - s.x) < hw + CHAR_R && Math.abs(c.pos.z - s.z) < hd + CHAR_R) { A.playEmpty(); return; }
+  if (s.k === 'wall') {
+    const hw = s.alongX ? 2 : 0.125, hd = s.alongX ? 0.125 : 2;
+    for (const c of G.chars) {
+      if (c.alive && (c.mode === 'ground' || c.mode === 'climb') && Math.abs(c.pos.x - s.x) < hw + CHAR_R && Math.abs(c.pos.z - s.z) < hd + CHAR_R) { A.playEmpty(); return; }
+    }
+  } else if (s.k === 'floor') {
+    // niente pavimenti dentro le persone (all'altezza del busto)
+    for (const c of G.chars) if (c.alive && c !== p && Math.abs(c.pos.x - s.x) < 2 + CHAR_R && Math.abs(c.pos.z - s.z) < 2 + CHAR_R && s.g > c.pos.y + 0.4 && s.g < c.pos.y + CHAR_H) { A.playEmpty(); return; }
   }
-  p.mats -= 10;
+  // stesso pezzo già lì? niente doppioni
+  if (G.walls.some(w => w.piece === s.k && Math.abs((w.minX + w.maxX) / 2 - s.x) < 0.3 && Math.abs((w.minZ + w.maxZ) / 2 - s.z) < 0.3 && Math.abs(w.baseY - s.g) < 0.5 && (s.k !== 'wall' || w.alongX === s.alongX))) { A.playEmpty(); return; }
+  p.mats -= PIECE_COST;
   makeWall(s);
-  if (p.isPlayer) PR.track('build', 1);
-  if (G.net) netSend({ t: 'wall', x: s.x, z: s.z, g: +s.g.toFixed(2), ax: s.alongX ? 1 : 0 });
+  if (p.isPlayer) { PR.track('build', 1); p.st.built++; }
+  if (G.net) netSend({ t: 'wall', k: s.k, x: s.x, z: s.z, g: +s.g.toFixed(2), ax: s.alongX ? 1 : 0, d: s.dir || '' });
 }
 function makeWall(s) {
-  const hw = s.alongX ? 2 : 0.125, hd = s.alongX ? 0.125 : 2;
+  const k = s.k || 'wall';
   const mat = new THREE.MeshStandardMaterial({ map: world.woodTex, normalMap: world.woodTex.userData.normal || null, roughness: 0.85, color: '#ffffff' });
-  const mesh = new THREE.Mesh(wallGeoX, mat);
-  mesh.position.set(s.x, s.g + 1.8 - 0.1, s.z);
-  mesh.rotation.y = s.alongX ? 0 : Math.PI / 2;
+  let mesh, c;
+  if (k === 'wall') {
+    const hw = s.alongX ? 2 : 0.125, hd = s.alongX ? 0.125 : 2;
+    mesh = new THREE.Mesh(wallGeoX, mat);
+    mesh.position.set(s.x, s.g + 1.8 - 0.1, s.z);
+    mesh.rotation.y = s.alongX ? 0 : Math.PI / 2;
+    c = { type: 'box', minX: s.x - hw, maxX: s.x + hw, minZ: s.z - hd, maxZ: s.z + hd, minY: s.g - 0.4, maxY: s.g + 3.5, hp: 150, maxHp: 150 };
+  } else if (k === 'floor') {
+    mesh = new THREE.Mesh(floorGeo, mat);
+    mesh.position.set(s.x, s.g - 0.11, s.z);
+    c = { type: 'box', minX: s.x - 2, maxX: s.x + 2, minZ: s.z - 2, maxZ: s.z + 2, minY: s.g - 0.22, maxY: s.g, hp: 140, maxHp: 140 };
+  } else {
+    mesh = new THREE.Mesh(rampGeo, mat);
+    placeRampMesh(mesh, s);
+    c = { type: 'ramp', dir: s.dir, minX: s.x - 2, maxX: s.x + 2, minZ: s.z - 2, maxZ: s.z + 2, minY: s.g, maxY: s.g + RAMP_RISE, hp: 140, maxHp: 140 };
+  }
   mesh.castShadow = mesh.receiveShadow = true;
   scene.add(mesh);
-  const c = addCollider({ type: 'box', minX: s.x - hw, maxX: s.x + hw, minZ: s.z - hd, maxZ: s.z + hd, minY: s.g - 0.4, maxY: s.g + 3.5, hp: 150, maxHp: 150, built: true, mesh, noStand: false });
+  Object.assign(c, { built: true, mesh, noStand: false, piece: k, baseY: s.g, alongX: !!s.alongX });
+  addCollider(c);
   G.walls.push(c);
   A.playBuild();
   emit(mesh.position, '#c8964a', 8, 2, 0.4, 0.12);
@@ -1711,6 +2120,7 @@ function updateUse(ch, dt) {
     if (d.shield) ch.shield = Math.min(d.maxShield, ch.shield + d.shield);
     if (ch.isPlayer) {
       PR.track('heal', ch.hp + ch.shield - before);
+      ch.st.healed += ch.hp + ch.shield - before;   // v41
       if (G.net && NET.role === 'client') netSend({ t: 'hpset', hp: ch.hp, sh: ch.shield, relay: false });
     }
     s.count--;
@@ -1749,6 +2159,11 @@ function randomCons() {
   const id = pick(ids);
   return { kind: 'cons', id, count: CONSUMABLES[id].count, rarity: CONSUMABLES[id].rarity };
 }
+/** v41: oggetto da lancio a caso (fumogeni comuni, impulso raro) */
+function randomThrow() {
+  const r = Math.random(), id = r < 0.45 ? 'frag' : r < 0.82 ? 'smoke' : 'impulse';
+  return { kind: 'throw', id, count: THROWABLES[id].pickup };
+}
 function ammoFor(id) {
   const t = WEAPONS[id].ammo;
   return { kind: 'ammo', id: t, count: AMMO_TYPES[t].pickup };
@@ -1758,6 +2173,7 @@ function itemLabel(it) {
   if (it.kind === 'weapon') return `${WEAPONS[it.id].name} <span style="color:${RARITIES[it.rarity].color}">[${RARITIES[it.rarity].name}]</span>`;
   if (it.kind === 'cons') return `${CONSUMABLES[it.id].icon} ${CONSUMABLES[it.id].name} x${it.count}`;
   if (it.kind === 'ammo') return `${AMMO_TYPES[it.id].name} x${it.count}`;
+  if (it.kind === 'throw') return `${THROWABLES[it.id].icon} ${THROWABLES[it.id].name} x${it.count}`;
   return `Materiali x${it.count}`;
 }
 
@@ -1773,11 +2189,12 @@ function buildLootMesh(L) {
   const g = new THREE.Group();
   let model;
   if (item.kind === 'weapon') { model = buildWeaponMesh(item.id, item.rarity); model.rotation.y = Math.PI / 2; model.rotation.z = 0.15; }
+  else if (item.kind === 'throw') { model = buildThrowMesh(item.id); model.scale.setScalar(2.4); model.rotation.z = 0.5; }
   else model = buildItemMesh(item.kind, item.id);
-  model.position.y = 0.45;
+  model.position.y = item.kind === 'throw' ? 0.3 : 0.45;
   model.traverse(o => { if (o.isMesh) o.castShadow = false; });
   g.add(model);
-  const rar = item.kind === 'weapon' ? item.rarity : (item.kind === 'cons' ? CONSUMABLES[item.id].rarity : -1);
+  const rar = item.kind === 'weapon' ? item.rarity : (item.kind === 'cons' ? CONSUMABLES[item.id].rarity : item.kind === 'throw' ? THROWABLES[item.id].rarity : -1);
   if (rar >= 0) {
     const ring = new THREE.Mesh(ringGeo, lootMats[rar].ring);
     ring.position.y = 0.04;
@@ -1810,6 +2227,14 @@ function pickupLoot(ch, L, allowSwap = true) {
   const it = L.item;
   if (it.kind === 'ammo') { ch.ammo[it.id] = Math.min(AMMO_TYPES[it.id].max, ch.ammo[it.id] + it.count); removeLoot(L); return true; }
   if (it.kind === 'mats') { ch.mats = Math.min(999, ch.mats + it.count); removeLoot(L); return true; }
+  if (it.kind === 'throw') {   // v41: vanno nella cintura, non occupano slot
+    const T = THROWABLES[it.id], add = Math.min(T.max - (ch.throws[it.id] || 0), it.count);
+    if (add <= 0) return false;
+    ch.throws[it.id] = (ch.throws[it.id] || 0) + add; it.count -= add;
+    if (ch.isPlayer && (ch.throws[ch.throwSel] || 0) <= add) ch.throwSel = it.id;
+    if (it.count <= 0) removeLoot(L);
+    return true;
+  }
   if (it.kind === 'cons') {
     const def = CONSUMABLES[it.id];
     for (const s of ch.slots) {
@@ -1864,11 +2289,12 @@ function updateLoot(dt) {
     if (!c.alive || c.mode !== 'ground' || c.remote) continue;
     for (let i = G.loot.length - 1; i >= 0; i--) {
       const L = G.loot[i];
-      if (L.item.kind !== 'ammo' && L.item.kind !== 'mats') continue;
+      if (L.item.kind !== 'ammo' && L.item.kind !== 'mats' && L.item.kind !== 'throw') continue;
+      if (L.item.kind === 'throw' && (c.throws[L.item.id] || 0) >= THROWABLES[L.item.id].max) continue;
       if (L.pop > 0) continue;
       const dx = L.pos.x - c.pos.x, dz = L.pos.z - c.pos.z;
       if (dx * dx + dz * dz < 1.6 && Math.abs(L.pos.y - c.pos.y) < 1.5) {
-        if (c.isPlayer) { dmgNumber(L.pos.clone().setY(L.pos.y + 1), '+' + L.item.count + ' ' + (L.item.kind === 'mats' ? '🪵' : AMMO_TYPES[L.item.id].short), 'shield'); A.playPickup(); }
+        if (c.isPlayer) { dmgNumber(L.pos.clone().setY(L.pos.y + 1), '+' + Math.min(L.item.count, L.item.kind === 'throw' ? THROWABLES[L.item.id].max - (c.throws[L.item.id] || 0) : 999) + ' ' + (L.item.kind === 'mats' ? '🪵' : L.item.kind === 'throw' ? THROWABLES[L.item.id].icon : AMMO_TYPES[L.item.id].short), 'shield'); A.playPickup(); }
         pickupLoot(c, L);
       }
     }
@@ -2008,8 +2434,9 @@ function openChest(ch, c) {
   if (!ch) { emit(c.pos.clone().setY(c.pos.y + 0.7), '#ffd24a', 20, 4, 0.8, 0.1, 0.4); if (c.pos.distanceTo(camera.position) < 40) A.playChest(); return; }
   const w = randomWeapon(G.goldT > 0 ? 2 : 1);   // evento "bottino d'oro": rarità superiore
   const items = [w, ammoFor(w.id), randomCons(), { kind: 'mats', count: 30 }];
+  if (Math.random() < 0.5) items.push(randomThrow());   // v41
   items.forEach((it, i) => {
-    const a = c.rot + (i - 1.5) * 0.6;
+    const a = c.rot + (i - (items.length - 1) / 2) * 0.6;
     const x = c.pos.x + Math.sin(a) * 1.3, z = c.pos.z + Math.cos(a) * 1.3;
     spawnLoot(it, new THREE.Vector3(x, groundAt(x, z, c.pos.y + 1), z), true);
   });
@@ -2202,6 +2629,7 @@ function makeAI() {
     goal: null, goalLoot: null, goalChest: null, think: Math.random() * 0.3,
     strafe: 1, strafeT: 0, avoidT: 0, avoidSign: 1, stuckT: 0.5, lastPos: new THREE.Vector3(),
     burst: 0, pauseT: 0, jumpT: 0, bad: new Set(), dropTarget: new THREE.Vector3(), wantJump: false, alert: 0, healCd: 0,
+    coverCd: 0, throwCd: 0, flankSide: Math.random() < 0.5 ? -1 : 1, flankT: 0, fleeT: 0, pingGoal: null, pingT: 0,   // v41
   };
 }
 
@@ -2234,7 +2662,7 @@ function botThink(b) {
   if (tgt) {
     los = hasLOS(b, tgt) && !(tgt.hidden && dist0(b, tgt) > hideRange(tgt));
     if (los) {
-      if (ai.target !== tgt) ai.seenT = 0;
+      if (ai.target !== tgt) { ai.seenT = 0; botAutoPing(b, tgt); }
       ai.target = tgt; ai.lastSeen = G.time; ai.lastSeenPos.copy(tgt.pos);
     } else if (G.time - ai.lastSeen > 5) { ai.target = null; tgt = null; }
   }
@@ -2253,16 +2681,19 @@ function botThink(b) {
   const dZone = Math.hypot(b.pos.x - st.x, b.pos.z - st.z);
   const inStormNow = Math.hypot(b.pos.x - s.cx, b.pos.z - s.cz) > s.r - 3;
 
+  // v41: tattica: al riparo a curarsi, fuga, aggiramento, granate e fumogeni
+  if (botTactics(b, tgt, los, hasWeapon, dist, inStormNow)) return;
   if (tgt && los && hasWeapon && !inStormNow) { ai.state = 'fight'; ai.goal = null; ai.goalLoot = ai.goalChest = null; return; }
   if (tgt && los && !hasWeapon) {
     // fuggi e cerca armi
     ai.state = 'flee';
   }
-  if (tgt && !los && hasWeapon && !inStormNow) { ai.state = 'chase'; ai.goalLoot = ai.goalChest = null; ai.goal = ai.lastSeenPos.clone(); return; }
+  if (tgt && !los && hasWeapon && !inStormNow) { ai.state = 'chase'; ai.goalLoot = ai.goalChest = null; ai.goal = flankGoal(b, tgt); return; }
 
   // cura
   ai.healCd -= 0.3;
-  if (!tgt && ai.healCd <= 0 && !inStormNow && (b.hp < 75 || b.shield < 50)) {
+  const lostT = tgt ? G.time - ai.lastSeen : 99;
+  if ((!tgt || (!los && lostT > 1.2)) && ai.healCd <= 0 && !inStormNow && (b.hp < 75 || b.shield < 50)) {
     const i = b.slots.findIndex(sl => sl && sl.kind === 'cons' && canUse(b, sl.id));
     if (i >= 0) { b.setActive(i); startUse(b); ai.state = 'heal'; ai.goal = null; ai.healCd = 2; return; }
   }
@@ -2303,6 +2734,11 @@ function botThink(b) {
     }
     if (ai.state === 'follow') ai.state = 'idle';
   }
+  // v41: un compagno ha segnalato un punto: andiamo lì
+  if (ai.pingGoal && G.time < ai.pingT) {
+    if (Math.hypot(ai.pingGoal.x - b.pos.x, ai.pingGoal.z - b.pos.z) > 4) { ai.state = 'follow'; ai.goal = ai.pingGoal.clone(); ai.goalLoot = ai.goalChest = null; return; }
+    ai.pingGoal = null;
+  }
   // bottino
   if (ai.state === 'chest' && ai.goalChest && !ai.goalChest.opened) return;
   if (ai.state !== 'loot' || !ai.goalLoot || !G.loot.includes(ai.goalLoot)) {
@@ -2335,10 +2771,128 @@ function botThink(b) {
   }
 }
 
+// ─────────────── v41: tattica dei bot ───────────────
+const _cv = new THREE.Vector3(), _cv2 = new THREE.Vector3(), _ce = new THREE.Vector3();
+/** il punto (x, z) è dentro un ostacolo? */
+function blockedAt(x, z, y) {
+  for (const c of queryColliders(x, z, 0.5)) {
+    if (c.maxY < y + 0.5 || c.minY > y + 1.7) continue;
+    if (c.type === 'box') { if (x > c.minX - 0.45 && x < c.maxX + 0.45 && z > c.minZ - 0.45 && z < c.maxZ + 0.45) return true; }
+    else if (c.type === 'cyl') { if (Math.hypot(x - c.x, z - c.z) < c.r + 0.45) return true; }
+  }
+  return false;
+}
+/** un riparo vicino: un punto da cui la minaccia non ti vede (preferendo quelli lontani da lei) */
+function findCover(b, threat) {
+  const eye = threat.eye(_ce);
+  const away = Math.atan2(b.pos.x - threat.pos.x, b.pos.z - threat.pos.z);
+  let best = null, bs = Infinity;
+  for (const r of [3.5, 6, 9, 13]) {
+    for (let k = 0; k < 10; k++) {
+      const a = away + (k - 4.5) * 0.55;
+      const x = b.pos.x + Math.sin(a) * r, z = b.pos.z + Math.cos(a) * r;
+      if (Math.abs(x) > HALF - 12 || Math.abs(z) > HALF - 12) continue;
+      const g = groundAt(x, z, b.pos.y + 2);
+      if (g < WATER_LEVEL - 0.6 || Math.abs(g - b.pos.y) > 2.2) continue;
+      if (blockedAt(x, z, g)) continue;
+      // nascosto? raggio dagli occhi della minaccia al petto nel punto
+      _cv.set(x, g + 1.25, z); _cv2.subVectors(_cv, eye);
+      const L = _cv2.length(); _cv2.divideScalar(L);
+      const h = rayWorld(eye, _cv2, L - 0.3);
+      if (!h || h.t > L - 1) continue;
+      const sc = r + Math.abs(k - 4.5) * 0.9 + (threat.pos.distanceTo(_cv) < 8 ? 10 : 0);
+      if (sc < bs) { bs = sc; best = new THREE.Vector3(x, 0, z); }
+    }
+    if (best) break;   // il riparo più vicino che funziona
+  }
+  return best;
+}
+/** aggiramento: invece di correre dritto dove l'hai visto, arriva di lato (i compagni da lati opposti) */
+function flankGoal(b, tgt) {
+  const ai = b.ai, lp = ai.lastSeenPos;
+  const dx = lp.x - b.pos.x, dz = lp.z - b.pos.z, d = Math.hypot(dx, dz);
+  const D = botDiff(b);
+  if (d < 11 || (D.tactics || 0.7) < 0.5) return lp.clone();
+  if (ai.flankTgt !== tgt) { ai.flankTgt = tgt; ai.flankSide = (b.idx & 1) ? 1 : -1; if (Math.random() < 0.3) ai.flankSide *= -1; ai.flankT = 0; }
+  const ux = dx / d, uz = dz / d, off = Math.min(13, d * 0.55) * ai.flankSide;
+  const gx = lp.x - ux * d * 0.35 - uz * off, gz = lp.z - uz * d * 0.35 + ux * off;
+  if (blockedAt(gx, gz, groundAt(gx, gz, b.pos.y + 2))) return lp.clone();
+  // arrivato al punto laterale: ora vai sul bersaglio
+  if (Math.hypot(gx - b.pos.x, gz - b.pos.z) < 4 || ai.flankT > 9) return lp.clone();
+  ai.flankT += 0.3;
+  return new THREE.Vector3(gx, 0, gz);
+}
+/** prova a lanciare: vero se la traiettoria prevista arriva vicino al punto voluto */
+const _tp = [];
+function botThrow(b, id, at, tol = 3.5) {
+  if ((b.throws[id] || 0) <= 0 || (b.throwCd || 0) > G.time || b.using || b.mode !== 'ground') return false;
+  const o = throwOrigin(b, _tho), sol = aimThrow(o, at);
+  const D = botDiff(b), err = (D.aimError || 0.07) * 0.6;
+  const yaw = sol.yaw + rand(-err, err), pitch = sol.pitch + rand(-err, err) * 0.5;
+  throwVelocity(yaw, pitch, _thv, sol.speed);
+  throwSys.predict(o, _thv, _tp, 3);
+  const end = _tp[_tp.length - 1];
+  if (!end || Math.hypot(end.x - at.x, end.z - at.z) > tol || Math.abs(end.y - at.y) > 3) { b.ai.throwCd = G.time + 1.2; return false; }
+  b.yaw = sol.yaw;
+  return throwItem(b, id, yaw, pitch, sol.speed);
+}
+function botTactics(b, tgt, los, hasWeapon, dist, inStorm) {
+  const ai = b.ai, D = botDiff(b), T = D.tactics ?? 0.7;
+  if (!tgt || inStorm || b.mode !== 'ground' || b.inWater) { if (ai.state === 'cover' || ai.state === 'flee2') ai.state = 'idle'; return false; }
+  const hpT = b.hp + b.shield;
+  const healI = b.slots.findIndex(sl => sl && sl.kind === 'cons' && canUse(b, sl.id));
+  const lostT = G.time - ai.lastSeen;
+  const canThrow = ai.throwCd <= G.time && (b.throwCd || 0) <= G.time;
+  // 1) poca vita: cerca un riparo (con un fumogeno fra te e lui, se ce l'hai) e curati lì
+  if (hpT < 55 && Math.random() < T + 0.25) {
+    if (ai.state !== 'cover' && ai.coverCd <= G.time) {
+      ai.coverCd = G.time + 2.5;
+      const cp = findCover(b, tgt);
+      if (cp) {
+        ai.state = 'cover'; ai.goal = cp; ai.goalLoot = ai.goalChest = null; ai.coverT = 0;
+        if (los && canThrow && dist < 40 && Math.random() < T) {
+          _cv.set(lerp(b.pos.x, tgt.pos.x, 0.25), 0, lerp(b.pos.z, tgt.pos.z, 0.25)); _cv.y = groundAt(_cv.x, _cv.z, b.pos.y + 2);
+          botThrow(b, 'smoke', _cv, 5);
+        }
+        return true;
+      }
+    }
+    if (ai.state === 'cover' && ai.goal) {
+      ai.coverT = (ai.coverT || 0) + 0.3;
+      const arrived = Math.hypot(ai.goal.x - b.pos.x, ai.goal.z - b.pos.z) < 1.4;
+      if (!los && (arrived || lostT > 0.8) && healI >= 0) { b.setActive(healI); startUse(b); ai.state = 'heal'; ai.goal = null; ai.healCd = 2; return true; }
+      if (!arrived && ai.coverT < 6) return true;
+      ai.state = 'idle'; ai.goal = null;   // niente cure o riparo scoperto: torna a combattere
+    }
+    // 2) quasi morto, niente cure e lui è vicino e più in forma: scappa (zigzagando)
+    if (healI < 0 && hpT < 35 && dist < 28 && tgt.hp + tgt.shield > hpT + 25 && Math.random() < T) {
+      ai.state = 'flee2'; ai.fleeT = G.time + rand(2.5, 4.5); ai.goal = null;
+      // impulso sotto i piedi o fra te e lui per allontanarlo
+      if (canThrow && dist < 9 && b.throws.impulse > 0 && Math.random() < 0.6) { _cv.copy(tgt.pos); botThrow(b, 'impulse', _cv, 4); }
+      return true;
+    }
+  } else if (ai.state === 'cover') ai.state = 'idle';
+  if (ai.state === 'flee2' && G.time < ai.fleeT) return true;
+  if (ai.state === 'flee2') ai.state = 'idle';
+  if (!hasWeapon) return false;
+  // 3) granata dove l'hai visto sparire dietro un riparo, o su chi sta fermo/accovacciato o dentro i muri costruiti
+  if (canThrow && b.throws.frag > 0 && Math.random() < T * 0.55) {
+    const dl = Math.hypot(ai.lastSeenPos.x - b.pos.x, ai.lastSeenPos.z - b.pos.z);
+    const camping = los && dist > 8 && dist < 32 && (tgt.crouch || tgt.moveAmt < 0.8 || G.walls.some(w => Math.hypot((w.minX + w.maxX) / 2 - tgt.pos.x, (w.minZ + w.maxZ) / 2 - tgt.pos.z) < 3.2));
+    const hiding = !los && lostT > 0.8 && lostT < 6 && dl > 8 && dl < 32;
+    if (camping || hiding) {
+      _cv.copy(hiding ? ai.lastSeenPos : tgt.pos);
+      if (botThrow(b, 'frag', _cv, 3.2)) { ai.throwCd = G.time + rand(5, 9); return false; }
+    }
+  }
+  return false;
+}
+
 function botWants(b, it) {
   if (it.kind === 'weapon' && WEAPONS[it.id].melee) return 0;   // v38: gli Artigli sono per i giocatori
   if (it.kind === 'ammo') return b.slots.some(s => s && s.kind === 'weapon' && WEAPONS[s.id].ammo === it.id) ? 0.8 : 0.1;
   if (it.kind === 'mats') return 0.1;
+  if (it.kind === 'throw') return (b.throws[it.id] || 0) < THROWABLES[it.id].max ? 0.6 : 0;
   const empty = b.slots.includes(null);
   if (it.kind === 'cons') {
     const st = b.slots.some(s => s && s.kind === 'cons' && s.id === it.id && s.count < CONSUMABLES[it.id].stack);
@@ -2359,7 +2913,7 @@ function botTryPickup(b) {
     const dx = L.pos.x - b.pos.x, dz = L.pos.z - b.pos.z;
     if (dx * dx + dz * dz > 3.2 || Math.abs(L.pos.y - b.pos.y) > 1.6) continue;
     const it = L.item;
-    if (it.kind === 'ammo' || it.kind === 'mats') continue;
+    if (it.kind === 'ammo' || it.kind === 'mats' || it.kind === 'throw') continue;
     if (botWants(b, it) <= 0) continue;
     if (!pickupLoot(b, L, false) && it.kind === 'weapon') {
       // sostituisci l'arma peggiore
@@ -2509,10 +3063,17 @@ function updateBot(b, dt) {
     }
   } else {
     let goal = ai.goal;
-    if (ai.state === 'flee' && tgt) goal = _bd.set(b.pos.x * 2 - tgt.pos.x, 0, b.pos.z * 2 - tgt.pos.z);
+    if ((ai.state === 'flee' || ai.state === 'flee2') && tgt) {
+      // v41: fuga a zigzag (più difficile da colpire), verso la zona sicura se possibile
+      const ax = b.pos.x - tgt.pos.x, az = b.pos.z - tgt.pos.z, al = Math.hypot(ax, az) || 1, zz = Math.sin(G.time * 2.3 + b.idx) * 0.6;
+      const st = safeTarget(), sx = st.x - b.pos.x, sz = st.z - b.pos.z, sl = Math.hypot(sx, sz) || 1;
+      const ux = ax / al + (sl > st.r * 0.5 ? sx / sl * 0.5 : 0), uz = az / al + (sl > st.r * 0.5 ? sz / sl * 0.5 : 0);
+      goal = _bd.set(b.pos.x + (ux - uz * zz) * 10, 0, b.pos.z + (uz + ux * zz) * 10);
+      if (ai.state === 'flee2' && Math.random() < dt * 0.6) ai.wantJump = true;
+    }
     if (goal) {
       const gd = Math.hypot(goal.x - b.pos.x, goal.z - b.pos.z);
-      const np = ai.state === 'flee' ? goal : navPoint(b, goal);
+      const np = ai.state === 'flee' || ai.state === 'flee2' ? goal : navPoint(b, goal);
       const dx = np.x - b.pos.x, dz = np.z - b.pos.z;
       const d = Math.max(Math.hypot(dx, dz), 0.001);
       const gy = ai.goalLoot ? ai.goalLoot.pos.y : (ai.goalChest ? ai.goalChest.pos.y : b.pos.y);
@@ -2524,7 +3085,7 @@ function updateBot(b, dt) {
         if (ai.state !== 'zone') ai.state = 'idle';
       } else {
         mx = dx / d; mz = dz / d;
-        speed = d > 25 || ai.state === 'zone' || ai.state === 'flee' || ai.state === 'follow' ? 7 : 5.2;
+        speed = d > 25 || ai.state === 'zone' || ai.state === 'flee' || ai.state === 'flee2' || ai.state === 'cover' || ai.state === 'follow' ? 7 : 5.2;
         b.yaw = angLerp(b.yaw, Math.atan2(mx, mz), dt * 6);
         b.pitch = lerp(b.pitch, 0, dt * 3);
       }
@@ -2594,6 +3155,7 @@ canvas.addEventListener('mousedown', e => {
     if (!pointerLocked && !G.paused) requestLock();
     if (e.button === 0) { mouse.left = true; mouse.leftPressed = true; }
     if (e.button === 2) mouse.right = true;
+    if (e.button === 1) { mouse.middlePressed = true; e.preventDefault(); }   // v41: clic della rotellina = segnalazione
   }
 });
 addEventListener('mouseup', e => { if (e.button === 0) mouse.left = false; if (e.button === 2) mouse.right = false; });
@@ -2617,6 +3179,7 @@ addEventListener('mousemove', e => {
 addEventListener('wheel', e => {
   if (G.state !== 'play' || !G.player || !G.player.alive) return;
   const dir = e.deltaY > 0 ? 1 : -1;
+  if (G.build.on) { setPiece(BUILD_PIECES[(BUILD_PIECES.indexOf(G.build.piece) + dir + BUILD_PIECES.length) % BUILD_PIECES.length]); return; }   // v41
   G.player.setActive((G.player.active + dir + SLOT_COUNT) % SLOT_COUNT);
 }, { passive: true });
 
@@ -2808,10 +3371,16 @@ $('#setPauseBtn').onclick = e => { e.stopPropagation(); settingsUI.open(); };
 $('#setMenuBtn').onclick = () => { A.playUI(); settingsUI.open(); };
 
 const SIGHT_NAMES = { iron: 'Tacca e mirino', notch: 'Tacca a V', holo: 'Olografico', reddot: 'Red dot', tri: 'Prismatico', bead: 'Bindella e perla', rocket: 'Telemetro', scope: 'Cannocchiale', acog: 'Ottica tattica', vintage: "Ottica d'epoca" };
+// v41: ogni classe d'arma ha il suo zoom in mira (regolabile nelle impostazioni) e la sua velocità di passaggio:
+// pistole e pompa entrano in mira di scatto, i cecchini con calma
+const ADS_SPEED = { pistol: 17, smg: 15, shotgun: 18, ar: 12, sniper: 8, rocket: 9, melee: 14 };
 function currentZoom() {
   const w = G.player && G.player.weapon;
-  return w ? WEAPONS[w.id].zoom : 1.2;
+  if (!w) return 1.2;
+  const def = WEAPONS[w.id], k = settings['adsK_' + def.role] ?? 1;
+  return Math.max(1.02, 1 + (def.zoom - 1) * k);
 }
+function adsSpeed() { const w = G.player && G.player.weapon; return w ? ADS_SPEED[WEAPONS[w.id].role] || 12 : 12; }
 
 // ─────────────── Giocatore ───────────────
 function currentSpread(p) {
@@ -2862,7 +3431,7 @@ function nearestInteract(p) {
   let best = null, bs = Infinity;
   const fx = Math.sin(G.camYaw), fz = Math.cos(G.camYaw);
   for (const L of G.loot) {
-    if (L.item.kind === 'ammo' || L.item.kind === 'mats') continue;
+    if (L.item.kind === 'ammo' || L.item.kind === 'mats' || L.item.kind === 'throw') continue;
     const dx = L.pos.x - p.pos.x, dz = L.pos.z - p.pos.z;
     const d = Math.hypot(dx, dz);
     if (d > 2.5 || Math.abs(L.pos.y - p.pos.y) > 1.8) continue;
@@ -2939,12 +3508,27 @@ function updatePlayer(dt) {
   if (p.crouch && !settings.crouchHold && (pressed.has('Space') || (keys.ShiftLeft || keys.ShiftRight))) { p.crouch = false; stoodUp = pressed.has('Space'); }
   // slot (con l'inventario aperto i tasti delle azioni servono all'inventario: qui arrivano solo i movimenti)
   if (G.invOpen) for (const k of [...pressed]) if (!INV_MOVE_KEYS.has(k)) pressed.delete(k);
-  for (let i = 0; i < SLOT_COUNT; i++) if (pressed.has('Digit' + (i + 1))) { p.setActive(i); if (G.build.on) toggleBuild(false); }
+  for (let i = 0; i < SLOT_COUNT; i++) if (pressed.has('Digit' + (i + 1))) {
+    // v41: in costruzione 1 = muro, 2 = pavimento, 3 = rampa
+    if (G.build.on && i < BUILD_PIECES.length) { setPiece(BUILD_PIECES[i]); continue; }
+    p.setActive(i); if (G.build.on) toggleBuild(false);
+  }
   if (pressed.has('KeyQ')) toggleBuild();
+  if (G.build.on && pressed.has('KeyR')) { setPiece(BUILD_PIECES[(BUILD_PIECES.indexOf(G.build.piece) + 1) % BUILD_PIECES.length]); pressed.delete('KeyR'); }
   if (pressed.has('KeyB')) { const i = ((p._emoteIdx ?? -1) + 1) % EMOTES.length; p._emoteIdx = i; startEmote(p, EMOTES[i].id); }
   for (let i = 0; i < EMOTES.length; i++) if (pressed.has(EMOTE_KEYS[i])) startEmote(p, EMOTES[i].id);
   if (pressed.has('KeyR')) startReload(p);
-  if (pressed.has('KeyG') && p.slot) { dropAt(p, itemFromSlot(p.slot)); p.slots[p.active] = null; p.using = null; p.reloading = 0; p.updateHeld(); }
+  if (pressed.has('KeyX') && p.slot) { dropAt(p, itemFromSlot(p.slot)); p.slots[p.active] = null; p.using = null; p.reloading = 0; p.updateHeld(); }
+  // v41: oggetti da lancio: tieni premuto G per vedere la traiettoria, rilascia per lanciare; H cambia tipo
+  if (pressed.has('KeyH')) cycleThrow(p);
+  fixThrowSel(p);
+  if (keys.KeyG && !G.invOpen && p.throws[p.throwSel] > 0 && !G.build.on && !p.inWater) { G.throwAim = true; G.throwAimT = G.time; showTrajectory(p, p.throwSel); }
+  else if (G.throwAim) {
+    G.throwAim = false; hideTrajectory();
+    if (!keys.KeyG && !G.build.on && !p.inWater) throwItem(p, p.throwSel, G.camYaw, G.camPitch);
+  } else if (pressed.has('KeyG') && !p.throws[p.throwSel]) showMsg('', 'Non hai oggetti da lancio', 1.2);
+  if (pressed.has('KeyZ') || mouse.middlePressed) playerPing();
+  mouse.middlePressed = false;
   const inter = nearestInteract(p);
   if (pressed.has('KeyE') && inter) {
     if (inter.loot) { if (pickupLoot(p, inter.loot, true)) A.playPickup(); }
@@ -2975,11 +3559,7 @@ function updatePlayer(dt) {
   touchAimTick(p, dt);   // v40: assistenza alla mira e fuoco automatico (solo touch)
   p.bloom = Math.max(0, p.bloom - dt * 0.12);
   if (G.build.on) {
-    const s = buildSpot(p);
-    ghost.visible = true;
-    ghost.position.set(s.x, s.g + 1.7, s.z);
-    ghost.rotation.y = s.alongX ? 0 : Math.PI / 2;
-    ghostMat.color.set(p.mats >= 10 ? '#4aa0ff' : '#ff4a4a');
+    showGhost(p);
     if (mouse.leftPressed || (mouse.left && (p._bt = (p._bt || 0) - dt) <= 0)) { placeWall(p); p._bt = 0.25; }
   } else {
     ghost.visible = false;
@@ -3066,6 +3646,17 @@ function toggleBuild(force) {
   G.build.on = force !== undefined ? force : !G.build.on;
   ghost.visible = G.build.on;
   $('#buildHint').classList.toggle('hidden', !G.build.on);
+  if (G.build.on) updateBuildHint();
+}
+/** v41: pezzo da costruire (muro, pavimento, rampa) */
+function setPiece(k) {
+  if (G.build.piece === k) return;
+  G.build.piece = k; A.playUI(); updateBuildHint();
+}
+function updateBuildHint() {
+  const el = $('#buildHint');
+  el.innerHTML = 'COSTRUZIONE · ' + BUILD_PIECES.map((k, i) => `<span class="${G.build.piece === k ? 'on' : ''}"><kbd>${i + 1}</kbd> ${PIECE_NAME[k]}</span>`).join(' ') +
+    ` · <kbd>R</kbd>/rotella cambia · Click sx: piazza (${PIECE_COST} 🪵) · <kbd>Q</kbd> esci`;
 }
 
 // ─────────────── Telecamera ───────────────
@@ -3111,7 +3702,8 @@ function updateCamera(dt) {
     G.camOffY = G.camOffY === undefined || Math.abs(G.camOffY - off) > 6 ? off : lerp(G.camOffY, off, Math.min(1, dt * (p.mode === 'ground' ? 10 : 4)));
     pivot.y = p.pos.y + G.camOffY;
   }
-  G.fov = lerp(G.fov, wantFov, Math.min(1, dt * 12));
+  G.fov = lerp(G.fov, wantFov, Math.min(1, dt * (G.ads || G.adsWas ? adsSpeed() : 12)));
+  G.adsWas = G.ads || Math.abs(G.fov - wantFov) > 0.5;
   if (Math.abs(camera.fov - G.fov) > 0.01) { camera.fov = G.fov; camera.updateProjectionMatrix(); }
   G.camDist = lerp(G.camDist, dist, Math.min(1, dt * 8));
   const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
@@ -3135,7 +3727,7 @@ function updateCamera(dt) {
   camera.lookAt(base.addScaledVector(dir, 50));
   // nascondi il modello quando si usa un cannocchiale o la camera è troppo vicina
   const wdef = p.alive && p.mode === 'ground' && p.weapon ? WEAPONS[p.weapon.id] : null;
-  const zFov = wdef ? F0 / wdef.zoom : F0;
+  const zFov = wdef ? F0 / currentZoom() : F0;   // v41: zoom per classe regolabile
   const scoped = !!(G.ads && wdef && wdef.scope && G.fov < zFov * 1.12 + 0.5);
   // ottica da mira (red dot, olografico, tacca e mirino…) quando lo zoom è quasi completo
   const sighted = !!(G.ads && wdef && !wdef.scope && wdef.sight !== 'none' && !G.build.on && G.fov < F0 - (F0 - zFov) * 0.6);
@@ -3144,8 +3736,8 @@ function updateCamera(dt) {
   if (wdef && scEl.dataset.s !== wdef.sight) {
     scEl.dataset.s = wdef.sight; siEl.dataset.s = wdef.sight;
     const label = SIGHT_NAMES[wdef.sight] || '';
-    scEl.querySelector('.mag').textContent = `${label} · ${String(wdef.zoom).replace('.', ',')}×`;
-    siEl.querySelector('.name').textContent = `${label} · ${String(wdef.zoom).replace('.', ',')}×`;
+    scEl.querySelector('.mag').textContent = `${label} · ${String(+currentZoom().toFixed(1)).replace('.', ',')}×`;
+    siEl.querySelector('.name').textContent = `${label} · ${String(+currentZoom().toFixed(1)).replace('.', ',')}×`;
   }
   scEl.classList.toggle('hidden', !scoped);
   siEl.classList.toggle('hidden', !sighted);
@@ -3175,6 +3767,7 @@ const hud = {
   hotbar: $('#hotbar'), mag: $('#magText'), res: $('#reserves'), mats: $('#matsText'),
   prompt: $('#prompt'), progress: $('#progress'), progFill: $('#progressFill'), progText: $('#progressText'),
   cross: $('#crosshair'), hit: $('#hitmarker'), center: $('#centerMsg'), sub: $('#subMsg'),
+  smoke: $('#smokeVeil'), thr: $('#throwHud'),
   vignette: $('#vignette'), stRow: $('#staminaRow'), stFill: $('#staminaFill'), crouch: $('#crouchBadge'), hidden: $('#hiddenBadge'), poi: $('#poiName'), evt: $('#eventBar'), dmg: $('#damageLayer'), feed: $('#killfeed'),
 };
 const cache = {};
@@ -3327,13 +3920,14 @@ function updateHUD(dt) {
     const px = Math.tan(Math.max(spread, 0.004)) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * (innerHeight / 2);
     // cosa c'è sotto il mirino (ogni 60 ms): un nemico, a che distanza, se il piccone ci arriva
     G.xhT = (G.xhT || 0) - dt;
-    if (!show) { G.xhEnemy = false; G.xhReach = false; }
+    if (!show) { G.xhEnemy = false; G.xhReach = false; G.xhAlly = false; }
     else if (G.xhT <= 0) {
       G.xhT = 0.06;
       camera.getWorldDirection(_xhD);
       const off = camera.position.distanceTo(p.chest());
       const h = rayAll(camera.position, _xhD, cdef ? Math.min(700, (cdef.range || 300) * 1.6 + off) : off + 3, p);
       G.xhEnemy = !!(h && h.char && h.char.alive && !(G.teamSize > 1 && h.char.team === p.team));
+      G.xhAlly = !!(h && h.char && h.char.alive && G.teamSize > 1 && h.char.team === p.team);   // v41: verde sui compagni (niente fuoco amico)
       G.xhDist = h ? Math.max(0, h.t - off * 0.9) : Infinity;
       G.xhReach = !cdef && !cons && !!h && h.t - off < 2.4;
     }
@@ -3341,6 +3935,7 @@ function updateHUD(dt) {
       show, style: cdef ? cdef.cross || 'cross' : cons ? 'cons' : 'melee',
       spreadPx: cdef ? Math.min(60, px) : 4, color: settings.chColor, size: settings.chSize,
       enemy: !!G.xhEnemy && (!!cdef || !!G.xhReach),
+      ally: !!G.xhAlly,
       outRange: !!cdef && G.xhDist > (cdef.range || 999),
       sprint: (p.sprintK || 0) > 0.5,
       reload: p.reloading > 0 && cdef ? clamp(1 - p.reloading / cdef.reload, 0, 1) : -1,
@@ -3385,6 +3980,17 @@ function updateHUD(dt) {
   setHTML(hud.evt, 'evt', events.hudText());
   hud.evt.style.display = hud.evt.innerHTML ? '' : 'none';
   updateDmgNums(dt);
+  drawDmgDirs(dt);   // v41
+  // v41: velo grigio quando la camera è dentro una nube di fumo
+  { const sk = throwSys.smokeAt(camera.position); if (Math.abs(sk - (G._smk || 0)) > 0.01) { G._smk = sk; hud.smoke.style.opacity = sk.toFixed(2); } }
+  // v41: oggetto da lancio scelto
+  { const n = p.throws ? p.throws[p.throwSel] || 0 : 0, tot = p.throws ? THROW_IDS.reduce((a, k) => a + (p.throws[k] || 0), 0) : 0;
+    const key = tot ? `${p.throwSel}|${n}|${tot}|${G.throwAim ? 1 : 0}` : '';
+    if (key !== G._thrKey) {
+      G._thrKey = key;
+      hud.thr.classList.toggle('hidden', !tot || p.mode === 'bus');
+      if (tot) { const T = THROWABLES[p.throwSel]; hud.thr.children[0].textContent = T.icon; hud.thr.children[1].textContent = '×' + n; hud.thr.children[2].textContent = T.short + (tot > n ? ' · H cambia' : ''); hud.thr.style.setProperty('--tc', T.color); hud.thr.classList.toggle('aim', !!G.throwAim); }
+    } }
   drawMinimap();
   if ($('#bigmap').classList.contains('hidden') === false) drawBigMap();
 }
@@ -3403,6 +4009,7 @@ function drawMinimap() {
   drawStormOn(mmCtx, S, c.x, c.z, view);
   events.drawMarkers(mmCtx, S, c.x, c.z, view, w2m);
   drawBusLine(mmCtx, S, c.x, c.z, view);
+  drawPingsOn(mmCtx, S, c.x, c.z, view, 1);
   mmCtx.font = 'bold 10px sans-serif'; mmCtx.textAlign = 'center';
   for (const t of TOWNS) {
     const x = w2m(t.x, c.x, view, S), y = w2m(t.z, c.z, view, S);
@@ -3439,6 +4046,16 @@ function drawStormOn(ctx, S, cx, cz, view) {
     ctx.setLineDash([]);
   }
   ctx.restore();
+}
+/** v41: segnalazioni sulla minimappa e sulla mappa grande */
+function drawPingsOn(ctx, S, cx, cz, view, k) {
+  for (const pg of G.pings) {
+    const x = w2m(pg.pos.x, cx, view, S), y = w2m(pg.pos.z, cz, view, S);
+    if (x < -10 || y < -10 || x > S + 10 || y > S + 10) continue;
+    const K = PING_KIND[pg.kind], r = (5 + Math.sin(pg.t * 8) * 1.2) * k;
+    ctx.fillStyle = K.color; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y + r * 0.2); ctx.lineTo(x - r * 0.8, y - r * 1.2); ctx.arc(x, y - r * 1.5, r * 0.85, Math.PI * 0.85, Math.PI * 0.15); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
 }
 function drawBusLine(ctx, S, cx, cz, view) {
   const B = G.bus;
@@ -3554,6 +4171,7 @@ function drawBigMap() {
   drawStormOn(bmCtx, S, cx, cz, view);
   events.drawMarkers(bmCtx, S, cx, cz, view, w2m);
   drawBusLine(bmCtx, S, cx, cz, view);
+  drawPingsOn(bmCtx, S, cx, cz, view, 1.6);
   bmCtx.font = `bold ${Math.round(13 + Math.min(5, BM.zoom))}px sans-serif`; bmCtx.textAlign = 'center';
   for (const t of TOWNS) {
     const x = w2m(t.x, cx, view, S), y = w2m(t.z, cz, view, S);
@@ -3736,6 +4354,7 @@ function beginMatch(net) {
   G.time = 0; G.endShown = false; G.spectate = null; G.paused = false; G.ads = false;
   exitSpectate(); G.specKiller = null; G.specPitch = 0;
   G.lootSeq = 0; G.lootPrefix = ''; G.matchStats = { chests: 0, grass: 0, climb: 0, glide: 0, walk: 0, surv: 0 };
+  throwSys.clear(); hideTrajectory(); G.throwAim = false; for (const pg of G.pings) pg.el.remove(); G.pings.length = 0; G.dmgDirs.length = 0; G.teamPingT = 0;   // v41
   PR.resetMatchMax();
   toggleBuild(false);
   // bottino iniziale (online: uguale per tutti grazie al seme comune)
@@ -3750,8 +4369,9 @@ function beginMatch(net) {
       const a = ammoFor(w.id);
       const p2 = off(); p2.x += 0.8;
       spawnLoot(a, p2);
-    } else if (r < 0.8) spawnLoot(randomCons(), off());
-    else if (r < 0.93) { const t = pick(Object.keys(AMMO_TYPES).filter(k => k !== 'rockets')); spawnLoot({ kind: 'ammo', id: t, count: AMMO_TYPES[t].pickup }, off()); }
+    } else if (r < 0.76) spawnLoot(randomCons(), off());
+    else if (r < 0.85) spawnLoot(randomThrow(), off());   // v41
+    else if (r < 0.94) { const t = pick(Object.keys(AMMO_TYPES).filter(k => k !== 'rockets')); spawnLoot({ kind: 'ammo', id: t, count: AMMO_TYPES[t].pickup }, off()); }
     else spawnLoot({ kind: 'mats', count: 30 }, off());
   }
   };
@@ -3953,7 +4573,15 @@ function finishMatch(win) {
     ? (duel ? `Hai battuto ${G.chars.filter(c => c !== p).map(c => c.name).slice(0, 3).join(', ')} in 1 contro 1. ⚔️🏆` : squad ? (p.alive ? 'La tua squadra è l\'ultima in piedi. Leggendari! 🏆' : 'I tuoi compagni hanno chiuso la partita: vittoria di squadra! 🏆') : 'Sei l\'ultimo sopravvissuto. Leggendario! 🏆')
     : (squad ? `La tua squadra è caduta · ultimo colpo: ${G.killedBy}` : `Sei stato eliminato da ${G.killedBy}`);
   const surv = G.time;
-  $('#endStats').innerHTML = `<div><b>${p.kills}</b><span>Uccisioni</span></div><div><b>${Math.round(p.damageDealt)}</b><span>Danni inflitti</span></div><div><b>${fmtTime(surv)}</b><span>Tempo</span></div><div><b>${G.chars.length}</b><span>Giocatori</span></div>`;
+  // v41: statistiche dettagliate di fine partita
+  const S = p.st, acc = S.shots ? Math.min(100, Math.round(S.hits / S.shots * 100)) : 0, hs = S.hits ? Math.round(S.heads / S.hits * 100) : 0;
+  const dist = S.dist >= 1000 ? (S.dist / 1000).toFixed(2) + ' km' : Math.round(S.dist) + ' m';
+  const st = (v, l, ic, cls = '') => `<div class="${cls}"><i>${ic}</i><b>${v}</b><span>${l}</span></div>`;
+  $('#endStats').innerHTML =
+    st(p.kills, 'Uccisioni', '💀', 'big') + st(Math.round(p.damageDealt), 'Danni inflitti', '💥', 'big') + st(fmtTime(surv), 'Tempo', '⏱', 'big') + st(`#${place}<small>/${G.teamSize > 1 ? G.teams.size : G.chars.length}</small>`, 'Posizione', '🏅', 'big') +
+    st(acc + '%', 'Precisione', '🎯') + st(hs + '%', 'Colpi alla testa', '🧠') + st(S.maxKillD ? Math.round(S.maxKillD) + ' m' : '—', 'Uccisione più lontana', '📏') +
+    st(Math.round(S.taken), 'Danni subiti', '🩸') + st(Math.round(S.healed), 'Vita e scudo curati', '💚') + st(dist, 'Distanza percorsa', '👟') +
+    st(S.built, 'Muri costruiti', '🧱') + st(G.matchStats.chests, 'Forzieri aperti', '🧰') + st(G.matchStats.thrown || 0, 'Oggetti lanciati', '💣');
   // progressi: XP del pass, monete, missioni
   PR.track('survive', Math.floor(G.time));
   const res = PR.matchResult({ place, total: G.chars.length, kills: p.kills, time: G.time, damage: p.damageDealt, chests: G.matchStats.chests, win, mode: G.mode, online: !!G.net });
@@ -4651,9 +5279,21 @@ function onNetMessage(from, m) {
         structEffects(m.r ? world.damageSphere(at, m.r, m.a) : world.damagePoint(at, m.a), null, true);
         break;
       }
+      case 'thr': {   // v41: oggetto da lancio di un altro giocatore (o di un bot dell'host)
+        const ch = C[m.v];
+        if (!ch || ch === G.player || !THROWABLES[m.id]) break;
+        throwItem(ch, m.id, m.y, m.p, m.s, true);
+        break;
+      }
+      case 'ping': {   // v41: segnalazione di un compagno
+        const ch = C[m.o];
+        if (!ch || ch === G.player || !PING_KIND[m.k] || !G.player || ch.team !== G.player.team) break;
+        addPing(m.k, _nv.set(m.p[0], m.p[1], m.p[2]), ch, m.tg >= 0 ? C[m.tg] : null, m.l || null, true);
+        break;
+      }
       case 'wall': {
         const g = m.g;
-        makeWall({ x: m.x, z: m.z, g, alongX: !!m.ax });
+        makeWall({ k: m.k || 'wall', x: m.x, z: m.z, g, alongX: !!m.ax, dir: m.d || 'z+' });
         break;
       }
       case 'ev':
@@ -4680,6 +5320,7 @@ function progressTick(dt) {
   if (p.mode === 'climb') { const dy = p.pos.y - (S.lastY ?? p.pos.y); if (dy > 0) { S.climb += dy; if (S.climb >= 1) { PR.track('climb', Math.floor(S.climb)); S.climb %= 1; } } }
   S.lastY = p.pos.y;
   if (p.mode === 'glide') { S.glide += dt; if (S.glide >= 1) { S.glide -= 1; PR.track('glide', 1); } }
+  if (p.mode !== 'bus') p.st.dist += Math.hypot(p.vel.x, p.vel.z) * dt;   // v41: distanza percorsa (anche planando)
   if (p.mode === 'ground' && p.onGround) {
     S.walk += Math.hypot(p.vel.x, p.vel.z) * dt;
     if (S.walk >= 10) { PR.track('walk', 10); S.walk -= 10; }
@@ -4882,6 +5523,10 @@ function update(dt) {
   }
   bossFight.update(dt);
   clawFX.update(dt);
+  // v41: oggetti da lancio, segnalazioni
+  throwSys.update(dt);
+  if (trajLine.visible && G.throwAimT !== G.time) { hideTrajectory(); G.throwAim = false; }
+  updatePings(dt);
   updateLoot(dt);
   updateChests(dt);
   updateProjectiles(dt);
@@ -4991,6 +5636,6 @@ setTimeout(() => $('#loading').classList.add('hidden'), 300);
 requestAnimationFrame(frame);
 
 // accesso da console per il debug
-window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, bossFight, clawAttack, rayAll, get stoves() { return stoves; } };
+window.__game = { WATER_LEVEL, touch, events, weather, TOWNS, biomeAt, gfx, settings, applySettings, settingsUI, QUALITY, NET, PR, prepareWorld, beginMatch, tallGrassAt, scene, camera, mouse, spawnBullet, updateBullets, WEAPONS, MODEL_SOURCE, explode, damageBarrel, G, startMatch, update, terrainHeight, groundAt, world, jumpFromBus, keys, pressed, updatePlayer, canStartClimb, damage, startEmote, camera, renderer, toggleStove, toggleDoor, spawnLoot, kill, structHit, structBlast, structEffects, toggleBigMap, BM, toggleInventory, lobby, lobbyZoomTo, specCycle, skinLoadStatus, bossFight, clawAttack, rayAll, throwSys, throwItem, impulseBlast, addPing, playerPing, hurtFrom, makeWall, placeWall, buildSpot, setPiece, toggleBuild, botTactics, findCover, finishMatch, surfaceUnder, currentZoom, get stoves() { return stoves; } };
 preloadIcons();
 setTimeout(() => preloadSkins([settings.skin]), 300);

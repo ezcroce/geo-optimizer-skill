@@ -6,13 +6,13 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { CAR_VARIANTS, CAR_DIMS, CAR_PAINTS } from './cars.js?v=25';
-import { mergeParts } from './props.js?v=40';
+import { mergeParts } from './props.js?v=41';
 import {
   facadeTexture, plainTexture, asphaltTexture, sidewalkTexture, cobbleTexture, roofFlatTexture, tileTexture,
   concreteTexture, corrugatedTexture, railTexture, awningTexture, AWNING_COLORS, signAtlas, signGeometry, SHOPS,
   productsTexture, booksTexture,
 } from './citytex.js?v=24';
-import { TOWN_SPECIALS, townBuilders } from './townkit.js?v=40';
+import { TOWN_SPECIALS, townBuilders } from './townkit.js?v=41';
 
 // ── reticolo stradale ──
 export const STREET = { RW: 3.3, SW: 2.0 };          // mezza carreggiata, marciapiede
@@ -997,8 +997,8 @@ export function buildCity(C) {
       const s = { kind: 'palazzo', w: pick(ws), d: Math.min(maxD, Math.round(sr(9, 12))), sb: 0 };
       // v27: nel deserto si vive dentro i camion; solo il centro della via ha saloon ed empori
       if (th === 'western' && (rho > 0.42 || s.d < 8.5 || rnd() < 0.25)) return { kind: 'truck', w: 9, d: 2.5, sb: 2.9 };
-      if (s.d < 8.5) return { kind: 'house', w: 9, d: Math.max(7, maxD), sb: 0 };
-      const house = () => ({ kind: 'house', w: Math.round(sr(8, 11)), d: Math.min(maxD - 3.5, Math.round(sr(8, 10))), sb: 3.5 });
+      if (s.d < 8.5) return { kind: 'house', w: 10.5, d: Math.max(8, maxD), sb: 0 };
+      const house = () => ({ kind: 'house', w: Math.round(sr(10, 13)), d: Math.min(maxD - 3.5, Math.round(sr(9.5, 12))), sb: 3.5 });   // v41: case più grandi
       switch (th) {
         case 'western':
           return { ...s, w: pick([9, 12]), n: res(1, 2), style: 'wood', color: pick(PALETTE.wood), roof: 'flat', falseFront: true, porch: true, shop: rnd() < 0.75 ? shopPick() : -1 };
@@ -1019,7 +1019,7 @@ export function buildCity(C) {
           return { ...s, n: res(2, 3), style: 'stone', color: pick(PALETTE.stone), roof: rnd() < 0.5 ? 'gable' : 'flat', roofColor: pick(['#4a4f5a', '#3b3f48']), merlons: true, flag: rnd() < 0.3, shop: rnd() < 0.35 ? shopPick() : -1 };
         case 'coastal':
           // palafitte (case su pali con scala e terrazzino) lontano dal centro
-          if (rho > 0.4 && maxD >= 10.5) return { kind: 'stilt', w: Math.round(sr(8, 10)), d: Math.min(maxD - 3.5, Math.round(sr(7, 9))), sb: 3.5 };
+          if (rho > 0.4 && maxD >= 12) return { kind: 'stilt', w: Math.round(sr(9.5, 11.5)), d: Math.min(maxD - 3.5, Math.round(sr(8.5, 10))), sb: 3.5 };
           return { ...s, n: res(2, 3), style: 'pastel', color: pick(PALETTE.pastel), roof: 'flat', balconies: 0.45, awnings: true, shop: rho < 0.7 && rnd() < 0.6 ? shopPick() : -1 };
         default: {
           if (rho > 0.82 && rnd() < 0.7) return house();
@@ -1094,7 +1094,7 @@ export function buildCity(C) {
           TB.truckHome(cx, cz, face, y, th);
           continue;
         }
-        const w = Math.round(sr(8, 11)), d = Math.round(sr(8, 10));
+        const w = Math.round(sr(10, 13)), d = Math.round(sr(9.5, 12));
         const stilt = th === 'coastal', m = stilt ? 4 : 1.5;
         const cx = t.x + sr(r.x0 + w / 2 + m, r.x1 - w / 2 - m), cz = t.z + sr(r.z0 + d / 2 + m, r.z1 - d / 2 - m);
         if (!fits(cx - w / 2 - m, cx + w / 2 + m, cz - d / 2 - m, cz + d / 2 + m, 1.5)) continue;
@@ -1135,7 +1135,7 @@ export function buildCity(C) {
           const px = alongX ? midA : edge, pz = alongX ? edge : midA;
           const rho = Math.hypot(px + (alongX ? 0 : 0), pz) / t.r;
           let sp = spec(rho, maxD);
-          if (u + sp.w > a1) { if (sp.kind === 'palazzo' && a1 - u >= 9) sp.w = Math.floor((a1 - u) / 3) * 3; else if (sp.kind === 'house' && a1 - u >= 8) sp.w = Math.floor(a1 - u); else break; }
+          if (u + sp.w > a1) { if (sp.kind === 'palazzo' && a1 - u >= 9) sp.w = Math.floor((a1 - u) / 3) * 3; else if (sp.kind === 'house' && a1 - u >= 9.5) sp.w = Math.floor(a1 - u); else break; }
           const inward = face === 0 || face === 2 ? 1 : -1;
           const fLine = edge + inward * sp.sb, cMid = fLine + inward * sp.d / 2;
           const ua = u + sp.w / 2;

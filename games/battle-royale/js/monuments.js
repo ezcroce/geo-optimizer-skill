@@ -8,7 +8,7 @@
 //  2 intonaco chiaro della chiesa, 3 marmo bianco venato.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts, makeAtlasMaterial } from './props.js?v=40';
+import { mergeParts, makeAtlasMaterial } from './props.js?v=41';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -78,7 +78,7 @@ function makeMonumentAtlas() {
   return t;
 }
 export const monumentAtlas = makeMonumentAtlas();
-export const monumentMaterial = makeAtlasMaterial('monument', monumentAtlas, { roughness: 0.78, metalness: 0.0 });
+export const monumentMaterial = makeAtlasMaterial('monument', monumentAtlas, { roughness: 0.78, metalness: 0.0, side: THREE.DoubleSide });
 
 // ───────────── aiuti geometrici ─────────────
 const P = (geo, color, o = {}) => ({ geo, color, o });
@@ -124,7 +124,7 @@ function sectorBlock(ra, rb, y0, y1, gA, gB, w, seg, faces = {}) {
     if (F.bottom) T.quad(pt(ra, a0, y0), pt(ra, a1, y0), pt(rb, b1, y0), pt(rb, b0, y0), [0, -1, 0]);
   }
   if (F.caps && w > 0 && !F.bridge) for (const [t, s] of [[0, -1], [1, 1]]) {
-    const aa = ang(ra, t), bb = ang(rb, t), tang = [-Math.sin(aa) * -s, 0, Math.cos(aa) * -s];
+    const aa = ang(ra, t), bb = ang(rb, t), tang = [-Math.sin(aa) * s, 0, Math.cos(aa) * s];   // v41: verso corretto (prima i fianchi dei corridoi erano rivolti all'interno e sembravano trasparenti)
     T.quad(pt(ra, aa, y0), pt(rb, bb, y0), pt(rb, bb, y1), pt(ra, aa, y1), tang);
   }
   return T.geo();

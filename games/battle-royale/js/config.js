@@ -347,6 +347,7 @@ export function scaledDifficulty(key, team = 'solo', humans = 1) {
     sight: 1 + 0.1 * lv,                                // vedono più lontano
     aggro: Math.min(0.9, 0.15 + 0.06 * lv),             // cercano bersagli più spesso
     burst: 1 + 0.12 * lv,                               // raffiche più lunghe
+    tactics: Math.min(1, ({ facile: 0.35, normale: 0.7, difficile: 1 }[key] ?? 0.7) + 0.08 * lv),   // v41: coperture, aggiramenti, granate
   };
 }
 /** etichetta breve per menu/HUD: "Normale +2" */

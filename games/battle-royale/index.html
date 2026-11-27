@@ -10,7 +10,7 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="stylesheet" href="site.css?v=40" />
+<link rel="stylesheet" href="site.css?v=41" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -71,8 +71,25 @@
 <!-- ───────── TICKER ───────── -->
 <div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
 
-<!-- ───────── NOVITÀ v40 ───────── -->
+<!-- ───────── NOVITÀ v41 ───────── -->
 <section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v41</span>
+    <h2 class="h2 reveal">Granate, fumogeni<br /><em>e bot che ragionano.</em></h2>
+    <p class="lead33 reveal">Tre oggetti da lancio con la traiettoria vera, segnalazioni per la squadra, l'arco rosso che ti dice da dove ti sparano, bot che si riparano e ti aggirano, passi diversi su ogni superficie, pavimenti e rampe da costruire, statistiche complete a fine partita, e case e città più grandi.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">💣</div><h3>Oggetti da lancio</h3><p>Granata a frammentazione (miccia di 2,5 s, rompe i muri), fumogeno (nasconde anche ai bot) e granata a impulso (spinge via; sotto i piedi ti catapulta). Tieni premuto <b>G</b> per la traiettoria, rilascia per lanciare, <b>H</b> cambia. Rimbalzano su muri e terreno. Lasciare un oggetto ora è <b>X</b>.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">📍</div><h3>Segnalazioni</h3><p><b>Z</b> o clic della rotellina: nemico (lo segue), bottino (col nome) o «Andiamo qui»; doppio tocco per «Pericolo». Si vedono sullo schermo e sulla mappa, e i compagni bot ci vanno e segnalano i nemici da soli.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🧠</div><h3>Bot più furbi</h3><p>Con poca vita cercano un riparo, a volte coperti da un fumogeno, e si curano lì; se stanno perdendo scappano a zigzag; ti aggirano di lato quando ti nascondi e ti lanciano granate se resti fermo o dietro ai muri.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🎯</div><h3>Da dove mi sparano?</h3><p>Un arco rosso attorno al mirino punta verso chi ti colpisce e la visuale trema in proporzione al danno. Il mirino diventa verde sui compagni, e lo zoom in mira si regola per ogni classe d'arma.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">👟</div><h3>Passi e costruzioni</h3><p>Erba, pietra, legno, metallo, neve, sabbia e acqua suonano diversi, e i passi degli altri arrivano da destra o da sinistra. In costruzione: <b>1</b> muro, <b>2</b> pavimento, <b>3</b> rampa.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">🏠</div><h3>Case più grandi</h3><p>Case più alte e larghe, città più ampie, salto rifatto con gambe e braccia, statistiche dettagliate a fine partita, Artigli fissi ai polsi e corridoi del Colosseo senza buchi.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v40 ───────── -->
+<section id="novita40" class="section news33">
   <div class="wrap">
     <span class="badge-new reveal">NOVITÀ · v40 · STAGIONE 2</span>
     <h2 class="h2 reveal">Stagione 2:<br /><em>Il Colosseo.</em></h2>
@@ -286,7 +303,10 @@
       <div class="key reveal"><kbd>R</kbd><span>Ricarica</span></div>
       <div class="key reveal"><kbd>E</kbd><span>Raccogli · apri</span></div>
       <div class="key reveal"><kbd>Q</kbd><span>Costruisci</span></div>
-      <div class="key reveal"><kbd>G</kbd><span>Lascia oggetto</span></div>
+      <div class="key reveal"><kbd>X</kbd><span>Lascia oggetto</span></div>
+      <div class="key reveal hl"><kbd>G</kbd><span>Tieni premuto: mira e lancia granata · fumogeno · impulso</span></div>
+      <div class="key reveal hl"><kbd>H</kbd><span>Cambia oggetto da lancio</span></div>
+      <div class="key reveal hl"><kbd>Z</kbd> · <kbd>Rotella</kbd><span>Segnala nemico · bottino · posizione</span></div>
       <div class="key reveal"><kbd>Tab</kbd><span>Inventario (puoi muoverti)</span></div>
       <div class="key reveal hl"><kbd>M</kbd>+<kbd>Rotellina</kbd><span>Mappa con zoom</span></div>
       <div class="key reveal hl"><kbd>←</kbd><kbd>→</kbd><span>Spettatore: cambia giocatore</span></div>
@@ -324,7 +344,7 @@
 
 <div id="toast"></div>
 
-<script type="module" src="js/site.js?v=40"></script>
-<script src="js/transition.js?v=40"></script>
+<script type="module" src="js/site.js?v=41"></script>
+<script src="js/transition.js?v=41"></script>
 </body>
 </html>

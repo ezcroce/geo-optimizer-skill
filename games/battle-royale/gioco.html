@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=40" />
+<link rel="stylesheet" href="style.css?v=41" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -108,7 +108,7 @@
         <div><kbd>C</kbd> abbassati (nell'erba alta sei nascosto) · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
         <div><kbd>Mouse</kbd> mira · <kbd>Click sx</kbd> spara/usa · <kbd>Click dx</kbd> mira di precisione</div>
         <div><kbd>1-5</kbd> / <kbd>Rotella</kbd> cambia slot · <kbd>R</kbd> ricarica · <kbd>E</kbd> raccogli / apri forziere</div>
-        <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>TAB</kbd> inventario · <kbd>G</kbd> lascia oggetto · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>0</kbd> e <kbd>'</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
+        <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>TAB</kbd> inventario · <kbd>X</kbd> lascia oggetto · <kbd>G</kbd> (tieni premuto) lancia granata/fumogeno · <kbd>H</kbd> cambia oggetto da lancio · <kbd>Z</kbd> / <kbd>clic rotella</kbd> segnala · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>0</kbd> e <kbd>'</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
       </div>
     </div>
     <div class="play-center">
@@ -218,6 +218,8 @@
   </div>
   <div id="buildHint" class="hidden">MODALITÀ COSTRUZIONE · Click sx: muro (10 🪵) · Q per uscire</div>
   <div id="damageLayer"></div>
+  <div id="pingLayer"></div>
+  <div id="throwHud" class="hidden" title="G: tieni premuto per mirare, rilascia per lanciare · H: cambia"><i></i><b></b><small></small><kbd>G</kbd></div>
   <div id="toasts"></div>
   <div id="netInfo" class="hidden"></div>
 </div>
@@ -235,6 +237,7 @@
   </div>
   <div class="spec-hint">Trascina il mouse per girare la visuale · ← → cambia giocatore</div>
 </div>
+<div id="smokeVeil"></div>
 <div id="vignette"></div>
 <div id="stormTint"></div>
 <div id="scope" class="hidden" data-s="scope"><div class="ring"><div class="ret"></div></div><div class="mag"></div></div>
@@ -261,7 +264,7 @@
       </div>
       <div id="invAmmo"></div>
     </div>
-    <div class="invtips">Trascina gli oggetti per riordinarli · seleziona e premi <kbd>1</kbd>–<kbd>5</kbd> per spostarli · <kbd>E</kbd> o doppio clic impugna · <kbd>G</kbd> getta</div>
+    <div class="invtips">Trascina gli oggetti per riordinarli · seleziona e premi <kbd>1</kbd>–<kbd>5</kbd> per spostarli · <kbd>E</kbd> o doppio clic impugna · <kbd>X</kbd> getta</div>
   </div>
 </div>
 
@@ -302,9 +305,9 @@
 <div id="rotateHint"><div class="phone"></div><b>Ruota il telefono</b><span>Arena Royale si gioca in orizzontale</span></div>
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento del gioco…</p></div>
-<script src="js/loading.js?v=40"></script>
+<script src="js/loading.js?v=41"></script>
 
-<script type="module" src="js/main.js?v=40"></script>
-<script src="js/transition.js?v=40"></script>
+<script type="module" src="js/main.js?v=41"></script>
+<script src="js/transition.js?v=41"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@
 //  Qui ci sono le texture delle strade, gli oggetti instanziati (colori per vertice) e i costruttori.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts } from './props.js?v=40';
+import { mergeParts } from './props.js?v=41';
 import { normalFromHeight, NORMALS, TEXQ, ANISO } from './texgen.js?v=19';
 
 const P = (geo, color, o = {}) => ({ geo, color, o });
@@ -695,7 +695,7 @@ export function townBuilders(K) {
     const lift = 1.6, F = frame(cx, cz, w, d, face);
     const sw = face >= 2;
     const hs = C.placeHouse(cx, cz, sw ? d : w, sw ? w : d, y + lift, false, th, face);
-    hs.lodH = 4.1 + lift; hs.baseY = y; hs.stilt = lift;
+    hs.lodH = (hs.lodH || 4.7) + lift; hs.baseY = y; hs.stilt = lift;
     const post = M.darkWoodMat;
     for (const u of [-w / 2 + 0.25, 0, w / 2 - 0.25]) for (const v of [0.25, d / 2, d - 0.25]) {
       if (u === 0 && v === d / 2) continue;

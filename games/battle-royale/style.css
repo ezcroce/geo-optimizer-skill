@@ -1032,3 +1032,48 @@ body.touch-edit #menu, body.touch-edit #pause { visibility: hidden; }
   .passfeat { display: none; }        /* poco spazio in altezza: la vetrina si nasconde, resta la traccia */
   .passhint { display: none; }
 }
+
+/* ───────────── v41: oggetti da lancio, segnalazioni, danni direzionali, fumo, costruzioni, statistiche ───────────── */
+#throwHud { position: absolute; right: 20px; bottom: 132px; display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 7px; border-radius: 10px;
+  background: rgba(0,0,0,.42); border: 1.5px solid var(--tc, #fff); font-weight: 800; text-shadow: 0 1px 2px #000; transition: transform .12s, box-shadow .12s; }
+#throwHud i { font-style: normal; font-size: 20px; }
+#throwHud b { font-size: 17px; }
+#throwHud small { font-size: 11px; opacity: .8; font-weight: 700; }
+#throwHud kbd { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); }
+#throwHud.aim { transform: scale(1.08); box-shadow: 0 0 14px var(--tc, #fff); }
+body.touch #throwHud { display: none; }
+#pingLayer { position: absolute; inset: 0; overflow: hidden; }
+.ping { position: absolute; left: 0; top: 0; margin: -46px 0 0 -40px; width: 80px; display: flex; flex-direction: column; align-items: center; color: #fff; text-shadow: 0 1px 3px #000; will-change: transform; }
+.ping i { font-style: normal; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pc); border: 2px solid #fff;
+  box-shadow: 0 0 12px var(--pc); font-size: 15px; animation: pingPop .35s ease-out; }
+.ping i u { text-decoration: none; display: inline-block; transform: rotate(45deg); }
+.ping b { margin-top: 4px; font-size: 11px; font-weight: 800; white-space: nowrap; background: rgba(0,0,0,.45); padding: 1px 6px; border-radius: 6px; border-bottom: 2px solid var(--pc); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.ping small { font-size: 10px; font-weight: 700; opacity: .9; }
+.ping.edge b { display: none; }
+.ping.edge i { width: 24px; height: 24px; font-size: 12px; }
+.ping-enemy i { animation: pingPop .35s ease-out, pingPulse .8s ease-in-out infinite .35s; }
+@keyframes pingPop { from { transform: rotate(-45deg) scale(2.2); opacity: 0; } to { transform: rotate(-45deg) scale(1); opacity: 1; } }
+@keyframes pingPulse { 50% { box-shadow: 0 0 22px var(--pc), 0 0 4px #fff; } }
+#dmgDir { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 4; display: none; }
+#smokeVeil { position: fixed; inset: 0; pointer-events: none; z-index: 8; opacity: 0; background: radial-gradient(circle at 50% 50%, rgba(214,220,226,.82), rgba(190,198,206,.97)); }
+#buildHint span { opacity: .65; padding: 1px 6px; border-radius: 6px; }
+#buildHint span.on { opacity: 1; background: rgba(255,255,255,.25); box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
+#buildHint kbd { font-size: 11px; padding: 0 4px; border-radius: 4px; background: rgba(0,0,0,.25); }
+.tbtn.tthrow { width: calc(54px * var(--k)); height: calc(54px * var(--k)); right: calc(var(--sr) + 286px * var(--k)); bottom: calc(var(--sb) + 64px * var(--k)); }
+.tbtn.tthrow span, .tbtn.tpiece span { font-size: calc(9px * var(--k)); }
+.tbtn.tpiece { width: calc(50px * var(--k)); height: calc(50px * var(--k)); right: calc(var(--sr) + 208px * var(--k)); bottom: calc(var(--sb) + 40px * var(--k)); background: rgba(40,120,255,.45); }
+/* statistiche di fine partita: 4 grandi + 9 piccole */
+#end .box { max-height: 94vh; overflow-y: auto; }
+#endStats.stats { display: grid; grid-template-columns: repeat(12, 1fr); gap: 8px; width: min(620px, 86vw); }
+#endStats div { grid-column: span 4; position: relative; padding: 7px 10px 7px 34px; text-align: left; }
+#endStats div.big { grid-column: span 3; padding: 10px 8px; text-align: center; background: rgba(255,207,46,.1); }
+#endStats div i { font-style: normal; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 17px; }
+#endStats div.big i { position: static; transform: none; display: block; font-size: 18px; }
+#endStats div b { font-size: 18px; }
+#endStats div.big b { font-size: 26px; }
+#endStats div b small { font-size: 13px; opacity: .6; }
+#endStats div span { font-size: 9.5px; letter-spacing: .5px; }
+@media (max-width: 640px), (max-height: 520px) {
+  #endStats div, #endStats div.big { grid-column: span 6; }
+  #endStats div.big b { font-size: 20px; }
+}

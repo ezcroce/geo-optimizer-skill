@@ -8,7 +8,7 @@
 export const MAX_PLAYERS = 8;
 const PREFIX = 'arenaroyale3d-';
 const VERSION = 11;
-export const GAME_VERSION = 'v40';
+export const GAME_VERSION = 'v41';
 
 // v34: PeerJS (canale JSON) rifiuta i messaggi oltre ~16 KB ("Message too big for JSON channel"):
 // l'avvio della partita (100 bot) e le istantanee affollate superavano il limite e facevano cadere il collegamento.

@@ -25,6 +25,11 @@ const ICON = {
   emote: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="1.3" fill="currentColor"/><circle cx="15" cy="10" r="1.3" fill="currentColor"/><path d="M8 14.2c2.2 2.6 5.8 2.6 8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   inv: '<svg viewBox="0 0 24 24"><path d="M9 4h6a2 2 0 0 1 2 2v1h1.5A2.5 2.5 0 0 1 21 9.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5A2.5 2.5 0 0 1 5.5 7H7V6a2 2 0 0 1 2-2zm0 2v1h6V6zm-2 6v2h10v-2z" fill="currentColor"/></svg>',
   drop: '<svg viewBox="0 0 24 24"><path d="M12 15l-5-5h3V4h4v6h3zM5 18h14v2H5z" fill="currentColor"/></svg>',
+  // v41: granata, segnalazione, cambio pezzo da costruire, cambio oggetto da lancio
+  throw: '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="6.5" fill="currentColor"/><path d="M9.5 6.5h4l1 2h-6z" fill="currentColor"/><path d="M14 5.5c2-2.5 5-2 6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  ping: '<svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7zm0 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" fill="currentColor"/></svg>',
+  piece: '<svg viewBox="0 0 24 24"><path d="M3 20h18L3 6z" fill="currentColor"/></svg>',
+  swap: '<svg viewBox="0 0 24 24"><path d="M7 7h11l-3-3M17 17H6l3 3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 /**
@@ -46,6 +51,8 @@ export function createTouch(api) {
     <button class="tbtn tcrouch" data-b="crouch" aria-label="Abbassati">${ICON.crouch}</button>
     <button class="tbtn treload" data-b="reload" aria-label="Ricarica">${ICON.reload}</button>
     <button class="tbtn tbuild" data-b="build" aria-label="Costruisci">${ICON.build}</button>
+    <button class="tbtn tthrow hidden" data-b="throw" aria-label="Lancia">${ICON.throw}<span id="tThrowLbl">LANCIA</span></button>
+    <button class="tbtn tpiece hidden" data-b="piece" aria-label="Cambia pezzo">${ICON.piece}<span id="tPieceLbl">MURO</span></button>
     <button class="tbtn tuse hidden" data-b="use" aria-label="Raccogli">${ICON.use}<span id="tUseLbl">RACCOGLI</span></button>
     <button class="tbtn tbusjump hidden" data-b="jump" aria-label="Lanciati">${ICON.jump}<span>LANCIATI</span></button>
     <div class="ttop">
@@ -53,6 +60,8 @@ export function createTouch(api) {
       <button class="tbtn tsmall" data-b="map" aria-label="Mappa">${ICON.map}</button>
       <button class="tbtn tsmall" data-b="emote" aria-label="Balletto">${ICON.emote}</button>
       <button class="tbtn tsmall" data-b="drop" aria-label="Lascia oggetto">${ICON.drop}</button>
+      <button class="tbtn tsmall" data-b="ping" aria-label="Segnala">${ICON.ping}</button>
+      <button class="tbtn tsmall" data-b="swap" aria-label="Cambia oggetto da lancio">${ICON.swap}</button>
       <button class="tbtn tsmall" data-b="inv" aria-label="Inventario">${ICON.inv}</button>
     </div>`;
   document.body.appendChild(root);
@@ -74,14 +83,16 @@ export function createTouch(api) {
     use: () => press('KeyE'),
     emote: () => press('KeyB'),
     map: () => press('KeyM'),
-    drop: () => press('KeyG'),
+    drop: () => press('KeyX'),
+    throw: () => press('KeyG'), ping: () => press('KeyZ'), piece: () => press('KeyR'), swap: () => press('KeyH'),
     pause: () => api.togglePause(),
     inv: () => api.toggleInv && api.toggleInv(),
   };
   const UP = {
     fire: () => { mouse.left = false; },
     jump: () => release('Space'), crouch: () => release('KeyC'), reload: () => release('KeyR'), build: () => release('KeyQ'),
-    use: () => release('KeyE'), emote: () => release('KeyB'), map: () => release('KeyM'), drop: () => release('KeyG'),
+    use: () => release('KeyE'), emote: () => release('KeyB'), map: () => release('KeyM'), drop: () => release('KeyX'),
+    throw: () => release('KeyG'), ping: () => release('KeyZ'), piece: () => release('KeyR'), swap: () => release('KeyH'),
   };
 
   // ── puntatori attivi: joystick, sguardo, pulsanti ──
@@ -205,6 +216,13 @@ export function createTouch(api) {
     vis('build', ground && p.mode !== 'climb');
     vis('jump', alive && !bus && p.mode !== 'glide');
     vis('drop', ground && !!p.slot);
+    const thr = p.throws ? (p.throws.frag || 0) + (p.throws.smoke || 0) + (p.throws.impulse || 0) : 0;
+    vis('throw', ground && thr > 0 && !G.build.on && p.mode !== 'climb');
+    vis('swap', ground && thr > 0 && (p.throws[p.throwSel] || 0) < thr);
+    vis('piece', ground && G.build.on);
+    vis('ping', alive && !bus);
+    if (thr > 0) { const l = $('#tThrowLbl'), tx = (({ frag: 'GRANATA', smoke: 'FUMO', impulse: 'IMPULSO' })[p.throwSel] || 'LANCIA') + ' ' + (p.throws[p.throwSel] || 0); if (l.textContent !== tx) l.textContent = tx; }
+    if (G.build.on) { const l = $('#tPieceLbl'), tx = ({ wall: 'MURO', floor: 'PAVIMENTO', ramp: 'RAMPA' })[G.build.piece] || 'MURO'; if (l.textContent !== tx) l.textContent = tx; }
     vis('emote', ground);
     root.querySelector('.tbusjump').classList.toggle('hidden', !(alive && bus));
     const inter = ground && G.interact;

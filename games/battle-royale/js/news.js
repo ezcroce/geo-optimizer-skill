@@ -1,9 +1,27 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v40';
+export const NEWS_VERSION = 'v41';
 
 export const NEWS = [
+  {
+    v: 'v41', title: 'Granate, segnalazioni e case più grandi', color: '#6ad8ff', icon: '💣',
+    items: [
+      'Oggetti da lancio: granata a frammentazione (esplode dopo 2,5 s, rompe muri e strutture), fumogeno (una nube densa che nasconde anche ai bot) e granata a impulso (spinge via chi è vicino; lanciata sotto i piedi ti catapulta in aria senza danni da caduta). Tieni premuto G per vedere la traiettoria, rilascia per lanciare, H cambia oggetto. Rimbalzano sui muri e sul terreno',
+      'Lasciare un oggetto ora è X (G serve per lanciare)',
+      'Segnalazioni per la squadra: Z o clic della rotellina. Sul nemico lo segnala in rosso e lo segue, sul bottino ne scrive il nome, altrove «Andiamo qui» (doppio tocco: «Pericolo»). I compagni bot ci vanno e segnalano da soli i nemici che vedono',
+      'Quando ti colpiscono un arco rosso attorno al mirino indica da dove arriva il colpo, e la visuale trema in proporzione al danno',
+      'Bot più furbi: con poca vita corrono dietro un riparo (a volte con un fumogeno) e si curano lì, se stanno per perdere scappano a zigzag, aggirano di lato chi si nasconde (i compagni da lati opposti) e lanciano granate a chi resta fermo o dietro i muri',
+      'Passi diversi su erba, pietra, legno, metallo, neve, sabbia e acqua; senti anche i passi degli altri, più forti quando corrono, a destra o a sinistra a seconda di dove sono',
+      'Costruzione: oltre al muro ci sono pavimenti e rampe. In modalità costruzione 1 muro, 2 pavimento, 3 rampa (o R e la rotellina); guardando in alto il pavimento va un piano più su',
+      'Fine partita con le statistiche complete: precisione, colpi alla testa, uccisione più lontana, danni subiti, cure, distanza percorsa, muri, forzieri e oggetti lanciati',
+      'Il mirino diventa verde sui compagni di squadra',
+      'Zoom in mira regolabile per ogni classe d’arma (Impostazioni › Controlli); pistole e pompa entrano in mira più in fretta, i cecchini con calma',
+      'Case più alte e più larghe, città più grandi, mobili un po’ più grossi. Saltando dentro casa non si viene più spinti fuori dai muri: si sbatte la testa sul soffitto',
+      'Salto rifatto: stacco con una gamba, gambe raccolte in volo, braccia per l’equilibrio e piedi che cercano il suolo nelle cadute lunghe',
+      'Gli Artigli restano attaccati ai polsi; Colosseo: nei corridoi sotto le gradinate non si vede più attraverso i muri',
+    ],
+  },
   {
     v: 'v40', title: 'Stagione 2 · Il Colosseo', color: '#ffcf2e', icon: '🏛️',
     items: [

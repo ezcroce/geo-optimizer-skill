@@ -1,7 +1,7 @@
 // Pose e animazioni dei personaggi articolati (anche, ginocchia, caviglie, spalle, gomiti).
 // Condivise tra il gioco (main.js) e il sito (site.js), così le animazioni sono identiche.
 import * as THREE from 'three';
-import { RIG } from './character.js?v=40';
+import { RIG } from './character.js?v=41';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -167,10 +167,10 @@ export function legsLocomotion(m, phase, mv, run, ck, spr = 0) {
 
 /** v31: fonde la posa in volo con quella attuale delle gambe (k 0..1): salti e atterraggi senza scatti */
 const _lg = new Float32Array(8);
-export function legsAirBlend(m, up, k) {
+export function legsAirBlend(m, up, k, o) {
   if (k <= 0.001) return;
   for (let i = 0; i < 2; i++) { _lg[i * 4] = m.legs[i].rotation.x; _lg[i * 4 + 1] = m.legs[i].rotation.z; _lg[i * 4 + 2] = m.knees[i].rotation.x; _lg[i * 4 + 3] = m.feet[i].rotation.x; }
-  legsAir(m, up);
+  legsAir(m, up, o);
   for (let i = 0; i < 2; i++) {
     m.legs[i].rotation.x = lerp(_lg[i * 4], m.legs[i].rotation.x, k);
     m.legs[i].rotation.z = lerp(_lg[i * 4 + 1], m.legs[i].rotation.z, k);
@@ -179,11 +179,35 @@ export function legsAirBlend(m, up, k) {
   }
 }
 
-/** gambe in volo: raccolte in salita, distese in discesa */
-export function legsAir(m, up) {
-  const u = clamp(up, -1, 1), k = Math.max(0, u);
-  setLeg(m, 0, lerp(-0.35, -1.0, k), lerp(0.45, 1.5, k), null);
-  setLeg(m, 1, lerp(0.25, -0.25, k), lerp(0.35, 1.1, k), 0.2);
+/**
+ * gambe in volo (v41: salto vivo, non più una posa fissa)
+ *  up: velocità verticale normalizzata (+1 sale forte, −1 scende) · o.run: 0..1 rincorsa · o.lead: gamba che stacca
+ *  o.t: tempo in aria · o.push: 0..1 spinta dello stacco (gambe distese, punte tese)
+ *  · da fermi: in salita le ginocchia si raccolgono (una un po' più dell'altra), in discesa le gambe si allungano verso terra
+ *  · in corsa: falcata aperta, la gamba avanti piegata, quella dietro distesa; in discesa si richiudono per atterrare
+ *  · cadute lunghe: le gambe "pedalano" piano e i piedi cercano il suolo
+ */
+export function legsAir(m, up, o = {}) {
+  const u = clamp(up, -1.3, 1), k = Math.max(0, u), dn = Math.min(1, Math.max(0, -u));
+  const run = clamp(o.run || 0, 0, 1), lead = o.lead ? 1 : 0, t = o.t || 0, push = clamp(o.push || 0, 0, 1);
+  const fall = clamp((t - 0.55) / 0.45, 0, 1) * dn;
+  const ped = t * 6.5;
+  for (let i = 0; i < 2; i++) {
+    const L = i === lead ? 1 : 0;   // 1 = gamba che va avanti
+    // salto da fermo
+    let hip = lerp(lerp(-0.3, -1.15, k), lerp(-0.2, -0.85, k), L ? 0 : 1) * (1 - dn) + lerp(-0.12, 0.06, L) * dn;
+    let knee = lerp(lerp(0.45, 1.65, k), lerp(0.35, 1.25, k), L ? 0 : 1) * (1 - dn) + lerp(0.22, 0.32, L) * dn;
+    // rincorsa: falcata
+    const sh = L ? -1.0 - 0.2 * k + 0.55 * dn : 0.55 - 0.25 * k - 0.4 * dn;
+    const sk = L ? 0.85 + 0.45 * k - 0.35 * dn : 0.55 + 0.6 * k - 0.15 * dn;
+    hip = lerp(hip, sh, run); knee = lerp(knee, sk, run);
+    // caduta lunga: pedalata
+    if (fall > 0) { const ph = ped + i * Math.PI; hip += Math.sin(ph) * 0.38 * fall; knee += (0.35 + Math.cos(ph) * 0.3) * fall; }
+    // stacco: la gamba di spinta si distende (punta tesa)
+    if (push > 0) { const e = L ? 0.4 : 1; hip = lerp(hip, L ? -0.55 : 0.18, push * e); knee = lerp(knee, L ? 0.8 : 0.06, push * e); }
+    const foot = -(hip + Math.max(0, knee)) * (1 - 0.6 * dn) + 0.38 * dn + (push > 0 && !L ? 0.5 * push : 0);
+    setLeg(m, i, hip, knee, foot, (i ? 1 : -1) * (0.05 + 0.06 * dn + 0.04 * fall));
+  }
 }
 
 /** braccia libere che oscillano opposte alle gambe (v32: seguono l'anca della gamba opposta; in corsa gomiti a 90° che pompano) */

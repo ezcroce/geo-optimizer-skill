@@ -4,11 +4,11 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=40';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=41';
 import { carInstances } from './cars.js?v=25';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=40';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=41';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=40';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=41';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -36,7 +36,7 @@ const DEFAULT_TOWNS = [
   { name: 'Lido Lampo', x: 466, z: -20, r: 48, houses: 5 },
   { name: 'Castello Cosmico', x: -130, z: -175, r: 52, houses: 6, towers: true },
   { name: 'Miniera Matta', x: -440, z: -420, r: 48, houses: 3, containers: true },
-  { name: 'Bosco Brivido', x: -200, z: 430, r: 46, houses: 4 },
+  { name: 'Bosco Brivido', x: -200, z: 430, r: 46, houses: 4, k: 1.08 },
   { name: 'Faro Folle', x: 456, z: 456, r: 46, houses: 3, towers: true },
   { name: 'Campeggio Caos', x: 190, z: 170, r: 50, houses: 4 },
   { name: 'Valle Vortice', x: -470, z: 190, r: 48, houses: 3 },
@@ -44,8 +44,10 @@ const DEFAULT_TOWNS = [
   { name: 'Paese Pazzo', x: -10, z: 250, r: 54, houses: 6 },
   { name: 'Rocca Ribelle', x: -20, z: -290, r: 50, houses: 4 },
 ];
+/** v41: le case sono più grandi: anche i paesi si allargano (il Colosseo resta com'è) */
+const TOWN_K = 1.2;
 /** città della mappa corrente (l'array resta lo stesso: viene riempito di nuovo a ogni mappa) */
-export const TOWNS = DEFAULT_TOWNS.map(t => ({ ...t }));
+export const TOWNS = DEFAULT_TOWNS.map(t => ({ ...t, r: t.arena ? t.r : Math.round(t.r * (t.k || TOWN_K)) }));
 /** mappa corrente: seme e tipo (classica o casuale) */
 export const MAP = { seed: 1337, random: false };
 
@@ -384,7 +386,7 @@ function configureMap(seed, random) {
   srand = mulberry32(seed);
   TOWNS.length = 0; MOUNTAINS.length = 0; LAKES.length = 0; BIOME_CENTERS.length = 0;
   if (!random) {
-    for (const t of DEFAULT_TOWNS) TOWNS.push({ ...t });
+    for (const t of DEFAULT_TOWNS) TOWNS.push({ ...t, r: t.arena ? t.r : Math.round(t.r * (t.k || TOWN_K)) });
     for (const m of DEFAULT_MOUNTAINS) MOUNTAINS.push({ ...m });
     for (const l of DEFAULT_LAKES) LAKES.push({ ...l });
     for (const bc of DEFAULT_BIOMES) BIOME_CENTERS.push({ ...bc });
@@ -397,7 +399,7 @@ function configureMap(seed, random) {
     for (let k = 0; TOWNS.length < n && k < 3000; k++) {
       const x = R(-HALF + 100, HALF - 100), z = R(-HALF + 100, HALF - 100);
       if (TOWNS.some(t => Math.hypot(t.x - x, t.z - z) < (t.r > 60 ? 200 : 172))) continue;
-      const tr = Math.round(R(46, 54)), kind = r();
+      const tr = Math.round(R(46, 54) * TOWN_K), kind = r();
       TOWNS.push({ name: name(), x, z, r: tr, houses: Math.max(2, Math.round(tr / 5.5 + R(-1, 1.5))), towers: kind < 0.2, containers: kind > 0.78 });
     }
     // biomi: uno per quadrante, in ordine e posizione casuali
@@ -515,12 +517,25 @@ export function ringGap(c, x, z, m = 0) {
   for (const g of c.gates) if (dx * g.ax + dz * g.az > 0 && Math.abs(dz * g.ax - dx * g.az) < g.w - m) return true;
   return false;
 }
+/** v41: rampe costruite: quota della superficie inclinata in (x, z) (sale lungo c.dir: 'x+', 'x-', 'z+', 'z-') */
+export function rampTop(c, x, z) {
+  const ax = c.dir[0] === 'x', u = ax ? x : z, u0 = ax ? c.minX : c.minZ, u1 = ax ? c.maxX : c.maxZ;
+  let t = (u - u0) / (u1 - u0);
+  if (c.dir[1] === '-') t = 1 - t;
+  return c.minY + Math.max(0, Math.min(1, t)) * (c.maxY - c.minY);
+}
 /** Altezza del suolo (terreno o cima di una cassa) sotto un punto */
 export function groundAt(x, z, feetY, radius = 0.35) {
   let g = terrainHeight(x, z);
   const list = queryColliders(x, z, radius + 0.1);
   for (const c of list) {
     if (c.noStand) continue;
+    if (c.type === 'ramp') {
+      if (x < c.minX - 0.05 || x > c.maxX + 0.05 || z < c.minZ - 0.05 || z > c.maxZ + 0.05) continue;
+      const s = rampTop(c, x, z);
+      if (s <= feetY + 0.6 && s > g) g = s;
+      continue;
+    }
     if (c.maxY > feetY + 0.5) continue; // troppo alto per salirci
     if (c.maxY <= g) continue;
     if (c.type === 'box') {
@@ -538,7 +553,11 @@ export function resolveCollisions(pos, radius, height) {
   const list = queryColliders(pos.x, pos.z, radius + 0.2);
   let hit = false;
   for (const c of list) {
+    if (c.type === 'ramp') continue;   // v41: sulle rampe si cammina, non spingono
     if (pos.y >= c.maxY - 0.05 || pos.y + height <= c.minY) continue;
+    // v41: ciò che sta sopra la testa (soffitti, architravi di porte e finestre, solai) è un soffitto, non un muro:
+    //  saltando sopra un tavolo la testa entrava nel tetto e la spinta laterale ti buttava fuori dalla casa
+    if (c.minY > pos.y + height * 0.62 && c.type === 'box') continue;
     if (!c.noStand && c.maxY - pos.y <= 0.5) continue; // gradino: ci si sale sopra
     if (c.type === 'box') {
       const cx = Math.max(c.minX, Math.min(pos.x, c.maxX));
@@ -581,6 +600,17 @@ export function resolveCollisions(pos, radius, height) {
   return hit;
 }
 
+/** v41: quota del soffitto più basso sopra (x, z) a partire dall'altezza della testa (Infinity se non c'è) */
+export function ceilingAt(x, z, feetY, height, radius = 0.35) {
+  let top = Infinity;
+  const r = radius * 0.8, from = feetY + height * 0.62;
+  for (const c of queryColliders(x, z, radius + 0.1)) {
+    if (c.type !== 'box' || c.minY <= from || c.minY >= top) continue;
+    if (x > c.minX - r && x < c.maxX + r && z > c.minZ - r && z < c.maxZ + r) top = c.minY;
+  }
+  return top;
+}
+
 function rayBox(o, d, c) {
   let tmin = 0, tmax = Infinity;
   const mins = [c.minX, c.minY, c.minZ], maxs = [c.maxX, c.maxY, c.maxZ];
@@ -600,6 +630,25 @@ function rayBox(o, d, c) {
   return tmin;
 }
 
+/** v41: raggio contro una rampa (lastra inclinata spessa 0,25 m) */
+function rayRamp(o, d, c) {
+  const ax = c.dir[0] === 'x', neg = c.dir[1] === '-';
+  const u0 = ax ? c.minX : c.minZ, u1 = ax ? c.maxX : c.maxZ;
+  const slope = (c.maxY - c.minY) / (u1 - u0) * (neg ? -1 : 1), base = neg ? u1 : u0;
+  const ou = ax ? o.x : o.z, du = ax ? d.x : d.z;
+  let best = -1;
+  for (const off of [0, -0.25]) {
+    // y(t) = o.y + d.y t   ·   piano: y = minY + off + slope (u - base)
+    const A = o.y - (c.minY + off + slope * (ou - base)), B = d.y - slope * du;
+    if (Math.abs(B) < 1e-9) continue;
+    const t = -A / B;
+    if (t < 0 || (best >= 0 && t >= best)) continue;
+    const x = o.x + d.x * t, z = o.z + d.z * t;
+    if (x < c.minX || x > c.maxX || z < c.minZ || z > c.maxZ) continue;
+    best = t;
+  }
+  return best;
+}
 function rayCyl(o, d, c) {
   const dx = o.x - c.x, dz = o.z - c.z;
   const a = d.x * d.x + d.z * d.z;
@@ -650,7 +699,7 @@ export function rayColliders(o, d, maxDist, ignore = null) {
     for (const c of arr) {
       if (c._s === stamp || c === ignore) continue;
       c._s = stamp;
-      const t = c.type === 'box' ? rayBox(o, d, c) : c.type === 'ring' ? rayRing(o, d, c) : rayCyl(o, d, c);
+      const t = c.type === 'box' ? rayBox(o, d, c) : c.type === 'ring' ? rayRing(o, d, c) : c.type === 'ramp' ? rayRamp(o, d, c) : rayCyl(o, d, c);
       if (t >= 0 && t < best) { best = t; hit = c; }
     }
   };
@@ -1485,7 +1534,7 @@ export function buildWorld(scene, opts = {}) {
   const plateGeo = new THREE.BoxGeometry(0.06, 0.2, 0.01); plateGeo.userData.shared = true;
   /** costruisce le due ante (pivot sui cardini) quando il chunk diventa visibile */
   function buildDoorLeaves(dr, group) {
-    const lw2 = dr.gap / 2 - 0.03, lh = 2.36;
+    const lw2 = dr.gap / 2 - 0.03, lh = dr.lh || 2.36;
     const tx = dr.horiz ? 1 : 0, tz = dr.horiz ? 0 : 1;   // direzione lungo il muro
     dr.leaves = [];
     const single = dr.single, lwS = dr.gap - 0.03;
@@ -1532,12 +1581,21 @@ export function buildWorld(scene, opts = {}) {
     const F = fo.F || (house.furn = []);
     const fy = baseY + 0.2;
     const at = (s, u, dist) => s.horiz ? [s.x + u, s.z - s.n[1] * (T / 2 + dist)] : [s.x - s.n[0] * (T / 2 + dist), s.z + u];
-    const reg = (s, u, lu, ld, dist = 0) => { const [x, z] = at(s, u, dist + ld / 2); F.push(s.horiz ? { x, z, hw: lu / 2, hd: ld / 2 } : { x, z, hw: ld / 2, hd: lu / 2 }); };
-    const fb = (s, u, dist, y0, lu, lh, ld, mat) => inner(s, u, dist, fy + y0 + lh / 2, lu, lh, ld, mat, { house, collide: false, cast: lh > 0.25 && lu > 0.2 });
+    // v41: mobili in scala con i personaggi (K): ogni pezzo si ingrandisce attorno al centro del mobile (U0)
+    const K = fo.k ?? 1.12;
+    let U0 = 0;
+    const su = (u) => U0 + (u - U0) * K;
+    const reg = (s, u, lu, ld, dist = 0) => { const [x, z] = at(s, su(u), (dist + ld / 2) * K); lu *= K; ld *= K; F.push(s.horiz ? { x, z, hw: lu / 2, hd: ld / 2 } : { x, z, hw: ld / 2, hd: lu / 2 }); };
+    const fb = (s, u, dist, y0, lu, lh, ld, mat) => {
+      const y = y0 * K; let h = lh * K;
+      if (y + h > H - 0.22) h = Math.max(0.01, H - 0.22 - y);   // niente mobili dentro il soffitto (piani da 3 m)
+      inner(s, su(u), dist * K, fy + y + h / 2, lu * K, h, ld * K, mat, { house, collide: false, cast: h > 0.25 && lu > 0.2 });
+    };
     const col = (s, u, lu, ld, h, dist = 0) => {
-      const [x, z] = at(s, u, dist + ld / 2);
+      const [x, z] = at(s, su(u), (dist + ld / 2) * K);
+      lu *= K; ld *= K;
       const hw = s.horiz ? lu / 2 : ld / 2, hd = s.horiz ? ld / 2 : lu / 2;
-      addCollider({ type: 'box', minX: x - hw, maxX: x + hw, minY: fy, maxY: fy + h, minZ: z - hd, maxZ: z + hd });
+      addCollider({ type: 'box', minX: x - hw, maxX: x + hw, minY: fy, maxY: fy + Math.min(h * K, H - 0.25), minZ: z - hd, maxZ: z + hd });
     };
     const rotFor = (s) => s.horiz ? (s.n[1] < 0 ? 0 : Math.PI) : (s.n[0] < 0 ? Math.PI / 2 : -Math.PI / 2);
     const wood = furnWoodMats[Math.floor(srand() * furnWoodMats.length)];
@@ -1561,7 +1619,7 @@ export function buildWorld(scene, opts = {}) {
         // comodino con lampada
         const nu = bu + L / 2 + 0.3;
         fb(s, nu, 0, 0, 0.46, 0.52, 0.42, wood); fb(s, nu, 0.42, 0.3, 0.3, 0.03, 0.012, darkWoodMat);
-        { const [lx, lz] = at(s, nu, 0.21); addGeo(cgeo('lampS', () => new THREE.CylinderGeometry(0.1, 0.15, 0.2, 10)), lx, fy + 0.52 + 0.27, lz, lampShadeMat, { house, cast: false }); }
+        { const [lx, lz] = at(s, su(nu), 0.21 * K); addGeo(cgeo('lampS', () => new THREE.CylinderGeometry(0.1, 0.15, 0.2, 10)), lx, fy + 0.52 * K + 0.1, lz, lampShadeMat, { house, cast: false }); }
         fb(s, nu, 0.17, 0.52, 0.08, 0.17, 0.08, steelMat);
         reg(s, u, L + 0.56, D);
       } },
@@ -1678,16 +1736,16 @@ export function buildWorld(scene, opts = {}) {
       } },
       plant: { D: 0.5, L: 0.6, make(s, u) {
         fb(s, u, 0.08, 0, 0.36, 0.38, 0.36, potMat); fb(s, u, 0.06, 0.36, 0.4, 0.05, 0.4, potMat);
-        const [x, z] = at(s, u, 0.26);
-        addGeo(cgeo('plantA', () => new THREE.IcosahedronGeometry(0.36, 0)), x, fy + 0.85, z, leafMat, { house });
-        addGeo(cgeo('plantB', () => new THREE.IcosahedronGeometry(0.26, 0)), x + 0.1, fy + 1.2, z - 0.05, leafMat, { house });
+        const [x, z] = at(s, su(u), 0.26 * K);
+        addGeo(cgeo('plantA', () => new THREE.IcosahedronGeometry(0.36, 0)), x, fy + 0.85 * K, z, leafMat, { house });
+        addGeo(cgeo('plantB', () => new THREE.IcosahedronGeometry(0.26, 0)), x + 0.1, fy + 1.2 * K, z - 0.05, leafMat, { house });
         fb(s, u, 0.24, 0.4, 0.04, 0.4, 0.04, darkWoodMat);
         reg(s, u, 0.5, 0.5);
       } },
       lamp: { D: 0.4, L: 0.5, tall: true, make(s, u) {
         fb(s, u, 0.12, 0, 0.3, 0.03, 0.3, blackMat); fb(s, u, 0.25, 0.03, 0.035, 1.4, 0.035, steelMat);
-        const [x, z] = at(s, u, 0.27);
-        addGeo(cgeo('lampF', () => new THREE.CylinderGeometry(0.16, 0.24, 0.3, 12)), x, fy + 1.52, z, lampShadeMat, { house, cast: false });
+        const [x, z] = at(s, su(u), 0.27 * K);
+        addGeo(cgeo('lampF', () => new THREE.CylinderGeometry(0.16, 0.24, 0.3, 12)), x, fy + 1.43 * K + 0.15, z, lampShadeMat, { house, cast: false });
         reg(s, u, 0.4, 0.4);
       } },
     };
@@ -1713,7 +1771,7 @@ export function buildWorld(scene, opts = {}) {
     for (let i = walls.length - 1; i > 0; i--) { const j = Math.floor(srand() * (i + 1)); [walls[i], walls[j]] = [walls[j], walls[i]]; }
     let placed = 0;
     const maxItems = fo.max ?? 3 + Math.floor(srand() * 3);
-    const winHit = (s, a, b) => s.win && a < 0.98 && b > -0.98;
+    const winHit = (s, a, b) => s.win && a < 1.18 && b > -1.18;
     const pics = [];
     for (const s of walls) {
       const umin = -s.len / 2 + T + 0.06, umax = s.len / 2 - T - 0.06;
@@ -1721,21 +1779,23 @@ export function buildWorld(scene, opts = {}) {
       while (cur < umax - 0.4 && placed < maxItems && guard++ < 10) {
         let k = -1;
         for (let j = 0; j < bag.length; j++) {
-          const it = items[bag[j]];
-          if (cur + it.L > umax) continue;
-          if (it.tall && winHit(s, cur, cur + it.L)) continue;
+          const it = items[bag[j]], iL = it.L * K, iD = it.D * K;
+          if (cur + iL > umax) continue;
+          if (it.tall && winHit(s, cur, cur + iL)) continue;
           // non sovrapporsi ad altri mobili (pareti adiacenti negli angoli)
-          const [x, z] = at(s, cur + it.L / 2, it.D / 2);
-          const hw = s.horiz ? it.L / 2 : it.D / 2, hd = s.horiz ? it.D / 2 : it.L / 2;
+          const [x, z] = at(s, cur + iL / 2, iD / 2);
+          const hw = s.horiz ? iL / 2 : iD / 2, hd = s.horiz ? iD / 2 : iL / 2;
           if (F.some(f => Math.abs(x - f.x) < f.hw + hw && Math.abs(z - f.z) < f.hd + hd)) continue;
           k = j; break;
         }
         if (k < 0) { cur += 0.6; continue; }
-        const name = bag.splice(k, 1)[0], it = items[name];
-        const nearWin = winHit(s, cur - 0.1, cur + it.L + 0.1);
-        it.make(s, cur + it.L / 2, nearWin);
+        const name = bag.splice(k, 1)[0], it = items[name], iL = it.L * K;
+        const nearWin = winHit(s, cur - 0.1, cur + iL + 0.1);
+        U0 = cur + iL / 2;
+        it.make(s, U0, nearWin);
+        U0 = 0;
         F[F.length - 1].tall = it.tall || (name === 'kitchen' && !nearWin);
-        cur += it.L + sr(0.15, 0.7); placed++;
+        cur += iL + sr(0.15, 0.7); placed++;
         if (!bag.length) break;
       }
       // un quadro sulla parete libera (non sopra le finestre né sui mobili alti)
@@ -1751,32 +1811,32 @@ export function buildWorld(scene, opts = {}) {
         }
       }
     }
-    // tavolo da pranzo con sedie e tappeto (se c'è spazio in mezzo alla stanza)
+    // tavolo da pranzo con sedie e tappeto (se c'è spazio in mezzo alla stanza; v41: in scala K)
     const w = house.w, d = house.d, cx = house.cx, cz = house.cz;
     for (let t = 0; t < 12; t++) {
       const along = srand() < 0.5;
-      const x = cx + sr(-w / 2 + 2.2, w / 2 - 2.2), z = cz + sr(-d / 2 + 2.2, d / 2 - 2.2);
-      const hw = along ? 1.35 : 1.15, hd = along ? 1.15 : 1.35;
+      const x = cx + sr(-w / 2 + 2.2 * K, w / 2 - 2.2 * K), z = cz + sr(-d / 2 + 2.2 * K, d / 2 - 2.2 * K);
+      const hw = (along ? 1.35 : 1.15) * K, hd = (along ? 1.15 : 1.35) * K;
       if (F.some(f => Math.abs(x - f.x) < f.hw + hw && Math.abs(z - f.z) < f.hd + hd)) continue;
-      const tw = along ? 1.5 : 0.9, td = along ? 0.9 : 1.5;
+      const tw = (along ? 1.5 : 0.9) * K, td = (along ? 0.9 : 1.5) * K, ty = 0.75 * K;
       const rug = rugMats[Math.floor(srand() * rugMats.length)];
-      addGeo(cgeo('rug' + along, () => new THREE.PlaneGeometry(along ? 2.8 : 2.2, along ? 2.2 : 2.8).rotateX(-Math.PI / 2)), x, fy + 0.012, z, rug, { house, cast: false });
-      addBox(tw, 0.05, td, x, fy + 0.75, z, wood, { house, collide: false });
-      addCollider({ type: 'box', minX: x - tw / 2, maxX: x + tw / 2, minY: fy, maxY: fy + 0.78, minZ: z - td / 2, maxZ: z + td / 2 });
-      for (const a of [-1, 1]) for (const b of [-1, 1]) addBox(0.06, 0.73, 0.06, x + a * (tw / 2 - 0.08), fy + 0.365, z + b * (td / 2 - 0.08), darkWoodMat, { house, collide: false, cast: false });
+      addGeo(cgeo('rug' + along + K, () => new THREE.PlaneGeometry((along ? 2.8 : 2.2) * K, (along ? 2.2 : 2.8) * K).rotateX(-Math.PI / 2)), x, fy + 0.012, z, rug, { house, cast: false });
+      addBox(tw, 0.05 * K, td, x, fy + ty, z, wood, { house, collide: false });
+      addCollider({ type: 'box', minX: x - tw / 2, maxX: x + tw / 2, minY: fy, maxY: fy + ty + 0.03, minZ: z - td / 2, maxZ: z + td / 2 });
+      for (const a of [-1, 1]) for (const b of [-1, 1]) addBox(0.06 * K, ty - 0.02, 0.06 * K, x + a * (tw / 2 - 0.08 * K), fy + (ty - 0.02) / 2, z + b * (td / 2 - 0.08 * K), darkWoodMat, { house, collide: false, cast: false });
       // 4 sedie ai lati lunghi, schienale verso l'esterno
       for (const a of [-1, 1]) for (const b of [-1, 1]) {
-        const ox = along ? a * 0.4 : b * 0.72, oz = along ? b * 0.72 : a * 0.4;
-        const sx = x + ox, sz = z + oz;
-        addBox(0.44, 0.05, 0.44, sx, fy + 0.465, sz, wood, { house, collide: false, cast: false });
-        for (const p of [-1, 1]) for (const q of [-1, 1]) addBox(0.04, 0.44, 0.04, sx + p * 0.18, fy + 0.22, sz + q * 0.18, darkWoodMat, { house, collide: false, cast: false });
-        const bx = along ? 0 : b * 0.2, bz = along ? b * 0.2 : 0;
-        addBox(along ? 0.44 : 0.04, 0.48, along ? 0.04 : 0.44, sx + bx, fy + 0.73, sz + bz, wood, { house, collide: false });
+        const ox = (along ? a * 0.4 : b * 0.72) * K, oz = (along ? b * 0.72 : a * 0.4) * K;
+        const sx = x + ox, sz = z + oz, c = 0.44 * K;
+        addBox(c, 0.05 * K, c, sx, fy + 0.465 * K, sz, wood, { house, collide: false, cast: false });
+        for (const p of [-1, 1]) for (const q of [-1, 1]) addBox(0.04 * K, 0.44 * K, 0.04 * K, sx + p * 0.18 * K, fy + 0.22 * K, sz + q * 0.18 * K, darkWoodMat, { house, collide: false, cast: false });
+        const bx = along ? 0 : b * 0.2 * K, bz = along ? b * 0.2 * K : 0;
+        addBox(along ? c : 0.04 * K, 0.48 * K, along ? 0.04 * K : c, sx + bx, fy + 0.73 * K, sz + bz, wood, { house, collide: false });
       }
       // vaso con fiori e tovaglietta
-      addBox(0.12, 0.2, 0.12, x, fy + 0.875, z, potMat, { house, collide: false, cast: false });
-      addGeo(cgeo('flowers', () => new THREE.IcosahedronGeometry(0.13, 0)), x, fy + 1.04, z, blanketMats[Math.floor(srand() * blanketMats.length)], { house, cast: false });
-      addBox(along ? 0.9 : 0.4, 0.008, along ? 0.4 : 0.9, x, fy + 0.78, z, linenMat, { house, collide: false, cast: false });
+      addBox(0.12, 0.2, 0.12, x, fy + ty + 0.125, z, potMat, { house, collide: false, cast: false });
+      addGeo(cgeo('flowers', () => new THREE.IcosahedronGeometry(0.13, 0)), x, fy + ty + 0.29, z, blanketMats[Math.floor(srand() * blanketMats.length)], { house, cast: false });
+      addBox((along ? 0.9 : 0.4) * K, 0.008, (along ? 0.4 : 0.9) * K, x, fy + ty + 0.03, z, linenMat, { house, collide: false, cast: false });
       F.push({ x, z, hw, hd });
       break;
     }
@@ -1784,11 +1844,13 @@ export function buildWorld(scene, opts = {}) {
 
   function placeHouse(cx, cz, w, d, baseY, rot90, theme = 'classic', doorFace = -1) {
     if (rot90) { const t = w; w = d; d = t; }
-    const H = 3.8, T = 0.35, door = 2.2;
+    // v41: case più alte e larghe (i personaggi dentro sembravano giganti): soffitto 4,4 m, porte 2,5 × 3 m,
+    //  finestre più ampie con l'architrave a 3,2 m (ci si passa saltando senza sbattere la testa)
+    const H = 4.4, T = 0.35, door = 2.5, doorH = 3.0, winW = 2.0, sill = 1.1, winTop = H - 1.2;
     const TH = THEMES[theme] || THEMES.classic;
     const wi = Math.floor(srand() * TH.walls.length);
     const wm = wallMatFor(TH.walls[wi]);
-    const house = { cx, cz, w, d, baseY, roofMesh: null, roofTop: baseY + H + 0.3, doors: [], wallColor: TH.walls[wi] === 'stone' ? '#a39d92' : TH.walls[wi], theme };
+    const house = { cx, cz, w, d, baseY, roofMesh: null, roofTop: baseY + H + 0.3, lodH: H + 0.3, doors: [], wallColor: TH.walls[wi] === 'stone' ? '#a39d92' : TH.walls[wi], theme };
     const ho = { house };
     const deco = { house, collide: false };
     const shutM = shutterMats[Math.floor(srand() * shutterMats.length)];
@@ -1818,14 +1880,14 @@ export function buildWorld(scene, opts = {}) {
       s.door = hasDoor; s.win = hasWindow; s.n = normals[i];
       if (hasDoor) {
         // porta vera a due ante (si apre e chiude con E), alcune restano aperte dall'inizio
-        const dr = { i: doors.length, x: s.x, z: s.z, y: baseY + 0.2, horiz: s.horiz, nx: normals[i][0], nz: normals[i][1], gap: door, open0: srand() < 0.3, open: false, ang: 0, mat: doorMats[Math.floor(srand() * doorMats.length)], c: null, leaves: null, house };
-        dr.c = { type: 'box', minX: s.horiz ? s.x - door / 2 : s.x - 0.08, maxX: s.horiz ? s.x + door / 2 : s.x + 0.08, minY: baseY + 0.2, maxY: baseY + 2.6, minZ: s.horiz ? s.z - 0.08 : s.z - door / 2, maxZ: s.horiz ? s.z + 0.08 : s.z + door / 2, door: dr };
+        const dr = { i: doors.length, x: s.x, z: s.z, y: baseY + 0.2, lh: doorH - 0.24, horiz: s.horiz, nx: normals[i][0], nz: normals[i][1], gap: door, open0: srand() < 0.3, open: false, ang: 0, mat: doorMats[Math.floor(srand() * doorMats.length)], c: null, leaves: null, house };
+        dr.c = { type: 'box', minX: s.horiz ? s.x - door / 2 : s.x - 0.08, maxX: s.horiz ? s.x + door / 2 : s.x + 0.08, minY: baseY + 0.2, maxY: baseY + doorH, minZ: s.horiz ? s.z - 0.08 : s.z - door / 2, maxZ: s.horiz ? s.z + 0.08 : s.z + door / 2, door: dr };
         setDoor(dr, dr.open0, true);
         doors.push(dr); chunkAt(s.x, s.z).doors.push(dr);
         house.doors.push({ x: s.x, z: s.z, nx: normals[i][0], nz: normals[i][1], door: dr });
       }
       if (hasDoor || hasWindow) {
-        const gap = hasDoor ? door : 1.6;
+        const gap = hasDoor ? door : winW;
         const seg = (s.len - gap) / 2;
         const off = gap / 2 + seg / 2;
         const n = normals[i];
@@ -1835,32 +1897,33 @@ export function buildWorld(scene, opts = {}) {
         }
         if (hasDoor) {
           // cornice della porta e zerbino
-          for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.07), baseY + 1.3, 0.14, 2.6, 0.1, trimMat);
-          outer(s, n, 0, baseY + 2.67, gap + 0.28, 0.14, 0.1, trimMat);
+          for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.07), baseY + doorH / 2, 0.14, doorH, 0.1, trimMat);
+          outer(s, n, 0, baseY + doorH + 0.07, gap + 0.28, 0.14, 0.1, trimMat);
           outer(s, n, 0, baseY - 0.02, gap + 0.7, 0.16, 0.75, stoneMat);   // gradino
           outer(s, n, 0, baseY + 0.075, 1.3, 0.03, 0.6, matMat);
         } else {
           // finestra: cornice, davanzale e persiane aperte
-          const wy = baseY + H / 2;
-          for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.06), wy, 0.12, 1.72, 0.08, trimMat);
-          outer(s, n, 0, baseY + H - 1.1 + 0.06, gap + 0.24, 0.12, 0.08, trimMat);
-          outer(s, n, 0, baseY + 1.1 - 0.04, gap + 0.4, 0.08, 0.26, trimMat);
-          if (seg > 1.0) for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.12 + 0.4), wy, 0.78, 1.6, 0.05, shutM);
-          // infisso a croce dentro il vano (dà profondità alla finestra)
-          if (s.horiz) { addBox(0.07, 1.6, 0.08, s.x, wy, s.z, trimMat, deco); addBox(gap, 0.07, 0.08, s.x, wy + 0.1, s.z, trimMat, deco); }
-          else { addBox(0.08, 1.6, 0.07, s.x, wy, s.z, trimMat, deco); addBox(0.08, 0.07, gap, s.x, wy + 0.1, s.z, trimMat, deco); }
+          const wh = winTop - sill, wy = baseY + sill + wh / 2;
+          for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.06), wy, 0.12, wh + 0.12, 0.08, trimMat);
+          outer(s, n, 0, baseY + winTop + 0.06, gap + 0.24, 0.12, 0.08, trimMat);
+          outer(s, n, 0, baseY + sill - 0.04, gap + 0.4, 0.08, 0.26, trimMat);
+          if (seg > 1.2) for (const sgn of [-1, 1]) outer(s, n, sgn * (gap / 2 + 0.12 + 0.5), wy, 0.98, wh, 0.05, shutM);
+          // infisso dentro il vano (solo la traversa alta: il vano resta libero per scavalcare)
+          if (s.horiz) addBox(gap, 0.07, 0.08, s.x, baseY + winTop - 0.5, s.z, trimMat, deco);
+          else addBox(0.08, 0.07, gap, s.x, baseY + winTop - 0.5, s.z, trimMat, deco);
         }
         if (hasDoor) {
-          const lh = H - 2.6;
-          if (s.horiz) addBox(gap, lh, T, s.x, baseY + 2.6 + lh / 2, s.z, wm, ho);
-          else addBox(T, lh, gap, s.x, baseY + 2.6 + lh / 2, s.z, wm, ho);
+          const lh = H - doorH;
+          if (s.horiz) addBox(gap, lh, T, s.x, baseY + doorH + lh / 2, s.z, wm, ho);
+          else addBox(T, lh, gap, s.x, baseY + doorH + lh / 2, s.z, wm, ho);
         } else {
+          const th2 = H - winTop;
           if (s.horiz) {
-            addBox(gap, 1.1, T, s.x, baseY + 0.55, s.z, wm, ho);
-            addBox(gap, 1.1, T, s.x, baseY + H - 0.55, s.z, wm, ho);
+            addBox(gap, sill, T, s.x, baseY + sill / 2, s.z, wm, ho);
+            addBox(gap, th2, T, s.x, baseY + winTop + th2 / 2, s.z, wm, ho);
           } else {
-            addBox(T, 1.1, gap, s.x, baseY + 0.55, s.z, wm, ho);
-            addBox(T, 1.1, gap, s.x, baseY + H - 0.55, s.z, wm, ho);
+            addBox(T, sill, gap, s.x, baseY + sill / 2, s.z, wm, ho);
+            addBox(T, th2, gap, s.x, baseY + winTop + th2 / 2, s.z, wm, ho);
           }
           plinth(s, gap, s.x, s.z);
         }
@@ -1926,7 +1989,7 @@ export function buildWorld(scene, opts = {}) {
       outer(ds, dn, 0, baseY + H + 0.9, ds.len * 0.55, 0.75, 0.08, signMat);
       outer(ds, dn, 0, baseY + H + 1.95, fl, 0.14, 0.14, trimMat);
     }
-    if (TH.awning) outer(ds, dn, 0, baseY + 3.0, door + 1.6, 0.1, 1.4, awningMats[Math.floor(srand() * awningMats.length)]);
+    if (TH.awning) outer(ds, dn, 0, baseY + doorH + 0.45, door + 1.6, 0.1, 1.4, awningMats[Math.floor(srand() * awningMats.length)]);
     if (TH.merlons) {
       for (let u = -w / 2; u <= w / 2 + 0.01; u += 1.5) for (const zz of [-1, 1]) addBox(0.6, 0.7, 0.6, cx + u, baseY + H + 0.65, cz + zz * (d / 2 + 0.05), stoneMat, { ...ho, roof: true, collide: false });
       for (let u = -d / 2 + 1.5; u <= d / 2 - 1.49; u += 1.5) for (const xx of [-1, 1]) addBox(0.6, 0.7, 0.6, cx + xx * (w / 2 + 0.05), baseY + H + 0.65, cz + u, stoneMat, { ...ho, roof: true, collide: false });
@@ -2537,7 +2600,7 @@ export function buildWorld(scene, opts = {}) {
     group.add(t);
     const blocks = [];
     for (const h of ch.houses) {
-      const lh = h.lodH ?? 4.1;
+      const lh = h.lodH ?? 4.7;
       blocks.push({ w: h.w, h: lh, d: h.d, x: h.cx, y: h.baseY + lh / 2, z: h.cz, color: h.wallColor, top: h.roofColor });
       if (h.pitch) for (let k = 1; k <= 2; k++) {                       // tetto a falde: due gradoni
         const f = 1 - k / 3, ax = h.pitch.alongX;

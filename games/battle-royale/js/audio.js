@@ -132,7 +132,56 @@ export function playKill() { tone(520, 0.1, 0.25, 'triangle'); tone(780, 0.1, 0.
 export function playBuild() { noise(0.12, 1200, 1.2, 0.4, 'bandpass'); tone(200, 0.1, 0.2, 'square', 0, 120); }
 export function playHeal() { tone(500, 0.3, 0.15, 'sine', 0, 900); }
 export function playChest() { for (let i = 0; i < 4; i++) tone(700 + i * 220, 0.18, 0.15, 'triangle', i * 0.07); }
-export function playStep() { noise(0.05, 300, 1, 0.08, 'lowpass'); }
+/** v41: esegue `fn` con l'uscita attenuata (vol) e posizionata a destra/sinistra (pan -1..1) */
+function routed(vol, pan, fn) {
+  const g = ctx.createGain();
+  g.gain.value = vol;
+  let out = g;
+  if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); out = p; }
+  out.connect(master);
+  const old = master; master = g;
+  try { fn(); } finally { master = old; }
+}
+// v41: passi diversi per superficie (erba, pietra/asfalto, legno, metallo, neve, sabbia, acqua),
+// attenuati con la distanza e posizionati a destra/sinistra: senti chi si avvicina e da dove
+const STEP = {
+  grass: () => { noise(0.07, 650, 0.7, 0.1, 'lowpass', 0, 0.06); noise(0.05, 3200, 1.2, 0.025, 'bandpass', 0.01, 0.04); },
+  stone: () => { noise(0.035, 2200, 1.6, 0.11, 'bandpass', 0, 0.03); tone(140, 0.04, 0.05, 'sine', 0, 90); noise(0.02, 5200, 2, 0.03, 'highpass', 0.005, 0.02); },
+  wood: () => { tone(190 + Math.random() * 30, 0.07, 0.11, 'triangle', 0, 110); noise(0.05, 900, 2, 0.08, 'bandpass', 0, 0.045); },
+  metal: () => { tone(620 + Math.random() * 80, 0.12, 0.035, 'square', 0, 540); tone(1240, 0.08, 0.025, 'sine', 0.004); noise(0.04, 2600, 3, 0.07, 'bandpass', 0, 0.035); },
+  snow: () => { noise(0.13, 1500, 0.8, 0.07, 'bandpass', 0, 0.12); noise(0.1, 420, 0.8, 0.06, 'lowpass', 0.02, 0.09); },
+  sand: () => { noise(0.11, 2400, 0.6, 0.05, 'bandpass', 0, 0.1); noise(0.07, 500, 0.8, 0.05, 'lowpass', 0, 0.06); },
+  water: () => { noise(0.16, 900, 0.9, 0.09, 'lowpass', 0, 0.14); noise(0.1, 2600, 1.3, 0.035, 'bandpass', 0.03, 0.08); },
+};
+let stepWin = 0, stepCount = 0;
+export function playStep(surf = 'grass', dist = 0, pan = 0, loud = 1) {
+  if (!ctx) return;
+  const att = Math.max(0, 1 - dist / 38);
+  if (att <= 0.02) return;
+  if (dist > 0) {   // al massimo 5 passi altrui ogni 120 ms
+    if (ctx.currentTime - stepWin > 0.12) { stepWin = ctx.currentTime; stepCount = 0; }
+    if (++stepCount > 5) return;
+  }
+  // i passi degli altri sono un po' più forti dei tuoi: devono farsi notare
+  routed(att * att * loud * (dist > 0 ? 1.6 : 1), pan, STEP[surf] || STEP.grass);
+}
+const att3 = (d, far) => { const a = Math.max(0, 1 - d / far); return a * a; };
+/** v41: lancio di un oggetto (fruscio + scatto della sicura) */
+export function playThrow(dist = 0) { if (!ctx) return; const a = att3(dist, 60); if (a < 0.01) return; routed(a, 0, () => { tone(1800, 0.03, 0.08, 'square'); noise(0.2, 1400, 0.8, 0.18, 'bandpass', 0.04, 0.18); }); }
+/** rimbalzo metallico della granata */
+export function playBounce(dist = 0, k = 1) { if (!ctx) return; const a = att3(dist, 45) * (0.4 + 0.6 * k); if (a < 0.01) return; routed(a, 0, () => { tone(900 + Math.random() * 300, 0.06, 0.12, 'triangle', 0, 600); noise(0.04, 2400, 2, 0.12, 'bandpass'); }); }
+/** fumogeno: sibilo che si apre */
+export function playSmoke(dist = 0) { if (!ctx) return; const a = att3(dist, 80); if (a < 0.01) return; routed(a, 0, () => { tone(2200, 0.05, 0.06, 'square'); noise(2.2, 3200, 0.5, 0.25, 'highpass', 0.05, 2.1); noise(1.6, 900, 0.6, 0.18, 'lowpass', 0.05, 1.5); }); }
+/** granata a impulso: "wub" elettrico con risucchio */
+export function playImpulse(dist = 0) { if (!ctx) return; const a = att3(dist, 120); if (a < 0.01) return; routed(a, 0, () => { tone(90, 0.5, 0.5, 'sine', 0, 420); tone(420, 0.35, 0.18, 'sawtooth', 0, 1400); noise(0.5, 1800, 0.9, 0.3, 'bandpass', 0, 0.45); tone(1600, 0.25, 0.08, 'sine', 0.05, 2600); }); }
+/** segnalazione dei compagni */
+export function playPing(kind = 'go') {
+  if (!ctx) return;
+  if (kind === 'enemy') { tone(1250, 0.09, 0.17, 'triangle'); tone(1250, 0.09, 0.17, 'triangle', 0.12); }
+  else if (kind === 'danger') { tone(700, 0.12, 0.18, 'square', 0, 520); tone(700, 0.12, 0.14, 'square', 0.15, 520); }
+  else if (kind === 'loot') { tone(990, 0.08, 0.14, 'triangle'); tone(1480, 0.14, 0.14, 'triangle', 0.08); }
+  else { tone(880, 0.07, 0.15, 'sine'); tone(1320, 0.16, 0.13, 'sine', 0.07); }
+}
 /** bracciata in acqua (sciabordio morbido) */
 export function playSwim() { noise(0.28, 700, 0.9, 0.12, 'lowpass', 0, 0.26); noise(0.18, 1800, 1.2, 0.05, 'bandpass', 0.08, 0.16); }
 /** tuffo / caduta in acqua */

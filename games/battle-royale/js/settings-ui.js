@@ -23,6 +23,13 @@ const SCHEMA = [
   { id: 'ctrl', label: 'Controlli', items: [
     { key: 'sens', type: 'range', label: 'Sensibilità mouse', min: 0.3, max: 3, step: 0.05, fmt: v => v.toFixed(2) },
     { key: 'adsSens', type: 'range', label: 'Sensibilità in mira (tasto destro)', min: 0.3, max: 2, step: 0.05, fmt: pct },
+    // v41: zoom in mira per classe d'arma (100% = quello dell'arma)
+    { key: 'adsK_pistol', type: 'range', label: 'Zoom in mira · pistole', min: 0.5, max: 1.5, step: 0.05, fmt: pct, hint: 'Meno = campo visivo più largo mirando. Ogni classe d\'arma ha il suo.' },
+    { key: 'adsK_smg', type: 'range', label: 'Zoom in mira · mitragliette', min: 0.5, max: 1.5, step: 0.05, fmt: pct },
+    { key: 'adsK_shotgun', type: 'range', label: 'Zoom in mira · fucili a pompa', min: 0.5, max: 1.5, step: 0.05, fmt: pct },
+    { key: 'adsK_ar', type: 'range', label: 'Zoom in mira · fucili d\'assalto', min: 0.5, max: 1.5, step: 0.05, fmt: pct },
+    { key: 'adsK_sniper', type: 'range', label: 'Zoom in mira · cecchini e balestra', min: 0.5, max: 1.5, step: 0.05, fmt: pct },
+    { key: 'adsK_rocket', type: 'range', label: 'Zoom in mira · lanciarazzi', min: 0.5, max: 1.5, step: 0.05, fmt: pct },
     { key: 'invertY', type: 'toggle', label: 'Inverti asse verticale' },
     { key: 'fov', type: 'range', label: 'Campo visivo (FOV)', min: 60, max: 100, step: 1, fmt: v => v + '°' },
     { key: 'crouchHold', type: 'select', label: 'Abbassarsi (C)', options: [[false, 'Premi per alternare'], [true, 'Tieni premuto']], bool: true },

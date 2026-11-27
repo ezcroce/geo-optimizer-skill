@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { dressUp, HAS_COSTUME } from './costume.js?v=40';
+import { dressUp, HAS_COSTUME } from './costume.js?v=41';
 
 export const REAL = { ready: false, bases: {}, promise: null, prefix: 'models/chars/' };
 const FILES = { soldier: 'soldato.glb', woman: 'donna.glb' };
@@ -547,7 +547,7 @@ export function syncReal(m) {
   const gp = m.gunPivot;
   let hold = gp.visible && gp.children.some(c => c.visible) && m.body.visible;
   const gr = m._grip, gun = hold && gp.children[0] && gp.children[0].userData.weapon;
-  if (gr && hold) setGrip(R, gr[0], gr[1], !gun); else setGrip(R, hold ? 1 : 0);
+  if (gr && hold) setGrip(R, gr[0], gr[1], !gun); else setGrip(R, hold || m._clawG ? 1 : 0);   // v41: con gli Artigli il pugno è chiuso
   if (hold) {
     for (let i = 0; i < 2; i++) {
       const side = i ? 'Left' : 'Right';
@@ -561,7 +561,19 @@ export function syncReal(m) {
     }
   }
   R.rg.updateMatrixWorld(true);
+  // v41: Artigli: i guanti stanno sulle mani procedurali, ma senza IK il polso del modello vero cade altrove
+  //  (proporzioni diverse) e i guanti sembravano galleggiare: li spostiamo sul polso vero a ogni fotogramma
+  if (m._clawG) for (let i = 0; i < 2; i++) {
+    const g = m._clawG[i], ih = I[i ? 'LeftHand' : 'RightHand'];
+    if (!g || !g.parent || ih === undefined) continue;
+    B[ih].getWorldPosition(_cw);
+    g.parent.updateWorldMatrix(true, false);
+    g.parent.worldToLocal(_cw);
+    g.position.set(_cw.x, _cw.y - 0.035, _cw.z);
+    g.updateMatrixWorld(true);
+  }
 }
+const _cw = new THREE.Vector3();
 
 /** cinematica inversa a due ossa (braccio + avambraccio) con il gomito verso pole */
 function ik(B, Q, P, base, ia, ie, ih, target, pole) {

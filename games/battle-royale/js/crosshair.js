@@ -10,12 +10,17 @@
 // ─────────────────────────────────────────────────────────────
 const TAU = Math.PI * 2;
 const S = 220, C = S / 2;                         // lato del canvas (px CSS) e centro
-const COL = { enemy: '#ff4848', head: '#ffd23a', shield: '#5ac8ff', body: '#ffffff', kill: '#ff3030', heal: '#7dff8a', shieldUse: '#5ad0ff' };
+const COL = { ally: '#4dff7a', enemy: '#ff4848', head: '#ffd23a', shield: '#5ac8ff', body: '#ffffff', kill: '#ff3030', heal: '#7dff8a', shieldUse: '#5ad0ff' };
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+function hexNum(c) {
+  if (c[0] === '#') return parseInt(c.slice(1), 16);
+  const m = c.match(/\d+/g) || [255, 255, 255];
+  return (+m[0] << 16) | (+m[1] << 8) | +m[2];
+}
 function mixHex(a, b, t) {
-  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const pa = hexNum(a), pb = hexNum(b);
   const r = Math.round(lerp(pa >> 16, pb >> 16, t)), g = Math.round(lerp((pa >> 8) & 255, (pb >> 8) & 255, t)), bl = Math.round(lerp(pa & 255, pb & 255, t));
   return `rgb(${r},${g},${bl})`;
 }
@@ -225,7 +230,7 @@ export function createCrosshair(el) {
     kill() { st.killT = 0.001; },
     /**
      * s: { show, style, spreadPx, color, size, enemy, outRange, sprint, reload (0..1 | −1), ready (0..1 | −1),
-     *      mag (frazione | −1), use (0..1 | −1), useShield, spin, reach }
+     *      mag (frazione | −1), use (0..1 | −1), useShield, spin, reach, ally }
      */
     update(dt, s) {
       resize();
@@ -237,6 +242,7 @@ export function createCrosshair(el) {
       st.gap = lerp(st.gap, s.spreadPx, Math.min(1, dt * 18));
       st.enemyK = lerp(st.enemyK, s.enemy ? 1 : 0, Math.min(1, dt * 16));
       st.reachK = lerp(st.reachK || 0, s.reach ? 1 : 0, Math.min(1, dt * 14));
+      st.allyK = lerp(st.allyK || 0, s.ally && !s.enemy ? 1 : 0, Math.min(1, dt * 16));   // v41: compagno sotto il mirino
       st.spin = s.spin || 0;
       st.mag = s.mag ?? -1; st.ready = s.ready ?? -1;
       const wantA = s.sprint ? 0.32 : s.outRange ? 0.55 : 1;
@@ -248,7 +254,7 @@ export function createCrosshair(el) {
       glowPx = 3.5 * k;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, S, S);
-      col = mixHex(s.color || '#ffffff', COL.enemy, st.enemyK);
+      col = mixHex(mixHex(s.color || '#ffffff', COL.ally, st.allyK), COL.enemy, st.enemyK);
       // cambio d'arma: la nuova forma si apre dal centro
       const pop = 0.6 + 0.4 * (1 - Math.pow(1 - st.styleT, 3));
       const gp = (Math.min(64, st.gap) + st.kick) * (s.sprint ? 0.6 : 1) * pop + 3;

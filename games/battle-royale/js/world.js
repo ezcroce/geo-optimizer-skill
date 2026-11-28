@@ -4,12 +4,12 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=45';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=45';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=46';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=46';
 import { carInstances } from './cars.js?v=25';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=45';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=46';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=45';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=46';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -872,7 +872,7 @@ function makeWallTexture(base, line) {
   return withNormal(c, H.c, 2.2);
 }
 
-let _roofN = null;
+const _roofN = {};
 /** v45: muro di pietra fotografico (blocchi irregolari con muschio, come nel riferimento) */
 function makeStoneWallTexture() {
   if (!hasPhoto('stone')) return makeWallTexture('#a39d92', 'rgba(0,0,0,0.25)');
@@ -882,13 +882,16 @@ function makeStoneWallTexture() {
   return H ? withNormal(c, H.c, 1.1) : colorTex(c);
 }
 function makeRoofTexture(base) {
-  if (hasPhoto('roof')) {
-    // v45: coppi fotografici (muschio e licheni) tinti col colore del tetto
+  // v45: coppi fotografici (muschio e licheni) per i tetti caldi; v46: ardesia per quelli grigi e blu
+  const hsl = {}; new THREE.Color(base).getHSL(hsl);
+  const warm = (hsl.h < 0.12 || hsl.h > 0.95) && hsl.s > 0.2;
+  const kind = warm || !hasPhoto('slate') ? 'roof' : 'slate';
+  if (hasPhoto(kind)) {
     const B = 256, { c, g } = canvas2d(B);
-    const warm = new THREE.Color(base); const hsl = {}; warm.getHSL(hsl);
-    paintPhoto(g, 'roof', 0, 0, B, B, { tint: base, keep: hsl.h < 0.12 || hsl.h > 0.95 ? 0.55 : 0.25, contrast: 1.1, bright: 1.18 });
-    if (NORMALS && !_roofN) { const H = canvas2d(B); paintPhoto(H.g, 'roof', 0, 0, B, B, { mode: 'height', contrast: 1.4 }); _roofN = normalFromHeight(H.c, 1.1); }
-    const t = colorTex(c); if (_roofN) t.userData.normal = _roofN;
+    if (kind === 'roof') paintPhoto(g, 'roof', 0, 0, B, B, { tint: base, keep: warm ? 0.55 : 0.25, contrast: 1.1, bright: 1.18 });
+    else paintPhoto(g, 'slate', 0, 0, B, B, { tint: base, keep: 0.5, contrast: 1.05, bright: 1.15 });
+    if (NORMALS && !_roofN[kind]) { const H = canvas2d(B); paintPhoto(H.g, kind, 0, 0, B, B, { mode: 'height', contrast: 1.4 }); _roofN[kind] = normalFromHeight(H.c, 1.1); }
+    const t = colorTex(c); if (_roofN[kind]) t.userData.normal = _roofN[kind];
     return t;
   }
   const { c, g, S } = canvas2d(128), H = canvas2d(128), h = H.g;
@@ -1018,7 +1021,18 @@ function makeWoodTexture() {
 }
 
 // ─────────────── Interni: parquet, tessuti, tappeti, quadri, porte ───────────────
+let _parquetTex = null;
 function makeParquetTexture() {
+  if (hasPhoto('parquet')) {
+    // v46: parquet fotografico (rovere a doghe sfalsate), condiviso da pavimenti e mobili
+    if (!_parquetTex) {
+      const B = 256, { c, g } = canvas2d(B), H = NORMALS ? canvas2d(B) : null;
+      paintPhoto(g, 'parquet', 0, 0, B, B, { contrast: 1.0, bright: 0.95 });
+      if (H) paintPhoto(H.g, 'parquet', 0, 0, B, B, { mode: 'height', contrast: 1.2 });
+      _parquetTex = H ? withNormal(c, H.c, 0.7) : colorTex(c);
+    }
+    return _parquetTex;
+  }
   const B = 128, { c, g, S } = canvas2d(B), H = canvas2d(B), h = H.g;
   h.fillStyle = 'rgb(160,160,160)'; h.fillRect(0, 0, B, B);
   const tones = ['#8e623a', '#9a6c40', '#84582f', '#a3754a', '#7c5130'];
@@ -1108,6 +1122,8 @@ function makeDoorTexture(paint) {
     h.fillStyle = 'rgb(200,200,200)'; h.fillRect(x + 3, y + 3, w - 6, hh - 6);
   }
   addGrain(g, S, 10); addGrain(h, H.S, 8);
+  // v46: legno verniciato vero (venature sotto la vernice, piccole scrostature)
+  paintPhoto(g, 'paintwood', 0, 0, B, B, { mode: 'detail', strength: 0.5, contrast: 0.55, ox: 0.05 });
   const t = withNormal(c, H.c, 2.2);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
@@ -1285,11 +1301,20 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
   // v45: prato fotografico nelle zone verdi (solo il materiale vicino, con la flora)
   const grassTex = flora ? photoTexture('grass') : null;
   const grassMean = grassTex ? photoMeanLinear('grass') : null;
+  // v46: neve e sabbia fotografiche dove il terreno è bianco o color sabbia
+  const snowTex = flora ? photoTexture('snow') : null, sandTex = flora ? photoTexture('sand') : null;
+  const snowMean = snowTex ? photoMeanLinear('snow') : null, sandMean = sandTex ? photoMeanLinear('sand') : null;
+  const ss = !!(snowTex && sandTex);
   mat.onBeforeCompile = (sh) => {
     if (grassTex) {
       sh.uniforms.grassMap = { value: grassTex };
       sh.uniforms.grassMean = { value: new THREE.Vector3(...grassMean) };
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D grassMap;\nuniform vec3 grassMean;');
+    }
+    if (ss) {
+      sh.uniforms.snowMap = { value: snowTex }; sh.uniforms.sandMap = { value: sandTex };
+      sh.uniforms.snowMean = { value: new THREE.Vector3(...snowMean) }; sh.uniforms.sandMean = { value: new THREE.Vector3(...sandMean) };
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D snowMap;\nuniform sampler2D sandMap;\nuniform vec3 snowMean;\nuniform vec3 sandMean;');
     }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
@@ -1306,6 +1331,12 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
           float nearK = 1.0 - smoothstep(${near.toFixed(1)}, ${far.toFixed(1)}, dist);
           float d = mix(1.0, 0.45 + 0.95 * fine, nearK * 0.9) * mix(1.0, 0.62 + 0.75 * fine2, 0.6);
           d *= 0.72 + 0.5 * blot;
+          ${ss ? `
+          // v46: su neve e sabbia la grana della terra si attenua (ci pensano le loro foto)
+          float vMin = min(vColor.r, min(vColor.g, vColor.b)), vMax = max(vColor.r, max(vColor.g, vColor.b));
+          float snowD = smoothstep(0.62, 0.78, vMin) * smoothstep(0.2, 0.08, vMax - vMin);
+          float sandD = smoothstep(0.45, 0.6, vColor.r) * smoothstep(0.88, 0.75, vColor.g / max(vColor.r, 0.01)) * smoothstep(0.5, 0.36, vColor.b / max(vColor.r, 0.01));
+          d = mix(d, 1.0 + (d - 1.0) * 0.3, max(snowD, sandD));` : ''}
           diffuseColor.rgb *= mix(1.0, d, ${amount.toFixed(2)});
         }`)
       .replace('#include <color_fragment>', flora ? `#include <color_fragment>
@@ -1332,6 +1363,21 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
             float gk = greenK * (1.0 - smoothstep(55.0, 150.0, dist)) * 0.85;
             diffuseColor.rgb *= mix(vec3(1.0), grel, gk);
           }` : ''}
+          ${ss ? `
+          {
+            // v46: neve e sabbia fotografiche (due scale), sfumano con la distanza
+            float fade = 1.0 - smoothstep(50.0, 140.0, dist);
+            float vMin = min(vc.r, min(vc.g, vc.b)), vMax = max(vc.r, max(vc.g, vc.b));
+            float snowK = smoothstep(0.62, 0.78, vMin) * smoothstep(0.2, 0.08, vMax - vMin);
+            vec3 s1 = texture2D(snowMap, vWPos.xz * 0.27).rgb, s2 = texture2D(snowMap, vWPos.xz * 0.061 + vec2(0.21, 0.63)).rgb;
+            vec3 srel = clamp(mix(s1, s2, 0.4) / snowMean, 0.0, 1.6);
+            float sdk = smoothstep(0.45, 0.6, vc.r) * smoothstep(0.88, 0.75, vc.g / max(vc.r, 0.01)) * smoothstep(0.5, 0.36, vc.b / max(vc.r, 0.01));
+            vec3 d1 = texture2D(sandMap, vWPos.xz * 0.29).rgb, d2 = texture2D(sandMap, vWPos.xz * 0.067 + vec2(0.57, 0.19)).rgb;
+            vec3 drel = clamp(mix(d1, d2, 0.4) / sandMean, 0.0, 2.0);
+            drel = mix(vec3(dot(drel, vec3(0.333))), drel, 0.35);   // tiene il colore del terreno, prende chiaroscuro e conchiglie
+            diffuseColor.rgb *= mix(vec3(1.0), srel, snowK * fade * 0.9);
+            diffuseColor.rgb *= mix(vec3(1.0), drel, sdk * fade * 0.85);
+          }` : ''}
           // macchie un po' più gialle tra l'erba (erba secca e fiorita, come nel riferimento)
           diffuseColor.rgb *= mix(vec3(1.0), vec3(1.1, 1.04, 0.72), greenK * smoothstep(0.55, 0.85, patchF) * 0.35);
           // sabbia: increspature parallele, deformate e più marcate sui fianchi delle dune
@@ -1355,7 +1401,7 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
           normal = normalize(normal + (viewMatrix * vec4(b, 0.0)).xyz);
         }` : '#include <normal_fragment_maps>');
   };
-  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount + (bump ? 'b' : '') + (flora ? 'f36' : '') + (grassTex ? 'g45' : '');
+  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount + (bump ? 'b' : '') + (flora ? 'f36' : '') + (grassTex ? 'g45' : '') + (ss ? 's46' : '');
 }
 
 /** normal map affiancabile per l'acqua (somma di onde con frequenze intere) */

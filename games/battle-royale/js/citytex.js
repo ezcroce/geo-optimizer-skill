@@ -4,7 +4,7 @@
 //  Tutte le facciate ripetono 4 campate × 4 piani: una cella = 3 m × 3 m.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto } from './texgen.js?v=45';
+import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto } from './texgen.js?v=46';
 
 // v45: foto di base per ogni stile di muro (una ripetizione = 2 m, uguale su facciate e muri lisci)
 const WALL_PHOTO = {
@@ -12,8 +12,8 @@ const WALL_PHOTO = {
   pastel: { name: 'plaster', o: (c) => ({ tint: c, keep: 0.3, contrast: 0.65, bright: 1.08 }), hc: 0.5 },
   brick: { name: 'brick', o: (c) => ({ tint: c, keep: 0.85, contrast: 1.0, bright: 1.08 }), hc: 1.3 },
   stone: { name: 'stone', o: (c) => ({ tint: c, keep: 0.55, contrast: 1.0, bright: 1.0 }), hc: 1.5 },
-  wood: { name: 'wood', o: (c) => ({ tint: c, keep: 0.45, contrast: 1.1, bright: 1.05 }), hc: 1.2 },
-  modern: { name: 'plaster', o: (c) => ({ tint: c, keep: 0, contrast: 0.5, bright: 1.06 }), hc: 0.4 },
+  wood: { name: 'wood', o: (c) => ({ tint: c, keep: 0.45, contrast: 1.1, bright: 1.05 }), hc: 0.45 },   // v46: rilievo basso, le venature non sono buchi
+  modern: { name: 'concrete', o: (c) => ({ tint: c, keep: 0, contrast: 0.6, bright: 1.06 }), hc: 0.5 },   // v46: cemento vero
 };
 /** dipinge la foto dello stile su tutto il canvas (W×H in coordinate base, `meters` = metri coperti in larghezza) */
 function wallPhoto(style, color, g, h, W, Hh, meters) {
@@ -253,12 +253,19 @@ export function facadeTexture(style, color) {
   const key = style + color;
   if (facadeCache.has(key)) return facadeCache.get(key);
   const seed = Object.keys(FACADE_STYLES).indexOf(style) * 101 + 7;
-  const { c, g } = cv(256, 256);
+  // v46: le facciate in legno (solo 2 colori) hanno il doppio di risoluzione, così le assi della foto si leggono anche da vicino
+  const fq = style === 'wood' ? Math.min(2, TEXQ) * 2 : TEXQ;
+  const { c, g } = cv(256, 256, fq);
   let H = null;
-  if (NORMALS && !facadeNormals.has(style)) H = cv(256, 256);
+  if (NORMALS && !facadeNormals.has(style)) H = cv(256, 256, fq);
   drawFacade(style, color, g, H && H.g, rng(seed), rng(seed * 31 + parseInt(color.slice(1), 16)));
   grain(g, c, style === 'glass' ? 6 : 14);
-  if (H) { grain(H.g, H.c, 26); facadeNormals.set(style, normalFromHeight(H.c, style === 'glass' ? 1.2 : WALL_PHOTO[style] && hasPhoto(WALL_PHOTO[style].name) ? 1.0 : 2.4)); }
+  if (H) {
+    // v46: con la foto il rilievo c'è già; il rumore per pixel, ingrandito da vicino, faceva le "bolle"
+    const ph = WALL_PHOTO[style] && hasPhoto(WALL_PHOTO[style].name);
+    grain(H.g, H.c, ph ? 4 : 26);
+    facadeNormals.set(style, normalFromHeight(H.c, style === 'glass' ? 1.2 : ph ? (style === 'wood' ? 0.8 : 0.9) : 2.4));
+  }
   const t = tex(c);
   t.repeat.set(2 / (4 * BAY), 2 / (4 * FLOOR));
   if (NORMALS) { const n = facadeNormals.get(style); n.repeat.copy(t.repeat); t.userData.normal = n; }
@@ -322,7 +329,7 @@ export function plainTexture(style, color) {
   const sg = g.createLinearGradient(0, 96, 0, 128); sg.addColorStop(0, 'rgba(50,40,30,0)'); sg.addColorStop(1, 'rgba(50,40,30,0.12)');
   g.fillStyle = sg; g.fillRect(0, 96, 128, 32);
   grain(g, c, 12);
-  if (H) { grain(h, H.c, 30); plainNormals.set(style, normalFromHeight(H.c, WALL_PHOTO[style] && hasPhoto(WALL_PHOTO[style].name) ? 1.1 : 2.2)); }
+  if (H) { const ph = WALL_PHOTO[style] && hasPhoto(WALL_PHOTO[style].name); grain(h, H.c, ph ? 4 : 30); plainNormals.set(style, normalFromHeight(H.c, ph ? 1.0 : 2.2)); }
   const t = tex(c);
   if (NORMALS) t.userData.normal = plainNormals.get(style);
   plainCache.set(key, t);
@@ -429,12 +436,13 @@ export const tileTexture = () => once('tile', () => {
 export const concreteTexture = () => once('concrete', () => {
   const r = rng(61), { c, g } = cv(128, 128), H = NORMALS ? cv(128, 128) : null;
   g.fillStyle = '#a5a29b'; g.fillRect(0, 0, 128, 128);
-  if (hasPhoto('plaster')) {
-    // cemento: intonaco fotografico grigio, poco contrastato
-    paintPhoto(g, 'plaster', 0, 0, 128, 128, { tint: '#a5a29b', keep: 0, contrast: 0.7, oy: 0.3 });
+  const cname = hasPhoto('concrete') ? 'concrete' : 'plaster';
+  if (hasPhoto(cname)) {
+    // cemento fotografico (v46: foto dedicata con i forellini d'aria; prima intonaco grigio)
+    paintPhoto(g, cname, 0, 0, 128, 128, { tint: '#a5a29b', keep: 0.15, contrast: 0.85, oy: 0.3 });
     g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 0, 128, 1); g.fillRect(0, 0, 1, 128);
-    if (H) { paintPhoto(H.g, 'plaster', 0, 0, 128, 128, { mode: 'height', contrast: 1.0, oy: 0.3 }); H.g.fillStyle = gray(60); H.g.fillRect(0, 0, 128, 1.2); H.g.fillRect(0, 0, 1.2, 128); }
-    return withH(c, H, 1.3);
+    if (H) { paintPhoto(H.g, cname, 0, 0, 128, 128, { mode: 'height', contrast: 1.0, oy: 0.3 }); H.g.fillStyle = gray(60); H.g.fillRect(0, 0, 128, 1.2); H.g.fillRect(0, 0, 1.2, 128); }
+    return withH(c, H, 1.0);
   }
   mottle(g, 128, 128, 30, r, 0.1, 0.06);
   g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 0, 128, 1); g.fillRect(0, 0, 1, 128);
@@ -445,6 +453,16 @@ export const concreteTexture = () => once('concrete', () => {
 /** lamiera ondulata chiara: il colore viene dal materiale (una texture per tutti i capannoni) */
 export const corrugatedTexture = () => once('corr', () => {
   const r = rng(71), { c, g } = cv(128, 128), H = NORMALS ? cv(128, 128) : null;
+  if (hasPhoto('metal')) {
+    // v46: lamiera zincata fotografica con colature di ruggine (chiara: il colore lo dà il materiale)
+    paintPhoto(g, 'metal', 0, 0, 128, 128, { bright: 1.18, contrast: 1.0 });
+    if (H) {
+      // onde regolari (16 ogni 2 m, come la foto) + ammaccature dalla foto
+      for (let x = 0; x < 128; x += 8) { const hg = H.g.createLinearGradient(x, 0, x + 8, 0); hg.addColorStop(0, gray(50)); hg.addColorStop(0.5, gray(205)); hg.addColorStop(1, gray(50)); H.g.fillStyle = hg; H.g.fillRect(x, 0, 8, 128); }
+      paintPhoto(H.g, 'metal', 0, 0, 128, 128, { mode: 'detail', strength: 0.35, contrast: 1.0 });
+    }
+    return withH(c, H, 1.6);
+  }
   for (let x = 0; x < 128; x += 8) {
     const gr = g.createLinearGradient(x, 0, x + 8, 0);
     gr.addColorStop(0, '#b8b8b8'); gr.addColorStop(0.5, '#f4f4f4'); gr.addColorStop(1, '#a8a8a8');

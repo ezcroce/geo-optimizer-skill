@@ -91,7 +91,8 @@ export function applyAnisotropy(root, n) {
 //  Fanno da base alle texture procedurali: le tinte, le finestre e i dettagli si disegnano sopra.
 //  Se un'immagine non arriva, ogni generatore torna al disegno procedurale di prima.
 // ═════════════════════════════════════════════════════════════
-const PHOTO_LIST = ['stone', 'plaster', 'brick', 'roof', 'wood', 'cobble', 'asphalt', 'slabs', 'grass', 'dirt'];
+const PHOTO_LIST = ['stone', 'plaster', 'brick', 'roof', 'wood', 'cobble', 'asphalt', 'slabs', 'grass', 'dirt',
+  'rock', 'concrete', 'metal', 'parquet', 'snow', 'sand', 'slate', 'paintwood'];   // v46: seconda serie
 export const PHOTOS = {};
 function loadPhoto(n) {
   return new Promise(res => {
@@ -99,7 +100,7 @@ function loadPhoto(n) {
     const to = setTimeout(() => res(null), 25000);
     im.onload = () => { clearTimeout(to); res(im); };
     im.onerror = () => { clearTimeout(to); res(null); };
-    im.src = new URL(`../img/tex/${n}.jpg?v=45`, import.meta.url).href;
+    im.src = new URL(`../img/tex/${n}.jpg?v=46`, import.meta.url).href;
   });
 }
 try {

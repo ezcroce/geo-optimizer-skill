@@ -1,9 +1,20 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v45';
+export const NEWS_VERSION = 'v46';
 
 export const NEWS = [
+  {
+    v: 'v46', title: 'Ancora più foto: roccia, neve, sabbia e metallo', color: '#9fb4c7', icon: '🪨',
+    items: [
+      'Rocce e colline rocciose con la foto di vera roccia di granito, crepe e licheni, proiettata da tutti i lati così non si stira sui fianchi',
+      'Montagne e villaggi alpini: neve fotografica con la crosta e le impronte, strade innevate vere e piazze con i sampietrini che spuntano dalla neve',
+      'Spiagge, deserto e Colosseo con sabbia vera increspata dal vento',
+      'Città moderne in cemento a vista con i fori dei casseri, baracche e camion del far west in lamiera ondulata arrugginita',
+      'Dentro le case: parquet vero a spina, porte in legno verniciato scrostato; i tetti grigi e blu ora sono in ardesia vera, quelli rossi restano in coppi',
+      'Le nuove immagini pesano circa 2 MB e gli FPS restano quelli della v44',
+    ],
+  },
   {
     v: 'v45', title: 'Texture fotorealistiche', color: '#c9b48a', icon: '🧱',
     items: [

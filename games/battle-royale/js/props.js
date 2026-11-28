@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=45';
+import { normalFromHeight, NORMALS, photoTexture, photoMeanLinear } from './texgen.js?v=46';
 
 function mulberry32(a) {
   return function () {
@@ -1413,7 +1413,10 @@ export const TREE_MATS = { cactus: cactusMaterial };
 export const bushLeafMaterial = addWind(makeLeafMaterial(true), 0.3, 0.07, 'bushleaf');
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
-const stoneTex = makeStoneTexture();
+// v46: roccia fotografica (granito con licheni e muschio) campionata in triplanare; se manca, la marezzatura di prima
+const rockPhoto = photoTexture('rock');
+const rockMean = rockPhoto ? photoMeanLinear('rock') : [0.5, 0.5, 0.5];
+const stoneTex = rockPhoto || makeStoneTexture();
 // rumore 3D liscio per gli shader (hash senza seno: stabile anche con coordinate grandi)
 const GLSL_NOISE = `
   float rHash(vec3 p3) { p3 = fract(p3 * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
@@ -1433,6 +1436,7 @@ const GLSL_NOISE = `
 // vengono da rumore 3D liscio che si attenua con la distanza; venature a strati morbide, muschio e neve sulle facce in alto
 export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0.0, flatShading: true, map: stoneTex });
 rockMaterial.onBeforeCompile = (sh) => {
+  sh.uniforms.rockMean = { value: new THREE.Vector3(...rockMean) };
   sh.vertexShader = sh.vertexShader
     .replace('#include <common>', '#include <common>\nattribute vec2 aSurf;\nvarying vec3 vOP;\nvarying vec3 vON;\nvarying vec2 vSurf;')
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvOP = position; vON = normal; vSurf = aSurf;');
@@ -1441,6 +1445,7 @@ rockMaterial.onBeforeCompile = (sh) => {
         varying vec3 vOP;
         varying vec3 vON;
         varying vec2 vSurf;
+        uniform vec3 rockMean;
         float rockH;
         ${GLSL_NOISE}`)
     .replace('#include <map_fragment>', '')   // la texture si campiona in triplanare qui sotto (le UV delle rocce sono vuote)
@@ -1454,13 +1459,20 @@ rockMaterial.onBeforeCompile = (sh) => {
         // texture di pietra solo come leggera marezzatura (mip normali, niente grana)
         vec3 w = abs(nn); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z);
         vec3 tp = P * 0.35;
-        float t = texture2D(map, tp.yz).r * w.x + texture2D(map, tp.xz).r * w.y + texture2D(map, tp.xy).r * w.z;
+        ${rockPhoto ? `
+        vec3 c3 = texture2D(map, tp.yz).rgb * w.x + texture2D(map, tp.xz).rgb * w.y + texture2D(map, tp.xy).rgb * w.z;
+        vec3 rrel = clamp(c3 / rockMean, 0.0, 2.4);
+        float rl = dot(rrel, vec3(0.299, 0.587, 0.114));
+        float t = clamp(rl * 0.5, 0.0, 1.0);
+        float rNear = 1.0 - smoothstep(50.0, 180.0, length(vViewPosition));` : `
+        float t = texture2D(map, tp.yz).r * w.x + texture2D(map, tp.xz).r * w.y + texture2D(map, tp.xy).r * w.z;`}
         // strati della roccia: bande morbide e ondulate, sfumate se troppo fitte per lo schermo
         float sp = P.y * 2.2 + n1 * 5.0;
         float bandAA = 1.0 - smoothstep(0.4, 1.2, fwidth(sp));
         float strata = (0.5 + 0.5 * sin(sp)) * bandAA + 0.5 * (1.0 - bandAA);
         float tone = (1.0 + n1 * 0.36 + n2 * 0.14) * (0.94 + 0.1 * t) * (0.94 + 0.1 * strata);
         diffuseColor.rgb *= clamp(tone, 0.55, 1.2);
+        ${rockPhoto ? 'diffuseColor.rgb *= mix(vec3(1.0), mix(vec3(rl), rrel, 0.6), 0.85 * (0.45 + 0.55 * rNear));' : ''}
         // muschio (prati, boschi) e neve (montagna) sulle facce rivolte verso l'alto, con bordo irregolare
         float up = nn.y + n1 * 0.9 + n2 * 0.4;
         float moss = vSurf.y * smoothstep(0.42, 0.72, up);
@@ -1469,6 +1481,7 @@ rockMaterial.onBeforeCompile = (sh) => {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82) * (0.97 + n2 * 0.1), snow);
         diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8));            // mai bianco abbagliante
         rockH = (n1 * 0.6 + n2 * 0.4) * (1.0 - snow * 0.7);
+        ${rockPhoto ? 'rockH += (rl - 1.0) * 0.22 * rNear * (1.0 - snow * 0.8);   // crepe e spigoli della foto' : ''}
       }`)
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
@@ -1481,7 +1494,7 @@ rockMaterial.onBeforeCompile = (sh) => {
       }`)
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = 1.0;');
 };
-rockMaterial.customProgramCacheKey = () => 'rock-v22';
+rockMaterial.customProgramCacheKey = () => 'rock-v22' + (rockPhoto ? 'p46' : '');
 
 /** rilievo procedurale (bump con rumore 3D) per legno e metallo degli oggetti di scena: più tridimensionali
  *  v22: venature lisce e continue (prima l'hash dava blocchi e anelli a macchie), che si sfumano da lontano */

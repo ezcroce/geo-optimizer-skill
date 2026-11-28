@@ -9,8 +9,8 @@
 //  Qui ci sono le texture delle strade, gli oggetti instanziati (colori per vertice) e i costruttori.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts } from './props.js?v=45';
-import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto } from './texgen.js?v=45';
+import { mergeParts } from './props.js?v=46';
+import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto, photoData } from './texgen.js?v=46';
 
 const P = (geo, color, o = {}) => ({ geo, color, o });
 
@@ -86,6 +86,13 @@ export const dirtRoadTexture = () => once('dirt', () => {
 export const snowRoadTexture = () => once('snowroad', () => {
   const r = rng(311), { c, g } = cv(), H = NORMALS ? cv() : null;
   g.fillStyle = '#e4e9ef'; g.fillRect(0, 0, 128, 128);
+  if (hasPhoto('snow')) {
+    // v46: neve battuta fotografica con le impronte, un po' più grigia (strada calpestata)
+    paintPhoto(g, 'snow', 0, 0, 128, 128, { tint: '#dfe4ea', keep: 0.6, contrast: 1.3 });
+    blots(g, 14, r, ['rgba(150,160,172,0.22)', 'rgba(170,160,150,0.16)'], 8, 30);
+    if (H) paintPhoto(H.g, 'snow', 0, 0, 128, 128, { mode: 'height', contrast: 1.8 });
+    return finish(c, H, 1.2);
+  }
   blots(g, 22, r, ['rgba(150,160,172,0.35)', 'rgba(255,255,255,0.5)', 'rgba(170,160,150,0.25)'], 8, 30);
   if (H) { H.g.fillStyle = gray(140); H.g.fillRect(0, 0, 128, 128); }
   // impronte di scarponi
@@ -105,6 +112,12 @@ export const snowRoadTexture = () => once('snowroad', () => {
 export const sandRoadTexture = () => once('sand', () => {
   const r = rng(321), { c, g } = cv(), H = NORMALS ? cv() : null;
   g.fillStyle = '#dcc48e'; g.fillRect(0, 0, 128, 128);
+  if (hasPhoto('sand')) {
+    // v46: sabbia fotografica con increspature e conchiglie
+    paintPhoto(g, 'sand', 0, 0, 128, 128, { tint: '#dcc48e', keep: 0.5, contrast: 1.0, bright: 1.02 });
+    if (H) paintPhoto(H.g, 'sand', 0, 0, 128, 128, { mode: 'height', contrast: 1.5 });
+    return finish(c, H, 1.3);
+  }
   // v45: grana fotografica (terra schiarita color sabbia) sotto le increspature
   const ph = paintPhoto(g, 'dirt', 0, 0, 128, 128, { tint: '#dcc48e', keep: 0.15, contrast: 0.55, ox: 0.4 });
   if (!ph) blots(g, 18, r, ['rgba(180,150,100,0.25)', 'rgba(250,236,200,0.3)']);
@@ -155,12 +168,37 @@ export const fieldTexture = () => once('field', () => {
     if (H) { const hg = H.g.createLinearGradient(x, 0, x + 16, 0); hg.addColorStop(0, gray(40)); hg.addColorStop(0.5, gray(210)); hg.addColorStop(1, gray(40)); H.g.fillStyle = hg; H.g.fillRect(x, 0, 16, 128); }
   }
   for (let i = 0; i < 500; i++) { g.fillStyle = r() < 0.6 ? 'rgba(30,20,10,0.4)' : 'rgba(150,120,80,0.4)'; g.fillRect(r() * 128, r() * 128, 1, 1); }
+  paintPhoto(g, 'dirt', 0, 0, 128, 128, { mode: 'detail', strength: 0.7, contrast: 1.2 });   // v46: zolle e sassolini veri
   grain(g, c, 16, r);
   return finish(c, H, 2.6);
 });
 /** sampietrini con neve negli interstizi (piazzetta alpina) */
 export const snowCobbleTexture = () => once('snowcobble', () => {
   const r = rng(351), { c, g } = cv(), H = NORMALS ? cv() : null;
+  if (hasPhoto('snow') && hasPhoto('cobble')) {
+    // v46: neve fotografica con i sampietrini veri che affiorano a chiazze (bordi morbidi, affiancabile)
+    const S = c.width, k = S / 128;
+    const layer = (fn) => { const t = document.createElement('canvas'); t.width = t.height = S; const tg = t.getContext('2d', { willReadFrequently: true }); tg.setTransform(k, 0, 0, k, 0, 0); fn(tg); return t; };
+    const mask = layer(mg => {
+      for (let i = 0; i < 16; i++) {
+        const x = r() * 128, y = r() * 128, rr = 14 + r() * 26;
+        for (const ox of [-128, 0, 128]) for (const oy of [-128, 0, 128]) {
+          const gr = mg.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, rr);
+          gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.9)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+          mg.fillStyle = gr; mg.fillRect(x + ox - rr, y + oy - rr, rr * 2, rr * 2);
+        }
+      }
+    });
+    const over = (dst, name, o) => {
+      const t = layer(tg => paintPhoto(tg, name, 0, 0, 128, 128, o));
+      const tg = t.getContext('2d'); tg.setTransform(1, 0, 0, 1, 0, 0); tg.globalCompositeOperation = 'destination-in'; tg.drawImage(mask, 0, 0);
+      dst.save(); dst.setTransform(1, 0, 0, 1, 0, 0); dst.drawImage(t, 0, 0); dst.restore();
+    };
+    paintPhoto(g, 'snow', 0, 0, 128, 128, { tint: '#e8edf2', keep: 0.6, contrast: 1.1 });
+    over(g, 'cobble', { bright: 1.0 });
+    if (H) { paintPhoto(H.g, 'snow', 0, 0, 128, 128, { mode: 'height', contrast: 1.2, base: 150 }); over(H.g, 'cobble', { mode: 'height', contrast: 1.8 }); }
+    return finish(c, H, 2.0);
+  }
   g.fillStyle = '#e8edf2'; g.fillRect(0, 0, 128, 128);
   if (H) { H.g.fillStyle = gray(60); H.g.fillRect(0, 0, 128, 128); }
   const s = 8;

@@ -6,7 +6,7 @@
 //  griglia, maniglie, specchietti e targhe italiane. Tre carrozzerie: berlina, utilitaria, SUV.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=45';
+import { normalFromHeight, NORMALS } from './texgen.js?v=46';
 
 // colori di serie (metallizzati e pastello)
 export const CAR_PAINTS = ['#8f1a1a', '#1e3f73', '#e9e9e6', '#121316', '#9da3a8', '#5d6266', '#2f4a3a', '#c7b48f', '#1d6f8a', '#b8b9b4', '#6a1f2e', '#d9a21b'];

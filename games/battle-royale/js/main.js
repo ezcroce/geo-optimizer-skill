@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=45';
+import { EMOTES, poseEmote } from './emotes.js?v=46';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=45';
-import * as PR from './progress.js?v=45';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=45';
-import { initMenu } from './menu.js?v=45';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=45';
-import { initSettingsUI } from './settings-ui.js?v=45';
-import { applyAnisotropy } from './texgen.js?v=45';
-import * as A from './audio.js?v=45';
+} from './config.js?v=46';
+import * as PR from './progress.js?v=46';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=46';
+import { initMenu } from './menu.js?v=46';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=46';
+import { initSettingsUI } from './settings-ui.js?v=46';
+import { applyAnisotropy } from './texgen.js?v=46';
+import * as A from './audio.js?v=46';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=45';
+} from './world.js?v=46';
 import { createWeather } from './weather.js?v=24';
 import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=45';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=45';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=45';
-import { buildChestMesh } from './models3d.js?v=45';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=45';
-import { createInventory } from './inventory.js?v=45';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=45';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=45';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=46';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=46';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=46';
+import { buildChestMesh } from './models3d.js?v=46';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=46';
+import { createInventory } from './inventory.js?v=46';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=46';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=46';
 import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=45';
-import { buildPickaxe, heldConsumable } from './held.js?v=45';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=45';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=45';
-import { createCrosshair } from './crosshair.js?v=45';
-import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=45';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=45';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=46';
+import { buildPickaxe, heldConsumable } from './held.js?v=46';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=46';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=46';
+import { createCrosshair } from './crosshair.js?v=46';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=46';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=46';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);

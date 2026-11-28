@@ -376,6 +376,32 @@ export function getPoolWaterTexture() {
 // =========================================================
 // 2. VILLA WALLS, STONEWORK, DOORS & IRONWORK
 // =========================================================
+// Cropped from the textured half of the supplied reference, mirrored at the
+// edges for tiling. The photograph is also used as a subtle relief map.
+const masonryUrl = new URL('../assets/stone-masonry.webp', import.meta.url).href;
+let masonrySource;
+const masonryCache = new Map();
+
+export function getMasonryTextures(lengthMeters = 6, heightMeters = 2.5) {
+  const repeatX = Math.max(0.05, lengthMeters / (heightMeters * 464 / 792));
+  const key = repeatX.toFixed(3);
+  if (masonryCache.has(key)) return masonryCache.get(key);
+  if (!masonrySource) masonrySource = new THREE.TextureLoader().load(masonryUrl);
+  const map = masonrySource.clone();
+  const bumpMap = masonrySource.clone();
+  for (const texture of [map, bumpMap]) {
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(repeatX, 1);
+    texture.anisotropy = 4;
+  }
+  map.colorSpace = THREE.SRGBColorSpace;
+  bumpMap.colorSpace = THREE.NoColorSpace;
+  const result = { map, bumpMap, bumpScale: 0.12 };
+  masonryCache.set(key, result);
+  return result;
+}
+
 export function getVillaWallTextures(lengthMeters = 6, isExterior = false) {
   const rx = Math.max(1, Math.round(lengthMeters / 2.6));
 

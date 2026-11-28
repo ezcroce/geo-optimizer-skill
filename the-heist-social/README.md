@@ -16,6 +16,7 @@ Videogioco multiplayer **online e offline** di azione e deduzione sociale in tem
 - **Personaggi umanoidi 3D proporzionati (`src/graphics/humanoid.js`)**: abiti da gala personalizzabili e animazioni procedurali di camminata, corsa e interazione.
 
 ### 2. Mappa Completa: "Villa Bellavista" (`src/data/villaLayout.js` & `src/graphics/villaScene.js`)
+- **Muri in pietra**: texture WebP ricavata dalla parte testurizzata dell’immagine fornita, ripetibile e accompagnata da mappa di rilievo; inclusa anche nella versione autonoma.
 - **Interni Arredati**: Atrio d’Ingresso (con Teca Infranta e Pulsante d’Emergenza), Salone delle Feste (pianoforte a coda, divani, paraventi), Studio Privato, Sala di Controllo CCTV, Camera Padronale, Bagno di Lusso / Spa, Camera degli Ospiti, Cucina Gourmet & Sala da Pranzo, Galleria Ovest / Centrale / Est.
 - **Esterni Completi**: Giardino Frontale con Fontana e Cancello, Area Piscina illuminata & Solarium, Retro-Villa con Gazebo antico, Vialetto Orientale & Roseto.
 - **Visuale e coperture**: nebbia di guerra dinamica, con linea di vista bloccata da muri, porte bloccate, arredi alti e siepi attraversabili. Il blackout dura 12 secondi, azzera la visuale dei civili e lascia al ladro un raggio ridotto. La visibilità è applicata al rendering del client: non costituisce protezione anti-cheat.

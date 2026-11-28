@@ -17,7 +17,7 @@ import {
 import {
   getFloorTextureSet,
   getPoolWaterTexture,
-  getVillaWallTextures,
+  getMasonryTextures,
   getWoodMaterial,
   getCofferedDoorMaterial,
   getCarvedStoneMaterial,
@@ -415,12 +415,12 @@ export class VillaSceneManager {
       const cx = (seg.x1 + seg.x2) / 2;
       const cz = (seg.z1 + seg.z2) / 2;
 
-      const wallTex = getVillaWallTextures(len, seg.exterior);
+      const wallTex = getMasonryTextures(len, h);
       const mat = new THREE.MeshStandardMaterial({
         map: wallTex.map,
         bumpMap: wallTex.bumpMap,
         bumpScale: wallTex.bumpScale,
-        roughness: seg.exterior ? 0.74 : 0.62,
+        roughness: 0.9,
         transparent: true,
         opacity: 1.0,
       });

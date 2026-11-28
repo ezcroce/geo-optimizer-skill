@@ -8,8 +8,8 @@
 //  2 intonaco chiaro della chiesa, 3 marmo bianco venato.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts, makeAtlasMaterial } from './props.js?v=50';
-import { paintPhoto, photosReady } from './texgen.js?v=50';
+import { mergeParts, makeAtlasMaterial } from './props.js?v=51';
+import { paintPhoto, photosReady } from './texgen.js?v=51';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 

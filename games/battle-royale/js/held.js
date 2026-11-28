@@ -6,8 +6,8 @@
 //  il manico va lungo +Z e la lama sta nel piano YZ (vedi posePickaxe in anim.js). Consumabili in mano (heldConsumable).
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=50';
-import { buildItemMesh } from './character.js?v=50';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=51';
+import { buildItemMesh } from './character.js?v=51';
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };

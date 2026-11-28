@@ -109,18 +109,36 @@ export const PHOTOS = {};
 // v47: WebP a 512 px (il gioco non ricampiona mai oltre i 512 px); a 1024 px solo le 4 foto usate intere come
 // texture del terreno e delle rocce, e solo con la qualità texture alta. Prima: 18 JPEG da 1024 px = 5,4 MB
 const PHOTO_BIG = TEXQ >= 2 ? new Set(['rock', 'grass', 'snow', 'sand']) : new Set();
-export const photoUrl = (n) => new URL(`../img/tex/${PHOTO_BIG.has(n) ? '' : 's/'}${n}.webp?v=50`, import.meta.url).href;
+export const photoUrl = (n) => new URL(`../img/tex/${PHOTO_BIG.has(n) ? '' : 's/'}${n}.webp?v=51`, import.meta.url).href;
 export const photoProgress = { done: 0, total: PHOTO_LIST.length };
 function loadPhoto(n) {
-  return new Promise(res => {
+  // v51: la foto si scarica con fetch e diventa un'immagine locale (blob:). Su raw.githack i file possono arrivare
+  // dal CDN (rawcdn.githack.com, un altro sito): con un <img> normale il browser poi vietava di leggerne i pixel
+  // ("canvas tainted by cross-origin data") e il caricamento si fermava. Se fetch non va, <img crossorigin>.
+  const url = photoUrl(n);
+  const fromSrc = (src, cors) => new Promise((res) => {
     const im = new Image();
-    let fin = false;
-    const end = (ok) => { if (fin) return; fin = true; clearTimeout(to); photoProgress.done++; res(ok ? im : null); };
-    const to = setTimeout(() => end(false), 20000);
-    im.onload = () => end(true);
-    im.onerror = () => end(false);
-    im.src = photoUrl(n);
+    if (cors) im.crossOrigin = 'anonymous';
+    im.onload = () => res(im);
+    im.onerror = () => res(null);
+    im.src = src;
   });
+  const viaFetch = fetch(url).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then((b) => fromSrc(URL.createObjectURL(b), false))
+    .catch(() => fromSrc(url, true));
+  const timeout = new Promise((res) => setTimeout(() => res(null), 25000));
+  return Promise.race([viaFetch, timeout]).then((im) => {
+    photoProgress.done++;
+    return im && readable(im) ? im : null;   // illeggibile = texture procedurale (mai più un blocco)
+  });
+}
+/** v51: i pixel dell'immagine si possono leggere? (un'immagine "di un altro sito" farebbe fallire getImageData) */
+function readable(im) {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 1;
+    const g = c.getContext('2d', WRF); g.drawImage(im, 0, 0, 1, 1); g.getImageData(0, 0, 1, 1);
+    return true;
+  } catch (e) { console.warn('Foto non leggibile, uso la texture disegnata:', im && im.src); return false; }
 }
 /** v47: le foto si scaricano in parallelo al resto (prima un await qui bloccava tutto il gioco fino all'ultima foto);
  *  main.js le aspetta solo prima di costruire l'isola, insieme ai personaggi */
@@ -148,7 +166,8 @@ export function photoData(name, size) {
       src = t; s = t.width;
     }
     g.drawImage(src, 0, 0, size, size);
-    const px = g.getImageData(0, 0, size, size).data;
+    let px;
+    try { px = g.getImageData(0, 0, size, size).data; } catch (e) { delete PHOTOS[name]; return null; }   // v51: mai bloccare il gioco
     let r = 0, gg = 0, b = 0;
     const n = size * size;
     for (let i = 0; i < px.length; i += 4) { r += px[i]; gg += px[i + 1]; b += px[i + 2]; }
@@ -203,7 +222,9 @@ export function paintPhoto(g, name, x, y, w, h, o = {}) {
   // lato della ripetizione in pixel (anche frazionario: la foto si campiona in proporzione, così resta periodica esatta)
   const tdx = Math.max(4, (o.tile ?? w) * T.a), tdy = Math.max(4, (o.tile ?? w) * T.d);
   const S = Math.ceil(Math.max(tdx, tdy));
-  const D = photoData(name, S), s = D.px;
+  const D = photoData(name, S);
+  if (!D) return false;
+  const s = D.px;
   const img = g.getImageData(X0, Y0, W, H), d = img.data;
   const mode = o.mode || 'color', contrast = o.contrast ?? 1, bright = o.bright ?? 1, alpha = o.alpha ?? 1, keep = o.keep ?? 0.5;
   const strength = o.strength ?? 1, rot = !!o.rot;

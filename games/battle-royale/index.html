@@ -10,7 +10,7 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="stylesheet" href="site.css?v=50" />
+<link rel="stylesheet" href="site.css?v=51" />
 <script type="importmap">
   { "imports": { "three": "./vendor/three.module.js?v=20", "three/addons/": "./vendor/addons/" } }
 </script>
@@ -71,8 +71,23 @@
 <!-- ───────── TICKER ───────── -->
 <div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
 
-<!-- ───────── NOVITÀ v50 ───────── -->
+<!-- ───────── NOVITÀ v51 ───────── -->
 <section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v51</span>
+    <h2 class="h2 reveal">Trovato<br /><em>il colpevole.</em></h2>
+    <p class="lead33 reveal">Il caricamento si fermava perché il browser vietava di leggere le foto delle texture arrivate dal CDN di githack. Ora si scaricano in modo compatibile e, nel caso peggiore, il gioco usa le texture disegnate invece di bloccarsi.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🔓</div><h3>Foto sempre leggibili</h3><p>Le foto si scaricano con fetch e diventano immagini locali: niente più "canvas tainted by cross-origin data".</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🛟</div><h3>Mai più bloccato</h3><p>Se una foto non si può usare, quella texture torna al disegno procedurale e il gioco va avanti.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">💻</div><h3>Computer e telefono</h3><p>Il problema colpiva tutti i dispositivi quando githack mandava le foto dal suo CDN: ora è risolto ovunque.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">⚡</div><h3>Niente doppi download</h3><p>Il pre-caricamento delle foto usa lo stesso canale del gioco, e i telefoni non scaricano più le foto 2×.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v50 ───────── -->
+<section id="novita50" class="section news33">
   <div class="wrap">
     <span class="badge-new reveal">NOVITÀ · v50</span>
     <h2 class="h2 reveal">Si ripara<br /><em>da solo.</em></h2>
@@ -481,7 +496,7 @@
 
 <div id="toast"></div>
 
-<script type="module" src="js/site.js?v=50"></script>
-<script src="js/transition.js?v=50"></script>
+<script type="module" src="js/site.js?v=51"></script>
+<script src="js/transition.js?v=51"></script>
 </body>
 </html>

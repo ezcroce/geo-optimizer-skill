@@ -8,7 +8,7 @@
 //     inclinano quando il bacino ondeggia), salti veri nell'esultanza
 //   · azione sovrapposta: mani e testa seguono il corpo con un piccolo ritardo
 // ─────────────────────────────────────────────────────────────
-import { footContact } from './anim.js?v=50';
+import { footContact } from './anim.js?v=51';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = (x) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };

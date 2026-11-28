@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v50';
+export const NEWS_VERSION = 'v51';
 
 export const NEWS = [
+  {
+    v: 'v51', title: 'Risolto il blocco del caricamento', color: '#ff9b9b', icon: '🔓',
+    items: [
+      'Trovata la causa: quando githack mandava le foto delle texture dal suo CDN (un altro sito), il browser vietava di leggerne i pixel e il caricamento si fermava (al 15% o al 74%)',
+      'Ora le foto si scaricano con fetch e diventano immagini locali, sempre leggibili',
+      'Nel caso peggiore (foto non utilizzabile) quella texture torna al disegno procedurale: il gioco non si blocca più',
+      'Pre-caricamento delle foto senza doppi download, e sui telefoni niente foto 2× fin dall’inizio',
+      'Se la volta scorsa era partita la modalità leggera, puoi tornare alla grafica normale con il pulsante del riquadro giallo o dalle Impostazioni',
+    ],
+  },
   {
     v: 'v50', title: 'Il caricamento si ripara da solo', color: '#b9ffcf', icon: '📝',
     items: [

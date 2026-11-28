@@ -9,8 +9,8 @@
 //  Qui ci sono le texture delle strade, gli oggetti instanziati (colori per vertice) e i costruttori.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts } from './props.js?v=47';
-import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto, photoData } from './texgen.js?v=47';
+import { mergeParts } from './props.js?v=48';
+import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto, photoData } from './texgen.js?v=48';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 

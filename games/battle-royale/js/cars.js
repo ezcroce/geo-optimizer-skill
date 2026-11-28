@@ -6,7 +6,7 @@
 //  griglia, maniglie, specchietti e targhe italiane. Tre carrozzerie: berlina, utilitaria, SUV.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=47';
+import { normalFromHeight, NORMALS } from './texgen.js?v=48';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 

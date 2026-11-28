@@ -7,8 +7,8 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=47';
-import { renderIcon } from './weapons.js?v=47';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=48';
+import { renderIcon } from './weapons.js?v=48';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 

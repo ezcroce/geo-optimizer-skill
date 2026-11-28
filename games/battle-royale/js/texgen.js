@@ -8,6 +8,10 @@ const WRF = { willReadFrequently: true };
 const saved = (() => { try { return JSON.parse(localStorage.getItem('arenaRoyale') || '{}').gfx || {}; } catch { return {}; } })();
 // primo avvio su telefono/tablet: texture leggere (come il preset "Bassa" scelto in main.js)
 try { if (!localStorage.getItem('arenaRoyale') && matchMedia('(pointer: coarse)').matches && !saved.texq) saved.texq = 'low'; } catch { /* ok */ }
+// v48: su telefono/tablet "Alta" (texture 2×, ~155 MB di immagini) poteva esaurire la memoria e bloccare il caricamento:
+// si usa "Normale" (stesse foto, con rilievo, ~35 MB). Vale anche per chi aveva impostazioni salvate senza questa voce.
+export const TEXQ_CAPPED = (() => { try { return matchMedia('(pointer: coarse)').matches && (!saved.texq || saved.texq === 'high'); } catch { return false; } })();
+if (TEXQ_CAPPED) saved.texq = 'normal';
 /** qualità delle texture: 1 = normale, 2 = alta (risoluzione doppia), 0.5 = bassa */
 export const TEXQ = saved.texq === 'low' ? 0.5 : saved.texq === 'normal' ? 1 : 2;
 /** normal map attive (rilievo) */
@@ -105,7 +109,7 @@ export const PHOTOS = {};
 // v47: WebP a 512 px (il gioco non ricampiona mai oltre i 512 px); a 1024 px solo le 4 foto usate intere come
 // texture del terreno e delle rocce, e solo con la qualità texture alta. Prima: 18 JPEG da 1024 px = 5,4 MB
 const PHOTO_BIG = TEXQ >= 2 ? new Set(['rock', 'grass', 'snow', 'sand']) : new Set();
-export const photoUrl = (n) => new URL(`../img/tex/${PHOTO_BIG.has(n) ? '' : 's/'}${n}.webp?v=47`, import.meta.url).href;
+export const photoUrl = (n) => new URL(`../img/tex/${PHOTO_BIG.has(n) ? '' : 's/'}${n}.webp?v=48`, import.meta.url).href;
 export const photoProgress = { done: 0, total: PHOTO_LIST.length };
 function loadPhoto(n) {
   return new Promise(res => {

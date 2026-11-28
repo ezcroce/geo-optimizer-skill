@@ -4,12 +4,12 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=47';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=47';
-import { carInstances } from './cars.js?v=47';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=47';
-import { makeNoise, fbm, ridged } from './noise.js?v=47';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=47';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=48';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=48';
+import { carInstances } from './cars.js?v=48';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=48';
+import { makeNoise, fbm, ridged } from './noise.js?v=48';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=48';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 
@@ -243,9 +243,9 @@ function buildBiomeGrid() {
   }
 }
 /** le strade restano percorribili: tagliano le colline e scavalcano i fiumi su un argine */
-function roadCarve(x, z, h) {
+function roadCarve(x, z, h, segs = roads) {
   let best = 1e9, lin = 0;
-  for (const [a, b] of roads) {
+  for (const [a, b] of segs) {
     const vx = b.x - a.x, vz = b.z - a.z;
     const t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / (vx * vx + vz * vz)));
     const d = Math.hypot(x - a.x - vx * t, z - a.z - vz * t);
@@ -255,13 +255,18 @@ function roadCarve(x, z, h) {
   const k = (1 - smoothstep(3.5, 10, best)) * smoothstep(15, 5, Math.abs(h - lin));
   return h + (Math.max(lin, WATER_LEVEL + 1.2) - h) * k;
 }
-function buildHeightGrid() {
-  for (let j = 0; j < HN; j++) {
+function buildHeightGrid() { for (let j = 0; j < HN; j++) heightRow(j); }
+/** v48: una riga della griglia delle altezze (così il calcolo si può spezzare e fare mentre si scaricano i file) */
+function heightRow(j) {
+  {
     const z = j * HSTEP - HOFF;
+    // v48: solo le strade a meno di 10 m da questa riga possono scavare il terreno (risultato identico, molti meno conti)
+    const rowRoads = roads.filter(([a, b]) => z >= Math.min(a.z, b.z) - 11 && z <= Math.max(a.z, b.z) + 11);
+    const coastFar = Math.abs(z) < HALF * 0.6;   // la costa (e > 0.82) non può arrivare a meno di 0,6·HALF dal centro
     for (let i = 0; i < HN; i++) {
       const x = i * HSTEP - HOFF;
       let h = rawHeight(x, z, biomeAt(x, z, _bw));
-      h = roadCarve(x, z, h);
+      if (rowRoads.length) h = roadCarve(x, z, h, rowRoads);
       let inT = false;
       for (const t of TOWNS) {
         const dx = x - t.x, dz = z - t.z, R = t.r + 24;
@@ -270,7 +275,7 @@ function buildHeightGrid() {
         if (d < R) h = h + (t.h - h) * (1 - smoothstep(t.r + 5, R, d));   // v24: piano fino a r+5 (lotti esterni)
         if (d < t.r + 6) inT = true;
       }
-      const e = coastMask(x, z);
+      const e = (coastFar && Math.abs(x) < HALF * 0.6) ? 0 : coastMask(x, z);
       if (e > 0.82 && !inT) {
         h = h + (-12 - h) * smoothstep(0.82, 0.97, e);
         const isl = fbm(NZ.isl, x * 0.009, z * 0.009, 3);
@@ -282,15 +287,25 @@ function buildHeightGrid() {
 }
 
 let fieldsReady = false;
+let pendingSteps = null;   // v48: preparazione a passi ancora in corso (prewarmMap)
 function ensureFields() {
   if (fieldsReady) return;
   fieldsReady = true;
+  const steps = pendingSteps || fieldsSteps();   // se prewarmMap non ha finito, si completa qui di fila
+  pendingSteps = null;
+  for (const _ of steps) { /* tutto di fila */ }
+}
+/** v48: biomi, strade, fiumi, altezze e temi a passi (yield = punto in cui si può lasciare respirare il browser) */
+function* fieldsSteps() {
   makeNoises(MAP.seed);
   buildBiomeGrid();
+  yield;
   for (const t of TOWNS) t.h = Math.max(1.2, rawHeight(t.x, t.z, biomeAt(t.x, t.z, _bw)) + 0.5);
   roads.length = 0; buildRoads();
+  yield;
   makeRivers(mulberry32(MAP.seed ^ 0x5eed), MAP.random ? 1 + (MAP.seed % 3) : 2);
-  buildHeightGrid();
+  yield;
+  for (let j = 0; j < HN; j++) { heightRow(j); if ((j & 3) === 3) yield; }
   assignThemes(mulberry32(MAP.seed ^ 0x7e3a), MAP.random);
   for (const t of TOWNS) { if (t.arena) { t.theme = 'arena'; t.plan = null; continue; } planTown(t); t.church = null; }
   // v38: la chiesa barocca affaccia sulla piazza della città a reticolo più vicina al centro
@@ -384,7 +399,46 @@ function assignThemes(r, random) {
 
 
 /** prepara le città, le montagne, i laghi, i biomi e i fiumi per il seme indicato */
+let prewarmed = null;   // v48: chiave della mappa già preparata da prewarmMap
 function configureMap(seed, random) {
+  if (prewarmed === seed + '|' + random && fieldsReady) {
+    // biomi, strade, fiumi e altezze sono già pronti (calcolati durante i download): si azzera solo il resto
+    prewarmed = null;
+    srand = mulberry32(seed);
+    colliders.length = 0; grid.clear(); stamp = 0;
+    TALL.length = 0; tallGrid.clear();
+    return;
+  }
+  prewarmed = null; pendingSteps = null;
+  defineMap(seed, random);
+  colliders.length = 0; grid.clear(); roads.length = 0; stamp = 0;
+  TALL.length = 0; tallGrid.clear();
+  // biomi, altezze (le città stanno sopra il livello del mare), strade, fiumi e temi
+  fieldsReady = false; ensureFields();
+}
+/**
+ * v48: prepara la mappa a piccoli passi (al massimo `budget` ms per volta) mentre il gioco aspetta foto e personaggi:
+ * sul telefono la griglia delle altezze da sola teneva lo schermo fermo per molti secondi su "Costruzione dell'isola"
+ */
+export async function prewarmMap(seed = 1337, random = false, budget = 12) {
+  defineMap(seed, random);
+  roads.length = 0;
+  const steps = fieldsSteps();
+  pendingSteps = steps; fieldsReady = false;
+  for (;;) {
+    // fra un passo e l'altro i campi risultano "non pronti": chi li chiede completa il lavoro di fila (ensureFields)
+    if (pendingSteps !== steps) return;
+    fieldsReady = true;
+    const t = performance.now();
+    let done = false;
+    while (!done && performance.now() - t < budget) done = steps.next().done;
+    if (done) { pendingSteps = null; prewarmed = seed + '|' + random; return; }
+    fieldsReady = false;
+    await new Promise(r => setTimeout(r, 0));
+  }
+}
+/** città, montagne, laghi e biomi della mappa (fissa o casuale) */
+function defineMap(seed, random) {
   MAP.seed = seed; MAP.random = random;
   srand = mulberry32(seed);
   TOWNS.length = 0; MOUNTAINS.length = 0; LAKES.length = 0; BIOME_CENTERS.length = 0;
@@ -429,10 +483,6 @@ function configureMap(seed, random) {
       LAKES.push(l);
     }
   }
-  colliders.length = 0; grid.clear(); roads.length = 0; stamp = 0;
-  TALL.length = 0; tallGrid.clear();
-  // biomi, altezze (le città stanno sopra il livello del mare), strade, fiumi e temi
-  fieldsReady = false; ensureFields();
 }
 
 // ─────────────── Erba alta (ci si nasconde dentro) ───────────────

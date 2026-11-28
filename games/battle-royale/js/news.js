@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v47';
+export const NEWS_VERSION = 'v48';
 
 export const NEWS = [
+  {
+    v: 'v48', title: 'Caricamento sicuro anche dal telefono', color: '#8fd3ff', icon: '📱',
+    items: [
+      'Il caricamento non resta più fermo al 74% (“Costruzione dell’isola”): sul telefono il calcolo del terreno congelava lo schermo per molti secondi',
+      'Biomi, strade, fiumi e altezze dell’isola ora si preparano a piccoli passi mentre si scaricano personaggi e texture, così la schermata resta viva',
+      'Calcolo del terreno più veloce: le strade e la costa si considerano solo dove possono davvero cambiare il suolo (isola identica al punto)',
+      'Su telefono e tablet le texture usano la qualità Normale (stesse foto, con rilievo) invece della 2×, che occupava circa 155 MB e poteva esaurire la memoria',
+      'Sul computer la grafica resta identica alla v47',
+    ],
+  },
   {
     v: 'v47', title: 'Caricamento molto più veloce', color: '#7ee0a1', icon: '⚡',
     items: [

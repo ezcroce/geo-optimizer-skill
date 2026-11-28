@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=47';
+import { EMOTES, poseEmote } from './emotes.js?v=48';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=47';
-import * as PR from './progress.js?v=47';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=47';
-import { initMenu } from './menu.js?v=47';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=47';
-import { initSettingsUI } from './settings-ui.js?v=47';
-import { applyAnisotropy, photosReady, photoProgress } from './texgen.js?v=47';
-import * as A from './audio.js?v=47';
+} from './config.js?v=48';
+import * as PR from './progress.js?v=48';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=48';
+import { initMenu } from './menu.js?v=48';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=48';
+import { initSettingsUI } from './settings-ui.js?v=48';
+import { applyAnisotropy, photosReady, photoProgress } from './texgen.js?v=48';
+import * as A from './audio.js?v=48';
 import {
-  buildWorld, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
+  buildWorld, prewarmMap, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=47';
-import { createWeather } from './weather.js?v=47';
-import { createEvents } from './events.js?v=47';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=47';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=47';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=47';
-import { buildChestMesh } from './models3d.js?v=47';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=47';
-import { createInventory } from './inventory.js?v=47';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=47';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=47';
-import { createStoves } from './stove.js?v=47';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=47';
-import { buildPickaxe, heldConsumable } from './held.js?v=47';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=47';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=47';
-import { createCrosshair } from './crosshair.js?v=47';
-import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=47';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=47';
+} from './world.js?v=48';
+import { createWeather } from './weather.js?v=48';
+import { createEvents } from './events.js?v=48';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=48';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=48';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=48';
+import { buildChestMesh } from './models3d.js?v=48';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=48';
+import { createInventory } from './inventory.js?v=48';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=48';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=48';
+import { createStoves } from './stove.js?v=48';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=48';
+import { buildPickaxe, heldConsumable } from './held.js?v=48';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=48';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=48';
+import { createCrosshair } from './crosshair.js?v=48';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=48';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=48';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -192,15 +192,23 @@ const LD = (f, t) => { try { window.LOADING && window.LOADING.set(f, t); } catch
 const nextPaint = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
 LD(0.5, 'Caricamento dei personaggi e delle texture…');
 // v47: le foto delle texture si scaricano insieme ai personaggi (prima bloccavano l'avvio di tutto il gioco)
-let _ldDone = false;
-const _ldTick = setInterval(() => { if (!_ldDone) LD(0.5 + 0.22 * photoProgress.done / photoProgress.total, `Caricamento dei personaggi e delle texture… ${photoProgress.done}/${photoProgress.total}`); }, 200);
-const [loadedModels] = await Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/', [settings.skin]), photosReady]);   // v25/v26: personaggi realistici (quello del giocatore subito)
+// v48: intanto, a piccoli passi, si preparano biomi, strade, fiumi e altezze dell'isola (sul telefono erano molti
+// secondi di schermo fermo su "Costruzione dell'isola")
+let _ldDone = false, _filesDone = false;
+const _ldTick = setInterval(() => {
+  if (_ldDone) return;
+  if (!_filesDone) LD(0.5 + 0.2 * photoProgress.done / photoProgress.total, `Caricamento dei personaggi e delle texture… ${photoProgress.done}/${photoProgress.total}`);
+  else LD(0.72, 'Preparazione del terreno…');
+}, 200);
+const _files = Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/', [settings.skin]), photosReady]).then((r) => { _filesDone = true; return r; });   // v25/v26: personaggi realistici (quello del giocatore subito)
+const [[loadedModels]] = await Promise.all([_files, prewarmMap(1337, false)]);
 _ldDone = true; clearInterval(_ldTick);
 if (loadedModels.length) console.info('Modelli GLB caricati:', loadedModels.join(', '));
 LD(0.74, "Costruzione dell'isola…");
 await nextPaint();
 let world = buildWorld(scene, { seed: 1337, random: false });
 LD(0.93, 'Ultimi ritocchi…');
+await nextPaint();   // v48: si vede che l'isola è pronta (prima lo schermo restava fermo fino al primo fotogramma)
 let stoves = createStoves(scene, world);   // v26: stufe a legna delle casette
 /** ricostruisce l'isola (Random Map: un seme nuovo a ogni partita) */
 async function prepareWorld(seed, random) {

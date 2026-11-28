@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { updateHumanoidAnimation } from './humanoid.js';
+import { createJewelOrnament } from './jewels.js';
 import {
   ESTATE_BOUNDS,
   ROOMS,
@@ -975,7 +976,6 @@ export class VillaSceneManager {
   _buildInteractiveMarkers() {
     const pedMarble = getPolishedMarblePropMaterial();
     const cushionVelvet = getTuftedUpholsteryMaterial('#4c0519');
-    const gemColors = [0xe11d48, 0x10b981, 0x3b82f6, 0xf59e0b, 0xa855f7, 0x38bdf8];
 
     JEWELS.forEach((j, idx) => {
       const group = new THREE.Group();
@@ -988,16 +988,13 @@ export class VillaSceneManager {
       velvetPad.position.y = 0.93;
       group.add(stand, velvetPad);
 
-      const gemMat = new THREE.MeshStandardMaterial({
-        color: gemColors[idx % gemColors.length],
-        emissive: gemColors[idx % gemColors.length],
-        emissiveIntensity: 0.58,
-        roughness: 0.08,
-        metalness: 0.35,
-      });
-      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), gemMat);
-      gem.position.y = 1.18;
+      // Each treasure gets a distinct ornament, faceted material and metallic setting.
+      const gem = createJewelOrnament(j.id, idx);
+      gem.position.y = 1.20;
       group.add(gem);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.026, 8, 24),
+        new THREE.MeshStandardMaterial({ color: 0xd9aa4f, metalness: 0.75, roughness: 0.26 }));
+      rim.rotation.x = Math.PI / 2; rim.position.y = 0.96; group.add(rim);
 
       const halo = new THREE.Mesh(
         new THREE.RingGeometry(0.42, 0.52, 24),
@@ -1130,7 +1127,7 @@ export class VillaSceneManager {
       jObj.halo.visible = !stolen;
       if (!stolen) {
         jObj.gem.rotation.y = time * 1.4;
-        jObj.gem.position.y = 1.18 + Math.sin(time * 2.5 + jObj.jewel.x) * 0.05;
+        jObj.gem.position.y = 1.20 + Math.sin(time * 2.5 + jObj.jewel.x) * 0.05;
       }
       const hasActiveClue = stolen && jState.clueRemaining > 0;
       jObj.clueRing.visible = hasActiveClue;

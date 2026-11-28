@@ -310,11 +310,11 @@ export class GameSimulation {
 
     let movedX = false;
     let movedZ = false;
-    if (!this.isBlocked(player.x + ux * step, player.z)) {
+    if (Math.abs(ux) > 0.0001 && !this.isBlocked(player.x + ux * step, player.z)) {
       player.x += ux * step;
       movedX = true;
     }
-    if (!this.isBlocked(player.x, player.z + uz * step)) {
+    if (Math.abs(uz) > 0.0001 && !this.isBlocked(player.x, player.z + uz * step)) {
       player.z += uz * step;
       movedZ = true;
     }

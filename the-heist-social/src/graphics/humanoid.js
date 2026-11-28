@@ -510,6 +510,7 @@ export function createRealisticHumanoid(config, showLabel = true) {
     groundShadow,
     bodyScale,
     walkPhase: Math.random() * Math.PI * 2,
+    walkBlend: 0,
     materials: [skinMat, hairMat, jacketMat, shirtMat, trouserMat, accentMat, shoeMat, eyeMat, glintMat, blushMat],
   };
 
@@ -522,6 +523,7 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
 
   const speed = state.speed || 0;
   const moving = speed > 0.15;
+  rig.walkBlend += ((moving ? 1 : 0) - rig.walkBlend) * (1 - Math.exp(-9 * dt));
   const interacting = Boolean(state.interacting);
   const usingTablet = Boolean(state.usingCctv);
   const hidden = Boolean(state.hidden);
@@ -561,7 +563,7 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
     const cadence = Math.min(11.5, 4.8 + speed * 1.15);
     rig.walkPhase += dt * cadence;
     const p = rig.walkPhase;
-    const stride = Math.min(0.56, 0.22 + speed * 0.065);
+    const stride = Math.min(0.56, 0.22 + speed * 0.065) * rig.walkBlend;
 
     // Smooth vertical pelvis bounce (2x per stride cycle) & natural counter-rotation
     rig.pelvisPivot.position.y = (hidden ? 0.68 : 0.89) + Math.abs(Math.sin(p)) * 0.026;
@@ -596,21 +598,21 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
       rig.rightArm.elbowPivot.rotation.x = -0.22 - Math.max(0, rHip) * 0.32;
     }
 
-    rig.headPivot.rotation.y *= 0.88;
+    rig.headPivot.rotation.y *= Math.exp(-7.7 * dt);
     rig.headPivot.rotation.x = -0.02;
   } else {
     // Calm human idle breathing + subtle weight shift
     const breath = Math.sin(time * 2.1 + rig.walkPhase);
     rig.pelvisPivot.position.y = (hidden ? 0.65 : 0.89) + breath * 0.006;
-    rig.pelvisPivot.rotation.y *= 0.88;
+    rig.pelvisPivot.rotation.y *= Math.exp(-7.7 * dt);
     rig.pelvisPivot.rotation.x = hidden ? 0.22 : 0.0;
 
-    rig.leftLeg.hipPivot.rotation.x *= 0.82;
-    rig.rightLeg.hipPivot.rotation.x *= 0.82;
-    rig.leftLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.leftLeg.kneePivot.rotation.x * 0.82;
-    rig.rightLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.rightLeg.kneePivot.rotation.x * 0.82;
-    rig.leftLeg.footGroup.rotation.x *= 0.82;
-    rig.rightLeg.footGroup.rotation.x *= 0.82;
+    rig.leftLeg.hipPivot.rotation.x *= Math.exp(-12 * dt);
+    rig.rightLeg.hipPivot.rotation.x *= Math.exp(-12 * dt);
+    rig.leftLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.leftLeg.kneePivot.rotation.x * Math.exp(-12 * dt);
+    rig.rightLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.rightLeg.kneePivot.rotation.x * Math.exp(-12 * dt);
+    rig.leftLeg.footGroup.rotation.x *= Math.exp(-12 * dt);
+    rig.rightLeg.footGroup.rotation.x *= Math.exp(-12 * dt);
 
     if (interacting) {
       // Natural working / inspecting / lockpicking gesture with both hands
@@ -629,11 +631,11 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
       rig.headPivot.rotation.x = 0.24;
     } else {
       // Relaxed tailored posture
-      rig.leftArm.shoulderPivot.rotation.x *= 0.85;
+      rig.leftArm.shoulderPivot.rotation.x *= Math.exp(-9.8 * dt);
       rig.leftArm.shoulderPivot.rotation.z = -0.055 - breath * 0.01;
       rig.leftArm.elbowPivot.rotation.x = -0.14;
 
-      rig.rightArm.shoulderPivot.rotation.x *= 0.85;
+      rig.rightArm.shoulderPivot.rotation.x *= Math.exp(-9.8 * dt);
       rig.rightArm.shoulderPivot.rotation.z = 0.055 + breath * 0.01;
       rig.rightArm.elbowPivot.rotation.x = -0.14;
 

@@ -1,3 +1,4 @@
+import { drawBlueprint } from './graphics/blueprint.js';
 import { CHARACTER_PRESETS, OUTFIT_SWATCHES } from './data/characters.js';
 import {
   ESTATE_BOUNDS,
@@ -253,10 +254,12 @@ function syncAvatarMeshes(simState, dt, time) {
       avatarMeshes.set(p.id, mesh);
     }
 
-    if (playMode === 'online' && p.id !== localPlayerId) {
-      // Smooth network interpolation
-      mesh.position.x += (p.x - mesh.position.x) * Math.min(1, dt * 12);
-      mesh.position.z += (p.z - mesh.position.z) * Math.min(1, dt * 12);
+    if (playMode === 'online') {
+      // Smooth every network avatar, including the local player. Snap genuine teleports.
+      const distance = Math.hypot(p.x - mesh.position.x, p.z - mesh.position.z);
+      const blend = distance > 3 ? 1 : 1 - Math.exp(-16 * dt);
+      mesh.position.x += (p.x - mesh.position.x) * blend;
+      mesh.position.z += (p.z - mesh.position.z) * blend;
     } else {
       mesh.position.x = p.x;
       mesh.position.z = p.z;
@@ -266,7 +269,7 @@ function syncAvatarMeshes(simState, dt, time) {
     let diff = (p.rotY || 0) - mesh.rotation.y;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    mesh.rotation.y += diff * Math.min(1, dt * 14);
+    mesh.rotation.y += diff * (1 - Math.exp(-14 * dt));
 
     updateHumanoidAnimation(mesh, p, dt, time, p.id === localPlayerId);
   }
@@ -893,133 +896,6 @@ function renderSavedEvidenceSidebar() {
       row.textContent = `${l.camName}: Movimento anomalo (${l.crime})`;
       logsEl.appendChild(row);
     }
-  }
-}
-
-// =========================================================
-// ARCHITECTURAL BLUEPRINT MAP RENDERER (MINIMAP & FULL [M])
-// =========================================================
-function drawBlueprint(targetCanvas, state, me, detailed = false) {
-  const ctx = targetCanvas.getContext('2d');
-  const w = targetCanvas.width;
-  const h = targetCanvas.height;
-
-  ctx.fillStyle = '#070d19';
-  ctx.fillRect(0, 0, w, h);
-
-  const worldW = 70; // -35..+35
-  const worldD = 56; // -28..+28
-  const scale = Math.min((w - 16) / worldW, (h - 16) / worldD);
-  const cx = w / 2;
-  const cy = h / 2;
-
-  const toScreen = (wx, wz) => [cx + wx * scale, cy + wz * scale];
-
-  // Draw Rooms & Outdoor Zones
-  for (const room of ROOMS) {
-    const [x1, y1] = toScreen(room.bounds.minX, room.bounds.minZ);
-    const [x2, y2] = toScreen(room.bounds.maxX, room.bounds.maxZ);
-    ctx.fillStyle = room.indoor ? 'rgba(30, 41, 59, 0.85)' : 'rgba(20, 52, 34, 0.55)';
-    if (room.id === 'pool_area') ctx.fillStyle = 'rgba(8, 145, 178, 0.32)';
-    ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
-
-    if (detailed) {
-      const [lx, ly] = toScreen(room.labelPos.x, room.labelPos.z);
-      ctx.fillStyle = room.indoor ? 'rgba(248, 250, 252, 0.78)' : 'rgba(167, 243, 208, 0.75)';
-      ctx.font = '600 11px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(room.shortName, lx, ly);
-    }
-  }
-
-  // Draw Walls
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.78)';
-  ctx.lineWidth = detailed ? 2.4 : 1.4;
-  for (const seg of WALL_SEGMENTS) {
-    const [sx1, sy1] = toScreen(seg.x1, seg.z1);
-    const [sx2, sy2] = toScreen(seg.x2, seg.z2);
-    ctx.beginPath();
-    ctx.moveTo(sx1, sy1);
-    ctx.lineTo(sx2, sy2);
-    ctx.stroke();
-  }
-
-  // Draw Locked Doors in red
-  for (const d of DOORS) {
-    if (state.sabotage.lockedWings[d.wing] > 0) {
-      const [dx, dy] = toScreen(d.x, d.z);
-      ctx.fillStyle = '#ef4444';
-      ctx.fillRect(dx - 4, dy - 4, 8, 8);
-    }
-  }
-
-  // Draw Jewels
-  for (const j of JEWELS) {
-    if (state.jewels[j.id]?.stolen) continue;
-    const [jx, jy] = toScreen(j.x, j.z);
-    ctx.fillStyle = me?.role === 'thief' ? '#fb7185' : 'rgba(56, 189, 248, 0.55)';
-    ctx.beginPath();
-    ctx.arc(jx, jy, detailed ? 4.2 : 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Draw Civilian Tasks
-  if (me && me.role === 'civilian') {
-    for (const at of me.assignedTasks) {
-      if (at.done) continue;
-      const t = TASKS.find((x) => x.id === at.id);
-      if (!t) continue;
-      const [tx, ty] = toScreen(t.x, t.z);
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(tx, ty, detailed ? 5 : 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // Draw Thief Secret Passages & Stash Spots
-  if (me && me.role === 'thief') {
-    for (const sp of SECRET_PASSAGES) {
-      const [px, py] = toScreen(sp.x, sp.z);
-      ctx.fillStyle = '#c084fc';
-      ctx.fillRect(px - 4, py - 4, 8, 8);
-    }
-    for (const ds of DIAMOND_HIDING_SPOTS) {
-      const [dx, dy] = toScreen(ds.x, ds.z);
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(dx - 5, dy - 5, 10, 10);
-    }
-  }
-
-  // Emergency Button in Foyer
-  {
-    const [ex, ey] = toScreen(EMERGENCY_BUTTON.x, EMERGENCY_BUTTON.z);
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.arc(ex, ey, detailed ? 5.5 : 3.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // CCTV Cameras on Detailed Blueprint
-  if (detailed) {
-    for (const cam of CCTV_CAMERAS) {
-      const [cxPos, cyPos] = toScreen(cam.pos.x, cam.pos.z);
-      ctx.fillStyle = '#22d3ee';
-      ctx.fillRect(cxPos - 3.5, cyPos - 3.5, 7, 7);
-    }
-  }
-
-  // Local Player Position Pulse
-  if (me) {
-    const [mx, my] = toScreen(me.x, me.z);
-    ctx.fillStyle = '#fde047';
-    ctx.beginPath();
-    ctx.arc(mx, my, detailed ? 6.5 : 4.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
   }
 }
 
@@ -1771,6 +1647,7 @@ function triggerClueReport() {
 // =========================================================
 let lastFrameTime = performance.now();
 let footstepAccum = 0;
+let lastMapDraw = 0;
 
 function animate(now) {
   requestAnimationFrame(animate);
@@ -1878,16 +1755,18 @@ function animate(now) {
   villaScene.syncWorldState(state, me, elapsedSec);
 
   if (me) {
-    villaScene.updateCameraFollow(me.x, me.z, dt);
+    const localMesh = avatarMeshes.get(me.id);
+    villaScene.updateCameraFollow(localMesh?.position.x ?? me.x, localMesh?.position.z ?? me.z, dt);
   }
   villaScene.renderMain();
 
   // Update HUD, Minimap, Blueprint, CCTV Feed, or Meeting UI
   if (state.phase === 'playing') {
     updateHud(state, me);
-    drawBlueprint(document.getElementById('minimap-canvas'), state, me, false);
-    if (blueprintOpen) {
-      drawBlueprint(document.getElementById('blueprint-full-canvas'), state, me, true);
+    if (now - lastMapDraw >= 100) {
+      drawBlueprint(document.getElementById('minimap-canvas'), state, me, false);
+      if (blueprintOpen) drawBlueprint(document.getElementById('blueprint-full-canvas'), state, me, true);
+      lastMapDraw = now;
     }
     if (cctvOpen) {
       if (me && me.currentRoom !== 'security' && (me.cctvBattery || 0) <= 0.5) {

@@ -13,8 +13,8 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="stylesheet" href="style.css?v=49" />
-<link rel="preload" as="script" href="js/loading.js?v=49" />
+<link rel="stylesheet" href="style.css?v=50" />
+<link rel="preload" as="script" href="js/loading.js?v=50" />
 <!-- v47: foto delle texture in WebP (512 px; 1024 px solo per terreno e rocce con la qualità alta), scelte come in texgen.js -->
 <script>
 (function () {
@@ -24,7 +24,7 @@
   var big = q !== 'low' && q !== 'normal' ? ['rock', 'grass', 'snow', 'sand'] : [];
   'stone plaster brick roof wood cobble asphalt slabs grass dirt rock concrete metal parquet snow sand slate paintwood'.split(' ').forEach(function (n) {
     var l = document.createElement('link'); l.rel = 'preload'; l.as = 'image';
-    l.href = 'img/tex/' + (big.indexOf(n) >= 0 ? '' : 's/') + n + '.webp?v=49';
+    l.href = 'img/tex/' + (big.indexOf(n) >= 0 ? '' : 's/') + n + '.webp?v=50';
     document.head.appendChild(l);
   });
 })();
@@ -47,45 +47,45 @@
 })();
 </script>
 <!-- v47: tutti i moduli del gioco in parallelo (prima si scoprivano a cascata, un livello di import alla volta) -->
-<link rel="modulepreload" href="js/main.js?v=49" />
-<link rel="modulepreload" href="js/sky.js?v=49" />
+<link rel="modulepreload" href="js/main.js?v=50" />
+<link rel="modulepreload" href="js/sky.js?v=50" />
 <link rel="modulepreload" href="vendor/three.module.js?v=20" />
 <link rel="modulepreload" href="vendor/three.core.js" />
-<link rel="modulepreload" href="js/throwables.js?v=49" />
-<link rel="modulepreload" href="js/crosshair.js?v=49" />
-<link rel="modulepreload" href="js/boss.js?v=49" />
-<link rel="modulepreload" href="js/sculpt.js?v=49" />
+<link rel="modulepreload" href="js/throwables.js?v=50" />
+<link rel="modulepreload" href="js/crosshair.js?v=50" />
+<link rel="modulepreload" href="js/boss.js?v=50" />
+<link rel="modulepreload" href="js/sculpt.js?v=50" />
 <link rel="modulepreload" href="vendor/addons/utils/BufferGeometryUtils.js" />
-<link rel="modulepreload" href="js/bossfight.js?v=49" />
-<link rel="modulepreload" href="js/held.js?v=49" />
-<link rel="modulepreload" href="js/character.js?v=49" />
-<link rel="modulepreload" href="js/models3d.js?v=49" />
-<link rel="modulepreload" href="js/texgen.js?v=49" />
-<link rel="modulepreload" href="js/items.js?v=49" />
-<link rel="modulepreload" href="js/weapons.js?v=49" />
-<link rel="modulepreload" href="js/config.js?v=49" />
-<link rel="modulepreload" href="js/props.js?v=49" />
-<link rel="modulepreload" href="js/chartex.js?v=49" />
-<link rel="modulepreload" href="js/realchar.js?v=49" />
-<link rel="modulepreload" href="js/costume.js?v=49" />
+<link rel="modulepreload" href="js/bossfight.js?v=50" />
+<link rel="modulepreload" href="js/held.js?v=50" />
+<link rel="modulepreload" href="js/character.js?v=50" />
+<link rel="modulepreload" href="js/models3d.js?v=50" />
+<link rel="modulepreload" href="js/texgen.js?v=50" />
+<link rel="modulepreload" href="js/items.js?v=50" />
+<link rel="modulepreload" href="js/weapons.js?v=50" />
+<link rel="modulepreload" href="js/config.js?v=50" />
+<link rel="modulepreload" href="js/props.js?v=50" />
+<link rel="modulepreload" href="js/chartex.js?v=50" />
+<link rel="modulepreload" href="js/realchar.js?v=50" />
+<link rel="modulepreload" href="js/costume.js?v=50" />
 <link rel="modulepreload" href="vendor/addons/utils/SkeletonUtils.js" />
 <link rel="modulepreload" href="vendor/addons/loaders/GLTFLoader.js" />
-<link rel="modulepreload" href="js/anim.js?v=49" />
-<link rel="modulepreload" href="js/stove.js?v=49" />
-<link rel="modulepreload" href="js/inventory.js?v=49" />
-<link rel="modulepreload" href="js/touch.js?v=49" />
-<link rel="modulepreload" href="js/events.js?v=49" />
-<link rel="modulepreload" href="js/weather.js?v=49" />
-<link rel="modulepreload" href="js/world.js?v=49" />
-<link rel="modulepreload" href="js/noise.js?v=49" />
-<link rel="modulepreload" href="js/monuments.js?v=49" />
-<link rel="modulepreload" href="js/cars.js?v=49" />
-<link rel="modulepreload" href="js/city.js?v=49" />
-<link rel="modulepreload" href="js/townkit.js?v=49" />
-<link rel="modulepreload" href="js/citytex.js?v=49" />
-<link rel="modulepreload" href="js/audio.js?v=49" />
-<link rel="modulepreload" href="js/settings-ui.js?v=49" />
-<link rel="modulepreload" href="js/gfx.js?v=49" />
+<link rel="modulepreload" href="js/anim.js?v=50" />
+<link rel="modulepreload" href="js/stove.js?v=50" />
+<link rel="modulepreload" href="js/inventory.js?v=50" />
+<link rel="modulepreload" href="js/touch.js?v=50" />
+<link rel="modulepreload" href="js/events.js?v=50" />
+<link rel="modulepreload" href="js/weather.js?v=50" />
+<link rel="modulepreload" href="js/world.js?v=50" />
+<link rel="modulepreload" href="js/noise.js?v=50" />
+<link rel="modulepreload" href="js/monuments.js?v=50" />
+<link rel="modulepreload" href="js/cars.js?v=50" />
+<link rel="modulepreload" href="js/city.js?v=50" />
+<link rel="modulepreload" href="js/townkit.js?v=50" />
+<link rel="modulepreload" href="js/citytex.js?v=50" />
+<link rel="modulepreload" href="js/audio.js?v=50" />
+<link rel="modulepreload" href="js/settings-ui.js?v=50" />
+<link rel="modulepreload" href="js/gfx.js?v=50" />
 <link rel="modulepreload" href="vendor/addons/postprocessing/GTAOPass.js" />
 <link rel="modulepreload" href="vendor/addons/math/SimplexNoise.js" />
 <link rel="modulepreload" href="vendor/addons/shaders/CopyShader.js" />
@@ -104,11 +104,11 @@
 <link rel="modulepreload" href="vendor/addons/postprocessing/RenderPass.js" />
 <link rel="modulepreload" href="vendor/addons/postprocessing/EffectComposer.js" />
 <link rel="modulepreload" href="vendor/addons/postprocessing/MaskPass.js" />
-<link rel="modulepreload" href="js/menu.js?v=49" />
-<link rel="modulepreload" href="js/net.js?v=49" />
-<link rel="modulepreload" href="js/progress.js?v=49" />
-<link rel="modulepreload" href="js/news.js?v=49" />
-<link rel="modulepreload" href="js/emotes.js?v=49" />
+<link rel="modulepreload" href="js/menu.js?v=50" />
+<link rel="modulepreload" href="js/net.js?v=50" />
+<link rel="modulepreload" href="js/progress.js?v=50" />
+<link rel="modulepreload" href="js/news.js?v=50" />
+<link rel="modulepreload" href="js/emotes.js?v=50" />
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -398,9 +398,9 @@
 <div id="rotateHint"><div class="phone"></div><b>Ruota il telefono</b><span>Arena Royale si gioca in orizzontale</span></div>
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento del gioco…</p></div>
-<script src="js/loading.js?v=49"></script>
+<script src="js/loading.js?v=50"></script>
 
-<script type="module" src="js/main.js?v=49"></script>
-<script src="js/transition.js?v=49"></script>
+<script type="module" src="js/main.js?v=50"></script>
+<script src="js/transition.js?v=50"></script>
 </body>
 </html>

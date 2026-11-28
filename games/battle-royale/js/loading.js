@@ -93,6 +93,7 @@
   var VER = (function () { try { var sc = document.querySelector('link[href*="main.js"], script[src*="main.js"]'); var m = sc && /[?&]v=(\d+)/.exec(sc.getAttribute('href') || sc.getAttribute('src')); return m ? 'v' + m[1] : ''; } catch (e) { return ''; } })();
   var errBox = null, lastChange = 0, lastSig = '', errShown = false;
   function showProblem(title, detail) {
+    if (window.__trace) window.__trace('ERRORE: ' + title + (detail ? ' — ' + detail : ''));
     if (!el || !visible || errShown) return;
     errShown = true;
     if (!errBox) {
@@ -123,6 +124,83 @@
     errBox.querySelector('code').hidden = !detail;
     errBox.hidden = false;
   }
+  // ── v50: registro dei passi del caricamento, salvato nel browser a ogni passo ──
+  // Se il telefono si blocca del tutto (niente riquadro rosso possibile), al caricamento dopo sappiamo dove si era fermato.
+  var TK = 'arenaTrace', DIAG = /[?&]diag\b/.test(location.search);
+  var LIGHT = { preset: 'basso', scale: 0.7, shadows: 'off', texq: 'low', aniso: 1, aa: 'fxaa', bloom: false, ao: false, view: 0.75, grass: 0.4 };
+  function readJSON(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  var prevTrace = readJSON(TK), autoLight = false, prevFail = null;
+  var savedSt = readJSON('arenaRoyale') || {};
+  var curGfxLow = !!(savedSt.gfx && savedSt.gfx.texq === 'low');
+  if (prevTrace && !prevTrace.done && !prevTrace.aborted && prevTrace.steps && prevTrace.steps.length && Date.now() - prevTrace.at < 7 * 864e5) {
+    prevFail = prevTrace;
+    // l'ultima volta non è arrivato in fondo: si parte direttamente con la grafica leggera (i moduli del gioco leggono
+    // le impostazioni dopo questo script, quindi non serve ricaricare)
+    if (!curGfxLow) {
+      try { savedSt.gfx = Object.assign({}, savedSt.gfx || {}, LIGHT); localStorage.setItem('arenaRoyale', JSON.stringify(savedSt)); autoLight = true; } catch (e) { /* ok */ }
+    }
+  }
+  var trace = {
+    v: VER, at: Date.now(), steps: [], done: false, light: curGfxLow || autoLight,
+    dev: (function () { var ua = navigator.userAgent || '', m = /\(([^)]+)\)/.exec(ua), c = /(Chrome|Firefox|Version)\/\d+/.exec(ua); return ((m ? m[1] : ua).slice(0, 60) + (c ? ' · ' + c[0] : '')); })() +
+      ' · ' + (navigator.deviceMemory ? navigator.deviceMemory + ' GB' : '? GB') + ' · ' + (navigator.hardwareConcurrency || '?') + ' core · ' +
+      screen.width + '×' + screen.height + '@' + (window.devicePixelRatio || 1),
+  };
+  var traceOn = true;
+  function saveTrace() { try { localStorage.setItem(TK, JSON.stringify(trace)); } catch (e) { /* ok */ } }
+  window.__trace = function (label) {
+    if (!traceOn) return;
+    trace.steps.push([Math.round(performance.now()), String(label).slice(0, 70)]);
+    if (trace.steps.length > 160) trace.steps.splice(30, 1);
+    saveTrace();
+    if (DIAG) drawDiag();
+  };
+  window.addEventListener('pagehide', function () {
+    // chiusa o ricaricata entro i primi 15 s: non era un blocco
+    if (traceOn && !trace.done && performance.now() < 15000) { trace.aborted = true; saveTrace(); }
+  });
+  function fmtSteps(tr, n) {
+    var st = tr.steps.slice(-n);
+    return st.map(function (x) { return (x[0] / 1000).toFixed(1) + 's  ' + x[1]; }).join('\n');
+  }
+  function gpuName() {
+    try {
+      var c = document.createElement('canvas'), gl = c.getContext('webgl');
+      if (!gl) return 'WebGL non disponibile';
+      var ext = gl.getExtension('WEBGL_debug_renderer_info');
+      var r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      var lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+      return String(r).slice(0, 80);
+    } catch (e) { return '?'; }
+  }
+  var diagBox = null;
+  function drawDiag() {
+    if (!el) return;
+    if (!diagBox) { diagBox = document.createElement('pre'); diagBox.className = 'lddiag'; el.appendChild(diagBox); diagBox.textContent = ''; diagBox._gpu = gpuName(); }
+    diagBox.textContent = (VER || '') + ' · ' + trace.dev + '\nGPU: ' + diagBox._gpu + (trace.light ? '\nModalità leggera' : '') + '\n' + fmtSteps(trace, 14);
+  }
+  function showPrevFail() {
+    if (!el || !prevFail) return;
+    var last = prevFail.steps[prevFail.steps.length - 1];
+    var box = document.createElement('div');
+    box.className = 'lderr ldprev';
+    box.innerHTML = '<b></b><p></p><code></code><div class="lderrbtns"><button type="button" data-a="ok">Ok</button><button type="button" data-a="normal">Usa la grafica normale</button></div>';
+    box.querySelector('b').textContent = 'L’ultimo caricamento si è fermato a «' + last[1] + '» (dopo ' + Math.round(last[0] / 1000) + ' s)';
+    box.querySelector('p').textContent = autoLight ? 'Per questo ora parte in modalità leggera (grafica Bassa). Puoi cambiarla dalle Impostazioni.' : (prevFail.light ? 'Era già in modalità leggera.' : '');
+    box.querySelector('code').textContent = (prevFail.v || '') + ' · ' + prevFail.dev + '\nGPU: ' + gpuName() + '\n' + fmtSteps(prevFail, 6);
+    box.addEventListener('click', function (ev) {
+      var a = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-a');
+      if (a === 'ok') box.hidden = true;
+      else if (a === 'normal') {
+        try { var st = readJSON('arenaRoyale') || {}; st.gfx = Object.assign({}, st.gfx || {}, { preset: 'medio', scale: 0.85, shadows: 'low', texq: 'normal', aniso: 4, aa: 'fxaa', bloom: false, ao: false, view: 1, grass: 0.8 }); localStorage.setItem('arenaRoyale', JSON.stringify(st)); } catch (e) { /* ok */ }
+        try { localStorage.removeItem(TK); } catch (e) { /* ok */ }
+        traceOn = false;
+        location.reload();
+      }
+    });
+    el.querySelector('.ldbottom').appendChild(box);
+  }
+
   window.addEventListener('error', function (e) {
     if (!e || !e.message || /ResizeObserver/.test(e.message)) return;
     var where = e.error && e.error.stack ? String(e.error.stack).split('\n').slice(1, 3).join(' ').replace(/https?:\/\/[^\s)]*\//g, '').trim() : (e.filename ? String(e.filename).split('/').pop() + ':' + e.lineno : '');
@@ -168,6 +246,9 @@
     new MutationObserver(function () { if (el.classList.contains('hidden')) onHide(); else onShow(); })
       .observe(el, { attributes: true, attributeFilter: ['class'] });
     if (!el.classList.contains('hidden')) onShow();
+    showPrevFail();
+    window.__trace('inizio · ' + (VER || ''));
+    if (DIAG) drawDiag();
     // primo avvio: avanzamento in base ai file del gioco già arrivati
     try {
       var seen = 0, EXPECT = 70;
@@ -183,7 +264,11 @@
     set: function (f, text) {
       if (!el) return;
       if (f == null) auto = true; else { auto = false; guided = true; target = Math.max(visible ? target : 0, Math.min(1, f)); }   // v47: la barra non torna indietro
-      if (text) stage.textContent = text;
+      if (text) {
+        if (text !== stage.textContent && !/\d+\/\d+|… \d+%$/.test(text)) window.__trace(text);
+        stage.textContent = text;
+        if (/^Pronti/.test(text) && traceOn) { trace.done = true; window.__trace('PRONTO'); if (!DIAG) traceOn = false; saveTrace(); }
+      }
     },
     tips: TIPS, art: ART,
   };

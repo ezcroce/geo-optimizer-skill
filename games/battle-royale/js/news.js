@@ -1,9 +1,18 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v49';
+export const NEWS_VERSION = 'v50';
 
 export const NEWS = [
+  {
+    v: 'v50', title: 'Il caricamento si ripara da solo', color: '#b9ffcf', icon: '📝',
+    items: [
+      'Ogni fase del caricamento viene annotata nel browser: se il telefono si blocca del tutto, alla volta dopo compare dove si era fermato (con modello del telefono e scheda video)',
+      'Se l’ultimo caricamento non era arrivato in fondo, il gioco parte direttamente in modalità leggera (grafica Bassa); con “Usa la grafica normale” si torna indietro',
+      'Diagnostica: aggiungi ?diag all’indirizzo del gioco per vedere in diretta ogni passo del caricamento',
+      'Il gioco è anche su Vercel con un indirizzo fisso: dal menu ⋮ di Chrome scegli “Installa app” per averlo sulla schermata Home come un’app',
+    ],
+  },
   {
     v: 'v49', title: 'La barra di caricamento non si ferma più', color: '#ffb36b', icon: '🏝️',
     items: [

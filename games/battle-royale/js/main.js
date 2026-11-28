@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=49';
+import { EMOTES, poseEmote } from './emotes.js?v=50';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=49';
-import * as PR from './progress.js?v=49';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=49';
-import { initMenu } from './menu.js?v=49';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=49';
-import { initSettingsUI } from './settings-ui.js?v=49';
-import { applyAnisotropy, photosReady, photoProgress } from './texgen.js?v=49';
-import * as A from './audio.js?v=49';
+} from './config.js?v=50';
+import * as PR from './progress.js?v=50';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=50';
+import { initMenu } from './menu.js?v=50';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=50';
+import { initSettingsUI } from './settings-ui.js?v=50';
+import { applyAnisotropy, photosReady, photoProgress } from './texgen.js?v=50';
+import * as A from './audio.js?v=50';
 import {
   buildWorld, buildWorldAsync, prewarmMap, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=49';
-import { createWeather } from './weather.js?v=49';
-import { createEvents } from './events.js?v=49';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=49';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=49';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=49';
-import { buildChestMesh } from './models3d.js?v=49';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=49';
-import { createInventory } from './inventory.js?v=49';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=49';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=49';
-import { createStoves } from './stove.js?v=49';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=49';
-import { buildPickaxe, heldConsumable } from './held.js?v=49';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=49';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=49';
-import { createCrosshair } from './crosshair.js?v=49';
-import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=49';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=49';
+} from './world.js?v=50';
+import { createWeather } from './weather.js?v=50';
+import { createEvents } from './events.js?v=50';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=50';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=50';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=50';
+import { buildChestMesh } from './models3d.js?v=50';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=50';
+import { createInventory } from './inventory.js?v=50';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=50';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=50';
+import { createStoves } from './stove.js?v=50';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=50';
+import { buildPickaxe, heldConsumable } from './held.js?v=50';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=50';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=50';
+import { createCrosshair } from './crosshair.js?v=50';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=50';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=50';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -242,6 +242,7 @@ async function matchIntro() {
   ld.classList.add('hidden');
 }
 
+window.__trace && window.__trace('gioco: Effetti');   // v50: registro dei passi
 // ─────────────── Effetti: particelle, traccianti, flash ───────────────
 const PMAX = 500;
 const particleMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), PMAX);
@@ -374,6 +375,7 @@ function updateEffects(dt) {
   if (G.flashBlueT > 0 && (G.flashBlueT -= dt) <= 0) flashLight.color.set('#ffb050');
 }
 
+window.__trace && window.__trace('gioco: Stato di gioco');   // v50: registro dei passi
 // ─────────────── Stato di gioco ───────────────
 const G = {
   state: 'menu', paused: false, time: 0,
@@ -392,6 +394,7 @@ const JUMP_STAMINA = 7;   // v42
 const CHAR_R = 0.4, CHAR_H = 1.85;
 const BODY = [[0.45, 0.33], [0.95, 0.36], [1.35, 0.36]];
 
+window.__trace && window.__trace('gioco: Personaggi');   // v50: registro dei passi
 // ─────────────── Personaggi ───────────────
 class Character {
   constructor(name, skin, isPlayer = false, cos = null) {
@@ -457,6 +460,7 @@ class Character {
   }
 }
 
+window.__trace && window.__trace('gioco: Arrampicata');   // v50: registro dei passi
 // ─────────────── Arrampicata ───────────────
 const CLIMB_SPEED = 2.7;   // v21: arrampicata più lenta e faticosa
 const _co = new THREE.Vector3(), _cd = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
@@ -799,6 +803,7 @@ function groundMove(ch, mx, mz, speed, dt, jump) {
   if (ch.inWater) swimFx(ch, dt);
 }
 
+window.__trace && window.__trace('gioco: acqua');   // v50: registro dei passi
 // ── acqua: anelli che si allargano sulla superficie, schizzi e suoni delle bracciate ──
 const rippleGeo = new THREE.RingGeometry(0.93, 1, 32).rotateX(-Math.PI / 2);
 const ripples = [];
@@ -903,6 +908,7 @@ function airMove(ch, mx, mz, dt, deploy) {
   ch.moveAmt = Math.hypot(ch.vel.x, ch.vel.z);
 }
 
+window.__trace && window.__trace('gioco: Animazioni dei personaggi');   // v50: registro dei passi
 // ─────────────── Animazioni dei personaggi ───────────────
 // v39: i balletti (coreografie a fotogrammi chiave) stanno in emotes.js
 const easeOutBounce = x => {
@@ -1388,6 +1394,7 @@ function animateChar(ch, dt) {
 }
 
 const _airO = { run: 0, lead: 0, t: 0, push: 0 };
+window.__trace && window.__trace('gioco: Raycast su personaggi');   // v50: registro dei passi
 // ─────────────── Raycast su personaggi ───────────────
 function raySphere(o, d, cx, cy, cz, r) {
   const ox = o.x - cx, oy = o.y - cy, oz = o.z - cz;
@@ -1447,6 +1454,7 @@ function hasLOS(a, b) {
   return !rayWorld(o, d, len - 0.4);
 }
 
+window.__trace && window.__trace('gioco: Combattimento');   // v50: registro dei passi
 // ─────────────── Combattimento ───────────────
 function startReload(ch) {
   const s = ch.weapon;
@@ -1728,6 +1736,7 @@ function updateProjectiles(dt) {
     emit(pr.pos, Math.random() < 0.5 ? '#ffb040' : '#888888', 1, 0.6, 0.5, 0.18, -0.05);
   }
 }
+window.__trace && window.__trace('gioco: Proiettili balistici');   // v50: registro dei passi
 // ─────────────── Proiettili balistici: velocità, gravità e tempo di volo ───────────────
 const BULLET_G = 9.8;
 const BMAX = 900;
@@ -1985,6 +1994,7 @@ function impulseBlast(at, owner) {
     if (c.isPlayer) { touch.buzz(25); if (under) showMsg('', '🌀 Lanciato in aria!', 1.2); }
   }
 }
+window.__trace && window.__trace('gioco: anteprima della traiettoria');   // v50: registro dei passi
 // ── anteprima della traiettoria (tenendo premuto G) ──
 const TRAJ_N = 90;
 const trajGeo = new THREE.BufferGeometry();
@@ -2240,6 +2250,7 @@ function botAutoPing(b, tgt) {
   addPing('enemy', tgt.pos, b, tgt, `Nemico: ${tgt.name}`);
 }
 
+window.__trace && window.__trace('gioco: indicatore di direzione dei danni subiti');   // v50: registro dei passi
 // ── indicatore di direzione dei danni subiti (archi rossi attorno al mirino) ──
 G.dmgDirs = [];
 const dmgDirCv = document.createElement('canvas');
@@ -2286,6 +2297,7 @@ function drawDmgDirs(dt) {
   }
 }
 
+window.__trace && window.__trace('gioco: passi');   // v50: registro dei passi
 // ── passi: suono diverso per superficie, posizionato a destra/sinistra, per tutti i personaggi vicini ──
 const _cr = new THREE.Vector3();
 function surfaceUnder(ch) {
@@ -2407,6 +2419,7 @@ function structBlast(at, r, amount, src) {
   if (G.net && (src === G.player || (NET.role === 'host' && src && !src.remote && !src.human))) netSend({ t: 'sdmg', p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)], a: Math.round(amount), r: +r.toFixed(2) });
 }
 
+window.__trace && window.__trace('gioco: Costruzioni');   // v50: registro dei passi
 // ─────────────── Costruzioni: muri, pavimenti e rampe (v41) ───────────────
 const wallGeoX = new THREE.BoxGeometry(4, 3.6, 0.25);
 const floorGeo = new THREE.BoxGeometry(4, 0.22, 4);
@@ -2522,6 +2535,7 @@ function damageWall(c, dmg) {
   }
 }
 
+window.__trace && window.__trace('gioco: Consumabili');   // v50: registro dei passi
 // ─────────────── Consumabili ───────────────
 function canUse(ch, id) {
   const d = CONSUMABLES[id];
@@ -2567,6 +2581,7 @@ function updateUse(ch, dt) {
   }
 }
 
+window.__trace && window.__trace('gioco: Bottino');   // v50: registro dei passi
 // ─────────────── Bottino ───────────────
 const ringGeo = new THREE.RingGeometry(0.35, 0.5, 24).rotateX(-Math.PI / 2);
 const beamGeo = new THREE.CylinderGeometry(0.06, 0.06, 6, 6, 1, true);
@@ -2907,6 +2922,7 @@ function updateChests(dt) {
   }
 }
 
+window.__trace && window.__trace('gioco: Tempesta');   // v50: registro dei passi
 // ─────────────── Tempesta ───────────────
 const stormMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
@@ -3003,6 +3019,7 @@ function safeTarget() {
   return { x: s.tx, z: s.tz, r: s.tr };
 }
 
+window.__trace && window.__trace('gioco: Battle bus');   // v50: registro dei passi
 // ─────────────── Battle bus ───────────────
 let busMesh = null;
 function newBus(ang = Math.random() * Math.PI * 2, off = rand(-50, 50) * SCALE) {
@@ -3052,6 +3069,7 @@ function updateBus(dt) {
   for (const c of G.chars) if (c.mode === 'bus') c.pos.copy(B.pos);
 }
 
+window.__trace && window.__trace('gioco: Intelligenza artificiale dei bot');   // v50: registro dei passi
 // ─────────────── Intelligenza artificiale dei bot ───────────────
 const WEAPON_VALUE = { pistol: 1, smg: 2, shotgun: 2.4, ar: 2.7, sniper: 2.3, rocket: 2.4, revolver: 1.5, compact: 1.9, burst: 2.6, heavyar: 2.6, dmr: 2.4, tactical: 2.3, drum: 2.5, hunting: 2.1, minigun: 2.6, lmg: 2.7, doublebarrel: 2.3, handcannon: 1.7, crossbow: 2.2, grenade: 2.5, silenced: 2.1 };
 function weaponScore(s, dist) {
@@ -3612,6 +3630,7 @@ function updateBot(b, dt) {
   }
 }
 
+window.__trace && window.__trace('gioco: Input');   // v50: registro dei passi
 // ─────────────── Input ───────────────
 const keys = {};
 const pressed = new Set();
@@ -3688,6 +3707,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 document.addEventListener('pointerlockerror', () => { lockFailed = true; });
 
+window.__trace && window.__trace('gioco: Comandi touch');   // v50: registro dei passi
 // ─────────────── Comandi touch (telefono / tablet) ───────────────
 const touch = createTouch({
   G, keys, pressed, mouse, settings,
@@ -3712,6 +3732,7 @@ const touchOn = () => settings.touch === 'on' || (settings.touch !== 'off' && IS
 /** testo dei suggerimenti: tastiera o touch */
 const tk = (kb, tc) => touch.T.on ? tc : kb;
 
+window.__trace && window.__trace('gioco: Inventario');   // v50: registro dei passi
 // ─────────────── Inventario (TAB) ───────────────
 const inventory = createInventory({
   G, weaponIconHTML, consIconHTML,
@@ -3759,6 +3780,7 @@ function toggleInventory(force) {
   inventory.toggle(force);
 }
 
+window.__trace && window.__trace('gioco: Schermo intero');   // v50: registro dei passi
 // ─────────────── Schermo intero ───────────────
 const inFrame = (() => { try { return window.top !== window.self; } catch { return true; } })();
 function isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
@@ -3807,6 +3829,7 @@ function togglePause(force) {
 $('#resumeBtn').onclick = e => { e.stopPropagation(); togglePause(false); requestLock(); };
 $('#pause').addEventListener('click', e => { if (e.target.id === 'pause' || e.target.tagName === 'P' || e.target.tagName === 'H2') { togglePause(false); requestLock(); } });
 $('#quitBtn').onclick = () => { togglePause(false); toMenu(); };
+window.__trace && window.__trace('gioco: Impostazioni');   // v50: registro dei passi
 // ─────────────── Impostazioni (grafica, controlli, audio, interfaccia) ───────────────
 let fogK = 1;
 // ─────────────── v43: qualità automatica (minimo 30 FPS) ───────────────
@@ -3948,6 +3971,7 @@ function currentSpread(p) {
   return s + p.bloom;
 }
 
+window.__trace && window.__trace('gioco: porte');   // v50: registro dei passi
 // ── porte: si aprono/chiudono con E; i bot le aprono quando ci passano ──
 function updateDoors(dt) {
   for (const d of world.doors) {
@@ -4238,6 +4262,7 @@ function updateBuildHint() {
     ` · <kbd>R</kbd>/rotella cambia · Click sx: piazza (${PIECE_COST} 🪵) · <kbd>Q</kbd> esci`;
 }
 
+window.__trace && window.__trace('gioco: Telecamera');   // v50: registro dei passi
 // ─────────────── Telecamera ───────────────
 const camTarget = new THREE.Vector3(), _specUp = new THREE.Vector3();
 function updateCamera(dt) {
@@ -4348,6 +4373,7 @@ function updateCamera(dt) {
   CLIP.y.value = 1e9;
 }
 
+window.__trace && window.__trace('gioco: HUD');   // v50: registro dei passi
 // ─────────────── HUD ───────────────
 const XH = createCrosshair($('#crosshair'));   // v32: mirino dinamico
 const _xhD = new THREE.Vector3();
@@ -4793,6 +4819,7 @@ function drawBigMap() {
   if (p && (p.alive || p.mode === 'bus')) drawPlayerArrow(bmCtx, w2m(pp.x, cx, view, S), w2m(pp.z, cz, view, S), 10);
 }
 
+window.__trace && window.__trace('gioco: Partita');   // v50: registro dei passi
 // ─────────────── Partita ───────────────
 function makeBotNames(n) {
   const out = [...BOT_NAMES].sort(() => Math.random() - 0.5);
@@ -5214,6 +5241,7 @@ function endMatch(win) {
   if (win) showMsg(G.mode === 'duel' ? '⚔️ DUELLO VINTO!' : '#1 VITTORIA REALE!', '', 5);
 }
 
+window.__trace && window.__trace('gioco: Spettatore');   // v50: registro dei passi
 // ─────────────── Spettatore (v33) ───────────────
 /** dopo l'eliminazione: risultati salvati, poi si osserva chi ti ha eliminato (o il più vicino) */
 function deathToSpectate(killer) {
@@ -5304,6 +5332,7 @@ function toMenu() {
   if (menuApi) menuApi.refresh();
 }
 
+window.__trace && window.__trace('gioco: Lobby');   // v50: registro dei passi
 // ─────────────── Lobby (armadietto) ───────────────
 const lobby = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100), char: null, rot: 0.4, rotV: 0, drag: false, ring: null };
 lobby.scene.onBeforeRender = syncAllReal;
@@ -5694,6 +5723,7 @@ function buildMenu() {
   setLobbyLook(null);
 }
 
+window.__trace && window.__trace('gioco: Online');   // v50: registro dei passi
 // ─────────────── Online: sincronizzazione della partita ───────────────
 // L'host simula bot, tempesta e salute di tutti; ogni giocatore muove il proprio personaggio
 // e decide i propri colpi. Gli altri personaggi sono "marionette" mosse dai messaggi.
@@ -5927,6 +5957,7 @@ function onNetMessage(from, m) {
   } finally { G.netForce = false; }
 }
 
+window.__trace && window.__trace('gioco: Progressi durante la partita');   // v50: registro dei passi
 // ─────────────── Progressi durante la partita (missioni) ───────────────
 function progressTick(dt) {
   const p = G.player, S = G.matchStats;
@@ -5958,6 +5989,7 @@ PR.onProgress(e => {
   else if (e.type === 'level') hudToast(`⭐ Livello ${e.to} del pass raggiunto!`);
 });
 
+window.__trace && window.__trace('gioco: Ciclo principale');   // v50: registro dei passi
 // ─────────────── Ciclo principale ───────────────
 // ─────────────── v38: Gargoyle e Artigli ───────────────
 const clawFX = createClawFX(scene);

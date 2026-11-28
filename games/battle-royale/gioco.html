@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1020" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Arena Royale" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="favicon-64.png" type="image/png" sizes="64x64" />
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<title>Arena Royale 3D</title>
+<link rel="stylesheet" href="style.css?v=52" />
+<link rel="preload" as="script" href="js/loading.js?v=52" />
+<!-- v47: foto delle texture in WebP (512 px; 1024 px solo per terreno e rocce con la qualità alta), scelte come in texgen.js -->
+<script>
+(function () {
+  var g = {}, first = true;
+  try { var s = localStorage.getItem('arenaRoyale'); first = !s; g = (JSON.parse(s || '{}').gfx) || {}; } catch (e) { /* ok */ }
+  var q = g.texq; try { if (matchMedia('(pointer: coarse)').matches) { if (first && !q) q = 'low'; else if (!q || q === 'high') q = 'normal'; } } catch (e) { /* ok */ }   // come texgen.js (v48: telefoni senza 2×)
+  var big = q !== 'low' && q !== 'normal' ? ['rock', 'grass', 'snow', 'sand'] : [];
+  'stone plaster brick roof wood cobble asphalt slabs grass dirt rock concrete metal parquet snow sand slate paintwood bark sky'.split(' ').forEach(function (n) {
+    var l = document.createElement('link'); l.rel = 'preload'; l.as = 'fetch'; l.crossOrigin = 'anonymous';   // v51: come il fetch di texgen.js
+    l.href = 'img/tex/' + (big.indexOf(n) >= 0 ? '' : 's/') + n + '.webp?v=52';
+    document.head.appendChild(l);
+  });
+})();
+</script>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js?v=20", "three/addons/": "./vendor/addons/" } }
+</script>
+<!-- v47: i due modelli base dei personaggi (servono prima di costruire l'isola) -->
+<link rel="preload" as="fetch" crossorigin="anonymous" href="models/chars/soldato.glb" />
+<link rel="preload" as="fetch" crossorigin="anonymous" href="models/chars/donna.glb" />
+<script>
+// v47: e il modello della skin scelta (stessa scelta di realchar.js: alcune skin condividono il file di un'altra)
+(function () {
+  var id = 'recluta'; try { id = JSON.parse(localStorage.getItem('arenaRoyale') || '{}').skin || id; } catch (e) { /* ok */ }
+  var same = { gladiatore: 'recluta', imperatore: 'agente', arlecchino: 'agente', cuoco: 'meccanico', sommozzatrice: 'esploratrice', mummia: 'zombie' };
+  var f = same[id] || id;
+  if (' agente astro banana cavaliere cowboy cyber drago esploratrice giardiniera leo meccanico ninja oren pirata rapper recluta robot samurai scienziata spettro tamsin tattico vichingo zombie '.indexOf(' ' + f + ' ') < 0) return;
+  var l = document.createElement('link'); l.rel = 'preload'; l.as = 'fetch'; l.crossOrigin = 'anonymous'; l.href = 'models/chars/' + f + '.glb';
+  document.head.appendChild(l);
+})();
+</script>
+<!-- v47: tutti i moduli del gioco in parallelo (prima si scoprivano a cascata, un livello di import alla volta) -->
+<link rel="modulepreload" href="js/main.js?v=52" />
+<link rel="modulepreload" href="js/sky.js?v=52" />
+<link rel="modulepreload" href="vendor/three.module.js?v=20" />
+<link rel="modulepreload" href="vendor/three.core.js" />
+<link rel="modulepreload" href="js/throwables.js?v=52" />
+<link rel="modulepreload" href="js/crosshair.js?v=52" />
+<link rel="modulepreload" href="js/boss.js?v=52" />
+<link rel="modulepreload" href="js/sculpt.js?v=52" />
+<link rel="modulepreload" href="vendor/addons/utils/BufferGeometryUtils.js" />
+<link rel="modulepreload" href="js/bossfight.js?v=52" />
+<link rel="modulepreload" href="js/held.js?v=52" />
+<link rel="modulepreload" href="js/character.js?v=52" />
+<link rel="modulepreload" href="js/models3d.js?v=52" />
+<link rel="modulepreload" href="js/texgen.js?v=52" />
+<link rel="modulepreload" href="js/items.js?v=52" />
+<link rel="modulepreload" href="js/weapons.js?v=52" />
+<link rel="modulepreload" href="js/config.js?v=52" />
+<link rel="modulepreload" href="js/props.js?v=52" />
+<link rel="modulepreload" href="js/chartex.js?v=52" />
+<link rel="modulepreload" href="js/realchar.js?v=52" />
+<link rel="modulepreload" href="js/costume.js?v=52" />
+<link rel="modulepreload" href="vendor/addons/utils/SkeletonUtils.js" />
+<link rel="modulepreload" href="vendor/addons/loaders/GLTFLoader.js" />
+<link rel="modulepreload" href="js/anim.js?v=52" />
+<link rel="modulepreload" href="js/stove.js?v=52" />
+<link rel="modulepreload" href="js/inventory.js?v=52" />
+<link rel="modulepreload" href="js/touch.js?v=52" />
+<link rel="modulepreload" href="js/events.js?v=52" />
+<link rel="modulepreload" href="js/weather.js?v=52" />
+<link rel="modulepreload" href="js/world.js?v=52" />
+<link rel="modulepreload" href="js/noise.js?v=52" />
+<link rel="modulepreload" href="js/monuments.js?v=52" />
+<link rel="modulepreload" href="js/cars.js?v=52" />
+<link rel="modulepreload" href="js/city.js?v=52" />
+<link rel="modulepreload" href="js/townkit.js?v=52" />
+<link rel="modulepreload" href="js/citytex.js?v=52" />
+<link rel="modulepreload" href="js/audio.js?v=52" />
+<link rel="modulepreload" href="js/settings-ui.js?v=52" />
+<link rel="modulepreload" href="js/gfx.js?v=52" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/GTAOPass.js" />
+<link rel="modulepreload" href="vendor/addons/math/SimplexNoise.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/CopyShader.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/PoissonDenoiseShader.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/GTAOShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/Pass.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/FXAAPass.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/ShaderPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/FXAAShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/SMAAPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/SMAAShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/OutputPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/OutputShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/UnrealBloomPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/LuminosityHighPassShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/RenderPass.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/EffectComposer.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/MaskPass.js" />
+<link rel="modulepreload" href="js/menu.js?v=52" />
+<link rel="modulepreload" href="js/net.js?v=52" />
+<link rel="modulepreload" href="js/progress.js?v=52" />
+<link rel="modulepreload" href="js/news.js?v=52" />
+<link rel="modulepreload" href="js/emotes.js?v=52" />
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="pageWipe"></div>
+
+<!-- ───────── MENU / LOBBY ───────── -->
+<div id="menu" class="screen">
+  <div class="topbar">
+    <a href="index.html" class="backsite" data-transition>← Sito</a>
+    <h1 class="logo mini">ARENA<span>ROYALE 3D</span></h1>
+    <nav class="tabs" id="tabs">
+      <button data-tab="play" class="on">Gioca</button>
+      <button data-tab="locker">Armadietto<i class="dot hidden" id="lockerDot"></i></button>
+      <button data-tab="pass">Pass battaglia</button>
+      <button data-tab="shop">Negozio</button>
+      <button data-tab="missions">Missioni<i class="dot hidden" id="missionDot"></i></button>
+    </nav>
+    <div class="wallet">
+      <div class="lvl" title="Livello del pass battaglia"><b id="lvlNum">1</b><div><small>LIVELLO</small><div class="xpbar"><i id="xpFill"></i></div></div></div>
+      <div class="coins" title="Monete: si guadagnano giocando e con le missioni">🪙 <b id="coinNum">0</b></div>
+      <button id="setMenuBtn" class="gearbtn" title="Impostazioni" aria-label="Impostazioni"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.4-2.9a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
+    </div>
+  </div>
+
+  <!-- GIOCA -->
+  <div class="tabpage playpage" data-page="play">
+    <div class="menu-left">
+      <div class="panel mepanel">
+        <div class="merow">
+          <div class="avatar" id="meAvatar"></div>
+          <div class="mename"><label class="lbl" for="playerName">Il tuo nome</label><input id="playerName" maxlength="16" value="Giocatore" /></div>
+        </div>
+      </div>
+      <div class="panel modepanel">
+        <div class="ph"><span class="lbl">Squadre</span><small id="teamDesc"></small></div>
+        <div id="teamModes" class="teammodes"></div>
+        <div id="vsRow" class="vsrow hidden">
+          <button data-vs="0"><b>🤝 Squadra</b><span>Gioco con i miei amici</span></button>
+          <button data-vs="1"><b>⚔ Versus</b><span>Io contro i miei amici e i bot</span></button>
+        </div>
+        <div class="ph"><span class="lbl">Mappa</span></div>
+        <div id="modes" class="modes"></div>
+        <details id="offlineOpts" class="opts">
+          <summary><span>Opzioni partita</span><small id="optsSum"></small></summary>
+          <label class="lbl">Difficoltà dei bot</label>
+          <div id="difficulty" class="seg">
+            <button data-d="facile">Facile</button>
+            <button data-d="normale" class="on">Normale</button>
+            <button data-d="difficile">Difficile</button>
+          </div>
+          <label class="lbl">Giocatori nella partita</label>
+          <div id="players" class="seg">
+            <button data-p="25">25</button>
+            <button data-p="50">50</button>
+            <button data-p="100" class="on">100</button>
+          </div>
+        </details>
+      </div>
+      <div class="panel online" id="onlinePanel">
+        <div class="ph"><span class="lbl">🌐 Online con gli amici</span><small id="onlineBadge"></small></div>
+        <div id="onlineIdle">
+          <button id="hostBtn" class="ghost wide glow">＋ Crea una lobby e invita</button>
+          <div class="joinrow"><input id="joinCode" maxlength="5" placeholder="CODICE" autocomplete="off" spellcheck="false" /><button id="joinBtn" class="ghost">Entra</button></div>
+          <div class="hint" id="netStatus">Fino a 8 giocatori: gli altri posti sono riempiti dai bot. Per sfidare un amico scegli ⚔️ 1 contro 1.</div>
+        </div>
+        <div id="onlineLobby" class="hidden">
+          <div class="roomcode">Codice <b id="roomCode">-----</b><button id="copyCode" class="ghost tiny" title="Copia il link d'invito">⧉ link</button></div>
+          <div id="lobbyPlayers" class="lobbyplayers"></div>
+          <div id="chatLog" class="chatlog"></div>
+          <div class="joinrow"><input id="chatInput" maxlength="140" placeholder="Scrivi un messaggio…" autocomplete="off" /><button id="chatSend" class="ghost">Invia</button></div>
+          <button id="leaveBtn" class="ghost wide">Esci dalla lobby</button>
+        </div>
+      </div>
+      <div class="fsrow">
+        <button id="fsBtn" class="ghost" title="Tasto F">⛶ Schermo intero</button>
+        <label class="fsauto"><input type="checkbox" id="fsAuto" /> all'avvio</label>
+        <a id="newTab" class="ghost hidden" href="gioco.html" target="_blank" rel="noopener">↗ Apri in nuova scheda</a>
+      </div>
+      <div class="controls touchhelp">
+        <b>Comandi touch</b>
+        <div>🕹️ <b>Pollice sinistro</b>: joystick per muoverti (spingi fino in fondo per correre)</div>
+        <div>👆 <b>Trascina a destra</b> per guardarti intorno · il pulsante di fuoco si può trascinare per mirare mentre spari</div>
+        <div>🎯 Spara · Mira · Salta · Abbassati · Ricarica · Costruisci · tocca gli slot per cambiare arma</div>
+        <div>⏸ Pausa · 🗺 Mappa (o tocca la minimappa) · 😀 Balletti · ⬇ Lascia oggetto · 🎒 Inventario</div>
+      </div>
+      <div class="controls keyhelp">
+        <b>Comandi</b>
+        <div><kbd>W A S D</kbd> muoviti · <kbd>Shift</kbd> corri · <kbd>Spazio</kbd> salta / paracadute</div>
+        <div><kbd>C</kbd> abbassati (nell'erba alta sei nascosto), correndo: scivolata · <kbd>W</kbd>+<kbd>Spazio</kbd> contro un muro: arrampicati</div>
+        <div><kbd>Mouse</kbd> mira · <kbd>Click sx</kbd> spara/usa · <kbd>Click dx</kbd> mira di precisione</div>
+        <div><kbd>1-5</kbd> / <kbd>Rotella</kbd> cambia slot · <kbd>R</kbd> ricarica · <kbd>E</kbd> raccogli / apri forziere</div>
+        <div><kbd>Q</kbd> modalità costruzione (muri) · <kbd>TAB</kbd> inventario · <kbd>X</kbd> lascia oggetto · <kbd>G</kbd> (tieni premuto) lancia granata/fumogeno · <kbd>H</kbd> cambia oggetto da lancio · <kbd>Z</kbd> / <kbd>clic rotella</kbd> segnala · <kbd>M</kbd> mappa · <kbd>B</kbd> / <kbd>6</kbd>–<kbd>0</kbd> e <kbd>'</kbd> balletti · <kbd>F</kbd> schermo intero · <kbd>Esc</kbd> pausa</div>
+      </div>
+    </div>
+    <div class="play-center">
+      <div id="squadBar" class="squadbar"></div>
+      <div id="playSummary" class="playsum"></div>
+      <button id="playBtn" class="play"><span>GIOCA</span></button>
+    </div>
+    <div class="menu-right">
+      <div class="card news" id="newsBoard"></div>
+      <div class="card" id="playMissions"></div>
+      <div class="card" id="playPass"></div>
+    </div>
+  </div>
+
+  <!-- ARMADIETTO -->
+  <div class="tabpage hidden" data-page="locker">
+    <div class="menu-right wide">
+      <div class="locker-title">ARMADIETTO <span id="skinName"></span></div>
+      <div id="lockerCats" class="seg">
+        <button data-cat="skin" class="on">Skin</button>
+        <button data-cat="hat">Cappelli</button>
+        <button data-cat="back">Zaini</button>
+        <button data-cat="glider">Deltaplani</button>
+      </div>
+      <div id="skins" class="skins"></div>
+    </div>
+    <div class="lobby-zoom" id="lobbyZoom" title="Rotellina o pizzico per lo zoom, trascina in su e in giù per spostarti">
+      <button data-z="in" aria-label="Ingrandisci">+</button><input type="range" id="lobbyZoomR" min="1" max="4" step="0.01" value="1" aria-label="Zoom" /><button data-z="out" aria-label="Rimpicciolisci">−</button>
+      <button data-z="head" title="Testa">🎩</button><button data-z="body" title="Figura intera">🧍</button>
+    </div>
+  </div>
+
+  <!-- PASS BATTAGLIA -->
+  <div class="tabpage hidden" data-page="pass">
+    <div class="passhead">
+      <div class="passinfo">
+        <div class="season" id="seasonName"></div>
+        <div class="passmeta"><span id="seasonDays"></span> · <span id="passClaimed"></span></div>
+        <div class="passlvl">Livello <b id="passLvl">1</b> / 40 · <span id="passXp"></span></div>
+        <div class="passbar"><i id="passBar"></i></div>
+      </div>
+      <div class="passbtns">
+        <button id="buyTierBtn" class="ghost small">+1 livello · 150 🪙</button>
+        <button id="premiumBtn" class="play small">Pass premium · 950 🪙</button>
+      </div>
+    </div>
+    <div class="passfeat" id="passFeat"></div>
+    <div class="passtrack" id="passTrack"></div>
+    <div class="hint passhint">80 ricompense: una gratis e una premium a ogni livello. Si sbloccano da sole salendo di livello (XP da partite e missioni); dopo il 40 ogni livello bonus vale 50 monete. Gli oggetti che hai già diventano monete. Tocca un oggetto per vederlo addosso.</div>
+  </div>
+
+  <!-- NEGOZIO -->
+  <div class="tabpage hidden" data-page="shop">
+    <div class="menu-right wide">
+      <div class="locker-title">NEGOZIO <span>Nuove offerte tra <b id="shopTimer">--:--:--</b></span></div>
+      <div id="shopGrid" class="shopgrid"></div>
+      <div class="hint">Le monete si guadagnano a ogni partita (eliminazioni, piazzamento) e con le missioni settimanali.</div>
+    </div>
+  </div>
+
+  <!-- MISSIONI -->
+  <div class="tabpage hidden" data-page="missions">
+    <div class="menu-right wide">
+      <div class="locker-title">MISSIONI <span>Completale per salire di livello nel pass</span></div>
+      <div id="missionList" class="missionlist"></div>
+    </div>
+  </div>
+  <div id="menuToast" class="menutoast hidden"></div>
+</div>
+
+<!-- ───────── HUD ───────── -->
+<div id="newsModal" class="screen hidden"><div class="newsbox"><div class="newshead"><b>📰 NOVITÀ</b><span>Gli ultimi aggiornamenti di Arena Royale 3D</span><button id="newsClose" class="ghost tiny" aria-label="Chiudi">✕</button></div><div id="newsList" class="newslist"></div></div></div>
+
+<div id="hud" class="hidden">
+  <div id="killfeed"></div>
+  <div id="teamHud" class="hidden"></div>
+  <div id="mateTags"></div>
+  <div id="topinfo">
+    <div class="pill"><span class="ico">👤</span><b id="aliveCount">0</b> vivi</div>
+    <div class="pill"><span class="ico">💀</span><b id="killCount">0</b> uccisioni</div>
+    <div class="pill storm" id="stormInfo">⛈ La tempesta arriva…</div>
+  </div>
+  <div id="eventBar" style="display:none"></div>
+  <div id="minimapWrap"><canvas id="minimap" width="200" height="200"></canvas><div id="poiName"></div></div>
+
+  <div id="crosshair"></div>
+  <div id="sight" class="hidden" data-s="reddot"><div class="o"></div><div class="x"></div><div class="r"></div><div class="name"></div></div>
+  <div id="rangeInfo"></div>
+  <div id="hitmarker"></div>
+  <div id="centerMsg"></div>
+  <div id="subMsg"></div>
+  <div id="prompt"></div>
+  <div id="progress" class="hidden"><div class="bar"><i id="progressFill"></i></div><span id="progressText"></span></div>
+
+  <div id="vitals">
+    <div class="vrow stamina" id="staminaRow"><div class="vbar st"><i id="staminaFill"></i></div><b>🧗</b></div>
+    <div id="crouchBadge">⬇ ACCOVACCIATO</div>
+    <div id="hiddenBadge">🌾 NASCOSTO NELL'ERBA</div>
+    <div class="vrow"><div class="vbar shield"><i id="shieldFill"></i></div><b id="shieldText">0</b></div>
+    <div class="vrow"><div class="vbar hp"><i id="hpFill"></i></div><b id="hpText">100</b></div>
+  </div>
+  <div id="hotbar"></div>
+  <div id="ammoInfo">
+    <div id="magText"></div>
+    <div id="reserves"></div>
+    <div id="mats">🪵 <b id="matsText">0</b></div>
+  </div>
+  <div id="buildHint" class="hidden">MODALITÀ COSTRUZIONE · Click sx: muro (10 🪵) · Q per uscire</div>
+  <div id="damageLayer"></div>
+  <div id="pingLayer"></div>
+  <div id="throwHud" class="hidden" title="G: tieni premuto per mirare, rilascia per lanciare · H: cambia"><i></i><b></b><small></small><kbd>G</kbd></div>
+  <div id="toasts"></div>
+  <div id="netInfo" class="hidden"></div>
+</div>
+<div id="spectate" class="hidden">
+  <div class="spec-tag">👁 MODALITÀ SPETTATORE</div>
+  <div class="spec-bar">
+    <button id="specPrev" title="Giocatore precedente (← / A)">‹</button>
+    <div class="spec-mid"><div id="specName"></div><div id="specInfo"></div></div>
+    <button id="specNext" title="Giocatore successivo (→ / D / Spazio)">›</button>
+  </div>
+  <div class="spec-btns">
+    <button id="specKill" class="ghost">🎯 Chi mi ha eliminato <kbd>K</kbd></button>
+    <button id="specExit" class="ghost">📊 Risultati <kbd>Esc</kbd></button>
+    <button id="specMenu" class="ghost">🏠 Lobby</button>
+  </div>
+  <div class="spec-hint">Trascina il mouse per girare la visuale · ← → cambia giocatore</div>
+</div>
+<div id="smokeVeil"></div>
+<div id="lowVig"></div>
+<div id="vignette"></div>
+<div id="stormTint"></div>
+<div id="scope" class="hidden" data-s="scope"><div class="ring"><div class="ret"></div></div><div class="mag"></div></div>
+
+<div id="bigmap" class="screen hidden">
+  <div class="bigmap-box"><canvas id="bigmapCanvas" width="640" height="640"></canvas>
+    <div class="bm-tools"><button id="bmIn" title="Ingrandisci (+)">+</button><span id="bmZoom">1×</span><button id="bmOut" title="Rimpicciolisci (−)">−</button><button id="bmCenter" title="Centra su di me">◎</button><button id="bmClose" title="Chiudi (M)">✕</button></div>
+    <div class="hint">Rotellina o <kbd>+</kbd> <kbd>−</kbd>: zoom · trascina per spostarti · <kbd>M</kbd> chiudi</div></div>
+</div>
+
+<div id="inventory" class="screen hidden">
+  <div class="invbox">
+    <div class="invhead">
+      <h2>INVENTARIO</h2>
+      <div id="invBars"></div>
+      <span class="invhint"><kbd>WASD</kbd> muoviti · <kbd>TAB</kbd> / <kbd>Esc</kbd> chiudi</span>
+      <button class="ghost tiny" data-a="close" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="invmain">
+      <div class="invleft">
+        <div id="invSlots"></div>
+        <div id="invDrop">⤓ Trascina qui per gettare a terra</div>
+        <div id="invDetail"></div>
+      </div>
+      <div id="invAmmo"></div>
+    </div>
+    <div class="invtips">Trascina gli oggetti per riordinarli · seleziona e premi <kbd>1</kbd>–<kbd>5</kbd> per spostarli · <kbd>E</kbd> o doppio clic impugna · <kbd>X</kbd> getta</div>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="box">
+    <h2>PAUSA</h2>
+    <p>Clicca per riprendere</p>
+    <button id="resumeBtn" class="play small">RIPRENDI</button>
+    <button id="setPauseBtn" class="ghost">⚙ Impostazioni</button>
+    <button id="fsPauseBtn" class="ghost">⛶ Schermo intero</button>
+    <button id="quitBtn" class="ghost">Torna al menu</button>
+  </div>
+</div>
+
+<div id="settings" class="screen hidden">
+  <div class="setbox">
+    <div class="sethead"><h2>IMPOSTAZIONI</h2><button id="setClose" class="ghost tiny" aria-label="Chiudi">✕</button></div>
+    <nav class="settabs" id="setTabs"></nav>
+    <div class="setbody" id="setBody"></div>
+    <div class="setfoot"><span id="setNote"></span><button id="setReset" class="ghost">Ripristina</button><button id="setDone" class="play small">FATTO</button></div>
+  </div>
+</div>
+<div id="fps" class="hidden"></div>
+
+<div id="end" class="screen hidden">
+  <div class="box">
+    <div id="endPlace"></div>
+    <h2 id="endTitle"></h2>
+    <p id="endSub"></p>
+    <div class="stats" id="endStats"></div>
+    <div id="endXp" class="endxp"></div>
+    <button id="againBtn" class="play small">GIOCA ANCORA</button>
+    <button id="specBtn" class="ghost hidden">👁 Continua a guardare</button>
+    <button id="menuBtn" class="ghost">Torna alla lobby</button>
+  </div>
+</div>
+
+<div id="rotateHint"><div class="phone"></div><b>Ruota il telefono</b><span>Arena Royale si gioca in orizzontale</span></div>
+
+<div id="loading" class="screen"><div class="spinner"></div><p>Caricamento del gioco…</p></div>
+<script src="js/loading.js?v=52"></script>
+
+<script type="module" src="js/main.js?v=52"></script>
+<script src="js/transition.js?v=52"></script>
+</body>
+</html>

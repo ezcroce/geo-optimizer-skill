@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Arena Royale 3D — Il battle royale nel tuo browser</title>
+<meta name="description" content="Arena Royale 3D: battle royale gratuito nel browser. Salta dal bus, raccogli armi, costruisci, abbassati, arrampicati e resta l'ultimo in piedi." />
+<meta name="theme-color" content="#0b1020" />
+<link rel="icon" href="favicon-64.png" type="image/png" sizes="64x64" />
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="stylesheet" href="site.css?v=52" />
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js?v=20", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<div id="pageWipe"></div>
+<div id="scrollBar"></div>
+
+<!-- ───────── NAV ───────── -->
+<header id="nav">
+  <a href="#top" class="brand">ARENA<span>ROYALE</span><small>3D</small></a>
+  <nav>
+    <a href="#novita">Novità</a>
+    <a href="#caratteristiche">Caratteristiche</a>
+    <a href="#movimento">Movimento</a>
+    <a href="#armi">Armi</a>
+    <a href="#skin">Skin</a>
+    <a href="#comandi">Comandi</a>
+  </nav>
+  <a href="gioco.html" class="btn btn-play sm" data-transition>GIOCA</a>
+</header>
+
+<!-- ───────── HERO ───────── -->
+<section id="top" class="hero">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-text">
+    <p class="eyebrow reveal">🎮 Gratis · Nel browser · Nessun download</p>
+    <h1 class="title" aria-label="Arena Royale">
+      <span class="line l1" data-split>ARENA</span>
+      <span class="line l2" data-split>ROYALE</span>
+    </h1>
+    <p class="lead reveal" style="--d:.5s">Salta dal bus, plana sull'isola, raccogli il bottino migliore, abbassati dietro ai ripari e <b>arrampicati sui tetti</b>.
+      Novantanove avversari, una tempesta che si stringe e una sola Vittoria Reale.</p>
+    <div class="cta reveal" style="--d:.65s">
+      <a href="gioco.html" class="btn btn-play" data-transition><span>▶ GIOCA ORA</span></a>
+      <a href="#novita" class="btn btn-ghost">Scopri le novità</a>
+    </div>
+    <div class="stats reveal" style="--d:.8s">
+      <div><b data-count="100">0</b><span>giocatori</span></div>
+      <div><b data-count="22">0</b><span>armi</span></div>
+      <div><b data-count="30">0</b><span>skin</span></div>
+      <div><b data-count="18">0</b><span>città</span></div>
+    </div>
+  </div>
+  <div class="hero-stage">
+    <canvas id="heroCanvas"></canvas>
+    <div class="stage-ui">
+      <button class="arrow prev" aria-label="Skin precedente">‹</button>
+      <div class="skin-label"><span class="rar" id="heroRar">Comune</span><b id="heroName">Recluta</b></div>
+      <button class="arrow next" aria-label="Skin successiva">›</button>
+    </div>
+    <div class="dots" id="heroDots"></div>
+  </div>
+  <a href="#caratteristiche" class="scroll-hint" aria-label="Scorri"><i></i></a>
+</section>
+
+<!-- ───────── TICKER ───────── -->
+<div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
+
+<!-- ───────── NOVITÀ v52 ───────── -->
+<section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v52</span>
+    <h2 class="h2 reveal">Un cielo vero,<br /><em>pietre vere.</em></h2>
+    <p class="lead33 reveal">Il cielo ora è una foto con nuvole vere, e rocce, silo e alberi secchi hanno texture fotografiche realistiche, come un muro di pietra vero invece di un modello grigio.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🌤️</div><h3>Cielo fotografico</h3><p>Nuvole e azzurro da una foto panoramica, con il chiarore allineato al sole del gioco.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🪨</div><h3>Rocce di pietra</h3><p>Nuova foto di pietra con muschio: forme grandi e sfumate, niente più grana a puntini.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🏭</div><h3>Silo in lamiera</h3><p>Lamiera ondulata con ruggine avvolta sul silo, cupola a costoloni: spariti i quadretti scuri.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🌳</div><h3>Corteccia vera</h3><p>Alberi secchi con corteccia fotografica grigio-bruna, non più neri e a righe lucide.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v51 ───────── -->
+<section id="novita51" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v51</span>
+    <h2 class="h2 reveal">Trovato<br /><em>il colpevole.</em></h2>
+    <p class="lead33 reveal">Il caricamento si fermava perché il browser vietava di leggere le foto delle texture arrivate dal CDN di githack. Ora si scaricano in modo compatibile e, nel caso peggiore, il gioco usa le texture disegnate invece di bloccarsi.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🔓</div><h3>Foto sempre leggibili</h3><p>Le foto si scaricano con fetch e diventano immagini locali: niente più "canvas tainted by cross-origin data".</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🛟</div><h3>Mai più bloccato</h3><p>Se una foto non si può usare, quella texture torna al disegno procedurale e il gioco va avanti.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">💻</div><h3>Computer e telefono</h3><p>Il problema colpiva tutti i dispositivi quando githack mandava le foto dal suo CDN: ora è risolto ovunque.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">⚡</div><h3>Niente doppi download</h3><p>Il pre-caricamento delle foto usa lo stesso canale del gioco, e i telefoni non scaricano più le foto 2×.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v50 ───────── -->
+<section id="novita50" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v50</span>
+    <h2 class="h2 reveal">Si ripara<br /><em>da solo.</em></h2>
+    <p class="lead33 reveal">Se il telefono si blocca durante il caricamento, alla volta dopo il gioco sa dove si era fermato, lo mostra e riparte da solo in modalità leggera.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">📝</div><h3>Registro dei passi</h3><p>Ogni fase del caricamento viene annotata nel browser: funziona anche se il telefono si blocca del tutto.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🪶</div><h3>Riparte leggero</h3><p>Se l'ultimo caricamento non era arrivato in fondo, il gioco parte direttamente con la grafica Bassa.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🔎</div><h3>Diagnostica</h3><p>Aggiungi ?diag all'indirizzo per vedere in diretta ogni passo, il telefono e la scheda video.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">📲</div><h3>Come un'app</h3><p>Dal sito su Vercel: menu ⋮ di Chrome → "Installa app" e Arena Royale si apre a schermo intero dalla schermata Home.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v49 ───────── -->
+<section id="novita49" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v49</span>
+    <h2 class="h2 reveal">La barra<br /><em>non si ferma più.</em></h2>
+    <p class="lead33 reveal">L'isola si costruisce a pezzi e la barra continua ad avanzare anche sui telefoni più lenti. Se qualcosa va storto, lo vedi subito e riparti con un tocco.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🏝️</div><h3>Isola a pezzi</h3><p>Città, alberi, rocce, case e acqua si costruiscono una sezione alla volta: la schermata resta viva e mostra la percentuale.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🩺</div><h3>Errori visibili</h3><p>Se il caricamento si inceppa compare un riquadro con il motivo, la fase e la versione: basta una foto per capire cosa è successo.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🪶</div><h3>Modalità leggera</h3><p>Un tocco su "Riprova in modalità leggera" ricarica il gioco con la grafica Bassa, ideale per i telefoni con poca memoria.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🏷️</div><h3>Versione in vista</h3><p>La schermata di caricamento mostra la versione del gioco: così sai subito se stai aprendo il link giusto.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v48 ───────── -->
+<section id="novita48" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v48</span>
+    <h2 class="h2 reveal">Dal telefono,<br /><em>senza blocchi.</em></h2>
+    <p class="lead33 reveal">Niente più schermata ferma al 74%: l'isola si prepara mentre il gioco scarica i file e i telefoni usano texture adatte alla loro memoria.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">📱</div><h3>Niente più 74%</h3><p>Il terreno dell'isola si calcola a piccoli passi durante i download, invece di congelare lo schermo per tanti secondi.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">⛰️</div><h3>Terreno più rapido</h3><p>Strade e costa si calcolano solo dove servono davvero: l'isola è identica, al punto.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🧠</div><h3>Memoria sotto controllo</h3><p>Su telefono e tablet le texture usano la qualità Normale (stesse foto, con rilievo) invece della 2×, che poteva esaurire la memoria.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🖥️</div><h3>Computer invariato</h3><p>Sul computer cambia solo la velocità: la grafica resta quella di prima.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v47 ───────── -->
+<section id="novita47" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v47</span>
+    <h2 class="h2 reveal">Si parte prima,<br /><em>molto prima.</em></h2>
+    <p class="lead33 reveal">Basta attese ferme al 92%: il gioco scarica meno della metà dei dati, tutto in parallelo, e la grafica resta identica.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">⚡</div><h3>Niente più blocchi</h3><p>Le foto delle texture arrivano insieme al resto invece di fermare l'avvio fino all'ultima immagine.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">📦</div><h3>7 MB invece di 16</h3><p>Texture WebP alla risoluzione che serve davvero, personaggi senza animazioni inutili, three.js compresso.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🚀</div><h3>Tutto in parallelo</h3><p>I file partono subito tutti insieme e la schermata con l'illustrazione appare in un attimo.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🧮</div><h3>Texture più rapide</h3><p>Normal map e foto si elaborano senza passare avanti e indietro dalla scheda video.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v46 ───────── -->
+<section id="novita46" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v46</span>
+    <h2 class="h2 reveal">Roccia, neve e sabbia,<br /><em>tutto fotografato.</em></h2>
+    <p class="lead33 reveal">Le ultime superfici disegnate passano alle foto: montagne, spiagge, città moderne e interni ora hanno lo stesso realismo dei borghi in pietra.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🪨</div><h3>Rocce vere</h3><p>Granito con crepe e licheni su massi e colline rocciose, proiettato da ogni lato per non stirarsi.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">❄️</div><h3>Neve e sabbia</h3><p>Neve con la crosta sulle montagne e nei villaggi alpini, sabbia increspata su spiagge, deserto e Colosseo.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🏗️</div><h3>Cemento e lamiera</h3><p>Città moderne in cemento a vista, baracche e camion del far west in lamiera ondulata arrugginita.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🚪</div><h3>Interni e tetti</h3><p>Parquet vero, porte in legno verniciato scrostato e tetti grigi in ardesia.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v45 ───────── -->
+<section id="novita45" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v45</span>
+    <h2 class="h2 reveal">Pietra vera,<br /><em>muschio compreso.</em></h2>
+    <p class="lead33 reveal">Le superfici disegnate a mano lasciano il posto a texture fotografiche: muri, tetti, strade e prati sembrano quelli di un vero borgo, con il rilievo che cattura la luce del sole.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🧱</div><h3>Muri veri</h3><p>Pietra a blocchi irregolari con muschio e licheni per castelli, torri e camini, mattoni anneriti, intonaco consumato con crepe e macchie. Le case colorate tengono il loro colore.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🏠</div><h3>Tetti e legno</h3><p>Coppi di terracotta con il muschio, assi con venature, nodi e chiodi, parquet vero nelle case e casse di legno più realistiche.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🛣️</div><h3>Strade e piazze</h3><p>Sampietrini di granito con l'erba fra le pietre, asfalto con crepe, marciapiedi a lastre, terra battuta, sabbia e passerelle di legno.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🌿</div><h3>Prati e terreno</h3><p>Erba fotografica con trifoglio e zolle, terreno con la grana dei sassolini. Da lontano sfuma, così non si vede la ripetizione.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v44 ───────── -->
+<section id="novita44" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v44</span>
+    <h2 class="h2 reveal">Grafica piena,<br /><em>FPS comunque alti.</em></h2>
+    <p class="lead33 reveal">Gli alleggerimenti della v43 restano, ma la qualità automatica ora è molto più delicata: niente più immagine sgranata, ombre spente o erba sparita per guadagnare qualche fotogramma.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🎨</div><h3>Qualità automatica gentile</h3><p>Sotto i 30 FPS toglie solo l'occlusione ambientale, passa a FXAA e, se serve, semplifica le ombre e dirada un po' l'erba. Ombre, bloom, distanza visiva e risoluzione restano.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🔍</div><h3>Immagine nitida</h3><p>La risoluzione dinamica interviene solo sotto i 40 FPS e non scende mai sotto il 75% (prima arrivava al 50%).</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">↩️</div><h3>Torna tutto da solo</h3><p>Sopra i 42 FPS la grafica torna piena, e ogni nuova partita riparte con la qualità completa. Le porte delle case lontane si rivedono.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v43 ───────── -->
+<section id="novita43" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v43</span>
+    <h2 class="h2 reveal">Più leggero,<br /><em>almeno 30 FPS.</em></h2>
+    <p class="lead33 reveal">Arena Royale ora gira molto più fluido anche su computer modesti: disegna solo quello che vedi, alleggerisce ciò che è lontano e, se serve, abbassa da solo la grafica per non scendere mai sotto i 30 FPS.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">⚡</div><h3>Qualità automatica</h3><p>Sotto i 30 FPS il gioco riduce prima la risoluzione (fino al 50%) e poi, un passo alla volta, antialiasing, ombre, bloom, erba e distanza visiva. Sopra i 50 FPS ripristina tutto. Si disattiva in <b>Impostazioni › Grafica</b>.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">👥</div><h3>Personaggi intelligenti</h3><p>Chi è fuori dallo schermo non viene disegnato; chi è lontano ha meno dettagli, niente ombra e animazioni meno frequenti. Tu e chi ti sta vicino restate identici.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🚪</div><h3>Mondo più leggero</h3><p>Porte con maniglie in un unico pezzo e nascoste da lontano, bottino che fa ombra solo vicino a te, icone delle armi preparate solo nei menu.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🤖</div><h3>Bot più efficienti</h3><p>I bot lontani da tutti pensano un po' meno spesso e trovano case e tetti molto più in fretta, senza cambiare il loro modo di giocare.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">📉</div><h3>I numeri</h3><p>Con 100 giocatori in partita: da circa 2700 a circa 760 oggetti disegnati per fotogramma, da 4,5 a 0,7 milioni di triangoli, metà del tempo di calcolo.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v42 ───────── -->
+<section id="novita42" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v42</span>
+    <h2 class="h2 reveal">Scivola, scavalca,<br /><em>sali in cima al Colosseo.</em></h2>
+    <p class="lead33 reveal">Movimento più veloce e più tecnico: scivolate che mantengono lo slancio, scavalchi automatici, salti a ripetizione che non pagano più. Il Colosseo si scala fino in cima, arrivano trampolini e trappole, e la grafica guadagna ombre nette, bagliori e impatti diversi per ogni materiale.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🏃</div><h3>Scivolata</h3><p>Correndo premi <b>C</b>: ti abbassi quasi a terra e mantieni lo slancio, in discesa acceleri. Perfetta per entrare in un riparo o passare fra i muri del Colosseo. Con <b>SPAZIO</b> salti via a piena velocità.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🧗</div><h3>Scavalco automatico</h3><p>Correndo contro muretti, casse e gradoni li superi senza fermarti (fino a 1,25 m), con <b>SPAZIO</b> fino a 1,75 m; saltando verso un bordo ti aggrappi e sali in un attimo.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🎯</div><h3>Basta saltelli</h3><p>Ogni salto costa resistenza, quelli di fila sono più bassi e in volo la mira va a farsi benedire: torna precisa 0,4 s dopo l'atterraggio. Vince chi si muove bene, non chi salta di più.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🏛️</div><h3>Il Colosseo in verticale</h3><p>Quattro scalinate diagonali salgono dalla sabbia a tutte le gradinate e, a ogni ingresso, una scala di legno porta in cima al muro, a 22 m. Si vede tutta l'arena, ma si è anche nel mirino di tutti.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">🚀</div><h3>Trampolini e trappole</h3><p>Il trampolino ti lancia in alto e apre il deltaplano; la trappola a spuntoni fa 75 danni e rallenta. Tieni premuto <b>G</b> per vedere dove li piazzi. A terra c'è solo bottino che serve davvero.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">✨</div><h3>Più bello da vedere</h3><p>Ombre del sole nette che non tremolano, bagliore su esplosioni e colpi alla testa, bordi scuri e battito del cuore con poca vita, e scintille, polvere, zolle o schegge a seconda di cosa colpisci.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v41 ───────── -->
+<section id="novita41" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v41</span>
+    <h2 class="h2 reveal">Granate, fumogeni<br /><em>e bot che ragionano.</em></h2>
+    <p class="lead33 reveal">Tre oggetti da lancio con la traiettoria vera, segnalazioni per la squadra, l'arco rosso che ti dice da dove ti sparano, bot che si riparano e ti aggirano, passi diversi su ogni superficie, pavimenti e rampe da costruire, statistiche complete a fine partita, e case e città più grandi.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">💣</div><h3>Oggetti da lancio</h3><p>Granata a frammentazione (miccia di 2,5 s, rompe i muri), fumogeno (nasconde anche ai bot) e granata a impulso (spinge via; sotto i piedi ti catapulta). Tieni premuto <b>G</b> per la traiettoria, rilascia per lanciare, <b>H</b> cambia. Rimbalzano su muri e terreno. Lasciare un oggetto ora è <b>X</b>.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">📍</div><h3>Segnalazioni</h3><p><b>Z</b> o clic della rotellina: nemico (lo segue), bottino (col nome) o «Andiamo qui»; doppio tocco per «Pericolo». Si vedono sullo schermo e sulla mappa, e i compagni bot ci vanno e segnalano i nemici da soli.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🧠</div><h3>Bot più furbi</h3><p>Con poca vita cercano un riparo, a volte coperti da un fumogeno, e si curano lì; se stanno perdendo scappano a zigzag; ti aggirano di lato quando ti nascondi e ti lanciano granate se resti fermo o dietro ai muri.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🎯</div><h3>Da dove mi sparano?</h3><p>Un arco rosso attorno al mirino punta verso chi ti colpisce e la visuale trema in proporzione al danno. Il mirino diventa verde sui compagni, e lo zoom in mira si regola per ogni classe d'arma.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">👟</div><h3>Passi e costruzioni</h3><p>Erba, pietra, legno, metallo, neve, sabbia e acqua suonano diversi, e i passi degli altri arrivano da destra o da sinistra. In costruzione: <b>1</b> muro, <b>2</b> pavimento, <b>3</b> rampa.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">🏠</div><h3>Case più grandi</h3><p>Case più alte e larghe, città più ampie, salto rifatto con gambe e braccia, statistiche dettagliate a fine partita, Artigli fissi ai polsi e corridoi del Colosseo senza buchi.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v40 ───────── -->
+<section id="novita40" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v40 · STAGIONE 2</span>
+    <h2 class="h2 reveal">Stagione 2:<br /><em>Il Colosseo.</em></h2>
+    <p class="lead33 reveal">Un pass battaglia con 80 ricompense, sei skin nuove ispirate a Roma e a Venezia, cappelli, zaini e deltaplani nuovi, comandi touch che si possono spostare e schermate di caricamento illustrate. E il gioco ora si installa con la sua icona.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🏛️</div><h3>Pass da 80 ricompense</h3><p>Una ricompensa gratis e una premium a <b>ogni</b> livello, dal 1 al 40: Gladiatore e Imperatore, Arlecchino, Chef Gusto, la Sommozzatrice e tutti gli oggetti della Stagione 1. Puoi comprare un livello a 150 monete, dopo il 40 i livelli bonus danno monete e gli oggetti che hai già diventano monete.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🎭</div><h3>Sei skin nuove</h3><p>Gladiatore con corazza, schinieri e gladio; Imperatore con toga, mantello porpora e alloro d'oro; Arlecchino a rombi con la maschera; Chef Gusto con grembiule e toque; Sommozzatrice con muta e boccaglio; e la Mummia nel negozio.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🪖</div><h3>Accessori nuovi</h3><p>Corona d'alloro, elmo da legionario, paglietta da gondoliere, cappello da chef e tricorno; scudo romano, aquila della legione e bombole da sub; cinque deltaplani: Imperiale, Laguna, Mosaico, Tramonto e Carnevale.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">📱</div><h3>Più comodo da telefono</h3><p>Sposta e ingrandisci ogni pulsante con l'editor dei comandi, fuoco automatico quando il mirino è su un nemico, mira assistita, trasparenza dei pulsanti regolabile e vibrazione quando colpisci o vieni colpito.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">🖼️</div><h3>Caricamenti illustrati</h3><p>Mentre il gioco prepara l'isola vedi un'illustrazione, una barra con le fasi del caricamento e un consiglio per vincere.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">📲</div><h3>Installa il gioco</h3><p>Dal menu del browser scegli «Aggiungi a schermata Home» o «Installa»: Arena Royale si apre a tutto schermo con la sua icona nuova.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v39 ───────── -->
+<section id="novita39" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v39</span>
+    <h2 class="h2 reveal">Balletti veri<br /><em>e un Gargoyle scolpito.</em></h2>
+    <p class="lead33 reveal">I balletti ora muovono tutto il corpo, fluidi e a tempo; il Gargoyle ha un corpo nuovo con muscoli e pelle al posto di palle e cilindri; e il muro del Colosseo sopra gli ingressi è chiuso.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">💃</div><h3>Sei balletti</h3><p>Ballo disco, Saluto, Floss, Esultanza, Robot e Running man: fianchi, spalle, ginocchia e piedi a tempo, mani e testa che seguono il movimento. B per farli girare, oppure 6, 7, 8, 9, 0 e ’.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🦇</div><h3>Il Gargoyle rifatto</h3><p>Una pelle unica scolpita con muscoli, costole e tendini che si piega con le articolazioni, muso da pipistrello con orecchie lunghe e zanne, mani con dita e artigli, criniera a ciocche. Gli attacchi sono quelli di prima.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🏛️</div><h3>Colosseo chiuso</h3><p>Sopra i quattro ingressi le gradinate ora continuano: dalla sabbia non si vede più fuori attraverso il muro, e i corridoi d'ingresso restano percorribili.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v38 ───────── -->
+<section id="novita38" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v38</span>
+    <h2 class="h2 reveal">Il Gargoyle<br /><em>del Colosseo.</em></h2>
+    <p class="lead33 reveal">Al centro dell'isola sorge un Colosseo con la statua dell'imperatore. In alcune partite ci dorme dentro un Gargoyle alato: sconfiggilo e prendi i suoi artigli, l'arma che attacca con tutto il corpo. E poi una chiesa barocca, forzieri, panchine e fontane nuove.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🦇</div><h3>Il boss Gargoyle</h3><p>Compare solo in alcune partite e non esce mai dall'arena. Si sveglia quando scendi sulla sabbia: graffi, doppio colpo, giravolta, balzo e un ruggito che colpisce chi si nasconde sugli spalti.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🗡️</div><h3>Gli artigli</h3><p>L'arma leggendaria che lascia il boss: colpi infiniti, una combo di quattro attacchi che muove tutto il corpo e il balzo con il mirino, gli stessi colpi del Gargoyle.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🏛️</div><h3>Colosseo e chiesa</h3><p>Un'arena romana con le tende e la statua dell'imperatore al centro della mappa, una chiesa barocca con colonne, statue e campanili. Forzieri in legno scuro e oro, panchine arancioni, fontane in marmo.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v37 ───────── -->
+<section id="novita37" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v37</span>
+    <h2 class="h2 reveal">Sfida un amico<br /><em>1 contro 1.</em></h2>
+    <p class="lead33 reveal">Una modalità duello senza bot per giocare contro i tuoi amici, un cielo in pixel art con le nuvole 3D a fumetto, scatole di munizioni vere e un gioco molto più leggero da far girare.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">⚔️</div><h3>1 contro 1</h3><p>Crea una lobby, scegli "1 contro 1" e dai il codice a un amico: partite subito in una piccola arena, armi già in mano e tempesta veloce. Niente bot.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🚀</div><h3>Più fluido</h3><p>Metà dei draw call in meno, ombre a frame alterni e risoluzione dinamica che si abbassa da sola quando il gioco rallenta e si rialza quando torna fluido.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">☁️</div><h3>Cielo a pixel</h3><p>Sfumature di blu a bande e grandi nuvole 3D a fumetto con i riccioli. Le munizioni hanno le loro scatole da caccia e il fucile si porta in spalla come si deve.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v36 ───────── -->
+<section id="novita36" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v36</span>
+    <h2 class="h2 reveal">Borghi medievali,<br /><em>salici e dune.</em></h2>
+    <p class="lead33 reveal">Le casette dell'isola diventano case da borgo in pietra e ardesia, arrivano i salici piangenti, i cactus saguaro e un deserto di dune vere. E finalmente si entra nelle lobby degli amici anche dalle reti più chiuse.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🌐</div><h3>Lobby per tutti</h3><p>Più server ponte (anche sulla porta 443, che passa quasi ovunque) e tre tentativi di collegamento. Mentre entri vedi a che punto sei, e ogni errore dice cosa fare.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🏡</div><h3>Case da borgo</h3><p>Zoccolo in pietra, tavole consumate, travi a vista, scuri con la croce e un tetto spesso di ardesia azzurra, con lanterna e fioriera.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🌵</div><h3>Salici, cactus e dune</h3><p>Salici piangenti vicino all'acqua, saguaro costolati con i bracci a gomito, prati di fiorellini viola e dune color crema increspate dal vento.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v35 ───────── -->
+<section id="novita35" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v35</span>
+    <h2 class="h2 reveal">Mirini al neon,<br /><em>boschi più folti.</em></h2>
+    <p class="lead33 reveal">Mirini ridisegnati con il bagliore, in sette colori, e alberi e cespugli rifatti da zero: chiome gonfie fatte di ciuffi di foglie, rosse, arancioni e verde lime.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🎯</div><h3>Mirini al neon</h3><p>Pompa a quattro archi, fucili d'assalto con l'anello: tacche, croce interna, anello spesso col più. Tutti con un alone luminoso e sette colori nelle impostazioni.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🌳</div><h3>Alberi a ciuffi</h3><p>Le chiome sono fatte di centinaia di ciuffi di foglie ritagliati, con l'ombra all'interno e le cime schiarite dal sole. Nei boschi spuntano querce rosse e alberi arancioni.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🌲</div><h3>Abeti e cespugli</h3><p>Abeti a palchi di rami che pendono, con la neve sulle punte in montagna. Cespugli fitti di rametti fogliosi, perfetti per nascondersi.</p></article>
+    </div>
+    <div class="xh33 reveal">
+      <h3>I nuovi mirini</h3>
+      <div class="xh-row" id="xhDemos"></div>
+      <p class="xh-note">Quattro per i fucili a pompa e quattro per i fucili d'assalto. Si aprono con la dispersione e reagiscono a ogni colpo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v34 ───────── -->
+<section id="novita34" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v34</span>
+    <h2 class="h2 reveal">Online con gli amici,<br /><em>senza scatti.</em></h2>
+    <p class="lead33 reveal">Le lobby online funzionano di nuovo, i bot si fanno più cattivi quando giochi in squadra e le prime partite sono fluide come le altre.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🌐</div><h3>Online riparato</h3><p>L'avvio della partita era troppo grande per il collegamento tra browser e buttava fuori chi entrava. Ora i messaggi si spezzano e si ricompongono, e l'host aspetta che tutti abbiano caricato l'isola.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🎯</div><h3>Difficoltà a squadre</h3><p>In duo, trio e squad i bot nemici mirano meglio, reagiscono prima e vedono più lontano. Online con gli amici ancora di più. I bot tuoi compagni restano normali.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">⚡</div><h3>Niente più scatti</h3><p>Shader, texture, icone e personaggi di tutte le skin vengono preparati prima di lanciarti dal bus, invece che a metà sparatoria.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v33 ───────── -->
+<section id="novita33" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v33</span>
+    <h2 class="h2 reveal">Spara, picchia,<br /><em>fai crollare tutto.</em></h2>
+    <p class="lead33 reveal">Pareti, pavimenti, auto e rocce ora si rompono davvero, un pezzo alla volta. Se abbatti tutta la base di una casa,
+      la gravità fa il resto: crolla e ti lascia i materiali. Il terreno no, quello resta dov'è.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">💥</div><h3>Distruzione a pezzi</h3><p>Picconate, proiettili ed esplosioni aprono buchi grandi poco più di un metro in muri, solai e pavimenti. Auto e massi si sgretolano e saltano via.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🏚️</div><h3>Gravità</h3><p>Rompi tutti gli appoggi a terra e la struttura viene giù: le macerie cadono, si alza la polvere e restano mucchi di materiali da raccogliere.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">👁️</div><h3>Modalità spettatore</h3><p>Eliminato? Guarda chi ti ha battuto, segui gli altri giocatori con <kbd>←</kbd> <kbd>→</kbd> e torna ai risultati quando vuoi.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🎒</div><h3>Inventario in movimento</h3><p>Con l'inventario aperto la partita non si ferma: continui a correre con <kbd>WASD</kbd> mentre sistemi gli oggetti.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">🔍</div><h3>Zoom su mappa e armadietto</h3><p>Rotellina, pizzico o <kbd>+</kbd>/<kbd>−</kbd> per ingrandire la mappa fino a 8× (con i nomi delle località) e per guardare da vicino la tua skin.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">🌳</div><h3>Natura viva</h3><p>Foglie e cortecce con più dettagli e raffiche di vento che ogni tanto attraversano l'isola e piegano alberi e cespugli.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── CARATTERISTICHE ───────── -->
+<section id="caratteristiche" class="section">
+  <div class="wrap">
+    <h2 class="h2 reveal">Tutto quello che serve<br /><em>per sopravvivere</em></h2>
+    <div class="cards">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">🚌</div><h3>Il Bus della Battaglia</h3><p>Scegli il momento giusto, salta e apri il deltaplano sopra la città che preferisci.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">🔫</div><h3>22 armi, 5 rarità</h3><p>Balestra, lanciagranate, doppietta, minigun, pompa tattico e gli Artigli del Gargoyle… ognuna con il suo mirino e la sua ottica. Più è rara, più fa male.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🧱</div><h3>Costruisci e distruggi</h3><p>Premi <kbd>Q</kbd> e alza muri al volo per ripararti. Col piccone sfondi le pareti e raccogli materiali.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🏝️</div><h3>Isola gigante</h3><p>1,2 km per lato, 18 località, montagne e laghi, caricati a blocchi mentre ti muovi. Al centro il Colosseo, e una tempesta che si stringe fase dopo fase.</p></article>
+      <article class="card tilt reveal" style="--d:.32s"><div class="ico">🤖</div><h3>Bot intelligenti</h3><p>Raccolgono il bottino, aprono forzieri, ti inseguono, si abbassano e scavalcano gli ostacoli.</p></article>
+      <article class="card tilt reveal" style="--d:.40s"><div class="ico">✨</div><h3>Forzieri e cure</h3><p>Bende, kit medici e pozioni scudo. I forzieri dorati luccicano: seguili!</p></article>
+      <article class="card tilt reveal" style="--d:.48s"><div class="ico">👥</div><h3>Modalità e amici</h3><p>Da solo, in coppia o in squadra, contro i bot o online con gli amici con un codice stanza, e il 1 contro 1.</p></article>
+      <article class="card tilt reveal" style="--d:.56s"><div class="ico">🎟️</div><h3>Pass, negozio e missioni</h3><p>Sali di livello giocando, completa le missioni del giorno e della settimana, sblocca skin, cappelli, zaini e deltaplani.</p></article>
+      <article class="card tilt reveal" style="--d:.64s"><div class="ico">💃</div><h3>Balletti</h3><p>Sei balletti a tutto corpo per festeggiare: Ballo disco, Saluto, Floss, Esultanza, Robot e Running man.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── MOVIMENTO (novità) ───────── -->
+<section id="movimento" class="section alt">
+  <div class="wrap split">
+    <div class="moves-text">
+      <span class="badge-new reveal">NOVITÀ</span>
+      <h2 class="h2 reveal">Abbassati.<br /><em>Arrampicati.</em> Scavalca.</h2>
+      <p class="reveal">Il movimento ora è molto più libero. Accovacciati per essere un bersaglio più piccolo e mirare meglio,
+        poi aggrappati a qualsiasi muro e sali fino al tetto con una scalata fluida.</p>
+      <ol class="steps" id="moveSteps">
+        <li data-step="walk"><kbd>W A S D</kbd><span>Cammina e corri</span></li>
+        <li data-step="crouch"><kbd>C</kbd><span>Abbassati: hitbox più piccola, −35% dispersione</span></li>
+        <li data-step="climb"><kbd>W</kbd>+<kbd>Spazio</kbd><span>Arrampicati su muri e casse (consuma stamina)</span></li>
+        <li data-step="mantle"><kbd>W</kbd><span>Arrivato in cima, scavalchi il bordo in automatico</span></li>
+        <li data-step="jump"><kbd>Spazio</kbd><span>Salta giù… e atterra con stile</span></li>
+      </ol>
+    </div>
+    <div class="moves-stage reveal">
+      <canvas id="demoCanvas"></canvas>
+      <div class="demo-caption" id="demoCaption">Cammina</div>
+      <div class="stamina"><i id="demoStamina"></i></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── ARMI ───────── -->
+<section id="armi" class="section">
+  <div class="wrap">
+    <h2 class="h2 reveal">L'arsenale</h2>
+    <p class="sub reveal">Passa il mouse su un'arma per vederla meglio.</p>
+    <div class="weapons" id="weapons"></div>
+  </div>
+</section>
+
+<!-- ───────── SKIN ───────── -->
+<section id="skin" class="section alt">
+  <div class="wrap">
+    <h2 class="h2 reveal">L'armadietto</h2>
+    <p class="sub reveal">Clicca una skin per equipaggiarla: la ritroverai già indossata quando entri in partita.</p>
+    <div class="skins" id="skins"></div>
+  </div>
+</section>
+
+<!-- ───────── COME SI GIOCA ───────── -->
+<section class="section">
+  <div class="wrap">
+    <h2 class="h2 reveal">Come si gioca</h2>
+    <div class="timeline">
+      <div class="tl-line"><i></i></div>
+      <div class="tl reveal"><b>1</b><h4>Salta</h4><p>Premi <kbd>Spazio</kbd> dal bus e plana dove vuoi.</p></div>
+      <div class="tl reveal" style="--d:.1s"><b>2</b><h4>Equipaggiati</h4><p>Armi, munizioni, cure e materiali per costruire.</p></div>
+      <div class="tl reveal" style="--d:.2s"><b>3</b><h4>Sopravvivi</h4><p>Resta nel cerchio, sfrutta tetti e ripari.</p></div>
+      <div class="tl reveal" style="--d:.3s"><b>4</b><h4>Vinci</h4><p>Ultimo in piedi = <em>Vittoria Reale</em> 👑</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── COMANDI ───────── -->
+<section id="comandi" class="section alt">
+  <div class="wrap">
+    <h2 class="h2 reveal">Comandi</h2>
+    <div class="keys">
+      <div class="key reveal"><kbd>W A S D</kbd><span>Muoviti</span></div>
+      <div class="key reveal"><kbd>Shift</kbd><span>Corri</span></div>
+      <div class="key reveal"><kbd>Spazio</kbd><span>Salta · deltaplano</span></div>
+      <div class="key reveal hl"><kbd>C</kbd><span>Abbassati / alzati · correndo: scivolata</span></div>
+      <div class="key reveal hl"><kbd>W</kbd>+<kbd>Spazio</kbd><span>Arrampicati</span></div>
+      <div class="key reveal"><kbd>Mouse</kbd><span>Mira</span></div>
+      <div class="key reveal"><kbd>Click sx</kbd><span>Spara · usa</span></div>
+      <div class="key reveal"><kbd>Click dx</kbd><span>Mira di precisione</span></div>
+      <div class="key reveal"><kbd>1-5</kbd><span>Cambia slot</span></div>
+      <div class="key reveal"><kbd>R</kbd><span>Ricarica</span></div>
+      <div class="key reveal"><kbd>E</kbd><span>Raccogli · apri</span></div>
+      <div class="key reveal"><kbd>Q</kbd><span>Costruisci</span></div>
+      <div class="key reveal"><kbd>X</kbd><span>Lascia oggetto</span></div>
+      <div class="key reveal hl"><kbd>G</kbd><span>Tieni premuto: mira e lancia granata · fumogeno · impulso</span></div>
+      <div class="key reveal hl"><kbd>H</kbd><span>Cambia oggetto da lancio</span></div>
+      <div class="key reveal hl"><kbd>Z</kbd> · <kbd>Rotella</kbd><span>Segnala nemico · bottino · posizione</span></div>
+      <div class="key reveal"><kbd>Tab</kbd><span>Inventario (puoi muoverti)</span></div>
+      <div class="key reveal hl"><kbd>M</kbd>+<kbd>Rotellina</kbd><span>Mappa con zoom</span></div>
+      <div class="key reveal hl"><kbd>←</kbd><kbd>→</kbd><span>Spettatore: cambia giocatore</span></div>
+      <div class="key reveal hl"><kbd>B</kbd> · <kbd>6-0</kbd><span>Balletti</span></div>
+      <div class="key reveal"><kbd>Esc</kbd><span>Pausa</span></div>
+    </div>
+    <h3 class="h3touch reveal">📱 Su telefono e tablet</h3>
+    <div class="keys">
+      <div class="key reveal hl"><kbd>🕹️ Joystick</kbd><span>Muoviti · spingi fino in fondo per correre</span></div>
+      <div class="key reveal"><kbd>👆 Trascina</kbd><span>Guardati intorno (anche dal pulsante di fuoco)</span></div>
+      <div class="key reveal"><kbd>🎯 Fuoco</kbd><span>Spara · usa (anche a sinistra)</span></div>
+      <div class="key reveal"><kbd>MIRA</kbd><span>Mira di precisione</span></div>
+      <div class="key reveal"><kbd>Slot</kbd><span>Tocca per cambiare arma</span></div>
+      <div class="key reveal"><kbd>RACCOGLI</kbd><span>Appare vicino a bottino e forzieri</span></div>
+      <div class="key reveal hl"><kbd>✏️ Editor</kbd><span>Impostazioni › Disponi i pulsanti: trascina e ridimensiona ognuno</span></div>
+      <div class="key reveal hl"><kbd>🔫 Auto</kbd><span>Fuoco automatico e mira assistita (si possono spegnere)</span></div>
+      <div class="key reveal hl"><kbd>📳 Vibrazione</kbd><span>Quando colpisci o vieni colpito</span></div>
+      <div class="key reveal"><kbd>👁️ Opacità</kbd><span>Pulsanti più o meno trasparenti</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── CTA FINALE ───────── -->
+<section class="final">
+  <div class="rays"></div>
+  <h2 class="reveal">Pronto a lanciarti?</h2>
+  <a href="gioco.html" class="btn btn-play xl reveal" style="--d:.15s" data-transition><span>▶ GIOCA ORA</span></a>
+  <p class="reveal" style="--d:.3s">Funziona nel browser su PC (mouse e tastiera) e su telefono o tablet (comandi touch, in orizzontale).</p>
+</section>
+
+<footer>
+  <span>Arena Royale 3D · fatto con <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a></span>
+  <a href="#top">Torna su ↑</a>
+</footer>
+
+<div id="toast"></div>
+
+<script type="module" src="js/site.js?v=52"></script>
+<script src="js/transition.js?v=52"></script>
+</body>
+</html>

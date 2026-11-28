@@ -1,9 +1,20 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v44';
+export const NEWS_VERSION = 'v45';
 
 export const NEWS = [
+  {
+    v: 'v45', title: 'Texture fotorealistiche', color: '#c9b48a', icon: '🧱',
+    items: [
+      'Tutto il mondo ha nuove texture fotografiche, nello stile di un vero borgo medievale: pietra a blocchi irregolari con muschio e licheni, intonaco consumato con crepe e macchie, mattoni rossi anneriti, coppi di terracotta con il muschio, assi di legno con venature e nodi',
+      'Strade e piazze vere: sampietrini di granito con l’erba negli interstizi, asfalto con crepe e ghiaietto, marciapiedi a lastre di pietra, terra battuta con i sassolini, sabbia e passerelle di legno',
+      'Prato fotografico (erba, trifoglio e zolle di terra) e terreno con la grana vera dei sassolini; sfuma con la distanza, così non si vede la ripetizione',
+      'Castelli, torri, camini e zoccoli delle case in pietra vera; le case colorate mantengono il loro colore, ma su intonaco vero; facciate delle città, parquet, casse e il Colosseo con grana e venature realistiche',
+      'Il rilievo (normal map) viene dalle foto: le fughe fra le pietre e i mattoni sono incavate e catturano la luce del sole',
+      'Le immagini pesano circa 3 MB in tutto e si scaricano insieme al gioco; se una non arriva, quella superficie torna alla texture disegnata di prima',
+    ],
+  },
   {
     v: 'v44', title: 'Grafica di nuovo piena, FPS comunque alti', color: '#ffd166', icon: '🎨',
     items: [

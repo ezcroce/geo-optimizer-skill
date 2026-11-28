@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Sculpt, sculptMaterial } from './sculpt.js?v=44';
+import { Sculpt, sculptMaterial } from './sculpt.js?v=45';
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

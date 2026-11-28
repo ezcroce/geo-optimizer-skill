@@ -85,3 +85,136 @@ export function applyAnisotropy(root, n) {
     }
   });
 }
+
+// ═════════════════════════════════════════════════════════════
+//  v45: texture fotografiche (img/tex/*.jpg, 1024 px, affiancabili senza cuciture)
+//  Fanno da base alle texture procedurali: le tinte, le finestre e i dettagli si disegnano sopra.
+//  Se un'immagine non arriva, ogni generatore torna al disegno procedurale di prima.
+// ═════════════════════════════════════════════════════════════
+const PHOTO_LIST = ['stone', 'plaster', 'brick', 'roof', 'wood', 'cobble', 'asphalt', 'slabs', 'grass', 'dirt'];
+export const PHOTOS = {};
+function loadPhoto(n) {
+  return new Promise(res => {
+    const im = new Image();
+    const to = setTimeout(() => res(null), 25000);
+    im.onload = () => { clearTimeout(to); res(im); };
+    im.onerror = () => { clearTimeout(to); res(null); };
+    im.src = new URL(`../img/tex/${n}.jpg?v=45`, import.meta.url).href;
+  });
+}
+try {
+  const ims = await Promise.all(PHOTO_LIST.map(loadPhoto));
+  PHOTO_LIST.forEach((n, i) => { if (ims[i]) PHOTOS[n] = { img: ims[i], sizes: new Map(), tex: null }; });
+} catch { /* niente foto: texture procedurali */ }
+export const hasPhoto = (n) => !!PHOTOS[n];
+
+/** pixel della foto ridimensionata a size×size (in cache) e colore medio */
+export function photoData(name, size) {
+  const P = PHOTOS[name];
+  if (!P) return null;
+  size = Math.max(4, Math.round(size));
+  let D = P.sizes.get(size);
+  if (!D) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    // riduzione a passi (meno aliasing di un salto unico da 1024 px)
+    let src = P.img, s = P.img.width;
+    while (s / 2 > size * 1.4) {
+      const t = document.createElement('canvas'); t.width = t.height = Math.round(s / 2);
+      const tg = t.getContext('2d'); tg.imageSmoothingQuality = 'high'; tg.drawImage(src, 0, 0, t.width, t.height);
+      src = t; s = t.width;
+    }
+    g.drawImage(src, 0, 0, size, size);
+    const px = g.getImageData(0, 0, size, size).data;
+    let r = 0, gg = 0, b = 0;
+    const n = size * size;
+    for (let i = 0; i < px.length; i += 4) { r += px[i]; gg += px[i + 1]; b += px[i + 2]; }
+    r /= n; gg /= n; b /= n;
+    D = { size, px, canvas: c, mean: [r, gg, b], lum: 0.299 * r + 0.587 * gg + 0.114 * b };
+    P.sizes.set(size, D);
+  }
+  return D;
+}
+/** colore medio della foto in spazio lineare (per gli shader) */
+export function photoMeanLinear(name) {
+  const D = photoData(name, 64);
+  if (!D) return [0.5, 0.5, 0.5];
+  const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const m = [0, 0, 0], px = D.px;
+  for (let i = 0; i < px.length; i += 4) { m[0] += lin(px[i]); m[1] += lin(px[i + 1]); m[2] += lin(px[i + 2]); }
+  const n = px.length / 4;
+  return m.map(v => v / n);
+}
+/** texture three.js della foto intera (ripetibile, con mipmap), condivisa */
+export function photoTexture(name) {
+  const P = PHOTOS[name];
+  if (!P) return null;
+  if (!P.tex) {
+    P.tex = new THREE.Texture(P.img);
+    P.tex.wrapS = P.tex.wrapT = THREE.RepeatWrapping;
+    P.tex.colorSpace = THREE.SRGBColorSpace;
+    P.tex.anisotropy = ANISO.value;
+    P.tex.needsUpdate = true;
+  }
+  return P.tex;
+}
+const hexRgb = (h) => { const n = parseInt(h.replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
+/**
+ * Dipinge la foto `name` ripetuta in un rettangolo del canvas (coordinate "base" del contesto, come gli altri disegni).
+ *  · tile: lato di una ripetizione della foto (coordinate base; deve dividere il canvas per restare affiancabile)
+ *  · mode 'color' (predefinito): colori della foto; con tint = tinta × chiaroscuro della foto
+ *      keep: quanto delle sfumature di colore della foto resta sotto la tinta (0 = solo chiaroscuro, 1 = tutte)
+ *  · mode 'detail': moltiplica ciò che è già disegnato per il chiaroscuro della foto (strength)
+ *  · mode 'height': scrive le altezze (chiaro = in rilievo) per la normal map
+ *  · contrast, bright, alpha (mescola sopra l'esistente), rot (foto ruotata di 90°), ox/oy (spostamento 0..1)
+ */
+export function paintPhoto(g, name, x, y, w, h, o = {}) {
+  if (!PHOTOS[name]) return false;
+  const T = g.getTransform();
+  const X0 = Math.round(T.a * x + T.e), Y0 = Math.round(T.d * y + T.f);
+  const W = Math.round(T.a * (x + w) + T.e) - X0, H = Math.round(T.d * (y + h) + T.f) - Y0;
+  if (W <= 0 || H <= 0) return false;
+  // lato della ripetizione in pixel (anche frazionario: la foto si campiona in proporzione, così resta periodica esatta)
+  const tdx = Math.max(4, (o.tile ?? w) * T.a), tdy = Math.max(4, (o.tile ?? w) * T.d);
+  const S = Math.ceil(Math.max(tdx, tdy));
+  const D = photoData(name, S), s = D.px;
+  const img = g.getImageData(X0, Y0, W, H), d = img.data;
+  const mode = o.mode || 'color', contrast = o.contrast ?? 1, bright = o.bright ?? 1, alpha = o.alpha ?? 1, keep = o.keep ?? 0.5;
+  const strength = o.strength ?? 1, rot = !!o.rot;
+  const ox = (o.ox || 0) * tdx, oy = (o.oy || 0) * tdy;
+  const us = new Int32Array(W);
+  for (let i = 0; i < W; i++) { const f = ((i + 0.5 + ox) / tdx) % 1; us[i] = Math.min(S - 1, Math.floor(f * S)); }
+  const [mr, mg, mb] = D.mean, ml = D.lum;
+  const tint = o.tint ? hexRgb(o.tint) : null;
+  const base = o.base ?? 128;
+  for (let j = 0; j < H; j++) {
+    const v = Math.min(S - 1, Math.floor((((j + 0.5 + oy) / tdy) % 1) * S));
+    for (let i = 0; i < W; i++) {
+      const u = us[i];
+      const k = rot ? (((S - 1 - u) * S + v) * 4) : ((v * S + u) * 4);
+      const r = s[k], gg = s[k + 1], b = s[k + 2];
+      const L = 0.299 * r + 0.587 * gg + 0.114 * b;
+      const q = (j * W + i) * 4;
+      let R, G, B;
+      if (mode === 'detail') {
+        const f = 1 + (1 + (L / ml - 1) * contrast - 1) * strength;
+        R = d[q] * f; G = d[q + 1] * f; B = d[q + 2] * f;
+      } else if (mode === 'height') {
+        R = G = B = base + (L - ml) * contrast;
+      } else if (tint) {
+        const lr = L / ml;
+        const rr = 1 + (lr + (r / mr - lr) * keep - 1) * contrast, rg = 1 + (lr + (gg / mg - lr) * keep - 1) * contrast, rb = 1 + (lr + (b / mb - lr) * keep - 1) * contrast;
+        R = tint[0] * rr * bright; G = tint[1] * rg * bright; B = tint[2] * rb * bright;
+      } else {
+        R = (mr + (r - mr) * contrast) * bright; G = (mg + (gg - mg) * contrast) * bright; B = (mb + (b - mb) * contrast) * bright;
+      }
+      if (alpha < 1) { R = d[q] + (R - d[q]) * alpha; G = d[q + 1] + (G - d[q + 1]) * alpha; B = d[q + 2] + (B - d[q + 2]) * alpha; }
+      d[q] = R; d[q + 1] = G; d[q + 2] = B; d[q + 3] = 255;
+    }
+  }
+  g.putImageData(img, X0, Y0);
+  return true;
+}

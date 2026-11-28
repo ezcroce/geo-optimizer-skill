@@ -9,8 +9,8 @@
 //  Qui ci sono le texture delle strade, gli oggetti instanziati (colori per vertice) e i costruttori.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts } from './props.js?v=44';
-import { normalFromHeight, NORMALS, TEXQ, ANISO } from './texgen.js?v=19';
+import { mergeParts } from './props.js?v=45';
+import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto } from './texgen.js?v=45';
 
 const P = (geo, color, o = {}) => ({ geo, color, o });
 
@@ -62,6 +62,12 @@ const once = (k, f) => { if (!TX.has(k)) TX.set(k, f()); return TX.get(k); };
 export const dirtRoadTexture = () => once('dirt', () => {
   const r = rng(301), { c, g } = cv(), H = NORMALS ? cv() : null;
   g.fillStyle = '#9b7b53'; g.fillRect(0, 0, 128, 128);
+  if (hasPhoto('dirt')) {
+    // v45: terra battuta fotografica
+    paintPhoto(g, 'dirt', 0, 0, 128, 128, { bright: 1.12 });
+    if (H) paintPhoto(H.g, 'dirt', 0, 0, 128, 128, { mode: 'height', contrast: 1.6 });
+    return finish(c, H, 1.6);
+  }
   blots(g, 26, r, ['rgba(70,48,28,0.28)', 'rgba(220,190,140,0.22)', 'rgba(120,90,55,0.25)']);
   if (H) { H.g.fillStyle = gray(120); H.g.fillRect(0, 0, 128, 128); }
   for (let i = 0; i < 260; i++) {
@@ -99,8 +105,10 @@ export const snowRoadTexture = () => once('snowroad', () => {
 export const sandRoadTexture = () => once('sand', () => {
   const r = rng(321), { c, g } = cv(), H = NORMALS ? cv() : null;
   g.fillStyle = '#dcc48e'; g.fillRect(0, 0, 128, 128);
-  blots(g, 18, r, ['rgba(180,150,100,0.25)', 'rgba(250,236,200,0.3)']);
-  if (H) { H.g.fillStyle = gray(128); H.g.fillRect(0, 0, 128, 128); }
+  // v45: grana fotografica (terra schiarita color sabbia) sotto le increspature
+  const ph = paintPhoto(g, 'dirt', 0, 0, 128, 128, { tint: '#dcc48e', keep: 0.15, contrast: 0.55, ox: 0.4 });
+  if (!ph) blots(g, 18, r, ['rgba(180,150,100,0.25)', 'rgba(250,236,200,0.3)']);
+  if (H) { H.g.fillStyle = gray(128); H.g.fillRect(0, 0, 128, 128); if (ph) paintPhoto(H.g, 'dirt', 0, 0, 128, 128, { mode: 'height', contrast: 0.8, ox: 0.4 }); }
   for (let y = 0; y < 128; y += 5.33) {
     g.strokeStyle = 'rgba(160,130,85,0.22)'; g.lineWidth = 1.1; g.beginPath();
     for (let x = 0; x <= 128; x += 4) { const yy = y + Math.sin(x / 128 * 6.283 * 2 + y * 0.3) * 1.4; x ? g.lineTo(x, yy) : g.moveTo(x, yy); }
@@ -114,6 +122,12 @@ export const sandRoadTexture = () => once('sand', () => {
 /** assi di legno (passerelle, terrazzini, scale): 6 assi ogni 2 m, chiodi e venature */
 export const plankTexture = () => once('plank', () => {
   const r = rng(331), { c, g } = cv(), H = NORMALS ? cv() : null;
+  if (hasPhoto('wood')) {
+    // v45: assi fotografiche orizzontali (foto ruotata)
+    paintPhoto(g, 'wood', 0, 0, 128, 128, { rot: true, bright: 1.1 });
+    if (H) paintPhoto(H.g, 'wood', 0, 0, 128, 128, { rot: true, mode: 'height', contrast: 1.5 });
+    return finish(c, H, 2.2);
+  }
   const n = 6, w = 128 / n;
   if (H) { H.g.fillStyle = gray(30); H.g.fillRect(0, 0, 128, 128); }
   for (let i = 0; i < n; i++) {

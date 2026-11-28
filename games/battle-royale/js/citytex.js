@@ -4,7 +4,26 @@
 //  Tutte le facciate ripetono 4 campate × 4 piani: una cella = 3 m × 3 m.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS, TEXQ, ANISO } from './texgen.js?v=19';
+import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto } from './texgen.js?v=45';
+
+// v45: foto di base per ogni stile di muro (una ripetizione = 2 m, uguale su facciate e muri lisci)
+const WALL_PHOTO = {
+  plaster: { name: 'plaster', o: (c) => ({ tint: c, keep: 0.5, contrast: 0.85, bright: 1.08 }), hc: 0.7 },
+  pastel: { name: 'plaster', o: (c) => ({ tint: c, keep: 0.3, contrast: 0.65, bright: 1.08 }), hc: 0.5 },
+  brick: { name: 'brick', o: (c) => ({ tint: c, keep: 0.85, contrast: 1.0, bright: 1.08 }), hc: 1.3 },
+  stone: { name: 'stone', o: (c) => ({ tint: c, keep: 0.55, contrast: 1.0, bright: 1.0 }), hc: 1.5 },
+  wood: { name: 'wood', o: (c) => ({ tint: c, keep: 0.45, contrast: 1.1, bright: 1.05 }), hc: 1.2 },
+  modern: { name: 'plaster', o: (c) => ({ tint: c, keep: 0, contrast: 0.5, bright: 1.06 }), hc: 0.4 },
+};
+/** dipinge la foto dello stile su tutto il canvas (W×H in coordinate base, `meters` = metri coperti in larghezza) */
+function wallPhoto(style, color, g, h, W, Hh, meters) {
+  const P = WALL_PHOTO[style];
+  if (!P || !hasPhoto(P.name)) return false;
+  const tile = W / (meters / 2);
+  paintPhoto(g, P.name, 0, 0, W, Hh, { tile, ...P.o(color) });
+  if (h) paintPhoto(h, P.name, 0, 0, W, Hh, { tile, mode: 'height', contrast: P.hc });
+  return true;
+}
 
 export const BAY = 3, FLOOR = 3;          // campata e altezza di un piano (m)
 
@@ -92,7 +111,10 @@ function drawFacade(style, color, g, h, rS, rC) {
   const W = 256;
   g.fillStyle = color; g.fillRect(0, 0, W, W);
   if (h) { h.fillStyle = gray(128); h.fillRect(0, 0, W, W); }
-  if (style === 'brick') {
+  const photo = wallPhoto(style, color, g, h, W, W, 4 * BAY);
+  if (photo && style !== 'modern' && style !== 'glass') {
+    // la foto sostituisce mattoni, assi, pietre e macchie disegnati
+  } else if (style === 'brick') {
     for (let y = 0; y < W; y += 4) {
       const off = (y / 4) % 2 ? 5 : 0;
       for (let x = -off; x < W; x += 10) {
@@ -122,9 +144,9 @@ function drawFacade(style, color, g, h, rS, rC) {
     g.globalCompositeOperation = 'destination-over'; g.fillStyle = shade(color, 0.6); g.fillRect(0, 0, W, W); g.globalCompositeOperation = 'source-over';
     if (h) { h.globalCompositeOperation = 'destination-over'; h.fillStyle = gray(80); h.fillRect(0, 0, W, W); h.globalCompositeOperation = 'source-over'; }
   } else if (style === 'modern') {
+    if (!photo) mottle(g, W, W, 20, rC, 0.03, 0.03);
     for (let y = 0; y <= W; y += 32) { g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, y - 0.5, W, 1); if (h) { h.fillStyle = gray(100); h.fillRect(0, y - 0.5, W, 1); } }
     for (let x = 0; x <= W; x += 32) { g.fillStyle = 'rgba(0,0,0,0.10)'; g.fillRect(x - 0.5, 0, 1, W); if (h) { h.fillStyle = gray(100); h.fillRect(x - 0.5, 0, 1, W); } }
-    mottle(g, W, W, 20, rC, 0.03, 0.03);
   } else if (style === 'glass') {
     const gr = g.createLinearGradient(0, 0, 0, W);
     gr.addColorStop(0, shade(color, 1.75)); gr.addColorStop(0.5, shade(color, 1.0)); gr.addColorStop(1, shade(color, 0.62));
@@ -236,7 +258,7 @@ export function facadeTexture(style, color) {
   if (NORMALS && !facadeNormals.has(style)) H = cv(256, 256);
   drawFacade(style, color, g, H && H.g, rng(seed), rng(seed * 31 + parseInt(color.slice(1), 16)));
   grain(g, c, style === 'glass' ? 6 : 14);
-  if (H) { grain(H.g, H.c, 26); facadeNormals.set(style, normalFromHeight(H.c, style === 'glass' ? 1.2 : 2.4)); }
+  if (H) { grain(H.g, H.c, 26); facadeNormals.set(style, normalFromHeight(H.c, style === 'glass' ? 1.2 : WALL_PHOTO[style] && hasPhoto(WALL_PHOTO[style].name) ? 1.0 : 2.4)); }
   const t = tex(c);
   t.repeat.set(2 / (4 * BAY), 2 / (4 * FLOOR));
   if (NORMALS) { const n = facadeNormals.get(style); n.repeat.copy(t.repeat); t.userData.normal = n; }
@@ -256,8 +278,11 @@ export function plainTexture(style, color) {
   const base = style === 'glass' ? '#4a4d52' : color;
   g.fillStyle = base; g.fillRect(0, 0, 128, 128);
   if (h) { h.fillStyle = gray(150); h.fillRect(0, 0, 128, 128); }
-  if (style === 'plaster' || style === 'pastel') {
-    mottle(g, 128, 128, 24, rC, 0.07, 0.05);
+  const photo = wallPhoto(style, color, g, h, 128, 128, 2);
+  if (photo && style !== 'plaster' && style !== 'modern') {
+    // foto al posto del disegno
+  } else if (style === 'plaster' || style === 'pastel') {
+    if (!photo) mottle(g, 128, 128, 24, rC, 0.07, 0.05);
     if (style === 'plaster') {
       // bugnato: corsi orizzontali ogni 50 cm, giunti sfalsati ogni metro
       for (let y = 0; y < 128; y += 32) {
@@ -297,7 +322,7 @@ export function plainTexture(style, color) {
   const sg = g.createLinearGradient(0, 96, 0, 128); sg.addColorStop(0, 'rgba(50,40,30,0)'); sg.addColorStop(1, 'rgba(50,40,30,0.12)');
   g.fillStyle = sg; g.fillRect(0, 96, 128, 32);
   grain(g, c, 12);
-  if (H) { grain(h, H.c, 30); plainNormals.set(style, normalFromHeight(H.c, 2.2)); }
+  if (H) { grain(h, H.c, 30); plainNormals.set(style, normalFromHeight(H.c, WALL_PHOTO[style] && hasPhoto(WALL_PHOTO[style].name) ? 1.1 : 2.2)); }
   const t = tex(c);
   if (NORMALS) t.userData.normal = plainNormals.get(style);
   plainCache.set(key, t);
@@ -312,6 +337,12 @@ function withH(c, H, strength) { const t = tex(c); if (NORMALS && H) t.userData.
 export const asphaltTexture = () => once('asphalt', () => {
   const r = rng(11), { c, g } = cv(128, 128), H = NORMALS ? cv(128, 128) : null;
   g.fillStyle = '#45474b'; g.fillRect(0, 0, 128, 128);
+  if (hasPhoto('asphalt')) {
+    // v45: asfalto fotografico (contrasto ridotto: le macchie grandi non devono ripetersi ogni 2 m)
+    paintPhoto(g, 'asphalt', 0, 0, 128, 128, { contrast: 0.8, bright: 1.0 });
+    if (H) paintPhoto(H.g, 'asphalt', 0, 0, 128, 128, { mode: 'height', contrast: 1.4 });
+    return withH(c, H, 1.2);
+  }
   mottle(g, 128, 128, 30, r, 0.12, 0.05);
   for (let i = 0; i < 2600; i++) { const v = r(); g.fillStyle = v < 0.5 ? `rgba(0,0,0,${0.25 * r()})` : `rgba(220,220,215,${0.22 * r()})`; g.fillRect(r() * 128, r() * 128, 0.7 + r() * 0.8, 0.7 + r() * 0.8); }
   // crepe sottili e rattoppi
@@ -326,6 +357,11 @@ export const sidewalkTexture = () => once('sidewalk', () => {
   const r = rng(21), { c, g } = cv(128, 128), H = NORMALS ? cv(128, 128) : null;
   g.fillStyle = '#9d988f'; g.fillRect(0, 0, 128, 128);
   if (H) { H.g.fillStyle = gray(60); H.g.fillRect(0, 0, 128, 128); }
+  if (hasPhoto('slabs')) {
+    paintPhoto(g, 'slabs', 0, 0, 128, 128, { bright: 0.95 });
+    if (H) paintPhoto(H.g, 'slabs', 0, 0, 128, 128, { mode: 'height', contrast: 1.6 });
+    return withH(c, H, 1.6);
+  }
   for (let y = 0; y < 128; y += 32) for (let x = 0; x < 128; x += 32) {
     const k = 0.92 + r() * 0.14;
     g.fillStyle = shade('#c2bdb2', k); g.fillRect(x + 0.8, y + 0.8, 30.4, 30.4);
@@ -341,6 +377,11 @@ export const cobbleTexture = () => once('cobble', () => {
   const r = rng(31), { c, g } = cv(128, 128), H = NORMALS ? cv(128, 128) : null;
   g.fillStyle = '#5a554c'; g.fillRect(0, 0, 128, 128);
   if (H) { H.g.fillStyle = gray(40); H.g.fillRect(0, 0, 128, 128); }
+  if (hasPhoto('cobble')) {
+    paintPhoto(g, 'cobble', 0, 0, 128, 128, { bright: 1.0 });
+    if (H) paintPhoto(H.g, 'cobble', 0, 0, 128, 128, { mode: 'height', contrast: 1.9 });
+    return withH(c, H, 2.4);
+  }
   const s = 6.4;
   for (let row = 0; row < 20; row++) {
     const off = (row % 2) * s * 0.5 + r() * 1.5;
@@ -359,6 +400,13 @@ export const cobbleTexture = () => once('cobble', () => {
 export const roofFlatTexture = () => once('roofFlat', () => {
   const r = rng(41), { c, g } = cv(128, 128), H = NORMALS ? cv(128, 128) : null;
   g.fillStyle = '#7d7c78'; g.fillRect(0, 0, 128, 128);
+  if (hasPhoto('asphalt')) {
+    // tetto piano: guaina con ghiaietto (asfalto fotografico schiarito)
+    paintPhoto(g, 'asphalt', 0, 0, 128, 128, { tint: '#8a8984', keep: 0, contrast: 0.9, ox: 0.5, oy: 0.5 });
+    for (let y = 0; y < 128; y += 42) { g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, y, 128, 1.4); }
+    if (H) paintPhoto(H.g, 'asphalt', 0, 0, 128, 128, { mode: 'height', contrast: 1.4, ox: 0.5, oy: 0.5 });
+    return withH(c, H, 1.4);
+  }
   for (let i = 0; i < 3000; i++) { g.fillStyle = r() < 0.5 ? `rgba(0,0,0,${0.2 * r()})` : `rgba(255,255,255,${0.18 * r()})`; g.fillRect(r() * 128, r() * 128, 1, 1); }
   for (let y = 0; y < 128; y += 42) { g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, y, 128, 1.4); }
   mottle(g, 128, 128, 14, r, 0.12, 0.04);
@@ -381,6 +429,13 @@ export const tileTexture = () => once('tile', () => {
 export const concreteTexture = () => once('concrete', () => {
   const r = rng(61), { c, g } = cv(128, 128), H = NORMALS ? cv(128, 128) : null;
   g.fillStyle = '#a5a29b'; g.fillRect(0, 0, 128, 128);
+  if (hasPhoto('plaster')) {
+    // cemento: intonaco fotografico grigio, poco contrastato
+    paintPhoto(g, 'plaster', 0, 0, 128, 128, { tint: '#a5a29b', keep: 0, contrast: 0.7, oy: 0.3 });
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 0, 128, 1); g.fillRect(0, 0, 1, 128);
+    if (H) { paintPhoto(H.g, 'plaster', 0, 0, 128, 128, { mode: 'height', contrast: 1.0, oy: 0.3 }); H.g.fillStyle = gray(60); H.g.fillRect(0, 0, 128, 1.2); H.g.fillRect(0, 0, 1.2, 128); }
+    return withH(c, H, 1.3);
+  }
   mottle(g, 128, 128, 30, r, 0.1, 0.06);
   g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 0, 128, 1); g.fillRect(0, 0, 1, 128);
   grain(g, c, 14, r);

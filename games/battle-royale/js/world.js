@@ -4,12 +4,12 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ } from './texgen.js?v=19';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=44';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=45';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=45';
 import { carInstances } from './cars.js?v=25';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=44';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=45';
 import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=44';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=45';
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -805,7 +805,31 @@ function withNormal(color, height, strength) {
   if (NORMALS) t.userData.normal = normalFromHeight(height, strength);
   return t;
 }
+// v45: intonaco fotografico unico per tutte le case; il colore di ogni casa è la tinta del materiale
+let _plasterTex = null;
+const PLASTER_K = 1 / 0.86;
 function makeWallTexture(base, line) {
+  if (hasPhoto('plaster')) {
+    if (!_plasterTex) {
+      const B = 256, { c, g } = canvas2d(B), H = NORMALS ? canvas2d(B) : null;
+      paintPhoto(g, 'plaster', 0, 0, B, B, { tint: '#dbdbdb', keep: 0.6, contrast: 0.85 });
+      // umidità e sporco verso il basso (affiancabile solo in orizzontale: in verticale ripete ogni 2 m come prima)
+      for (let i = 0; i < 16; i++) {
+        const x = Math.random() * B, y = 150 + Math.random() * 106, r = 14 + Math.random() * 34;
+        for (const ox of [-B, 0, B]) {
+          const gr = g.createRadialGradient(x + ox, y, 0, x + ox, y, r);
+          gr.addColorStop(0, 'rgba(70,58,36,0.10)'); gr.addColorStop(1, 'rgba(70,58,36,0)');
+          g.fillStyle = gr; g.fillRect(x + ox - r, y - r, r * 2, r * 2);
+        }
+      }
+      if (H) paintPhoto(H.g, 'plaster', 0, 0, B, B, { mode: 'height', contrast: 0.7 });
+      _plasterTex = colorTex(c);
+      if (H) _plasterTex.userData.normal = normalFromHeight(H.c, 0.45);
+    }
+    const t = _plasterTex;
+    // la stessa texture per tutti: la tinta passa al materiale (texMat)
+    return { isTexProxy: true, tex: t, tint: base, tintK: PLASTER_K };
+  }
   const { c, g, S } = canvas2d(128), H = canvas2d(128), h = H.g;
   g.fillStyle = base; g.fillRect(0, 0, 128, 128);
   h.fillStyle = 'rgb(150,150,150)'; h.fillRect(0, 0, 128, 128);
@@ -848,7 +872,25 @@ function makeWallTexture(base, line) {
   return withNormal(c, H.c, 2.2);
 }
 
+let _roofN = null;
+/** v45: muro di pietra fotografico (blocchi irregolari con muschio, come nel riferimento) */
+function makeStoneWallTexture() {
+  if (!hasPhoto('stone')) return makeWallTexture('#a39d92', 'rgba(0,0,0,0.25)');
+  const B = 256, { c, g } = canvas2d(B), H = NORMALS ? canvas2d(B) : null;
+  paintPhoto(g, 'stone', 0, 0, B, B, { bright: 1.18, contrast: 1.05 });
+  if (H) paintPhoto(H.g, 'stone', 0, 0, B, B, { mode: 'height', contrast: 1.5 });
+  return H ? withNormal(c, H.c, 1.1) : colorTex(c);
+}
 function makeRoofTexture(base) {
+  if (hasPhoto('roof')) {
+    // v45: coppi fotografici (muschio e licheni) tinti col colore del tetto
+    const B = 256, { c, g } = canvas2d(B);
+    const warm = new THREE.Color(base); const hsl = {}; warm.getHSL(hsl);
+    paintPhoto(g, 'roof', 0, 0, B, B, { tint: base, keep: hsl.h < 0.12 || hsl.h > 0.95 ? 0.55 : 0.25, contrast: 1.1, bright: 1.18 });
+    if (NORMALS && !_roofN) { const H = canvas2d(B); paintPhoto(H.g, 'roof', 0, 0, B, B, { mode: 'height', contrast: 1.4 }); _roofN = normalFromHeight(H.c, 1.1); }
+    const t = colorTex(c); if (_roofN) t.userData.normal = _roofN;
+    return t;
+  }
   const { c, g, S } = canvas2d(128), H = canvas2d(128), h = H.g;
   g.fillStyle = base; g.fillRect(0, 0, 128, 128);
   h.fillStyle = '#000'; h.fillRect(0, 0, 128, 128);
@@ -877,6 +919,12 @@ function makeRoofTexture(base) {
 }
 
 function makeBrickTexture(base = '#9a4a3a') {
+  if (hasPhoto('brick')) {
+    const B = 256, { c, g } = canvas2d(B), H = NORMALS ? canvas2d(B) : null;
+    paintPhoto(g, 'brick', 0, 0, B, B, { bright: 1.05 });
+    if (H) paintPhoto(H.g, 'brick', 0, 0, B, B, { mode: 'height', contrast: 1.3 });
+    return H ? withNormal(c, H.c, 0.9) : colorTex(c);
+  }
   const { c, g, S } = canvas2d(64), H = canvas2d(64), h = H.g;
   g.fillStyle = '#d8cfc0'; g.fillRect(0, 0, 64, 64);
   h.fillStyle = 'rgb(50,50,50)'; h.fillRect(0, 0, 64, 64);
@@ -904,7 +952,10 @@ function makeWoodTexture() {
   g.fillStyle = '#9a6a35'; g.fillRect(0, 0, B, B);
   h.fillStyle = 'rgb(150,150,150)'; h.fillRect(0, 0, B, B);
   const PW = B / 5;
-  for (let x = 0; x < B - 0.1; x += PW) {
+  // v45: assi fotografiche (venature, nodi e chiodi veri) al posto di quelle disegnate
+  const photo = paintPhoto(g, 'wood', 0, 0, B, B, { bright: 1.12 });
+  if (photo) paintPhoto(h, 'wood', 0, 0, B, B, { mode: 'height', contrast: 1.5, base: 150 });
+  for (let x = 0; !photo && x < B - 0.1; x += PW) {
     const k = 0.86 + Math.random() * 0.28;
     g.fillStyle = `rgba(${k > 1 ? 255 : 40},${k > 1 ? 215 : 20},${k > 1 ? 150 : 0},${Math.abs(k - 1) * 0.7})`; g.fillRect(x, 0, PW, B);
     // venature: linee ondulate che si stringono attorno ai nodi
@@ -939,7 +990,15 @@ function makeWoodTexture() {
   // cornice e traversa diagonale (cassa), in rilievo e con ombra portata
   const frame = (ctx, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.strokeRect(5, 5, B - 10, B - 10); ctx.beginPath(); ctx.moveTo(5, 5); ctx.lineTo(B - 5, B - 5); ctx.stroke(); };
   frame(g, 'rgba(25,12,3,0.55)', 9.5);
-  frame(g, '#74491f', 7);
+  let frameStyle = '#74491f';
+  if (photo) {
+    // cornice con le venature orizzontali (foto ruotata), un po' più scura delle assi
+    const tc = document.createElement('canvas'); tc.width = tc.height = S;
+    const tg = tc.getContext('2d'); tg.setTransform(S / B, 0, 0, S / B, 0, 0);
+    paintPhoto(tg, 'wood', 0, 0, B, B, { rot: true, tint: '#7a4c22', keep: 0.7, contrast: 1.25, ox: 0.37 });
+    frameStyle = g.createPattern(tc, 'repeat'); frameStyle.setTransform(new DOMMatrix().scale(B / S));
+  }
+  frame(g, frameStyle, 7);
   g.strokeStyle = 'rgba(255,220,160,0.16)'; g.lineWidth = 1; g.strokeRect(2.5, 2.5, B - 5, B - 5);
   frame(h, 'rgb(250,250,250)', 7);
   // chiodi (testa lucida con ombra)
@@ -977,6 +1036,8 @@ function makeParquetTexture() {
     g.fillStyle = 'rgba(30,15,5,0.6)'; g.fillRect(i * PW, 0, 0.9, B);
     h.fillStyle = 'rgb(30,30,30)'; h.fillRect(i * PW, 0, 1, B);
   }
+  // v45: venature fotografiche sulle doghe
+  paintPhoto(g, 'wood', 0, 0, B, B, { tile: B / 2, mode: 'detail', strength: 0.75, contrast: 1.1 });
   // cera: riflesso morbido
   const gr = g.createLinearGradient(0, 0, B, B); gr.addColorStop(0, 'rgba(255,240,210,0.06)'); gr.addColorStop(0.5, 'rgba(255,240,210,0)'); gr.addColorStop(1, 'rgba(255,240,210,0.05)');
   g.fillStyle = gr; g.fillRect(0, 0, B, B);
@@ -1172,7 +1233,7 @@ function groundColor(x, z, h, out, slope = null) {
 
 // texture di dettaglio del terreno (dati lineari): R = filini d'erba fini, G = chiazze morbide
 function makeGroundDetail() {
-  const S = 256, c = document.createElement('canvas');
+  const S = 256, c = document.createElement('canvas');   // (v45: canale R dalla foto della terra)
   c.width = c.height = S;
   const g = c.getContext('2d');
   g.fillStyle = 'rgb(150,150,0)'; g.fillRect(0, 0, S, S);
@@ -1201,6 +1262,15 @@ function makeGroundDetail() {
     }
   }
   g.putImageData(img, 0, 0);
+  // v45: canale R = grana fotografica della terra (sassolini, zolle) al posto dei filini disegnati
+  if (hasPhoto('dirt')) {
+    const H = document.createElement('canvas'); H.width = H.height = S;
+    const hg = H.getContext('2d', { willReadFrequently: true });
+    paintPhoto(hg, 'dirt', 0, 0, S, S, { mode: 'height', contrast: 1.35, base: 150 });
+    const hd = hg.getImageData(0, 0, S, S).data, im2 = g.getImageData(0, 0, S, S), d2 = im2.data;
+    for (let i = 0; i < d2.length; i += 4) d2[i] = hd[i];
+    g.putImageData(im2, 0, 0);
+  }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.NoColorSpace;
@@ -1212,7 +1282,15 @@ function makeGroundDetail() {
  *  Usa lo slot `map` integrato (binding affidabile) ma sostituisce il campionamento. */
 function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = false, flora = false) {
   mat.map = tex;
+  // v45: prato fotografico nelle zone verdi (solo il materiale vicino, con la flora)
+  const grassTex = flora ? photoTexture('grass') : null;
+  const grassMean = grassTex ? photoMeanLinear('grass') : null;
   mat.onBeforeCompile = (sh) => {
+    if (grassTex) {
+      sh.uniforms.grassMap = { value: grassTex };
+      sh.uniforms.grassMean = { value: new THREE.Vector3(...grassMean) };
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D grassMap;\nuniform vec3 grassMean;');
+    }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -1246,6 +1324,14 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
           flw *= greenK * (1.0 - smoothstep(0.12, 0.3, fw)) * (1.0 - smoothstep(28.0, 48.0, dist));
           vec3 fcol = mix(vec3(0.34, 0.14, 0.56), vec3(0.55, 0.32, 0.8), h2);
           diffuseColor.rgb = mix(diffuseColor.rgb, fcol, flw);
+          ${grassTex ? `
+          {
+            // v45: foto del prato (due scale, per non far vedere la ripetizione), sfuma con la distanza
+            vec3 g1 = texture2D(grassMap, vWPos.xz * 0.31).rgb, g2 = texture2D(grassMap, vWPos.xz * 0.077 + vec2(0.37, 0.11)).rgb;
+            vec3 grel = clamp(mix(g1, g2, 0.35) / grassMean, 0.0, 2.6);
+            float gk = greenK * (1.0 - smoothstep(55.0, 150.0, dist)) * 0.85;
+            diffuseColor.rgb *= mix(vec3(1.0), grel, gk);
+          }` : ''}
           // macchie un po' più gialle tra l'erba (erba secca e fiorita, come nel riferimento)
           diffuseColor.rgb *= mix(vec3(1.0), vec3(1.1, 1.04, 0.72), greenK * smoothstep(0.55, 0.85, patchF) * 0.35);
           // sabbia: increspature parallele, deformate e più marcate sui fianchi delle dune
@@ -1269,7 +1355,7 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
           normal = normalize(normal + (viewMatrix * vec4(b, 0.0)).xyz);
         }` : '#include <normal_fragment_maps>');
   };
-  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount + (bump ? 'b' : '') + (flora ? 'f36' : '');
+  mat.customProgramCacheKey = () => 'ground-' + near + '-' + far + '-' + amount + (bump ? 'b' : '') + (flora ? 'f36' : '') + (grassTex ? 'g45' : '');
 }
 
 /** normal map affiancabile per l'acqua (somma di onde con frequenze intere) */
@@ -1430,11 +1516,15 @@ export function buildWorld(scene, opts = {}) {
 
   // ── materiali ──
   const wallColors = ['#e8dcc0', '#d9b48a', '#c9d6df', '#e6c3b0', '#cfe0c0', '#f0e0a0'];
-  const texMat = (t, opts = {}) => new THREE.MeshStandardMaterial({ map: t, normalMap: t.userData.normal || null, normalScale: new THREE.Vector2(0.9, 0.9), ...opts });
+  const texMat = (t, opts = {}) => {
+    // v45: intonaco fotografico condiviso, colore della casa come tinta del materiale
+    if (t.isTexProxy) return new THREE.MeshStandardMaterial({ map: t.tex, normalMap: t.tex.userData.normal || null, normalScale: new THREE.Vector2(0.9, 0.9), color: new THREE.Color(t.tint).multiplyScalar(t.tintK), ...opts });
+    return new THREE.MeshStandardMaterial({ map: t, normalMap: t.userData.normal || null, normalScale: new THREE.Vector2(0.9, 0.9), ...opts });
+  };
   const wallMats = wallColors.map(c => texMat(makeWallTexture(c, 'rgba(0,0,0,0.12)'), { roughness: 0.9 }));
   const roofColors = ['#a33b2a', '#5a5f6a', '#3b5a8a', '#7a4a2a'];
   const roofMats = roofColors.map(c => texMat(makeRoofTexture(c), { roughness: 0.72 }));
-  const stoneMat = texMat(makeWallTexture('#a39d92', 'rgba(0,0,0,0.25)'), { roughness: 0.95 });
+  const stoneMat = texMat(makeStoneWallTexture(), { roughness: 0.95 });
   const trimMat = m('trim', '#f1ede2');
   const brickMat = texMat(makeBrickTexture(), { roughness: 0.9 });
   const capMat = m('cap', '#55575c');

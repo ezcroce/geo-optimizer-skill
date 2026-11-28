@@ -7,8 +7,8 @@ Videogioco multiplayer **online e offline** di azione e deduzione sociale in tem
 ## Caratteristiche Implementate
 
 ### 1. Architettura Web, Matchmaking & Stanze Private
-- **Server Node.js Express + WebSocket (`/ws`) + Three.js WebGL**: quando il server Node è pubblicato su un host che supporta WebSocket persistenti, lo stesso URL serve il gioco e gestisce la simulazione delle stanze.
-- **Versione statica su Vercel**: in assenza di `/ws`, il gioco usa PeerJS/WebRTC e il browser del capostanza coordina la partita; richiede un servizio di segnalazione e il capostanza deve rimanere connesso. Non è un backend Node persistente su Vercel e la connessione P2P può non funzionare su tutte le reti.
+- **Server Node.js Express + Socket.IO + Three.js WebGL**: quando il server Node è pubblicato su un host che supporta connessioni persistenti, gestisce la simulazione delle stanze e il movimento. Rimane disponibile anche il trasporto WebSocket precedente (`/ws`).
+- **Versione statica su Vercel**: se non è configurato alcun backend persistente, il gioco ripiega su PeerJS/WebRTC e il browser del capostanza coordina la partita; richiede un servizio di segnalazione e il capostanza deve rimanere connesso. Non è un backend Node persistente su Vercel e la connessione P2P può non funzionare su tutte le reti.
 - **Tre Modalità Immediate dal Menu**:
   1. **Gioca Subito (Offline / 10 Giocatori con IA)**: partita istantanea con 9 ospiti IA contestuali che pattugliano la villa, usano la Sala CCTV, ricordano chi hanno incrociato, mentono (se Ladro) e votano in italiano. Il ruolo è sempre assegnato casualmente.
   2. **Matchmaking Rapido Online**: coda pubblica automatica fino a 10 giocatori.
@@ -18,7 +18,7 @@ Videogioco multiplayer **online e offline** di azione e deduzione sociale in tem
 ### 2. Mappa Completa: "Villa Bellavista" (`src/data/villaLayout.js` & `src/graphics/villaScene.js`)
 - **Interni Arredati**: Atrio d’Ingresso (con Teca Infranta e Pulsante d’Emergenza), Salone delle Feste (pianoforte a coda, divani, paraventi), Studio Privato, Sala di Controllo CCTV, Camera Padronale, Bagno di Lusso / Spa, Camera degli Ospiti, Cucina Gourmet & Sala da Pranzo, Galleria Ovest / Centrale / Est.
 - **Esterni Completi**: Giardino Frontale con Fontana e Cancello, Area Piscina illuminata & Solarium, Retro-Villa con Gazebo antico, Vialetto Orientale & Roseto.
-- **Visuale e coperture**: nebbia di guerra dinamica, con linea di vista bloccata da muri, porte bloccate e arredi alti; il blackout riduce la visuale. La visibilità è applicata al rendering del client: non costituisce protezione anti-cheat.
+- **Visuale e coperture**: nebbia di guerra dinamica, con linea di vista bloccata da muri, porte bloccate, arredi alti e siepi attraversabili. Il blackout dura 12 secondi, azzera la visuale dei civili e lascia al ladro un raggio ridotto. La visibilità è applicata al rendering del client: non costituisce protezione anti-cheat.
 - **Zone di Occultamento (`[E]`)**: Armadi, paraventi di seta, dispensa e siepi esterne.
 - **Movimento**: WASD/frecce, clic destro per muoversi, Shift per correre.
 - **4 Passaggi Segreti per il Ladro (`[Q]`)**: Libreria Girevole (Studio), Armadio a Doppiofondo (Camera Padronale), Botola Cantina Vini (Cucina) e Botola Antica sotto il Gazebo (Retro-Villa).
@@ -48,3 +48,9 @@ npm run dev
 ```
 
 Apri Google Chrome su `http://localhost:3000`.
+
+## Frontend e backend separati
+
+Pubblica `server/index.js` su un servizio Node persistente, ad esempio usando `render.yaml`; la memoria delle stanze è locale a una singola istanza e si perde al riavvio. Configura sul server `CLIENT_ORIGINS=https://the-heist-social.vercel.app` (più origini separate da virgola). Compila il frontend con `VITE_BACKEND_URL=https://INDIRIZZO-DEL-BACKEND npm run build:standalone` e pubblica il risultato. Usa l'URL HTTPS reale, senza percorso. Con `VITE_BACKEND_URL` impostato, un backend non raggiungibile produce un errore anziché ripiegare silenziosamente su WebRTC.
+
+Il server calcola posizione e velocità a tick fissi, verifica collisioni e ingresso/uscita dei passaggi segreti e sincronizza gli stati. Non è ancora una soluzione anti-cheat completa: diverse azioni e le immagini CCTV prodotte dal client non sono verificate indipendentemente. I modelli sono procedurali low-poly con un rig personalizzato, non asset fotorealistici con scheletro standard.

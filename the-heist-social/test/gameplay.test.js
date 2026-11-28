@@ -41,3 +41,37 @@ test('private crime notifications and culprit ID do not leak to civilians', () =
   assert.equal(publicJewels(jewels, false).ring.stolenBy, null);
   assert.equal(publicJewels(jewels, true).ring.stolenBy, 'a');
 });
+
+test('secret passage requires thief, proximity, a valid linked destination and active play', async () => {
+  const { SECRET_PASSAGES } = await import('../src/data/villaLayout.js');
+  const sim = match();
+  const thief = sim.state.players.find(p => p.role === 'thief');
+  const civilian = sim.state.players.find(p => p.role === 'civilian');
+  const source = SECRET_PASSAGES[0], destination = SECRET_PASSAGES.find(p => p.id === source.targets[0]);
+  thief.x = source.x + 10; thief.z = source.z;
+  assert.equal(sim.useSecretPassage(thief.id, source.id, destination.id), false);
+  thief.x = civilian.x = source.x; thief.z = civilian.z = source.z;
+  assert.equal(sim.useSecretPassage(civilian.id, source.id, destination.id), false);
+  assert.equal(sim.useSecretPassage(thief.id, source.id, source.id), false);
+  assert.equal(sim.useSecretPassage(thief.id, source.id, destination.id), true);
+  assert.equal(thief.x, destination.x); assert.equal(thief.z, destination.z);
+  sim.clearTimers();
+});
+
+test('movement respects elapsed time and rejects non-finite input', () => {
+  const sim = match(), p = sim.state.players[0];
+  sim.isBlocked = () => false;
+  p.x = 0; p.z = 0;
+  sim.movePlayer(p, 1, 0, 0.2);
+  const one = p.x;
+  p.x = 0;
+  for (let i = 0; i < 4; i++) sim.movePlayer(p, 1, 0, 0.05);
+  assert.ok(Math.abs(p.x - one) < 1e-10);
+  sim.movePlayer(p, Infinity, 0, 0.05);
+  assert.ok(Number.isFinite(p.x));
+  const before = p.x;
+  sim.state.phase = 'meeting';
+  sim.movePlayer(p, 1, 0, 0.05);
+  assert.equal(p.x, before);
+  sim.clearTimers();
+});

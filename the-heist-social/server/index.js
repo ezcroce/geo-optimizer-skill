@@ -1,10 +1,12 @@
-import { hasLineOfSight, sightObstacles } from '../src/engine/vision.js';
+import { hasLineOfSight, sightObstacles, playerSightRange } from '../src/engine/vision.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 import express from 'express';
 import { WebSocketServer } from 'ws';
+import { Server as SocketIOServer } from 'socket.io';
+import { EventEmitter } from 'node:events';
 import { GameSimulation } from '../src/engine/gameSimulation.js';
 import { CHARACTER_PRESETS } from '../src/data/characters.js';
 import { canReceiveEvent, publicJewels } from '../src/engine/privacy.js';
@@ -65,7 +67,7 @@ function serializeStateForPlayer(state, recipientId) {
   const me = state.players.find((p) => p.id === recipientId);
   const revealAll = state.phase === 'gameover';
   const obstacles = sightObstacles(state.sabotage);
-  const sightRange = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
+  const sightRange = playerSightRange(me, state.sabotage);
 
   return {
     phase: state.phase,
@@ -177,7 +179,7 @@ function startRoomMatch(room) {
     if (room.sim.state.phase === 'playing') {
       for (const client of room.clients.values()) {
         const p = room.sim.state.players.find((x) => x.id === client.id);
-        if (p && !p.eliminated && (client.input.dx || client.input.dz)) {
+        if (p && !p.eliminated && Date.now() - (client.input.updatedAt || 0) < 500 && (client.input.dx || client.input.dz)) {
           room.sim.movePlayer(p, client.input.dx, client.input.dz, TICK_DT, client.input.sprint ? 6.1 : 4.5);
         } else if (p) {
           p.speed = 0;
@@ -235,9 +237,26 @@ async function bootstrap() {
   });
 
   // WebSocket Multiplayer Server on /ws
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 400000 });
+  server.on('upgrade', (req, socket, head) => {
+    if (new URL(req.url, 'http://localhost').pathname === '/ws') {
+      wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+    }
+  });
 
-  wss.on('connection', (ws) => {
+  // Keep the existing message protocol while allowing a Socket.IO transport.
+  const allowedOrigins = (process.env.CLIENT_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const io = new SocketIOServer(server, {
+    cors: { origin: allowedOrigins, methods: ['GET', 'POST'] },
+    maxHttpBufferSize: 400000,
+    allowRequest: (req, cb) => {
+      const origin = req.headers.origin;
+      let sameOrigin = false;
+      try { sameOrigin = !origin || new URL(origin).host === req.headers.host; } catch {}
+      cb(null, sameOrigin || allowedOrigins.includes(origin));
+    },
+  });
+  const handleConnection = (ws) => {
     const playerId = `p_${ Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     const defaultPreset = CHARACTER_PRESETS[Math.floor(Math.random() * CHARACTER_PRESETS.length)];
     const client = {
@@ -259,6 +278,7 @@ async function bootstrap() {
       } catch {
         return;
       }
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
 
       if (msg.type === 'set_profile') {
         if (msg.name) client.name = String(msg.name).trim().slice(0, 22) || client.name;
@@ -343,15 +363,18 @@ async function bootstrap() {
 
       // In-game packets
       if (msg.type === 'move_input') {
-        client.input.dx = Number(msg.dx) || 0;
-        client.input.dz = Number(msg.dz) || 0;
+        client.input.dx = Number.isFinite(msg.dx) ? Math.max(-1, Math.min(1, msg.dx)) : 0;
+        client.input.dz = Number.isFinite(msg.dz) ? Math.max(-1, Math.min(1, msg.dz)) : 0;
         client.input.sprint = msg.sprint === true;
+        client.input.updatedAt = Date.now();
         return;
       }
 
       if (msg.type === 'player_action') {
         const p = room.sim.state.players.find((x) => x.id === client.id);
         if (!p || p.eliminated) return;
+        const meetingAction = ['chat', 'skip_discussion', 'vote'].includes(msg.action);
+        if ((meetingAction && room.sim.state.phase !== 'meeting') || (!meetingAction && room.sim.state.phase !== 'playing')) return;
 
         switch (msg.action) {
           case 'complete_task':
@@ -430,6 +453,17 @@ async function bootstrap() {
     ws.on('close', () => {
       removeClientFromRoom(client);
     });
+  };
+  wss.on('connection', handleConnection);
+  io.on('connection', (socket) => {
+    const channel = new EventEmitter();
+    channel.readyState = 1;
+    channel.send = data => socket.emit('packet', JSON.parse(data));
+    socket.on('packet', data => {
+      if (data && typeof data === 'object' && !Array.isArray(data)) channel.emit('message', JSON.stringify(data));
+    });
+    socket.on('disconnect', () => { channel.readyState = 3; channel.emit('close'); });
+    handleConnection(channel);
   });
 
   // In production (e.g. Render/Railway) serve built dist/; in dev mount Vite middleware
@@ -453,7 +487,7 @@ async function bootstrap() {
   }
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[THE HEIST SOCIAL] Villa Bellavista server listening on http://0.0.0.0:${PORT}`);
+    console.log(`[THE HEIST SOCIAL] Villa Bellavista server listening on http://0.0.0.0:${server.address().port}`);
   });
 }
 

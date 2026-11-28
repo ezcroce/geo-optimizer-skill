@@ -566,6 +566,25 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
   // Local player ring visibility
   rig.localRing.material.opacity = isLocalPlayer && !hidden ? 0.65 + 0.2 * Math.sin(time * 3.0) : 0.0;
 
+  // Brief expulsion animation before removing the avatar from the scene.
+  if (state.eliminated) {
+    rig.expelledElapsed = (rig.expelledElapsed || 0) + dt;
+    const progress = Math.min(1, rig.expelledElapsed / 1.1);
+    mesh.visible = progress < 1;
+    rig.pelvisPivot.rotation.z = progress * 0.9;
+    rig.leftArm.shoulderPivot.rotation.x = -progress * 0.6;
+    rig.rightArm.shoulderPivot.rotation.x = -progress * 0.6;
+    for (const material of rig.materials) {
+      material.transparent = true;
+      material.opacity = 1 - progress;
+    }
+    if (rig.nameplate) rig.nameplate.visible = false;
+    rig.localRing.material.opacity = 0;
+    return;
+  }
+  rig.expelledElapsed = 0;
+  rig.pelvisPivot.rotation.z = 0;
+
   // Concealment in Hiding Spots
   if (hidden) {
     if (isLocalPlayer) {
@@ -601,7 +620,8 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
     // Smooth vertical pelvis bounce (2x per stride cycle) & natural counter-rotation
     rig.pelvisPivot.position.y = (hidden ? 0.68 : 0.89) + Math.abs(Math.sin(p)) * 0.026;
     rig.pelvisPivot.rotation.y = Math.sin(p) * 0.065;
-    rig.pelvisPivot.rotation.x = 0.04; // Subtle natural forward posture
+    // Distinct furtive walk and stronger forward lean when sprinting.
+    rig.pelvisPivot.rotation.x = speed > 5 ? 0.18 : 0.09;
 
     // Legs: hip swing + anatomically accurate backward-only knee flexion
     const lHip = Math.sin(p) * stride;

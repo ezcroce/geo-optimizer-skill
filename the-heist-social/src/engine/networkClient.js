@@ -1,5 +1,6 @@
-import { hasLineOfSight, sightObstacles } from './vision.js';
+import { hasLineOfSight, sightObstacles, playerSightRange } from './vision.js';
 import { Peer } from 'peerjs';
+import { io } from 'socket.io-client';
 import { GameSimulation } from './gameSimulation.js';
 import { CHARACTER_PRESETS } from '../data/characters.js';
 import { canReceiveEvent, publicJewels } from './privacy.js';
@@ -19,7 +20,7 @@ function maskStateForRecipient(state, recipientId) {
   const me = state.players.find((p) => p.id === recipientId);
   const revealAll = state.phase === 'gameover';
   const obstacles = sightObstacles(state.sabotage);
-  const sightRange = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
+  const sightRange = playerSightRange(me, state.sabotage);
   return {
     phase: state.phase,
     matchTime: state.matchTime,
@@ -67,6 +68,7 @@ function maskStateForRecipient(state, recipientId) {
 export class NetworkClient {
   constructor(handlers = {}) {
     this.ws = null;
+    this.socket = null;
     this.transport = null; // 'ws' | 'webrtc'
     this.playerId = null;
     this.connected = false;
@@ -93,7 +95,15 @@ export class NetworkClient {
       return this.playerId;
     }
 
-    // 1. Try dedicated /ws server if running on http/https with backend
+    // A separately deployed authoritative server can be selected at build time.
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+    if (await this._tryConnectSocketIO(backendUrl)) {
+      this.transport = 'socketio';
+      return this.playerId;
+    }
+    if (backendUrl) throw new Error('Server multiplayer non raggiungibile. Riprova più tardi.');
+
+    // Try the legacy same-origin WebSocket server before static-host fallback.
     if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
       const wsWorked = await this._tryConnectWebSocket();
       if (wsWorked) {
@@ -107,6 +117,39 @@ export class NetworkClient {
     this.playerId = `rtc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     this.connected = true;
     return this.playerId;
+  }
+
+  _tryConnectSocketIO(backendUrl) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const socket = io(backendUrl || undefined, { transports: ['websocket'], reconnection: false, timeout: 1800, autoConnect: false });
+      const finish = ok => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (!ok) socket.disconnect();
+        resolve(ok);
+      };
+      const timer = setTimeout(() => finish(false), 2000);
+      socket.on('packet', data => {
+        if (data.type === 'welcome' && !settled) {
+          this.socket = socket;
+          this.playerId = data.playerId;
+          this.connected = true;
+          finish(true);
+        } else if (settled && this.socket === socket) this._dispatchIncoming(data);
+      });
+      socket.on('connect_error', () => finish(false));
+      socket.on('disconnect', () => {
+        if (this.socket === socket) {
+          this.socket = null;
+          this.connected = false;
+          this.handlers.onDisconnect?.();
+        }
+        finish(false);
+      });
+      socket.connect();
+    });
   }
 
   _tryConnectWebSocket() {
@@ -179,6 +222,10 @@ export class NetworkClient {
   }
 
   send(payload) {
+    if (this.transport === 'socketio') {
+      if (this.socket?.connected) this.socket.emit('packet', payload);
+      return;
+    }
     if (this.transport === 'ws') {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify(payload));
@@ -500,15 +547,18 @@ export class NetworkClient {
     if (!r.sim?.state) return;
 
     if (msg.type === 'move_input') {
-      client.input.dx = Number(msg.dx) || 0;
-      client.input.dz = Number(msg.dz) || 0;
+      client.input.dx = Number.isFinite(msg.dx) ? Math.max(-1, Math.min(1, msg.dx)) : 0;
+      client.input.dz = Number.isFinite(msg.dz) ? Math.max(-1, Math.min(1, msg.dz)) : 0;
       client.input.sprint = msg.sprint === true;
+      client.input.updatedAt = Date.now();
       return;
     }
 
     if (msg.type === 'player_action') {
       const p = r.sim.state.players.find((x) => x.id === senderId);
       if (!p || p.eliminated) return;
+      const meetingAction = ['chat', 'skip_discussion', 'vote'].includes(msg.action);
+      if ((meetingAction && r.sim.state.phase !== 'meeting') || (!meetingAction && r.sim.state.phase !== 'playing')) return;
 
       switch (msg.action) {
         case 'complete_task':
@@ -613,7 +663,7 @@ export class NetworkClient {
       if (r.sim.state.phase === 'playing') {
         for (const client of r.clients.values()) {
           const p = r.sim.state.players.find((x) => x.id === client.id);
-          if (p && !p.eliminated && (client.input.dx || client.input.dz)) {
+          if (p && !p.eliminated && Date.now() - (client.input.updatedAt || 0) < 500 && (client.input.dx || client.input.dz)) {
             r.sim.movePlayer(p, client.input.dx, client.input.dz, TICK_DT, client.input.sprint ? 6.1 : 4.5);
           } else if (p) {
             p.speed = 0;

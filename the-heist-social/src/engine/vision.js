@@ -8,7 +8,7 @@ const wallBoxes = WALL_SEGMENTS.map(s => ({
   minZ: Math.min(s.z1, s.z2) - s.thickness / 2,
   maxZ: Math.max(s.z1, s.z2) + s.thickness / 2,
 }));
-const coverBoxes = FURNITURE.filter(f => f.solid && COVER_TYPES.has(f.type)).map(f => {
+const coverBoxes = FURNITURE.filter(f => (f.solid || f.type === 'hedge') && COVER_TYPES.has(f.type)).map(f => {
   const swap = Math.abs(Math.sin(f.rot || 0)) > 0.7;
   const hw = (swap ? f.d : f.w) / 2, hd = (swap ? f.w : f.d) / 2;
   return { minX: f.x - hw, maxX: f.x + hw, minZ: f.z - hd, maxZ: f.z + hd };
@@ -68,4 +68,10 @@ export function cameraSees(camera, player, obstacles) {
   const cosine = (dx * fx + dz * fz) / (distance * facingLength);
   if (cosine < Math.cos(camera.fov * Math.PI / 360)) return false;
   return hasLineOfSight({ x: camera.pos.x, z: camera.pos.z }, player, camera.detectRadius, obstacles);
+}
+
+// A civilian is blinded by a blackout; the thief keeps a short torch radius.
+export function playerSightRange(player, sabotage) {
+  if (sabotage?.blackoutRemaining > 0) return player?.role === 'thief' ? 4.5 : 0;
+  return 11;
 }

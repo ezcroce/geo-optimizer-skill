@@ -283,7 +283,7 @@ export class GameSimulation {
 
     // Solid Furniture
     for (const f of FURNITURE) {
-      if (!f.solid) continue;
+      if (!f.solid || f.type === 'hedge') continue;
       const rotQuarter = Math.abs(Math.sin(f.rot || 0)) > 0.7;
       const hw = (rotQuarter ? f.d : f.w) / 2;
       const hd = (rotQuarter ? f.w : f.d) / 2;
@@ -296,7 +296,7 @@ export class GameSimulation {
   }
 
   movePlayer(player, dx, dz, dt, maxSpeed = 4.5) {
-    if (player.eliminated || player.hidden) {
+    if (!this.state || this.state.phase !== 'playing' || player.eliminated || player.hidden || !Number.isFinite(dx) || !Number.isFinite(dz) || !Number.isFinite(dt) || dt <= 0) {
       player.speed = 0;
       return;
     }
@@ -311,13 +311,18 @@ export class GameSimulation {
 
     let movedX = false;
     let movedZ = false;
-    if (Math.abs(ux) > 0.0001 && !this.isBlocked(player.x + ux * step, player.z)) {
-      player.x += ux * step;
-      movedX = true;
-    }
-    if (Math.abs(uz) > 0.0001 && !this.isBlocked(player.x, player.z + uz * step)) {
-      player.z += uz * step;
-      movedZ = true;
+    // Subdivide long frames so movement stays time-based without tunnelling through walls.
+    const steps = Math.max(1, Math.ceil(step / 0.2));
+    const substep = step / steps;
+    for (let i = 0; i < steps; i++) {
+      if (Math.abs(ux) > 0.0001 && !this.isBlocked(player.x + ux * substep, player.z)) {
+        player.x += ux * substep;
+        movedX = true;
+      }
+      if (Math.abs(uz) > 0.0001 && !this.isBlocked(player.x, player.z + uz * substep)) {
+        player.z += uz * substep;
+        movedZ = true;
+      }
     }
 
     if (movedX || movedZ) {
@@ -427,7 +432,7 @@ export class GameSimulation {
         for (const other of this.state.players) {
           if (other.id === bot.id || other.eliminated || other.hidden) continue;
           const dist = Math.hypot(other.x - bot.x, other.z - bot.z);
-          const sightRange = blackout ? 3.8 : 9.5;
+          const sightRange = blackout ? 0 : 9.5;
           if (dist < sightRange && hasLineOfSight(bot, other, sightRange, obstacles)) {
             if (other.activeCrime) {
               ai.suspicionMap.set(other.id, (ai.suspicionMap.get(other.id) || 0) + 75);
@@ -845,8 +850,9 @@ export class GameSimulation {
   useSecretPassage(playerId, fromSpId, toSpId) {
     const p = this.state.players.find((x) => x.id === playerId);
     if (!p || p.role !== 'thief' || p.eliminated) return false;
+    const source = SECRET_PASSAGES.find((s) => s.id === fromSpId);
     const dest = SECRET_PASSAGES.find((s) => s.id === toSpId);
-    if (!dest) return false;
+    if (this.state.phase !== 'playing' || !source || !dest || !source.targets.includes(dest.id) || Math.hypot(p.x - source.x, p.z - source.z) > 2.5) return false;
 
     p.hidden = false;
     p.x = dest.x;
@@ -891,7 +897,7 @@ export class GameSimulation {
       return true;
     }
     if (kind === 'blackout' && sab.blackoutCooldown <= 0) {
-      sab.blackoutRemaining = 20;
+      sab.blackoutRemaining = 12;
       sab.blackoutCooldown = 36;
       this.onEvent({ type: 'sabotage', kind: 'blackout' });
       return true;
@@ -1023,7 +1029,7 @@ export class GameSimulation {
   }
 
   postChatMessage(senderId, text, evidenceAttachment = null) {
-    if (!this.state?.meeting || !text.trim()) return false;
+    if (!this.state?.meeting || typeof text !== 'string' || !text.trim()) return false;
     const sender = this.state.players.find((p) => p.id === senderId);
     if (!sender) return false;
 

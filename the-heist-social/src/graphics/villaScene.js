@@ -1090,7 +1090,7 @@ export class VillaSceneManager {
       this.ambientLight.intensity = isThief ? 0.54 : 0.15;
       this.dirLight.intensity = isThief ? 0.88 : 0.24;
       for (const il of this.indoorLights) {
-        il.light.intensity = isThief ? il.baseIntensity * 0.55 : 1.6;
+        il.light.intensity = isThief ? il.baseIntensity * 0.25 : 0;
         il.light.color.setHex(0xef4444);
       }
     } else {

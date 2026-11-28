@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { sightObstacles, hasLineOfSight, visibilityPolygon } from './engine/vision.js';
+import { sightObstacles, hasLineOfSight, visibilityPolygon, playerSightRange } from './engine/vision.js';
 import { drawBlueprint } from './graphics/blueprint.js';
 import { CHARACTER_PRESETS, OUTFIT_SWATCHES } from './data/characters.js';
 import {
@@ -45,9 +45,10 @@ function renderVisionFog(me, state, obstacles) {
   const w = visionCanvas.width, h = visionCanvas.height;
   visionCtx.clearRect(0, 0, w, h);
   if (!me || state.phase !== 'playing' || me.eliminated) return;
-  const radius = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
+  const radius = playerSightRange(me, state.sabotage);
   visionCtx.fillStyle = 'rgba(4, 10, 18, 0.82)';
   visionCtx.fillRect(0, 0, w, h);
+  if (radius <= 0) return;
   visionCtx.globalCompositeOperation = 'destination-out';
   visionCtx.fillStyle = '#000';
   visionCtx.beginPath();
@@ -1055,6 +1056,8 @@ function renderMeetingModal(state, forceFull = false) {
     myEvs.forEach((ev, idx) => {
       const btn = document.createElement('button');
       btn.className = 'btn-share-ev';
+      btn.draggable = true;
+      btn.addEventListener('dragstart', event => event.dataTransfer.setData('text/plain', String(idx)));
       btn.textContent = `📤 Condividi ${ev.camCode} (${idx + 1})`;
       btn.addEventListener('click', () => {
         sendMeetingChat(`Guardate questa prova salvata da ${ev.camCode} (${ev.camName}): ${ev.summary}`, ev);
@@ -1063,6 +1066,14 @@ function renderMeetingModal(state, forceFull = false) {
     });
 
     const galEl = document.getElementById('shared-evidence-gallery');
+    galEl.ondragover = event => event.preventDefault();
+    galEl.ondrop = event => {
+      event.preventDefault();
+      const raw = event.dataTransfer.getData('text/plain');
+      if (!/^\d+$/.test(raw)) return;
+      const ev = (getLocalPlayer()?.savedEvidence || [])[Number(raw)];
+      if (ev) sendMeetingChat(`Guardate questa prova salvata da ${ev.camCode} (${ev.camName}): ${ev.summary}`, ev);
+    };
     const shared = m.sharedEvidence || [];
     if (shared.length === 0) {
       galEl.innerHTML = '<div class="empty-ev-msg">Nessuna foto CCTV ancora condivisa in questa riunione.</div>';
@@ -1680,10 +1691,12 @@ function triggerClueReport() {
 let lastFrameTime = performance.now();
 let footstepAccum = 0;
 let lastMapDraw = 0;
+let lastCctvDraw = 0;
 
 function animate(now) {
   requestAnimationFrame(animate);
-  const dt = Math.min(0.08, (now - lastFrameTime) / 1000);
+  // Clamp only very long stalls (background tabs); ordinary slow frames retain elapsed time.
+  const dt = Math.min(0.25, Math.max(0, (now - lastFrameTime) / 1000));
   lastFrameTime = now;
   const elapsedSec = now / 1000;
 
@@ -1741,7 +1754,8 @@ function animate(now) {
     if (playMode === 'offline') {
       localSim.movePlayer(me, dx, dz, dt, sprint ? 6.1 : 4.5);
     } else {
-      netClient.send({ type: 'move_input', dx, dz, sprint });
+      const magnitude = Math.hypot(dx, dz);
+      netClient.send({ type: 'move_input', dx: magnitude ? dx / magnitude : 0, dz: magnitude ? dz / magnitude : 0, sprint });
     }
 
     // Footstep sound feedback
@@ -1789,7 +1803,7 @@ function animate(now) {
   villaScene.syncWorldState(state, me, elapsedSec);
   const obstacles = sightObstacles(state.sabotage);
   if (me && state.phase === 'playing' && !me.eliminated) {
-    const range = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
+    const range = playerSightRange(me, state.sabotage);
     for (const player of state.players) {
       const mesh = avatarMeshes.get(player.id);
       if (mesh && player.id !== me.id && mesh.visible) {
@@ -1817,7 +1831,8 @@ function animate(now) {
       if (me && me.currentRoom !== 'security' && (me.cctvBattery || 0) <= 0.5) {
         closeCctvModal();
         showToast('🔋 Batteria Tablet CCTV esaurita!', true);
-      } else {
+      } else if (now - lastCctvDraw >= 100) {
+        lastCctvDraw = now;
         lastCctvTelemetry = villaScene.renderCctvFeedToCanvas(
           activeCctvCamId,
           document.getElementById('cctv-feed-canvas'),

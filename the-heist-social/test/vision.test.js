@@ -20,3 +20,20 @@ test('locked doors add occluders and camera detection follows cone and line of s
   assert.equal(cameraSees(camera, { x: -4, z: 0 }, []), false);
   assert.equal(cameraSees(camera, { x: 4, z: 0 }, [{ minX: 2, maxX: 3, minZ: -1, maxZ: 1 }]), false);
 });
+
+test('blackout blinds civilians while thief keeps a short visual radius', async () => {
+  const { playerSightRange } = await import('../src/engine/vision.js');
+  assert.equal(playerSightRange({ role: 'civilian' }, { blackoutRemaining: 3 }), 0);
+  assert.equal(playerSightRange({ role: 'thief' }, { blackoutRemaining: 3 }), 4.5);
+  assert.equal(playerSightRange({ role: 'civilian' }, { blackoutRemaining: 0 }), 11);
+});
+
+test('hedges obstruct sight but do not block walking', async () => {
+  const { GameSimulation } = await import('../src/engine/gameSimulation.js');
+  const { FURNITURE } = await import('../src/data/villaLayout.js');
+  const sim = new GameSimulation(); sim.initMatch([]);
+  const hedge = FURNITURE.find(f => f.id === 'f_back_hedge1');
+  assert.equal(sim.isBlocked(hedge.x, hedge.z), false);
+  assert.equal(hasLineOfSight({ x: hedge.x, z: hedge.z - hedge.d / 2 - 1 }, { x: hedge.x, z: hedge.z + hedge.d / 2 + 1 }, 10, sightObstacles(sim.state.sabotage)), false);
+  sim.clearTimers();
+});

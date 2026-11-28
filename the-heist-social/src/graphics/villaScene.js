@@ -1,3 +1,4 @@
+import { sightObstacles, cameraSees } from '../engine/vision.js';
 import * as THREE from 'three';
 import { updateHumanoidAnimation } from './humanoid.js';
 import { createJewelOrnament } from './jewels.js';
@@ -1197,7 +1198,7 @@ export class VillaSceneManager {
     this.renderer.render(this.scene, this.camera);
   }
 
-  renderCctvFeedToCanvas(camId, outCanvas, simState, time) {
+  renderCctvFeedToCanvas(camId, outCanvas, simState, time, avatarMeshes = new Map()) {
     const ctx = outCanvas.getContext('2d');
     const w = outCanvas.width;
     const h = outCanvas.height;
@@ -1235,12 +1236,19 @@ export class VillaSceneManager {
       const pan = Math.sin(time * 0.45) * 1.35;
       cam3d.lookAt(baseLook.x + pan, baseLook.y, baseLook.z);
 
+      // CCTV has its own viewpoint; do not inherit the player's fog-of-war visibility.
+      const savedVisibility = [];
+      for (const player of simState.players) {
+        const mesh = avatarMeshes.get(player.id);
+        if (mesh) { savedVisibility.push([mesh, mesh.visible]); mesh.visible = !player.hidden && !player.eliminated; }
+      }
       const prevFog = this.scene.fog;
       this.scene.fog = null;
       this.renderer.setRenderTarget(this.cctvRenderTarget);
       this.renderer.render(this.scene, cam3d);
       this.renderer.setRenderTarget(null);
       this.scene.fog = prevFog;
+      for (const [mesh, visible] of savedVisibility) mesh.visible = visible;
 
       const width = this.cctvRenderTarget.width;
       const height = this.cctvRenderTarget.height;
@@ -1278,11 +1286,11 @@ export class VillaSceneManager {
     }
 
     const visiblePlayers = [];
+    const cameraObstacles = sightObstacles(simState.sabotage);
     let suspiciousActivity = null;
     for (const p of simState.players) {
       if (p.eliminated || p.hidden) continue;
-      const dist = Math.hypot(p.x - camDef.lookAt.x, p.z - camDef.lookAt.z);
-      if (p.currentRoom === camDef.room || dist < camDef.detectRadius * 0.72) {
+      if (cameraSees(camDef, p, cameraObstacles)) {
         visiblePlayers.push(p);
         if (p.activeCrime) {
           suspiciousActivity = {

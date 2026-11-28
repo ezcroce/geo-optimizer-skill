@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+import { sightObstacles, hasLineOfSight, visibilityPolygon } from './engine/vision.js';
 import { drawBlueprint } from './graphics/blueprint.js';
 import { CHARACTER_PRESETS, OUTFIT_SWATCHES } from './data/characters.js';
 import {
@@ -31,6 +33,33 @@ import { soundEngine } from './audio/soundEngine.js';
 // =========================================================
 const canvas = document.getElementById('game-canvas');
 const villaScene = new VillaSceneManager(canvas);
+const visionCanvas = document.getElementById('vision-canvas');
+const visionCtx = visionCanvas.getContext('2d');
+const visionPoint = new THREE.Vector3();
+
+function renderVisionFog(me, state, obstacles) {
+  if (visionCanvas.width !== window.innerWidth || visionCanvas.height !== window.innerHeight) {
+    visionCanvas.width = window.innerWidth;
+    visionCanvas.height = window.innerHeight;
+  }
+  const w = visionCanvas.width, h = visionCanvas.height;
+  visionCtx.clearRect(0, 0, w, h);
+  if (!me || state.phase !== 'playing' || me.eliminated) return;
+  const radius = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
+  visionCtx.fillStyle = 'rgba(4, 10, 18, 0.82)';
+  visionCtx.fillRect(0, 0, w, h);
+  visionCtx.globalCompositeOperation = 'destination-out';
+  visionCtx.fillStyle = '#000';
+  visionCtx.beginPath();
+  const polygon = visibilityPolygon(me, radius, obstacles);
+  polygon.forEach((p, i) => {
+    visionPoint.set(p.x, 0.9, p.z).project(villaScene.camera);
+    const x = (visionPoint.x + 1) * w / 2, y = (1 - visionPoint.y) * h / 2;
+    if (i === 0) visionCtx.moveTo(x, y); else visionCtx.lineTo(x, y);
+  });
+  visionCtx.closePath(); visionCtx.fill();
+  visionCtx.globalCompositeOperation = 'source-over';
+}
 
 let selectedPreset = CHARACTER_PRESETS[0];
 let customAppearance = { ...selectedPreset };
@@ -411,9 +440,11 @@ function handleSimEvent(ev) {
       }
       break;
     case 'diamond_stashed':
+      if (getLocalPlayer()?.role !== 'thief') break;
       showToast('💠 Hai nascosto "La Stella di Venezia" nel nascondiglio segreto!');
       break;
     case 'diamond_retrieved':
+      if (getLocalPlayer()?.role !== 'thief') break;
       showToast('💠 Hai ripreso con te "La Stella di Venezia"!');
       break;
     case 'diamond_recovered':
@@ -782,6 +813,7 @@ function openCctvModal() {
   const me = getLocalPlayer();
   const state = getSimState();
   if (!me || !state || state.phase !== 'playing' || me.eliminated) return;
+  if (me.role !== 'civilian') { showToast('La sorveglianza CCTV è riservata ai civili.', true); return; }
   if (me.currentRoom !== 'security' && (me.cctvBattery || 0) < 5) {
     showToast('🔋 Batteria Tablet CCTV scarica! Ricarica in Sala di Controllo o completando compiti.', true);
     return;
@@ -1663,6 +1695,7 @@ function animate(now) {
     const orbitZ = 4 + Math.cos(elapsedSec * 0.14) * 8;
     villaScene.cameraZoom = 22;
     villaScene.syncWorldState(null, null, elapsedSec);
+    visionCtx.clearRect(0, 0, visionCanvas.width, visionCanvas.height);
     villaScene.updateCameraFollow(orbitX, orbitZ, dt);
     villaScene.renderMain();
     return;
@@ -1704,10 +1737,11 @@ function animate(now) {
       else netClient.send({ type: 'player_action', action: 'set_interacting', interacting: false });
     }
 
+    const sprint = keysDown.has('shift');
     if (playMode === 'offline') {
-      localSim.movePlayer(me, dx, dz, dt, me.role === 'thief' ? 4.75 : 4.5);
+      localSim.movePlayer(me, dx, dz, dt, sprint ? 6.1 : 4.5);
     } else {
-      netClient.send({ type: 'move_input', dx, dz });
+      netClient.send({ type: 'move_input', dx, dz, sprint });
     }
 
     // Footstep sound feedback
@@ -1753,12 +1787,23 @@ function animate(now) {
   // Sync 3D Avatars & Villa World Props
   syncAvatarMeshes(state, dt, elapsedSec);
   villaScene.syncWorldState(state, me, elapsedSec);
+  const obstacles = sightObstacles(state.sabotage);
+  if (me && state.phase === 'playing' && !me.eliminated) {
+    const range = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
+    for (const player of state.players) {
+      const mesh = avatarMeshes.get(player.id);
+      if (mesh && player.id !== me.id && mesh.visible) {
+        mesh.visible = hasLineOfSight(me, player, range, obstacles);
+      }
+    }
+  }
 
   if (me) {
     const localMesh = avatarMeshes.get(me.id);
     villaScene.updateCameraFollow(localMesh?.position.x ?? me.x, localMesh?.position.z ?? me.z, dt);
   }
   villaScene.renderMain();
+  renderVisionFog(me, state, obstacles);
 
   // Update HUD, Minimap, Blueprint, CCTV Feed, or Meeting UI
   if (state.phase === 'playing') {
@@ -1777,7 +1822,8 @@ function animate(now) {
           activeCctvCamId,
           document.getElementById('cctv-feed-canvas'),
           state,
-          elapsedSec
+          elapsedSec,
+          avatarMeshes
         );
       }
     }

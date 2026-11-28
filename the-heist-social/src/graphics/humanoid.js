@@ -25,10 +25,37 @@ function createLimbGeometry(topRadius, midRadius, bottomRadius, length, scaleX =
   return geom;
 }
 
-// Rounded, oversized toy-like head inspired by illustrated game characters.
+// Sculpted realistic human head geometry (ovoid cranium + tapered jawline, no abstract shapes)
 function createSculptedHeadGeometry() {
   const geom = new THREE.SphereGeometry(0.105, 32, 24);
-  geom.scale(1.08, 1.0, 0.98);
+  const pos = geom.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    let z = pos.getZ(i);
+
+    // Human head is taller than wide (~1 : 1.24)
+    y *= 1.16;
+    x *= 0.90;
+    z *= 0.98;
+
+    // Gentle jaw & chin taper below cheekbones
+    if (y < 0) {
+      const jawFactor = 1.0 - Math.min(0.28, (-y / 0.12) * 0.26);
+      x *= jawFactor;
+      z *= 0.96;
+      // Subtle chin forward projection
+      if (z > 0 && y < -0.05) {
+        z += 0.008 * (1 - Math.abs(x) / 0.08);
+      }
+    } else {
+      // Slightly fuller back of cranium
+      if (z < 0) z *= 1.05;
+    }
+
+    pos.setXYZ(i, x, y, z);
+  }
+  geom.computeVertexNormals();
   return geom;
 }
 
@@ -211,7 +238,7 @@ export function createRealisticHumanoid(config, showLabel = true) {
   });
 
   const characterGroup = new THREE.Group();
-  characterGroup.scale.set(1.20 * bodyScale, 0.80 * bodyScale, 1.20 * bodyScale);
+  characterGroup.scale.setScalar(bodyScale);
   root.add(characterGroup);
 
   // Subtle ground contact shadow disc
@@ -294,8 +321,7 @@ export function createRealisticHumanoid(config, showLabel = true) {
   neckPivot.add(collar);
 
   const headPivot = new THREE.Group();
-  headPivot.position.y = 0.31;
-  headPivot.scale.setScalar(2.45);
+  headPivot.position.y = 0.145;
   neckPivot.add(headPivot);
 
   const headMesh = new THREE.Mesh(createSculptedHeadGeometry(), skinMat);
@@ -311,34 +337,43 @@ export function createRealisticHumanoid(config, showLabel = true) {
     headPivot.add(ear);
   }
 
-  // Bold dark eyes, small eyebrows and cheek highlights read clearly from above.
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x201b22, roughness: 0.8 });
-  const glintMat = new THREE.MeshBasicMaterial({ color: 0xfff8eb });
-  const blushMat = new THREE.MeshBasicMaterial({ color: 0xee8b80, transparent: true, opacity: 0.45 });
+  // Sculpted nose bridge
+  const noseGeo = new THREE.ConeGeometry(0.013, 0.036, 12);
+  noseGeo.scale(0.85, 1.0, 1.15);
+  const nose = new THREE.Mesh(noseGeo, skinMat);
+  nose.position.set(0, -0.008, 0.102);
+  nose.rotation.x = 0.25;
+  headPivot.add(nose);
+
+  // Calm human eyes + eyebrows + natural lips
+  const scleraMat = new THREE.MeshBasicMaterial({ color: 0xfafafa });
+  const pupilMat = new THREE.MeshBasicMaterial({ color: 0x1b2028 });
+  const lipMat = new THREE.MeshStandardMaterial({
+    color: isFemale ? '#b56565' : '#bf8474',
+    roughness: 0.45,
+  });
+
   for (const side of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.014, 16, 12), eyeMat);
-    eye.scale.set(0.8, 1.45, 0.45);
-    eye.position.set(side * 0.038, 0.005, 0.098);
-    headPivot.add(eye);
+    const eyeWhite = new THREE.Mesh(new THREE.SphereGeometry(0.013, 12, 10), scleraMat);
+    eyeWhite.scale.set(1.18, 0.78, 0.55);
+    eyeWhite.position.set(side * 0.035, 0.016, 0.092);
+    headPivot.add(eyeWhite);
 
-    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.003, 8, 8), glintMat);
-    glint.position.set(side * 0.038 - 0.003, 0.014, 0.105);
-    headPivot.add(glint);
+    const iris = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 10, 10), pupilMat);
+    iris.scale.set(1.0, 1.0, 0.5);
+    iris.position.set(side * 0.035, 0.016, 0.098);
+    headPivot.add(iris);
 
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.027, 0.006, 0.008), hairMat);
-    brow.position.set(side * 0.038, 0.037, 0.090);
-    brow.rotation.z = side * -0.08;
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.0055, 0.008), hairMat);
+    brow.position.set(side * 0.036, 0.033, 0.094);
+    brow.rotation.z = side * (isFemale ? 0.06 : -0.04);
     headPivot.add(brow);
-
-    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 10), blushMat);
-    cheek.scale.set(1.25, 0.48, 0.25);
-    cheek.position.set(side * 0.066, -0.024, 0.078);
-    headPivot.add(cheek);
   }
-  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.009, 12, 10), eyeMat);
-  mouth.scale.set(1.1, 0.25, 0.25);
-  mouth.position.set(0, -0.041, 0.095);
-  headPivot.add(mouth);
+
+  const lips = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 10), lipMat);
+  lips.scale.set(1.35, 0.36, 0.5);
+  lips.position.set(0, -0.044, 0.094);
+  headPivot.add(lips);
 
   // Styled Realistic Hair
   const hairGroup = createHairMesh(config.hairStyle || 'swept', hairMat, isFemale);
@@ -478,7 +513,7 @@ export function createRealisticHumanoid(config, showLabel = true) {
   let nameplate = null;
   if (showLabel) {
     nameplate = createNameplateSprite(config.name, config.badgeHex);
-    nameplate.position.y = 1.94 * bodyScale;
+    nameplate.position.y = 1.98 * bodyScale;
     root.add(nameplate);
   }
 
@@ -511,7 +546,7 @@ export function createRealisticHumanoid(config, showLabel = true) {
     bodyScale,
     walkPhase: Math.random() * Math.PI * 2,
     walkBlend: 0,
-    materials: [skinMat, hairMat, jacketMat, shirtMat, trouserMat, accentMat, shoeMat, eyeMat, glintMat, blushMat],
+    materials: [skinMat, hairMat, jacketMat, shirtMat, trouserMat, accentMat, shoeMat, scleraMat, pupilMat, lipMat],
   };
 
   return root;
@@ -536,9 +571,8 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
     if (isLocalPlayer) {
       mesh.visible = true;
       for (const m of rig.materials) {
-        if (m.userData.normalOpacity === undefined) m.userData.normalOpacity = m.opacity;
         m.transparent = true;
-        m.opacity = m.userData.normalOpacity * 0.42;
+        m.opacity = 0.42;
       }
       if (rig.nameplate) rig.nameplate.visible = false;
     } else {
@@ -548,10 +582,9 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
   } else {
     mesh.visible = !state.eliminated;
     for (const m of rig.materials) {
-      if (m.userData.normalOpacity !== undefined) {
-        m.opacity = m.userData.normalOpacity;
-        m.transparent = m.opacity < 1;
-        delete m.userData.normalOpacity;
+      if (m.opacity !== 1) {
+        m.opacity = 1;
+        m.transparent = false;
       }
     }
     if (rig.nameplate) rig.nameplate.visible = true;
@@ -563,7 +596,7 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
     const cadence = Math.min(11.5, 4.8 + speed * 1.15);
     rig.walkPhase += dt * cadence;
     const p = rig.walkPhase;
-    const stride = Math.min(0.56, 0.22 + speed * 0.065) * rig.walkBlend;
+    const stride = Math.min(0.70, 0.22 + speed * 0.065) * rig.walkBlend;
 
     // Smooth vertical pelvis bounce (2x per stride cycle) & natural counter-rotation
     rig.pelvisPivot.position.y = (hidden ? 0.68 : 0.89) + Math.abs(Math.sin(p)) * 0.026;
@@ -598,21 +631,21 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
       rig.rightArm.elbowPivot.rotation.x = -0.22 - Math.max(0, rHip) * 0.32;
     }
 
-    rig.headPivot.rotation.y *= Math.exp(-7.7 * dt);
+    rig.headPivot.rotation.y *= 0.88;
     rig.headPivot.rotation.x = -0.02;
   } else {
     // Calm human idle breathing + subtle weight shift
     const breath = Math.sin(time * 2.1 + rig.walkPhase);
     rig.pelvisPivot.position.y = (hidden ? 0.65 : 0.89) + breath * 0.006;
-    rig.pelvisPivot.rotation.y *= Math.exp(-7.7 * dt);
+    rig.pelvisPivot.rotation.y *= 0.88;
     rig.pelvisPivot.rotation.x = hidden ? 0.22 : 0.0;
 
-    rig.leftLeg.hipPivot.rotation.x *= Math.exp(-12 * dt);
-    rig.rightLeg.hipPivot.rotation.x *= Math.exp(-12 * dt);
-    rig.leftLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.leftLeg.kneePivot.rotation.x * Math.exp(-12 * dt);
-    rig.rightLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.rightLeg.kneePivot.rotation.x * Math.exp(-12 * dt);
-    rig.leftLeg.footGroup.rotation.x *= Math.exp(-12 * dt);
-    rig.rightLeg.footGroup.rotation.x *= Math.exp(-12 * dt);
+    rig.leftLeg.hipPivot.rotation.x *= 0.82;
+    rig.rightLeg.hipPivot.rotation.x *= 0.82;
+    rig.leftLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.leftLeg.kneePivot.rotation.x * 0.82;
+    rig.rightLeg.kneePivot.rotation.x = hidden ? 0.45 : rig.rightLeg.kneePivot.rotation.x * 0.82;
+    rig.leftLeg.footGroup.rotation.x *= 0.82;
+    rig.rightLeg.footGroup.rotation.x *= 0.82;
 
     if (interacting) {
       // Natural working / inspecting / lockpicking gesture with both hands
@@ -631,11 +664,11 @@ export function updateHumanoidAnimation(mesh, state, dt, time, isLocalPlayer = f
       rig.headPivot.rotation.x = 0.24;
     } else {
       // Relaxed tailored posture
-      rig.leftArm.shoulderPivot.rotation.x *= Math.exp(-9.8 * dt);
+      rig.leftArm.shoulderPivot.rotation.x *= 0.85;
       rig.leftArm.shoulderPivot.rotation.z = -0.055 - breath * 0.01;
       rig.leftArm.elbowPivot.rotation.x = -0.14;
 
-      rig.rightArm.shoulderPivot.rotation.x *= Math.exp(-9.8 * dt);
+      rig.rightArm.shoulderPivot.rotation.x *= 0.85;
       rig.rightArm.shoulderPivot.rotation.z = 0.055 + breath * 0.01;
       rig.rightArm.elbowPivot.rotation.x = -0.14;
 
@@ -665,8 +698,8 @@ export function renderCharacterPortrait(config) {
     const scene = new THREE.Scene();
     const cam = new THREE.PerspectiveCamera(32, 1, 0.1, 10);
     const scale = config.gender === 'female' ? 0.955 : 1.0;
-    cam.position.set(0.16, 1.43 * scale, 1.8);
-    cam.lookAt(0, 1.28 * scale, 0);
+    cam.position.set(0.18, 1.50 * scale, 0.82);
+    cam.lookAt(0, 1.46 * scale, 0);
 
     const amb = new THREE.AmbientLight(0xfff5eb, 1.15);
     const keyLight = new THREE.DirectionalLight(0xfff0dd, 1.8);

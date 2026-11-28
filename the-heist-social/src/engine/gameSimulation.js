@@ -1,3 +1,4 @@
+import { hasLineOfSight, sightObstacles, cameraSees } from './vision.js';
 import {
   ESTATE_BOUNDS,
   ROOMS,
@@ -379,18 +380,11 @@ export class GameSimulation {
 
     // Automatic CCTV Sensor Log when cameras are online
     if (sab.cctvGlitchRemaining <= 0) {
+      const cameraObstacles = sightObstacles(sab);
       for (const cam of CCTV_CAMERAS) {
         for (const p of this.state.players) {
           if (p.eliminated || p.hidden) continue;
-          const dist = Math.hypot(p.x - cam.lookAt.x, p.z - cam.lookAt.z);
-          if (p.currentRoom === cam.room || dist < cam.detectRadius * 0.7) {
-            if (p.role === 'thief' && this.state.matchTime > 5 && this.state.thiefCaughtMoments.length === 0) {
-              this._recordThiefMoment(
-                p,
-                'TRANSITO SOSPETTO SU TELECAMERA',
-                `Ripreso da ${cam.code} (${cam.name}) con La Stella di Venezia`
-              );
-            }
+          if (cameraSees(cam, p, cameraObstacles)) {
             if (!p.activeCrime) continue;
             const recentSame = this.state.recentCctvLogs.find(
               (l) => l.suspectId === p.id && l.camId === cam.id && this.state.matchTime - l.time < 8
@@ -421,6 +415,7 @@ export class GameSimulation {
 
   _updateAIBots(dt) {
     const blackout = this.state.sabotage.blackoutRemaining > 0;
+    const obstacles = sightObstacles(this.state.sabotage);
 
     for (const bot of this.state.players) {
       if (!bot.isBot || bot.eliminated) continue;
@@ -433,7 +428,7 @@ export class GameSimulation {
           if (other.id === bot.id || other.eliminated || other.hidden) continue;
           const dist = Math.hypot(other.x - bot.x, other.z - bot.z);
           const sightRange = blackout ? 3.8 : 9.5;
-          if ((other.currentRoom === bot.currentRoom || dist < 5.5) && dist < sightRange) {
+          if (dist < sightRange && hasLineOfSight(bot, other, sightRange, obstacles)) {
             if (other.activeCrime) {
               ai.suspicionMap.set(other.id, (ai.suspicionMap.get(other.id) || 0) + 75);
               ai.sightings.unshift({
@@ -1175,6 +1170,7 @@ export class GameSimulation {
     if (!m || m.subPhase !== 'voting') return false;
     const voter = this.state.players.find((p) => p.id === voterId);
     if (!voter || voter.eliminated || m.votes[voterId]) return false;
+    if (targetId && targetId !== 'skip' && !this.state.players.some(p => p.id === targetId && !p.eliminated)) return false;
 
     m.votes[voterId] = targetId || 'skip';
     this.onEvent({ type: 'vote_cast', voterId });
@@ -1227,14 +1223,15 @@ export class GameSimulation {
       }
     }
 
-    if (highestId === 'skip' || tie || highestVotes === 0) {
+    const majority = Math.floor(this.state.players.filter(p => !p.eliminated).length / 2) + 1;
+    if (highestId === 'skip' || tie || highestVotes < majority) {
       m.resultSummary = {
         expelledPlayer: null,
         wasThief: false,
         counts,
         headline: tie
           ? 'PAREGGIO NELLA VOTAZIONE — Nessun ospite è stato espulso dalla Villa.'
-          : 'MAGGIORANZA DI ASTENSIONI — Nessun sospettato espulso.',
+          : 'NESSUNA MAGGIORANZA — Nessun sospettato espulso.',
       };
     } else {
       const expelled = this.state.players.find((p) => p.id === highestId);

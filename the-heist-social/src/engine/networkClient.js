@@ -1,6 +1,8 @@
+import { hasLineOfSight, sightObstacles } from './vision.js';
 import { Peer } from 'peerjs';
 import { GameSimulation } from './gameSimulation.js';
 import { CHARACTER_PRESETS } from '../data/characters.js';
+import { canReceiveEvent, publicJewels } from './privacy.js';
 
 const PEER_PREFIX = 'ths-villa-2026-';
 
@@ -16,11 +18,13 @@ function randomRoomCode() {
 function maskStateForRecipient(state, recipientId) {
   const me = state.players.find((p) => p.id === recipientId);
   const revealAll = state.phase === 'gameover';
+  const obstacles = sightObstacles(state.sabotage);
+  const sightRange = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
   return {
     phase: state.phase,
     matchTime: state.matchTime,
     emergencyCooldown: state.emergencyCooldown,
-    jewels: state.jewels,
+    jewels: publicJewels(state.jewels, revealAll || me?.role === 'thief'),
     stolenJewelsCount: state.stolenJewelsCount,
     jewelQuota: state.jewelQuota,
     mainDiamond: {
@@ -31,7 +35,7 @@ function maskStateForRecipient(state, recipientId) {
     },
     securityProgress: state.securityProgress,
     sabotage: state.sabotage,
-    recentCctvLogs: state.recentCctvLogs,
+    recentCctvLogs: revealAll || (me?.role === 'civilian' && me.usingCctv) ? state.recentCctvLogs : [],
     thiefCaughtMoments: revealAll ? state.thiefCaughtMoments || [] : [],
     meeting: state.meeting,
     winner: state.winner,
@@ -50,7 +54,7 @@ function maskStateForRecipient(state, recipientId) {
       hidden: p.hidden,
       usingCctv: p.usingCctv,
       interacting: p.interacting,
-      activeCrime: p.activeCrime,
+      activeCrime: (revealAll || p.id === recipientId || (me?.role === 'civilian' && me.usingCctv) || (me && !p.hidden && hasLineOfSight(me, p, sightRange, obstacles))) ? p.activeCrime : null,
       currentRoom: p.currentRoom,
       emergencyCallsLeft: p.id === recipientId ? p.emergencyCallsLeft : undefined,
       cctvBattery: p.id === recipientId ? p.cctvBattery : undefined,
@@ -498,6 +502,7 @@ export class NetworkClient {
     if (msg.type === 'move_input') {
       client.input.dx = Number(msg.dx) || 0;
       client.input.dz = Number(msg.dz) || 0;
+      client.input.sprint = msg.sprint === true;
       return;
     }
 
@@ -525,7 +530,7 @@ export class NetworkClient {
           r.sim.toggleHide(senderId, msg.spotId);
           break;
         case 'set_cctv_open':
-          p.usingCctv = Boolean(msg.open);
+          p.usingCctv = p.role === 'civilian' && Boolean(msg.open);
           break;
         case 'set_interacting':
           p.interacting = Boolean(msg.interacting);
@@ -571,6 +576,10 @@ export class NetworkClient {
   _rtcStartMatch() {
     const r = this.rtcHostRoom;
     if (!r || r.status === 'in_game') return;
+    if (!r.fillWithBots && r.clients.size < 10) {
+      this.handlers.onMessage?.({ type: 'error_msg', message: 'Servono 10 giocatori: attendi gli ospiti o attiva il riempimento IA.' });
+      return;
+    }
     r.status = 'in_game';
 
     const roster = Array.from(r.clients.values()).map((c) => ({
@@ -584,22 +593,17 @@ export class NetworkClient {
     r.sim = new GameSimulation({
       mode: 'online_host',
       onEvent: (ev) => {
-        this._rtcBroadcast({ type: 'sim_event', event: ev });
+        for (const client of r.clients.values()) {
+          if (!canReceiveEvent(ev, client.id, r.sim.state)) continue;
+          const packet = { type: 'sim_event', event: ev };
+          if (client.id === this.playerId) this._dispatchIncoming(packet);
+          else if (client.conn?.open) client.conn.send(packet);
+        }
         this._rtcBroadcastSimState();
       },
     });
 
-    if (!r.fillWithBots && roster.length >= 2) {
-      r.sim.initMatch(roster);
-      r.sim.state.players = r.sim.state.players.filter((p) => !p.isBot);
-      const thiefIdx = Math.floor(Math.random() * r.sim.state.players.length);
-      r.sim.state.players.forEach((p, idx) => {
-        p.role = idx === thiefIdx ? 'thief' : 'civilian';
-      });
-      r.sim.state.mainDiamond.carrierId = r.sim.state.players[thiefIdx].id;
-    } else {
-      r.sim.initMatch(roster);
-    }
+    r.sim.initMatch(roster);
 
     this._rtcBroadcastSimState();
 
@@ -610,7 +614,7 @@ export class NetworkClient {
         for (const client of r.clients.values()) {
           const p = r.sim.state.players.find((x) => x.id === client.id);
           if (p && !p.eliminated && (client.input.dx || client.input.dz)) {
-            r.sim.movePlayer(p, client.input.dx, client.input.dz, TICK_DT, p.role === 'thief' ? 4.75 : 4.5);
+            r.sim.movePlayer(p, client.input.dx, client.input.dz, TICK_DT, client.input.sprint ? 6.1 : 4.5);
           } else if (p) {
             p.speed = 0;
           }

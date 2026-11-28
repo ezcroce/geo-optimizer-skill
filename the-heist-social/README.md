@@ -7,17 +7,20 @@ Videogioco multiplayer **online e offline** di azione e deduzione sociale in tem
 ## Caratteristiche Implementate
 
 ### 1. Architettura Web, Matchmaking & Stanze Private
-- **Server Unificato Express + WebSocket (`/ws`) + Three.js WebGL**: un unico URL gestisce sia il rendering 3D sia il multiplayer autoritativo lato server (zero port-forwarding o host P2P richiesto ai giocatori).
+- **Server Node.js Express + WebSocket (`/ws`) + Three.js WebGL**: quando il server Node è pubblicato su un host che supporta WebSocket persistenti, lo stesso URL serve il gioco e gestisce la simulazione delle stanze.
+- **Versione statica su Vercel**: in assenza di `/ws`, il gioco usa PeerJS/WebRTC e il browser del capostanza coordina la partita; richiede un servizio di segnalazione e il capostanza deve rimanere connesso. Non è un backend Node persistente su Vercel e la connessione P2P può non funzionare su tutte le reti.
 - **Tre Modalità Immediate dal Menu**:
   1. **Gioca Subito (Offline / 10 Giocatori con IA)**: partita istantanea con 9 ospiti IA contestuali che pattugliano la villa, usano la Sala CCTV, ricordano chi hanno incrociato, mentono (se Ladro) e votano in italiano. Il ruolo è sempre assegnato casualmente.
   2. **Matchmaking Rapido Online**: coda pubblica automatica fino a 10 giocatori.
   3. **Stanza Privata tramite Codice (`VL-XXXX`)**: generazione codice stanza + link invito diretto (`?room=VL-XXXX`), con possibilità di completare i posti liberi fino a 10 con Bot IA.
-- **Personaggi 3D stilizzati (`src/graphics/humanoid.js`)**: proporzioni da miniature cartoon, volti espressivi, abiti da gala personalizzabili e animazioni procedurali.
+- **Personaggi umanoidi 3D proporzionati (`src/graphics/humanoid.js`)**: abiti da gala personalizzabili e animazioni procedurali di camminata, corsa e interazione.
 
 ### 2. Mappa Completa: "Villa Bellavista" (`src/data/villaLayout.js` & `src/graphics/villaScene.js`)
 - **Interni Arredati**: Atrio d’Ingresso (con Teca Infranta e Pulsante d’Emergenza), Salone delle Feste (pianoforte a coda, divani, paraventi), Studio Privato, Sala di Controllo CCTV, Camera Padronale, Bagno di Lusso / Spa, Camera degli Ospiti, Cucina Gourmet & Sala da Pranzo, Galleria Ovest / Centrale / Est.
 - **Esterni Completi**: Giardino Frontale con Fontana e Cancello, Area Piscina illuminata & Solarium, Retro-Villa con Gazebo antico, Vialetto Orientale & Roseto.
+- **Visuale e coperture**: nebbia di guerra dinamica, con linea di vista bloccata da muri, porte bloccate e arredi alti; il blackout riduce la visuale. La visibilità è applicata al rendering del client: non costituisce protezione anti-cheat.
 - **Zone di Occultamento (`[E]`)**: Armadi, paraventi di seta, dispensa e siepi esterne.
+- **Movimento**: WASD/frecce, clic destro per muoversi, Shift per correre.
 - **4 Passaggi Segreti per il Ladro (`[Q]`)**: Libreria Girevole (Studio), Armadio a Doppiofondo (Camera Padronale), Botola Cantina Vini (Cucina) e Botola Antica sotto il Gazebo (Retro-Villa).
 
 ### 3. Ruoli, Gioielli & "La Stella di Venezia"

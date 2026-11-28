@@ -14,12 +14,12 @@ const context = new Proxy({}, {
 });
 globalThis.document = { createElement: () => ({ getContext: () => context }) };
 
-test('cartoon characters keep their animation rig and facial materials', () => {
+test('proportioned characters keep their animation rig and facial materials', () => {
   for (const preset of CHARACTER_PRESETS) {
     const avatar = createRealisticHumanoid(preset, true);
     const rig = avatar.userData.rig;
-    assert.equal(rig.headPivot.scale.x, 2.45);
-    assert.ok(rig.characterGroup.scale.y < rig.characterGroup.scale.x);
+    assert.equal(rig.headPivot.scale.x, 1);
+    assert.equal(rig.characterGroup.scale.y, rig.characterGroup.scale.x);
     updateHumanoidAnimation(avatar, { speed: 2, usingCctv: true }, 0.016, 2, true);
     assert.equal(rig.tabletMesh.visible, true);
     const originalOpacities = rig.materials.map(m => m.opacity);

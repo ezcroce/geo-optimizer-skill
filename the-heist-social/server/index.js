@@ -1,3 +1,4 @@
+import { hasLineOfSight, sightObstacles } from '../src/engine/vision.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -6,6 +7,7 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import { GameSimulation } from '../src/engine/gameSimulation.js';
 import { CHARACTER_PRESETS } from '../src/data/characters.js';
+import { canReceiveEvent, publicJewels } from '../src/engine/privacy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -62,12 +64,14 @@ function serializeLobby(room) {
 function serializeStateForPlayer(state, recipientId) {
   const me = state.players.find((p) => p.id === recipientId);
   const revealAll = state.phase === 'gameover';
+  const obstacles = sightObstacles(state.sabotage);
+  const sightRange = state.sabotage.blackoutRemaining > 0 ? 4.5 : 11;
 
   return {
     phase: state.phase,
     matchTime: state.matchTime,
     emergencyCooldown: state.emergencyCooldown,
-    jewels: state.jewels,
+    jewels: publicJewels(state.jewels, revealAll || me?.role === 'thief'),
     stolenJewelsCount: state.stolenJewelsCount,
     jewelQuota: state.jewelQuota,
     mainDiamond: {
@@ -80,7 +84,7 @@ function serializeStateForPlayer(state, recipientId) {
     },
     securityProgress: state.securityProgress,
     sabotage: state.sabotage,
-    recentCctvLogs: state.recentCctvLogs,
+    recentCctvLogs: revealAll || (me?.role === 'civilian' && me.usingCctv) ? state.recentCctvLogs : [],
     thiefCaughtMoments: revealAll ? state.thiefCaughtMoments || [] : [],
     meeting: state.meeting,
     winner: state.winner,
@@ -99,7 +103,7 @@ function serializeStateForPlayer(state, recipientId) {
       hidden: p.hidden,
       usingCctv: p.usingCctv,
       interacting: p.interacting,
-      activeCrime: p.activeCrime,
+      activeCrime: (revealAll || p.id === recipientId || (me?.role === 'civilian' && me.usingCctv) || (me && !p.hidden && hasLineOfSight(me, p, sightRange, obstacles))) ? p.activeCrime : null,
       currentRoom: p.currentRoom,
       emergencyCallsLeft: p.id === recipientId ? p.emergencyCallsLeft : undefined,
       cctvBattery: p.id === recipientId ? p.cctvBattery : undefined,
@@ -134,6 +138,11 @@ function broadcastSimState(room) {
 
 function startRoomMatch(room) {
   if (room.status === 'in_game') return;
+  if (!room.fillWithBots && room.clients.size < 10) {
+    const host = room.clients.get(room.hostId);
+    host?.ws.send(JSON.stringify({ type: 'error_msg', message: 'Servono 10 giocatori: attendi gli ospiti o attiva il riempimento IA.' }));
+    return;
+  }
   room.status = 'in_game';
 
   const roster = Array.from(room.clients.values()).map((c) => ({
@@ -147,25 +156,16 @@ function startRoomMatch(room) {
   room.sim = new GameSimulation({
     mode: 'online_host',
     onEvent: (ev) => {
-      broadcastRoom(room, { type: 'sim_event', event: ev });
+      for (const client of room.clients.values()) {
+        if (client.ws.readyState === 1 && canReceiveEvent(ev, client.id, room.sim.state)) {
+          client.ws.send(JSON.stringify({ type: 'sim_event', event: ev }));
+        }
+      }
       broadcastSimState(room);
     },
   });
 
-  // If fillWithBots is false and >= 3 humans, only use humans; otherwise pad to 10 with smart AI suspects
-  if (!room.fillWithBots && roster.length >= 2) {
-    // Temporarily init and trim bots if disabled
-    room.sim.initMatch(roster);
-    room.sim.state.players = room.sim.state.players.filter((p) => !p.isBot);
-    // Ensure exactly 1 thief among humans
-    const thiefIdx = Math.floor(Math.random() * room.sim.state.players.length);
-    room.sim.state.players.forEach((p, idx) => {
-      p.role = idx === thiefIdx ? 'thief' : 'civilian';
-    });
-    room.sim.state.mainDiamond.carrierId = room.sim.state.players[thiefIdx].id;
-  } else {
-    room.sim.initMatch(roster);
-  }
+  room.sim.initMatch(roster);
 
   broadcastSimState(room);
 
@@ -178,7 +178,7 @@ function startRoomMatch(room) {
       for (const client of room.clients.values()) {
         const p = room.sim.state.players.find((x) => x.id === client.id);
         if (p && !p.eliminated && (client.input.dx || client.input.dz)) {
-          room.sim.movePlayer(p, client.input.dx, client.input.dz, TICK_DT, p.role === 'thief' ? 4.75 : 4.5);
+          room.sim.movePlayer(p, client.input.dx, client.input.dz, TICK_DT, client.input.sprint ? 6.1 : 4.5);
         } else if (p) {
           p.speed = 0;
         }
@@ -345,6 +345,7 @@ async function bootstrap() {
       if (msg.type === 'move_input') {
         client.input.dx = Number(msg.dx) || 0;
         client.input.dz = Number(msg.dz) || 0;
+        client.input.sprint = msg.sprint === true;
         return;
       }
 
@@ -372,7 +373,7 @@ async function bootstrap() {
             room.sim.toggleHide(client.id, msg.spotId);
             break;
           case 'set_cctv_open':
-            p.usingCctv = Boolean(msg.open);
+            p.usingCctv = p.role === 'civilian' && Boolean(msg.open);
             break;
           case 'set_interacting':
             p.interacting = Boolean(msg.interacting);

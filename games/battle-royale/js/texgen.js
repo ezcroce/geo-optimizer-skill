@@ -104,12 +104,12 @@ export function applyAnisotropy(root, n) {
 //  Se un'immagine non arriva, ogni generatore torna al disegno procedurale di prima.
 // ═════════════════════════════════════════════════════════════
 const PHOTO_LIST = ['stone', 'plaster', 'brick', 'roof', 'wood', 'cobble', 'asphalt', 'slabs', 'grass', 'dirt',
-  'rock', 'concrete', 'metal', 'parquet', 'snow', 'sand', 'slate', 'paintwood'];   // v46: seconda serie
+  'rock', 'concrete', 'metal', 'parquet', 'snow', 'sand', 'slate', 'paintwood', 'bark', 'sky'];   // v46: seconda serie; v52: corteccia e cielo
 export const PHOTOS = {};
 // v47: WebP a 512 px (il gioco non ricampiona mai oltre i 512 px); a 1024 px solo le 4 foto usate intere come
 // texture del terreno e delle rocce, e solo con la qualità texture alta. Prima: 18 JPEG da 1024 px = 5,4 MB
 const PHOTO_BIG = TEXQ >= 2 ? new Set(['rock', 'grass', 'snow', 'sand']) : new Set();
-export const photoUrl = (n) => new URL(`../img/tex/${PHOTO_BIG.has(n) ? '' : 's/'}${n}.webp?v=51`, import.meta.url).href;
+export const photoUrl = (n) => new URL(`../img/tex/${PHOTO_BIG.has(n) ? '' : 's/'}${n}.webp?v=52`, import.meta.url).href;
 export const photoProgress = { done: 0, total: PHOTO_LIST.length };
 function loadPhoto(n) {
   // v51: la foto si scarica con fetch e diventa un'immagine locale (blob:). Su raw.githack i file possono arrivare

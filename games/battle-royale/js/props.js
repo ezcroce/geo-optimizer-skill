@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS, photoTexture, photoMeanLinear, photosReady } from './texgen.js?v=51';
+import { normalFromHeight, NORMALS, photoTexture, photoMeanLinear, photosReady } from './texgen.js?v=52';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 
@@ -1411,7 +1411,7 @@ export const leafMaterial = addWind(makeLeafMaterial(false), 2.2, 0.0045, 'leaf'
 /** v36: cactus lisci (normali per vertice, niente sfaccettature) e un filo di lucido */
 export const cactusMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.0 });
 /** materiale per tipo di albero (versione dettagliata): di base treeMaterial */
-export const TREE_MATS = { cactus: cactusMaterial };
+export const TREE_MATS = { cactus: cactusMaterial };   // v52: + deadTree: barkMaterial (sotto)
 export const bushLeafMaterial = addWind(makeLeafMaterial(true), 0.3, 0.07, 'bushleaf');
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
@@ -1465,10 +1465,10 @@ rockMaterial.onBeforeCompile = (sh) => {
         float n2 = rFbm(P * 1.9 + 11.0, fw * 1.9);                    // dettaglio medio
         // texture di pietra solo come leggera marezzatura (mip normali, niente grana)
         vec3 w = abs(nn); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z);
-        vec3 tp = P * 0.35;
+        vec3 tp = P * 0.3;
         ${rockPhoto ? `
         vec3 c3 = texture2D(map, tp.yz).rgb * w.x + texture2D(map, tp.xz).rgb * w.y + texture2D(map, tp.xy).rgb * w.z;
-        vec3 rrel = clamp(c3 / rockMean, 0.0, 2.4);
+        vec3 rrel = clamp(c3 / rockMean, 0.3, 1.8);
         float rl = dot(rrel, vec3(0.299, 0.587, 0.114));
         float t = clamp(rl * 0.5, 0.0, 1.0);
         float rNear = 1.0 - smoothstep(50.0, 180.0, length(vViewPosition));` : `
@@ -1479,7 +1479,7 @@ rockMaterial.onBeforeCompile = (sh) => {
         float strata = (0.5 + 0.5 * sin(sp)) * bandAA + 0.5 * (1.0 - bandAA);
         float tone = (1.0 + n1 * 0.36 + n2 * 0.14) * (0.94 + 0.1 * t) * (0.94 + 0.1 * strata);
         diffuseColor.rgb *= clamp(tone, 0.55, 1.2);
-        ${rockPhoto ? 'diffuseColor.rgb *= mix(vec3(1.0), mix(vec3(rl), rrel, 0.6), 0.85 * (0.45 + 0.55 * rNear));' : ''}
+        ${rockPhoto ? 'diffuseColor.rgb *= mix(vec3(1.0), mix(vec3(rl), rrel, 0.6), 0.75 * (0.45 + 0.55 * rNear));' : ''}
         // muschio (prati, boschi) e neve (montagna) sulle facce rivolte verso l'alto, con bordo irregolare
         float up = nn.y + n1 * 0.9 + n2 * 0.4;
         float moss = vSurf.y * smoothstep(0.42, 0.72, up);
@@ -1488,7 +1488,8 @@ rockMaterial.onBeforeCompile = (sh) => {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.77, 0.82) * (0.97 + n2 * 0.1), snow);
         diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8));            // mai bianco abbagliante
         rockH = (n1 * 0.6 + n2 * 0.4) * (1.0 - snow * 0.7);
-        ${rockPhoto ? 'rockH += (rl - 1.0) * 0.22 * rNear * (1.0 - snow * 0.8);   // crepe e spigoli della foto' : ''}
+        // v52: niente rilievo preso dalla foto: la derivata di una texture filtrata è a gradini (i "quadretti" e la grana
+        // a puntini sulle rocce); il rilievo resta quello del rumore liscio, la foto dà solo colore e chiaroscuro
       }`)
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       {
@@ -1501,7 +1502,81 @@ rockMaterial.onBeforeCompile = (sh) => {
       }`)
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = 1.0;');
 };
-rockMaterial.customProgramCacheKey = () => 'rock-v22' + (rockPhoto ? 'p46' : '');
+rockMaterial.customProgramCacheKey = () => 'rock-v22' + (rockPhoto ? 'p52' : '');
+
+/**
+ * v52: materiali fotografici per gli oggetti "tondi" (silo, ciminiere) e per gli alberi secchi.
+ *  · cylPhotoMaterial: foto avvolta attorno all'asse verticale dell'oggetto (coordinate cilindriche, senza cucitura
+ *    visibile: le derivate si prendono dall'angolo continuo), tinta dal colore dei vertici. Niente rilievo a rumore
+ *    (era quello a dare i "quadretti" scuri sul silo).
+ *  · barkMaterial: corteccia fotografica proiettata sui 3 assi, ombreggiatura liscia (prima: righe lucide e quasi nero).
+ */
+function cylPhotoMaterial(name, key, { tile = 1.6, around = 8, rough = 0.7, metal = 0.1, sat = 0.75, k = 1 } = {}) {
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: metal });
+  let mean = [0.5, 0.5, 0.5], has = false;
+  photosReady.then(() => { const t = photoTexture(name); if (t) { mat.map = t; mean = photoMeanLinear(name); has = true; mat.needsUpdate = true; } });
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.pMean = { value: new THREE.Vector3(...mean) };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCP = position;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCP;\nuniform vec3 pMean;')
+      .replace('#include <map_fragment>', '')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      ${has ? `{
+        float a1 = atan(vCP.z, vCP.x), a2 = atan(-vCP.z, -vCP.x);
+        vec2 g1 = vec2(dFdx(a1), dFdy(a1)), g2 = vec2(dFdx(a2), dFdy(a2));
+        vec2 ga = dot(g1, g1) < dot(g2, g2) ? g1 : g2;
+        float ka = ${around.toFixed(2)} / 6.28318;
+        vec2 uv = vec2(a1 * ka, vCP.y / ${tile.toFixed(2)});
+        vec3 ph = textureGrad(map, uv, vec2(ga.x * ka, dFdx(uv.y)), vec2(ga.y * ka, dFdy(uv.y))).rgb;
+        vec3 rel = clamp(ph / pMean, 0.2, 2.2);
+        float rl = dot(rel, vec3(0.299, 0.587, 0.114));
+        diffuseColor.rgb *= mix(vec3(rl), rel, ${sat.toFixed(2)}) * ${k.toFixed(2)};
+      }` : ''}`);
+  };
+  mat.customProgramCacheKey = () => 'cyl52-' + key + (has ? 'p' : '');
+  return mat;
+}
+export const siloMaterial = cylPhotoMaterial('metal', 'silo', { tile: 1.8, around: 7, rough: 0.55, metal: 0.25, sat: 0.8 });
+export const stackMaterial = cylPhotoMaterial('brick', 'stack', { tile: 1.4, around: 5, rough: 0.9, metal: 0.0, sat: 0.6 });
+
+export const barkMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.0 });
+{
+  let has = false;
+  photosReady.then(() => { const t = photoTexture('bark'); if (t) { barkMaterial.map = t; has = true; barkMaterial.needsUpdate = true; } });
+  barkMaterial.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vBP;\nvarying vec3 vBN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBP = position; vBN = normal;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vBP;\nvarying vec3 vBN;\nfloat barkH;\n${GLSL_NOISE}\nfloat rFbmB(vec3 p) { return rFbm(p, length(fwidth(p))); }`)
+      .replace('#include <map_fragment>', '')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        barkH = 0.0;
+        ${has ? `
+        vec3 w = abs(normalize(vBN)); w = pow(w, vec3(4.0)); w /= (w.x + w.y + w.z);
+        vec3 tp = vBP * vec3(1.6, 0.8, 1.6);   // fessure allungate in verticale
+        vec3 b = texture2D(map, tp.zy).rgb * w.x + texture2D(map, tp.xz).rgb * w.y + texture2D(map, tp.xy).rgb * w.z;
+        // la foto dà il dettaglio; il colore del vertice (legno secco, grigio-bruno) dà la tinta
+        float lb = dot(b, vec3(0.299, 0.587, 0.114));
+        diffuseColor.rgb = mix(vec3(lb), b, 0.8) * vec3(1.12, 1.0, 0.88) * 1.45 * (dot(diffuseColor.rgb, vec3(0.333)) / 0.106);
+        barkH = rFbmB(vBP * vec3(6.0, 1.2, 6.0)) * 0.12;` : ''}
+        diffuseColor.rgb *= mix(0.7, 1.0, smoothstep(0.0, 0.8, vBP.y));   // terra e ombra alla base
+      }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
+        float dhx = dFdx(barkH), dhy = dFdy(barkH);
+        vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
+        float det = dot(dpx, r1);
+        normal = normalize(abs(det) * normal - sign(det) * (dhx * r1 + dhy * r2) * 0.5);
+      }`);
+  };
+  barkMaterial.customProgramCacheKey = () => 'bark52' + (has ? 'p' : '');
+}
 
 /** rilievo procedurale (bump con rumore 3D) per legno e metallo degli oggetti di scena: più tridimensionali
  *  v22: venature lisce e continue (prima l'hash dava blocchi e anelli a macchie), che si sfumano da lontano */
@@ -1672,3 +1747,4 @@ export async function loadModelOverrides(base = 'models/') {
   }));
   return loaded;
 }
+TREE_MATS.deadTree = barkMaterial;   // v52: albero secco con la corteccia fotografica

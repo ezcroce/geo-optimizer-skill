@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=51';
+import { EMOTES, poseEmote } from './emotes.js?v=52';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=51';
-import * as PR from './progress.js?v=51';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=51';
-import { initMenu } from './menu.js?v=51';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=51';
-import { initSettingsUI } from './settings-ui.js?v=51';
-import { applyAnisotropy, photosReady, photoProgress } from './texgen.js?v=51';
-import * as A from './audio.js?v=51';
+} from './config.js?v=52';
+import * as PR from './progress.js?v=52';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=52';
+import { initMenu } from './menu.js?v=52';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=52';
+import { initSettingsUI } from './settings-ui.js?v=52';
+import { applyAnisotropy, photosReady, photoProgress, PHOTOS } from './texgen.js?v=52';
+import * as A from './audio.js?v=52';
 import {
   buildWorld, buildWorldAsync, prewarmMap, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=51';
-import { createWeather } from './weather.js?v=51';
-import { createEvents } from './events.js?v=51';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=51';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=51';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=51';
-import { buildChestMesh } from './models3d.js?v=51';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=51';
-import { createInventory } from './inventory.js?v=51';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=51';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=51';
-import { createStoves } from './stove.js?v=51';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=51';
-import { buildPickaxe, heldConsumable } from './held.js?v=51';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=51';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=51';
-import { createCrosshair } from './crosshair.js?v=51';
-import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=51';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=51';
+} from './world.js?v=52';
+import { createWeather } from './weather.js?v=52';
+import { createEvents } from './events.js?v=52';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=52';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=52';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=52';
+import { buildChestMesh } from './models3d.js?v=52';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=52';
+import { createInventory } from './inventory.js?v=52';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=52';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=52';
+import { createStoves } from './stove.js?v=52';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=52';
+import { buildPickaxe, heldConsumable } from './held.js?v=52';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=52';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=52';
+import { createCrosshair } from './crosshair.js?v=52';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=52';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds, setSkyPhoto, SKY_PHOTO } from './sky.js?v=52';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -150,6 +150,8 @@ function gradientMaterial(top, bottom) {
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 32), skyMaterial(SUN_OFF));   // v37: cielo a fasce con striature (pixel art in 3D)
 sky.renderOrder = -1;
 scene.add(sky);
+// v52: appena arrivano le foto il cielo diventa quello fotografico (con le sue nuvole: quelle disegnate si nascondono)
+photosReady.then(() => { if (PHOTOS.sky) setSkyPhoto(PHOTOS.sky.img); });
 // meteo e atmosfera: nebbia d'altezza, montagne all'orizzonte, neve/foglie/polvere locali
 const weather = createWeather(scene, { biomeAt, terrainHeight });
 const SUN_BASE = new THREE.Color('#ffeccc'), SUN_GOLD = new THREE.Color('#ffb84a');
@@ -5683,7 +5685,7 @@ function renderLobby(dt) {
     lobby.bus.position.set(x, 30 + Math.sin(t * 0.5) * 0.8, -95);
     lobby.bus.rotation.set(0, Math.PI / 2, Math.sin(t * 0.7) * 0.03);
   }
-  if (lobby.clouds) { for (const cl of lobby.clouds) { cl.position.x += dt * 0.8; if (cl.position.x > 130) cl.position.x = -130; } faceClouds(lobby.clouds, lobby.cam); }
+  if (lobby.clouds) { for (const cl of lobby.clouds) { cl.visible = !SKY_PHOTO.tex; cl.position.x += dt * 0.8; if (cl.position.x > 130) cl.position.x = -130; } faceClouds(lobby.clouds, lobby.cam); }
   // personaggio centrato nello spazio libero tra i pannelli (metri per pixel alla distanza della camera)
   const tab = menuApi ? menuApi.tab() : 'play';
   // con la squadra la camera si allontana un po' per inquadrare tutti
@@ -6202,8 +6204,9 @@ function update(dt) {
   updateDoors(dt);
   G.warm = stoves.update(dt, camera, G.chars);
   updateEffects(dt);
-  for (const cl of clouds) { cl.position.x += dt * 2; if (cl.position.x > 450) cl.position.x = -450; }
-  faceClouds(clouds, camera);
+  const showCl = !SKY_PHOTO.tex;   // v52: con il cielo fotografico niente nuvole disegnate
+  for (const cl of clouds) { cl.visible = showCl; cl.position.x += dt * 2; if (cl.position.x > 450) cl.position.x = -450; }
+  if (showCl) faceClouds(clouds, camera);
   sky.material.uniforms.uTime.value += dt;
   updateCamera(dt);
   weather.update(dt, G.time, camera, renderer, true);

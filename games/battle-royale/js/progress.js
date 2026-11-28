@@ -2,7 +2,7 @@
 //  Progressi del giocatore: pass battaglia, negozio, missioni, monete
 //  (tutto salvato nel browser con localStorage)
 // ─────────────────────────────────────────────────────────────
-import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=51';
+import { SKINS, HATS, BACKPACKS, GLIDERS, RARITIES } from './config.js?v=52';
 
 const KEY = 'arenaRoyaleProfile';
 export const XP_PER_TIER = 1000;

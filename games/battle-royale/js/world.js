@@ -4,12 +4,12 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=51';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=51';
-import { carInstances } from './cars.js?v=51';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=51';
-import { makeNoise, fbm, ridged } from './noise.js?v=51';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=51';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=52';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=52';
+import { carInstances } from './cars.js?v=52';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=52';
+import { makeNoise, fbm, ridged } from './noise.js?v=52';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial, siloMaterial, stackMaterial } from './props.js?v=52';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 
@@ -1595,7 +1595,11 @@ function ridgeGeo(len) { const g = new THREE.CylinderGeometry(0.13, 0.13, len, 8
 
 function specialGeo(type, c = 0) {
   const key = type + ':' + (c || 0);
-  if (!_specialCache.has(key)) _specialCache.set(key, SPECIAL_GEO[type](c || 0));
+  if (!_specialCache.has(key)) {
+    const g = SPECIAL_GEO[type](c || 0);
+    if (type === 'silo' || type === 'stack') g.userData.mat = type;   // v52: materiale fotografico avvolto (lamiera / mattoni)
+    _specialCache.set(key, g);
+  }
   return _specialCache.get(key);
 }
 
@@ -3468,9 +3472,9 @@ function* buildWorldSteps(scene, opts = {}) {
         for (const im of carInstances(list[0].c || 0, list, (s) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); return mat4.compose(p, q, sc); }, scene.environment, (mt) => { clipMat(mt); return mt; })) group.add(im);
         continue;
       }
-      clipMat(propMaterial); clipMat(civicMaterial);
+      clipMat(propMaterial); clipMat(civicMaterial); clipMat(siloMaterial); clipMat(stackMaterial);
       const sg = specialGeo(list[0].type, list[0].c);
-      const im = new THREE.InstancedMesh(sg, sg.userData.rock ? rockMaterial : sg.userData.civic ? civicMaterial : propMaterial, list.length);   // v38: panchine e fontane con le texture   // v33: colline di roccia vera
+      const im = new THREE.InstancedMesh(sg, sg.userData.rock ? rockMaterial : sg.userData.civic ? civicMaterial : sg.userData.mat === 'silo' ? siloMaterial : sg.userData.mat === 'stack' ? stackMaterial : propMaterial, list.length);   // v38: panchine e fontane con le texture   // v33: colline di roccia vera
       list.forEach((s, i) => { q.setFromAxisAngle(up, s.rot || 0); p.set(s.x, s.h, s.z); sc.set(1, 1, 1); mat4.compose(p, q, sc); im.setMatrixAt(i, mat4); });
       im.castShadow = im.receiveShadow = true;
       im.computeBoundingSphere();

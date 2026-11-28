@@ -8,17 +8,34 @@ import * as THREE from 'three';
 
 export const SKY_COLORS = { top: '#2f6fd8', mid: '#5b9cf0', bottom: '#bfe2ff' };
 
+// v52: cielo fotografico (img/tex/s/sky.webp: striscia panoramica 2048×256 ricavata dalla foto scelta, filigrana tolta,
+// specchiata per chiudersi a 360°). Arriva con le altre foto: finché non c'è (o se manca) resta il cielo disegnato.
+const SKY_MATS = [];
+export const SKY_PHOTO = { tex: null };
+export function setSkyPhoto(img) {
+  if (!img || SKY_PHOTO.tex) return !!SKY_PHOTO.tex;
+  const t = new THREE.Texture(img);
+  t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter;   // niente mipmap: nessuna riga sulla cucitura a 360°
+  t.needsUpdate = true;
+  SKY_PHOTO.tex = t;
+  for (const m of SKY_MATS) { m.uniforms.uPhoto.value = t; m.uniforms.uUsePhoto.value = 1; }
+  return true;
+}
+
 /** materiale della cupola del cielo (anche per la mappa d'ambiente) */
 export function skyMaterial(sunDir, colors = SKY_COLORS, streaks = true) {
-  return new THREE.ShaderMaterial({
+  const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: {
       top: { value: new THREE.Color(colors.top) }, mid: { value: new THREE.Color(colors.mid) }, bottom: { value: new THREE.Color(colors.bottom) },
       warm: { value: new THREE.Color('#ffe2b8') }, sunDir: { value: sunDir.clone().normalize() }, uTime: { value: 0 },
       uStreak: { value: streaks ? 1 : 0 },
+      uPhoto: { value: SKY_PHOTO.tex }, uUsePhoto: { value: SKY_PHOTO.tex ? 1 : 0 }, zenith: { value: new THREE.Color('#86aee8') },
     },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; uniform vec3 warm; uniform vec3 sunDir; uniform float uTime; uniform float uStreak; varying vec3 vP;
+    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; uniform vec3 warm; uniform vec3 sunDir; uniform float uTime; uniform float uStreak; uniform sampler2D uPhoto; uniform float uUsePhoto; uniform vec3 zenith; varying vec3 vP;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -27,7 +44,7 @@ export function skyMaterial(sunDir, colors = SKY_COLORS, streaks = true) {
         float h = clamp(d.y * 1.25 + 0.06, 0.0, 1.0);
         vec3 col = mix(bottom, mid, smoothstep(0.0, 0.42, h));
         col = mix(col, top, smoothstep(0.36, 1.0, h));
-        if (uStreak > 0.5) {
+        if (uStreak > 0.5 && uUsePhoto < 0.5) {
           // striature orizzontali: rumore molto allungato lungo l'orizzonte, a righe come nei cieli disegnati a pixel
           float az = atan(d.z, d.x);
           float row = floor(d.y * 150.0);
@@ -38,16 +55,33 @@ export function skyMaterial(sunDir, colors = SKY_COLORS, streaks = true) {
           col *= 1.0 - smoothstep(0.7, 0.92, n2) * band * 0.08;                              // righe un po' più scure
         }
         float s = max(dot(d, sunDir), 0.0);
+        if (uUsePhoto > 0.5) {
+          // v52: foto del cielo. La striscia viene da una faccia di skybox (90°): la riga v corrisponde a tan(elevazione)
+          // fino a 45°; più in alto si sfuma nell'azzurro dello zenit. Il chiarore della foto si allinea al sole del gioco.
+          float hl = max(length(d.xz), 1e-4);
+          float tn = d.y / hl;
+          float sunAz = atan(sunDir.z, sunDir.x);
+          float u = (atan(d.z, d.x) - sunAz) / 6.28318 + 0.25;
+          vec3 ph = texture2D(uPhoto, vec2(u, clamp(tn, 0.002, 0.995))).rgb;
+          float el = atan(d.y, hl);
+          col = mix(ph, zenith, smoothstep(0.75, 1.35, el));
+          col = max(mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.25), 0.0) * 0.93;   // un po' più azzurro, meno abbagliante
+          col = mix(col, texture2D(uPhoto, vec2(u, 0.004)).rgb, smoothstep(0.0, -0.06, d.y));   // sotto l'orizzonte: la foschia chiara
+          col += vec3(1.0, 0.95, 0.82) * (pow(s, 900.0) * 2.5 + pow(s, 80.0) * 0.12);
+        } else {
         col = mix(col, warm, pow(s, 6.0) * 0.3 * (1.0 - h * 0.5));
         col += vec3(1.0, 0.92, 0.75) * (pow(s, 900.0) * 3.0 + pow(s, 60.0) * 0.22);
         col = mix(col, bottom * 1.02, smoothstep(0.06, -0.05, d.y));
         // leggera posterizzazione: le sfumature diventano fasce, come in pixel art
         if (uStreak > 0.5) col = floor(col * 40.0 + 0.5) / 40.0;
+        }
         gl_FragColor = vec4(col, 1.0);
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
       }`,
   });
+  SKY_MATS.push(mat);
+  return mat;
 }
 
 // ── nuvole ──

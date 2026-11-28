@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v51';
+export const NEWS_VERSION = 'v52';
 
 export const NEWS = [
+  {
+    v: 'v52', title: 'Cielo fotografico e texture realistiche', color: '#9fd0ff', icon: '🌤️',
+    items: [
+      'Nuovo cielo fotografico con nuvole vere (al posto di quello disegnato): il chiarore della foto è allineato con il sole del gioco',
+      'Rocce con una nuova foto di pietra con muschio, come un muro di pietra vero: niente più grana a puntini',
+      'Silo in lamiera ondulata fotografica (con ruggine) e cupola a costoloni: spariti i quadretti scuri',
+      'Alberi secchi con corteccia fotografica grigio-bruna: non più neri con le righe lucide',
+      'Ciminiere in mattoni fotografici',
+    ],
+  },
   {
     v: 'v51', title: 'Risolto il blocco del caricamento', color: '#ff9b9b', icon: '🔓',
     items: [

@@ -931,6 +931,8 @@ button {
 }
 
 #minimap-canvas {
+  width: clamp(160px, 26vw, 300px);
+  height: auto;
   display: block;
   border-radius: 11px;
   background: #060b16;
@@ -1311,7 +1313,7 @@ kbd {
    5. ARCHITECTURAL BLUEPRINT MODAL
 ========================================================= */
 .blueprint-shell {
-  width: min(980px, 96vw);
+  width: min(1240px, 96vw);
   max-height: 94vh;
   overflow-y: auto;
 }

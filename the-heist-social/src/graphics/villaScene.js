@@ -1,3 +1,4 @@
+import { GAME_CAMERA_ZOOM } from './cameraSettings.js';
 import { sightObstacles, cameraSees } from '../engine/vision.js';
 import * as THREE from 'three';
 import { updateHumanoidAnimation } from './humanoid.js';
@@ -59,7 +60,7 @@ export class VillaSceneManager {
 
     // Orthographic isometric view gives the villa a miniature-diorama look.
     this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.5, 160);
-    this.cameraZoom = 18.5;
+    this.cameraZoom = GAME_CAMERA_ZOOM;
     this.cameraYaw = Math.PI / 4;
     this.cameraTarget = new THREE.Vector3(-7, 0, 7);
 

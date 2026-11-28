@@ -20,7 +20,7 @@ Videogioco multiplayer **online e offline** di azione e deduzione sociale in tem
 - **Esterni Completi**: Giardino Frontale con Fontana e Cancello, Area Piscina illuminata & Solarium, Retro-Villa con Gazebo antico, Vialetto Orientale & Roseto.
 - **Visuale e coperture**: nebbia di guerra dinamica, con linea di vista bloccata da muri, porte bloccate, arredi alti e siepi attraversabili. Il blackout dura 12 secondi, azzera la visuale dei civili e lascia al ladro un raggio ridotto. La visibilità è applicata al rendering del client: non costituisce protezione anti-cheat.
 - **Zone di Occultamento (`[E]`)**: Armadi, paraventi di seta, dispensa e siepi esterne.
-- **Movimento**: WASD/frecce, clic destro per muoversi, Shift per correre.
+- **Movimento e visuale**: WASD/frecce, clic destro per muoversi, Shift per correre. La visuale in partita è ingrandita rispetto al menu; usa `+`, `−` o la rotellina per regolarla. Premi `M` per aprire la piantina ingrandita.
 - **4 Passaggi Segreti per il Ladro (`[Q]`)**: Libreria Girevole (Studio), Armadio a Doppiofondo (Camera Padronale), Botola Cantina Vini (Cucina) e Botola Antica sotto il Gazebo (Retro-Villa).
 
 ### 3. Ruoli, Gioielli & "La Stella di Venezia"

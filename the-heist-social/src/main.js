@@ -1,3 +1,4 @@
+import { GAME_CAMERA_ZOOM, LOBBY_CAMERA_ZOOM, CAMERA_ZOOM_STEP, clampCameraZoom } from './graphics/cameraSettings.js';
 import * as THREE from 'three';
 import { sightObstacles, hasLineOfSight, visibilityPolygon, playerSightRange } from './engine/vision.js';
 import { drawBlueprint } from './graphics/blueprint.js';
@@ -346,6 +347,8 @@ async function ensureOnlineConnected() {
 }
 
 function enterMatchGameplay(state) {
+  // The lobby uses a wide cinematic view; reset to a closer view for every match.
+  villaScene.cameraZoom = GAME_CAMERA_ZOOM;
   document.getElementById('lobby-screen').classList.remove('active');
   document.getElementById('lobby-screen').classList.add('hidden');
   document.getElementById('gameover-modal').classList.add('hidden');
@@ -357,7 +360,8 @@ function enterMatchGameplay(state) {
     document.getElementById('hud-player-name').textContent = me.name;
     showRoleRevealBanner(me);
   }
-  handlePhaseTransitions(null, state.phase, state);
+  // Online entry is already inside handlePhaseTransitions; do not re-enter it.
+  if (playMode === 'offline') handlePhaseTransitions(null, state.phase, state);
 }
 
 function showRoleRevealBanner(me) {
@@ -1451,10 +1455,10 @@ function setupEventListeners() {
 
   // HUD Quick Tools
   document.getElementById('btn-zoom-in').addEventListener('click', () => {
-    villaScene.cameraZoom = Math.max(10.5, villaScene.cameraZoom - 2.5);
+    villaScene.cameraZoom = clampCameraZoom(villaScene.cameraZoom - CAMERA_ZOOM_STEP);
   });
   document.getElementById('btn-zoom-out').addEventListener('click', () => {
-    villaScene.cameraZoom = Math.min(30.0, villaScene.cameraZoom + 2.5);
+    villaScene.cameraZoom = clampCameraZoom(villaScene.cameraZoom + CAMERA_ZOOM_STEP);
   });
   document.getElementById('btn-mute-audio').addEventListener('click', (e) => {
     const muted = soundEngine.toggleMute();
@@ -1467,7 +1471,7 @@ function setupEventListeners() {
 
   // Mouse wheel zoom
   canvas.addEventListener('wheel', (e) => {
-    villaScene.cameraZoom = Math.max(10.0, Math.min(31.0, villaScene.cameraZoom + e.deltaY * 0.012));
+    villaScene.cameraZoom = clampCameraZoom(villaScene.cameraZoom + e.deltaY * 0.012);
   });
 
   // Right-click or Click on ground to walk smoothly!
@@ -1706,7 +1710,7 @@ function animate(now) {
     // Cinematic slow pan across Villa Bellavista while in the Main Lobby!
     const orbitX = Math.sin(elapsedSec * 0.16) * 14;
     const orbitZ = 4 + Math.cos(elapsedSec * 0.14) * 8;
-    villaScene.cameraZoom = 22;
+    villaScene.cameraZoom = LOBBY_CAMERA_ZOOM;
     villaScene.syncWorldState(null, null, elapsedSec);
     visionCtx.clearRect(0, 0, visionCanvas.width, visionCanvas.height);
     villaScene.updateCameraFollow(orbitX, orbitZ, dt);

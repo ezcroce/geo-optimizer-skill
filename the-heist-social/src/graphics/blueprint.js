@@ -87,12 +87,12 @@ export function drawBlueprint(canvas, state, me, detailed = false) {
   }
 
   if (detailed) {
-    ctx.font = 'bold 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const room of ROOMS) {
       const [x, y] = toScreen(room.labelPos.x, room.indoor ? room.bounds.minZ + 0.8 : room.labelPos.z);
       const label = room.shortName;
-      const width = ctx.measureText(label).width + 12;
-      ctx.fillStyle = 'rgba(5,18,27,0.82)'; ctx.fillRect(x - width / 2, y - 8, width, 16);
+      const width = ctx.measureText(label).width + 14;
+      ctx.fillStyle = 'rgba(5,18,27,0.82)'; ctx.fillRect(x - width / 2, y - 9, width, 18);
       ctx.fillStyle = '#f5f3e9'; ctx.fillText(label, x, y);
     }
   }

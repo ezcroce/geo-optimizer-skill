@@ -300,7 +300,7 @@ export const FURNITURE = [
   { id: 'f_study_books1', type: 'bookshelf', x: -1.8, z: -11.5, w: 1.1, d: 4.5, rot: Math.PI / 2, solid: true, secretGlow: true },
   { id: 'f_study_books2', type: 'bookshelf', x: 8.5, z: -14.1, w: 3.2, d: 1.0, rot: 0, solid: true },
   { id: 'f_study_sofa', type: 'sofa', x: 8.2, z: -7.5, w: 2.8, d: 1.3, rot: -Math.PI / 2, solid: true, color: '#3e2723' },
-  { id: 'f_study_rug', type: 'rug', x: 3.5, z: -10.2, w: 6.2, d: 4.8, rot: 0, solid: false, color: '#1e3a3a' },
+  { id: 'f_study_rug', type: 'rug', x: 3.5, z: -10.2, w: 6.2, d: 4.8, rot: 0, solid: false, color: '#2563a3' },
 
   // Sala di Controllo CCTV (X: 11..24, Z: -15..-5)
   { id: 'f_sec_console', type: 'cctv_desk', x: 17.5, z: -13.3, w: 4.8, d: 1.5, rot: 0, solid: true },
@@ -331,7 +331,7 @@ export const FURNITURE = [
   { id: 'f_salon_sofa2', type: 'sofa', x: 3.5, z: 8.8, w: 3.2, d: 1.3, rot: Math.PI, solid: true, color: '#7c2d12' },
   { id: 'f_salon_table', type: 'coffee_table', x: 3.5, z: 7.0, w: 2.0, d: 1.1, rot: 0, solid: true },
   { id: 'f_salon_screen', type: 'folding_screen', x: 10.2, z: 3.2, w: 1.8, d: 0.9, rot: 0.4, solid: true },
-  { id: 'f_salon_rug', type: 'rug', x: 4.2, z: 7.0, w: 6.8, d: 6.2, rot: 0, solid: false, color: '#581c2c' },
+  { id: 'f_salon_rug', type: 'rug', x: 4.2, z: 7.0, w: 6.8, d: 6.2, rot: 0, solid: false, color: '#15569a' },
 
   // Cucina & Sala da Pranzo (X: 12..24, Z: +1..+13)
   { id: 'f_kit_island', type: 'kitchen_island', x: 20.2, z: 4.8, w: 3.2, d: 1.6, rot: 0, solid: true },

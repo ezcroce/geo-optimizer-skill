@@ -49,16 +49,16 @@ export class VillaSceneManager {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.25;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x090f1c);
-    this.scene.fog = new THREE.FogExp2(0x090f1c, 0.008);
+    this.scene.background = new THREE.Color(0x244d2b);
+    this.scene.fog = new THREE.FogExp2(0x244d2b, 0.004);
 
-    // Main gameplay camera (Architectural 3D angled view)
-    this.camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.5, 160);
+    // Orthographic isometric view gives the villa a miniature-diorama look.
+    this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.5, 160);
     this.cameraZoom = 18.5;
-    this.cameraYaw = 0;
+    this.cameraYaw = Math.PI / 4;
     this.cameraTarget = new THREE.Vector3(-7, 0, 7);
 
     // Dedicated offscreen WebGLRenderTarget for live CCTV camera feeds & snapshots
@@ -91,22 +91,21 @@ export class VillaSceneManager {
 
     this._onResize = () => {
       if (!this.renderer) return;
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
+      this._updateCameraFrustum();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     };
     window.addEventListener('resize', this._onResize);
   }
 
   _buildLighting() {
-    this.ambientLight = new THREE.AmbientLight(0xdbeafe, 0.66);
+    this.ambientLight = new THREE.AmbientLight(0xffead2, 0.84);
     this.scene.add(this.ambientLight);
 
-    this.hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.56);
+    this.hemiLight = new THREE.HemisphereLight(0xffebc4, 0x566b32, 0.66);
     this.scene.add(this.hemiLight);
 
     // Moonlight / Architectural Flood Key Light
-    this.dirLight = new THREE.DirectionalLight(0xfff4e6, 1.42);
+    this.dirLight = new THREE.DirectionalLight(0xffebc5, 1.65);
     this.dirLight.position.set(-18, 34, 24);
     this.dirLight.castShadow = true;
     this.dirLight.shadow.mapSize.set(2048, 2048);
@@ -434,7 +433,7 @@ export class VillaSceneManager {
       cap.position.set(cx, h + 0.045, cz);
       this.scene.add(cap);
 
-      this.wallMeshes.push({ mesh, cx, cz, isH, h });
+      this.wallMeshes.push({ mesh, cap, cx, cz, isH, h, len });
     }
 
     // Hang Classical Oil Paintings in gilded frames on key interior walls!
@@ -1155,18 +1154,31 @@ export class VillaSceneManager {
 
     if (localPlayer) {
       for (const w of this.wallMeshes) {
-        const blockingPlayer =
-          w.isH &&
-          w.cz > localPlayer.z + 0.2 &&
-          w.cz < localPlayer.z + 7.5 &&
-          Math.abs(w.cx - localPlayer.x) < 9.5;
-        const targetOp = blockingPlayer ? 0.26 : 1.0;
+        // Fade only the near-facing wall segments between the camera and the player.
+        const dx = w.cx - localPlayer.x;
+        const dz = w.cz - localPlayer.z;
+        const along = dx * Math.sin(this.cameraYaw) + dz * Math.cos(this.cameraYaw);
+        const across = dx * Math.cos(this.cameraYaw) - dz * Math.sin(this.cameraYaw);
+        const blockingPlayer = along > 0.2 && along < 7.5 && Math.abs(across) < w.len * 0.5 + 1.8;
+        const targetOp = blockingPlayer ? 0.25 : 1.0;
         w.mesh.material.opacity += (targetOp - w.mesh.material.opacity) * 0.18;
+        w.cap.visible = !blockingPlayer;
       }
     }
   }
 
+  _updateCameraFrustum() {
+    const halfHeight = this.cameraZoom * 0.54;
+    const halfWidth = halfHeight * window.innerWidth / window.innerHeight;
+    this.camera.left = -halfWidth;
+    this.camera.right = halfWidth;
+    this.camera.top = halfHeight;
+    this.camera.bottom = -halfHeight;
+    this.camera.updateProjectionMatrix();
+  }
+
   updateCameraFollow(targetX, targetZ, dt) {
+    this._updateCameraFrustum();
     this.cameraTarget.x += (targetX - this.cameraTarget.x) * Math.min(1, dt * 7.5);
     this.cameraTarget.z += (targetZ - this.cameraTarget.z) * Math.min(1, dt * 7.5);
 

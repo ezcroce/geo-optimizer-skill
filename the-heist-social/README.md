@@ -12,7 +12,7 @@ Videogioco multiplayer **online e offline** di azione e deduzione sociale in tem
   1. **Gioca Subito (Offline / 10 Giocatori con IA)**: partita istantanea con 9 ospiti IA contestuali che pattugliano la villa, usano la Sala CCTV, ricordano chi hanno incrociato, mentono (se Ladro) e votano in italiano. Il ruolo è sempre assegnato casualmente.
   2. **Matchmaking Rapido Online**: coda pubblica automatica fino a 10 giocatori.
   3. **Stanza Privata tramite Codice (`VL-XXXX`)**: generazione codice stanza + link invito diretto (`?room=VL-XXXX`), con possibilità di completare i posti liberi fino a 10 con Bot IA.
-- **Personaggi Umanoidi 3D Realistici (`src/graphics/humanoid.js`)**: proporzioni anatomiche classiche 1:7.5, busto continuo ed arti raccordati senza stacchi né geometrie astratte, abiti civili sartoriali da gala personalizzabili e animazioni procedurali fluide a 60 FPS.
+- **Personaggi 3D stilizzati (`src/graphics/humanoid.js`)**: proporzioni da miniature cartoon, volti espressivi, abiti da gala personalizzabili e animazioni procedurali.
 
 ### 2. Mappa Completa: "Villa Bellavista" (`src/data/villaLayout.js` & `src/graphics/villaScene.js`)
 - **Interni Arredati**: Atrio d’Ingresso (con Teca Infranta e Pulsante d’Emergenza), Salone delle Feste (pianoforte a coda, divani, paraventi), Studio Privato, Sala di Controllo CCTV, Camera Padronale, Bagno di Lusso / Spa, Camera degli Ospiti, Cucina Gourmet & Sala da Pranzo, Galleria Ovest / Centrale / Est.

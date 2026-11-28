@@ -1803,6 +1803,10 @@ function animate(now) {
     if (keysDown.has('d') || keysDown.has('arrowright')) dx += 1;
 
     if (dx !== 0 || dz !== 0) {
+      // Align keyboard directions with the isometric screen, while click-to-move stays world-based.
+      const yaw = villaScene.cameraYaw;
+      [dx, dz] = [dx * Math.cos(yaw) + dz * Math.sin(yaw),
+                  -dx * Math.sin(yaw) + dz * Math.cos(yaw)];
       clickMoveTarget = null; // Manual keyboard overrides click-to-move
     } else if (clickMoveTarget) {
       const cdx = clickMoveTarget.x - me.x;

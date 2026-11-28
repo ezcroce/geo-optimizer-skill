@@ -182,8 +182,8 @@ export function getFloorTextureSet(type, widthMeters = 10, depthMeters = 10) {
     case 'parquet_warm':
     case 'parquet_dark':
     case 'parquet_herringbone': {
-      const base = type === 'parquet_dark' ? '#422a1c' : type === 'parquet_herringbone' ? '#633f25' : '#734b2e';
-      const alt = type === 'parquet_dark' ? '#513524' : type === 'parquet_herringbone' ? '#764d2f' : '#855938';
+      const base = type === 'parquet_dark' ? '#794626' : type === 'parquet_herringbone' ? '#a45b30' : '#b26e39';
+      const alt = type === 'parquet_dark' ? '#945b32' : type === 'parquet_herringbone' ? '#ba7341' : '#cb8750';
       const map = makeTexture(`fl_${type}`, 512, (ctx, s) => {
         ctx.fillStyle = base;
         ctx.fillRect(0, 0, s, s);
@@ -309,11 +309,11 @@ export function getFloorTextureSet(type, widthMeters = 10, depthMeters = 10) {
       const map = makeTexture('fl_grass', 512, (ctx, s) => {
         const stripe = s / 4;
         for (let i = 0; i < 4; i++) {
-          ctx.fillStyle = i % 2 === 0 ? '#244b2c' : '#2b5734';
+          ctx.fillStyle = i % 2 === 0 ? '#3d7836' : '#4d893d';
           ctx.fillRect(0, i * stripe, s, stripe);
         }
         // Rich multi-tone grass blades & clover micro-detail
-        const bladeColors = ['#356b3f', '#1c3b22', '#3f7a49', '#2e5e37'];
+        const bladeColors = ['#5d9b4a', '#32642d', '#77ad54', '#43813b'];
         for (let i = 0; i < 2600; i++) {
           const x = hash2(i, 13) * s;
           const y = hash2(29, i) * s;
@@ -384,8 +384,8 @@ export function getVillaWallTextures(lengthMeters = 6, isExterior = false) {
     const map = makeTexture('wall_ext', 512, (ctx, s) => {
       // Upper Venetian plaster
       const grad = ctx.createLinearGradient(0, 0, 0, s * 0.68);
-      grad.addColorStop(0, '#e3d8c4');
-      grad.addColorStop(1, '#d6c7ae');
+      grad.addColorStop(0, '#f4d89f');
+      grad.addColorStop(1, '#dfb77a');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, s, s * 0.68);
 
@@ -456,8 +456,8 @@ export function getVillaWallTextures(lengthMeters = 6, isExterior = false) {
   const map = makeTexture('wall_int', 512, (ctx, s) => {
     const dadoY = Math.floor(s * 0.64);
     const grad = ctx.createLinearGradient(0, 0, 0, dadoY);
-    grad.addColorStop(0, '#dfd4be');
-    grad.addColorStop(1, '#cfc1a6');
+    grad.addColorStop(0, '#f3d6a0');
+    grad.addColorStop(1, '#dfb982');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, s, dadoY);
 
@@ -480,6 +480,19 @@ export function getVillaWallTextures(lengthMeters = 6, isExterior = false) {
       }
     }
 
+    // Hand-painted floral sprigs, like the wallpaper of a miniature dollhouse.
+    for (let x = 16; x < s; x += 64) {
+      for (let y = 42; y < dadoY - 22; y += 64) {
+        ctx.strokeStyle = 'rgba(111, 128, 67, 0.50)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y + 10); ctx.lineTo(x, y - 4); ctx.stroke();
+        ctx.fillStyle = 'rgba(177, 89, 66, 0.48)';
+        for (const [ox, oy] of [[0, -7], [-5, -3], [5, -3], [0, 1]]) {
+          ctx.beginPath(); ctx.arc(x + ox, y + oy, 3, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
     // Crown molding
     ctx.fillStyle = '#f3ead8';
     ctx.fillRect(0, 0, s, 16);
@@ -487,7 +500,7 @@ export function getVillaWallTextures(lengthMeters = 6, isExterior = false) {
     ctx.fillRect(0, 16, s, 4);
 
     // Walnut Chair Rail & Boiserie Lower Wainscoting
-    ctx.fillStyle = '#4a2e1d';
+    ctx.fillStyle = '#64361e';
     ctx.fillRect(0, dadoY, s, s - dadoY);
     ctx.fillStyle = '#c8a24e';
     ctx.fillRect(0, dadoY + 3, s, 4);
@@ -498,7 +511,7 @@ export function getVillaWallTextures(lengthMeters = 6, isExterior = false) {
       const py = dadoY + 20;
       const pw = panelW - 36;
       const ph = s - dadoY - 42;
-      ctx.fillStyle = '#5c3924';
+      ctx.fillStyle = '#89502a';
       ctx.fillRect(px, py, pw, ph);
       ctx.strokeStyle = '#c8a24e';
       ctx.lineWidth = 2;
@@ -766,8 +779,8 @@ export function getTreeBarkMaterial() {
 export function getTreeFoliageMaterial(species = 'cypress') {
   const isOlive = species === 'olive';
   const palette = isOlive
-    ? ['#2d4d31', '#3f6642', '#587f56', '#76996e', '#213b25']
-    : ['#122b1a', '#1b3f26', '#255432', '#31693f', '#0e2214'];
+    ? ['#3b702e', '#539143', '#74a956', '#96bc68', '#2d5a29']
+    : ['#28572c', '#367236', '#4e9143', '#70a855', '#204924'];
 
   const map = makeTexture(`foliage_${species}`, 512, (ctx, s) => {
     ctx.fillStyle = palette[0];

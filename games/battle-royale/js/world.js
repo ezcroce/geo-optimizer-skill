@@ -4,12 +4,12 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=48';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=48';
-import { carInstances } from './cars.js?v=48';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=48';
-import { makeNoise, fbm, ridged } from './noise.js?v=48';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=48';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=49';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=49';
+import { carInstances } from './cars.js?v=49';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=49';
+import { makeNoise, fbm, ridged } from './noise.js?v=49';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=49';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 
@@ -1597,12 +1597,39 @@ function specialGeo(type, c = 0) {
 }
 
 // ═════════════════════════ COSTRUZIONE ═════════════════════════
+/** costruisce l'isola tutta di fila (cambio di mappa a partita già avviata) */
 export function buildWorld(scene, opts = {}) {
+  const steps = buildWorldSteps(scene, opts);
+  for (;;) { const r = steps.next(); if (r.done) return r.value; }
+}
+/**
+ * v49: costruisce l'isola a sezioni lasciando respirare il browser fra l'una e l'altra (al massimo `budget` ms di fila):
+ * sul telefono la schermata "Costruzione dell'isola" restava congelata per molti secondi e sembrava bloccata.
+ * onStep(frazione 0..1) aggiorna la barra di caricamento.
+ */
+export async function buildWorldAsync(scene, opts = {}, onStep = null, budget = 50) {
+  const steps = buildWorldSteps(scene, opts);
+  let k = 0, t = performance.now();
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+    k++;
+    if (performance.now() - t > budget) {
+      if (onStep) onStep(Math.min(1, k / BUILD_STEPS));
+      await new Promise(res => setTimeout(res, 0));   // (niente requestAnimationFrame: con la scheda in background si fermerebbe)
+      t = performance.now();
+    }
+  }
+}
+const BUILD_STEPS = 22;
+function* buildWorldSteps(scene, opts = {}) {
   configureMap(opts.seed ?? 1337, !!opts.random);
+  yield;
   const lootSpots = [];
   const chestSpots = [];
   const houses = [];
 
+  yield;
   // ── griglia dei chunk ──
   const NC = Math.ceil(EDGE / CHUNK);            // chunk per lato da 0 al bordo
   const chunks = new Map();
@@ -1612,6 +1639,7 @@ export function buildWorld(scene, opts = {}) {
   }
   const chunkAt = (x, z) => chunks.get(chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK)));
 
+  yield;
   // ── materiali ──
   const wallColors = ['#e8dcc0', '#d9b48a', '#c9d6df', '#e6c3b0', '#cfe0c0', '#f0e0a0'];
   const texMat = (t, opts = {}) => {
@@ -1633,6 +1661,7 @@ export function buildWorld(scene, opts = {}) {
   const ceilMat = new THREE.MeshStandardMaterial({ color: '#f3efe6', roughness: 0.95, emissive: '#b8b2a6', emissiveIntensity: 0.32 });
   const ceilLampMat = new THREE.MeshStandardMaterial({ color: '#fffaf0', roughness: 0.4, emissive: '#fff4dc', emissiveIntensity: 0.9 });
   const floorMat = texMat(makeParquetTexture(), { roughness: 0.62 });
+  yield;
   // ── arredi degli interni (v21) ──
   const fabricTex = makeFabricTexture();
   const fab = (c) => texMat(fabricTex, { color: c, roughness: 0.95 });
@@ -1663,6 +1692,7 @@ export function buildWorld(scene, opts = {}) {
   const contColors = ['#c0392b', '#2471a3', '#d68910', '#1e8449'];
   const containerMats = contColors.map(c => m('cont' + c, c, { metalness: 0.4, roughness: 0.6 }));
   const contFrameMats = contColors.map(c => m('contF' + c, '#' + new THREE.Color(c).multiplyScalar(0.62).getHexString(), { metalness: 0.5, roughness: 0.55 }));
+  yield;
   // ── città tematiche: tavolozze di muri e tetti (materiali creati solo per i temi presenti) ──
   const THEMES = {
     classic: { walls: wallColors, roofs: roofColors },
@@ -1719,6 +1749,7 @@ export function buildWorld(scene, opts = {}) {
     return spec;
   }
 
+  yield;
   // ── porte: collisore solo quando sono chiuse; le ante vengono animate dal gioco ──
   function setDoor(dr, open, silent = false) {
     if (dr.broken) return false;
@@ -1784,6 +1815,7 @@ export function buildWorld(scene, opts = {}) {
     for (const piv of dr.leaves) piv.rotation.y = piv.userData.base + piv.userData.into * e * 1.72;
   }
 
+  yield;
   // ── arredamento degli interni ──
   const WALL_T = 0.35;
   /** box appoggiato alla faccia interna di un muro: u lungo il muro, dist dalla parete */
@@ -2317,6 +2349,7 @@ export function buildWorld(scene, opts = {}) {
     if (/^Faro/.test(t.name) && th !== 'port') { const s = townSpot(t, 1.5); if (s) special('lighthouse', s[0], s[1], t.h, [1.7, 14, false]); }
   }
 
+  yield;
   // ── città (v24): strade, piazze, palazzi, negozi, capannoni e case (city.js) ──
   function makeDoor(x, z, y, horiz, nx, nz, house, gap = 2.2) {
     const dr = { i: doors.length, x, z, y: y + 0.2, horiz, nx, nz, gap, open0: srand() < 0.3, open: false, ang: 0, mat: doorMats[Math.floor(srand() * doorMats.length)], c: null, leaves: null, house };
@@ -2420,6 +2453,7 @@ export function buildWorld(scene, opts = {}) {
     }
   }
 
+  yield;
   // ── alberi (solo dati + collisori) ──
   const trees = [];
   let tries = 0;
@@ -2463,6 +2497,7 @@ export function buildWorld(scene, opts = {}) {
     addCollider({ type: 'cyl', x: t.x, z: t.z, r: 0.42 * t.s, minY: h - 1, maxY: h + 3.2 * t.s, noStand: true, tree: true });
   }
 
+  yield;
   // ── cespugli (nessuna collisione: ci si può nascondere dentro) ──
   const NBUSH = Math.round(520 * SCALE * SCALE);
   tries = 0;
@@ -2478,6 +2513,7 @@ export function buildWorld(scene, opts = {}) {
     nb++;
   }
 
+  yield;
   // ── rocce ──
   const NROCKS = Math.round(140 * SCALE * SCALE * 0.9 * 1.4);
   tries = 0;
@@ -2507,6 +2543,7 @@ export function buildWorld(scene, opts = {}) {
     if (srand() < 0.15) lootSpots.push(new THREE.Vector3(x + r.s + 0.8, h, z));
   }
 
+  yield;
   // ── erba alta: macchie nei prati dove ci si può nascondere (generatore a parte: il resto della mappa non cambia) ──
   {
     const tr = mulberry32(MAP.seed ^ 0x51ed27), R = (a, b) => a + tr() * (b - a);
@@ -2525,6 +2562,7 @@ export function buildWorld(scene, opts = {}) {
     }
   }
 
+  yield;
   // ── oggetti di scena: catasta di legna, pile di mattoni, barili, casette ──
   const barrels = [];
   /** true se in (x,z) c'è spazio libero di raggio r (niente collisori né case) */
@@ -2573,6 +2611,7 @@ export function buildWorld(scene, opts = {}) {
     }
     return pr;
   }
+  yield;
   // ── v26: casette di legno abitabili ──
   const stoves = [];
   /** box nelle coordinate del modello (x, z) → collisore nel mondo (rotazioni multiple di 90°) */
@@ -2686,6 +2725,7 @@ export function buildWorld(scene, opts = {}) {
     addProp(barrelKinds(), x, z, srand() * 6.28); n++;
   }
 
+  yield;
   // ── bottino sparso ──
   for (let i = 0; i < 60 * SCALE * SCALE; i++) {
     const x = sr(-HALF + 15, HALF - 15), z = sr(-HALF + 15, HALF - 15);
@@ -2700,6 +2740,7 @@ export function buildWorld(scene, opts = {}) {
     chestSpots.push({ pos: new THREE.Vector3(x, h, z), rot: srand() * 3 });
   }
 
+  yield;
   // ── acqua (unica, enorme e leggera) ──
   const waterNormal = makeWaterNormal();
   waterNormal.repeat.set(6000 / 22, 6000 / 22);
@@ -2849,6 +2890,7 @@ export function buildWorld(scene, opts = {}) {
   }
 
   // geometrie condivise per alberi/rocce/erba
+  yield;
   // ── erba: ciuffi di fili sottili (colori per vertice: scuri alla base, chiari in punta) ──
   /**
    * Ciuffo d'erba: fili curvi a 3 segmenti che si assottigliano fino alla punta.
@@ -3568,6 +3610,7 @@ export function buildWorld(scene, opts = {}) {
     rebuildFrags(sp);
     ev.touched.add(sp);
   }
+  yield;
   // ── gravità: i pezzi collegati che non toccano più terra crollano ──
   const touching = (a, b, e = 0.06) => a.minX <= b.maxX + e && a.maxX >= b.minX - e && a.minY <= b.maxY + e && a.maxY >= b.minY - e && a.minZ <= b.maxZ + e && a.maxZ >= b.minZ - e;
   function structural(c) { return c && c.type === 'box' && c.spec && !(c.spec.dead && !c.spec.cg); }
@@ -3619,6 +3662,7 @@ export function buildWorld(scene, opts = {}) {
     falling.sort((a, b) => b.w * b.h * b.d - a.w * a.h * a.d);
     ev.collapses.push({ x: (bb.minX + bb.maxX) / 2, y: bb.minY, z: (bb.minZ + bb.maxZ) / 2, w: bb.maxX - bb.minX, h: bb.maxY - bb.minY, d: bb.maxZ - bb.minZ, boxes: falling.slice(0, 70), mats: Math.round(clamp(vol * 3, 12, 240)) });
   }
+  yield;
   // ── rocce, auto e oggetti: vita propria, si rimpiccioliscono a tappe e poi spariscono ──
   function damageObj(c, amount, ev) {
     if (c.rock) {
@@ -3717,6 +3761,7 @@ export function buildWorld(scene, opts = {}) {
     dirty.clear();
   }
 
+  yield;
   // ── barili esplosivi ──
   const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
   function destroyBarrel(pr) {
@@ -3740,6 +3785,7 @@ export function buildWorld(scene, opts = {}) {
     lastKey = '';
   }
 
+  yield;
   // ── streaming: costruisce i chunk vicini un po' per frame ──
   const stats = { detail: 0, lod: 0, built: 0 };
   let lastKey = '';
@@ -3801,6 +3847,7 @@ export function buildWorld(scene, opts = {}) {
     lastKey = '';
   }
 
+  yield;
   // ── minimappa pre-renderizzata ──
   const MM = 600;
   const mm = document.createElement('canvas');

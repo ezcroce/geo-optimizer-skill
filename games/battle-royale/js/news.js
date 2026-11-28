@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v48';
+export const NEWS_VERSION = 'v49';
 
 export const NEWS = [
+  {
+    v: 'v49', title: 'La barra di caricamento non si ferma più', color: '#ffb36b', icon: '🏝️',
+    items: [
+      'La costruzione dell’isola (città, alberi, rocce, case, acqua) ora va a sezioni: sul telefono la barra continua ad avanzare invece di restare ferma al 74%',
+      'Se il caricamento si inceppa compare un riquadro con il motivo, la fase e la versione del gioco, invece di una percentuale ferma senza spiegazioni',
+      'Nel riquadro: “Riprova”, “Aspetta ancora” e “Riprova in modalità leggera” (grafica Bassa, adatta ai telefoni con poca memoria)',
+      'La schermata di caricamento mostra la versione (v49): così sai subito se stai aprendo il link giusto',
+      'Isola e grafica identiche alla v48',
+    ],
+  },
   {
     v: 'v48', title: 'Caricamento sicuro anche dal telefono', color: '#8fd3ff', icon: '📱',
     items: [

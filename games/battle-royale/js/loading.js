@@ -87,7 +87,61 @@
     el.classList.remove('out');
     if (!raf) raf = requestAnimationFrame(loop);
   }
-  function onHide() { visible = false; }
+  function onHide() { visible = false; if (errBox) errBox.hidden = true; }
+
+  // ── v49: se il caricamento si inceppa lo diciamo (prima restava fermo su una percentuale senza spiegazioni) ──
+  var VER = (function () { try { var sc = document.querySelector('link[href*="main.js"], script[src*="main.js"]'); var m = sc && /[?&]v=(\d+)/.exec(sc.getAttribute('href') || sc.getAttribute('src')); return m ? 'v' + m[1] : ''; } catch (e) { return ''; } })();
+  var errBox = null, lastChange = 0, lastSig = '', errShown = false;
+  function showProblem(title, detail) {
+    if (!el || !visible || errShown) return;
+    errShown = true;
+    if (!errBox) {
+      errBox = document.createElement('div');
+      errBox.className = 'lderr';
+      errBox.innerHTML = '<b></b><p></p><code></code><div class="lderrbtns">' +
+        '<button type="button" data-a="light">🪶 Riprova in modalità leggera</button>' +
+        '<button type="button" data-a="retry">↻ Riprova</button>' +
+        '<button type="button" data-a="wait">Aspetta ancora</button></div>';
+      errBox.addEventListener('click', function (ev) {
+        var a = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-a');
+        if (a === 'retry') location.reload();
+        else if (a === 'light') {
+          // grafica "Bassa": texture leggere, niente ombre/bloom, meno erba e distanza (si può cambiare dalle impostazioni)
+          try {
+            var st = JSON.parse(localStorage.getItem('arenaRoyale') || '{}') || {};
+            st.gfx = Object.assign({}, st.gfx || {}, { preset: 'basso', scale: 0.7, shadows: 'off', texq: 'low', aniso: 1, aa: 'fxaa', bloom: false, ao: false, view: 0.75, grass: 0.4 });
+            localStorage.setItem('arenaRoyale', JSON.stringify(st));
+          } catch (e) { /* ok */ }
+          location.reload();
+        } else if (a === 'wait') { errBox.hidden = true; errShown = false; lastChange = performance.now(); }
+      });
+      el.querySelector('.ldbottom').appendChild(errBox);
+    }
+    errBox.querySelector('b').textContent = title;
+    errBox.querySelector('p').textContent = 'Fase: ' + ((stage && stage.textContent) || '?') + ' (' + Math.round(shown * 100) + '%) · ' + (VER || '') + ' · ' + (window.innerWidth + '×' + window.innerHeight);
+    errBox.querySelector('code').textContent = detail || '';
+    errBox.querySelector('code').hidden = !detail;
+    errBox.hidden = false;
+  }
+  window.addEventListener('error', function (e) {
+    if (!e || !e.message || /ResizeObserver/.test(e.message)) return;
+    var where = e.error && e.error.stack ? String(e.error.stack).split('\n').slice(1, 3).join(' ').replace(/https?:\/\/[^\s)]*\//g, '').trim() : (e.filename ? String(e.filename).split('/').pop() + ':' + e.lineno : '');
+    showProblem('Si è verificato un errore durante il caricamento', e.message + (where ? ' — ' + where : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    showProblem('Si è verificato un errore durante il caricamento', r ? (r.message || String(r)) + (r.stack ? ' — ' + String(r.stack).split('\n').slice(1, 3).join(' ').replace(/https?:\/\/[^\s)]*\//g, '').trim() : '') : '');
+  });
+  // nessun avanzamento per 45 secondi (il conto riparte se la scheda va in background)
+  var lastTick = 0;
+  setInterval(function () {
+    var now = performance.now(), busy = now - lastTick > 3000;   // il telefono era occupato a lavorare: non è un blocco
+    lastTick = now;
+    if (!visible || busy) { lastChange = now; return; }
+    var sig = Math.round(target * 1000) + '|' + (stage && stage.textContent);
+    if (sig !== lastSig || document.hidden) { lastSig = sig; lastChange = now; return; }
+    if (now - lastChange > 45000) showProblem('Il caricamento sembra fermo', '');
+  }, 1000);
 
   function build() {
     el = document.getElementById('loading');
@@ -96,7 +150,7 @@
     el.classList.add('ld40');
     el.innerHTML =
       '<div class="ldart"></div><div class="ldart"></div><div class="ldshade"></div>' +
-      '<div class="ldtop"><div class="ldlogo">ARENA<span>ROYALE 3D</span></div><div class="ldseason">Stagione 2 · Il Colosseo</div></div>' +
+      '<div class="ldtop"><div class="ldlogo">ARENA<span>ROYALE 3D</span></div><div class="ldseason">Stagione 2 · Il Colosseo' + (VER ? ' · ' + VER : '') + '</div></div>' +
       '<div class="ldcap"><b class="ldtitle"></b><span class="ldsub"></span></div>' +
       '<div class="ldbottom">' +
       '  <div class="ldtipbox"><span class="ldtiplbl">💡 CONSIGLIO</span><span class="ldtip"></span></div>' +

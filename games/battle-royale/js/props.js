@@ -4,7 +4,7 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS, photoTexture, photoMeanLinear, photosReady } from './texgen.js?v=48';
+import { normalFromHeight, NORMALS, photoTexture, photoMeanLinear, photosReady } from './texgen.js?v=49';
 /** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
 const WRF = { willReadFrequently: true };
 

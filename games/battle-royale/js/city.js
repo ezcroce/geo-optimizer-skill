@@ -5,14 +5,14 @@
 //  Tutto è fatto di box (uniti per materiale quando il chunk viene costruito) + oggetti "speciali" instanziati.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { CAR_VARIANTS, CAR_DIMS, CAR_PAINTS } from './cars.js?v=25';
-import { mergeParts } from './props.js?v=46';
+import { CAR_VARIANTS, CAR_DIMS, CAR_PAINTS } from './cars.js?v=47';
+import { mergeParts } from './props.js?v=47';
 import {
   facadeTexture, plainTexture, asphaltTexture, sidewalkTexture, cobbleTexture, roofFlatTexture, tileTexture,
   concreteTexture, corrugatedTexture, railTexture, awningTexture, AWNING_COLORS, signAtlas, signGeometry, SHOPS,
   productsTexture, booksTexture,
-} from './citytex.js?v=24';
-import { TOWN_SPECIALS, townBuilders } from './townkit.js?v=46';
+} from './citytex.js?v=47';
+import { TOWN_SPECIALS, townBuilders } from './townkit.js?v=47';
 
 // ── reticolo stradale ──
 export const STREET = { RW: 3.3, SW: 2.0 };          // mezza carreggiata, marciapiede

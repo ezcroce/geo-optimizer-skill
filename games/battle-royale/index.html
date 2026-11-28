@@ -10,9 +10,9 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <link rel="manifest" href="manifest.webmanifest" />
-<link rel="stylesheet" href="site.css?v=46" />
+<link rel="stylesheet" href="site.css?v=47" />
 <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
+  { "imports": { "three": "./vendor/three.module.js?v=20", "three/addons/": "./vendor/addons/" } }
 </script>
 </head>
 <body>
@@ -71,8 +71,23 @@
 <!-- ───────── TICKER ───────── -->
 <div class="ticker" aria-hidden="true"><div class="track" id="ticker"></div></div>
 
-<!-- ───────── NOVITÀ v46 ───────── -->
+<!-- ───────── NOVITÀ v47 ───────── -->
 <section id="novita" class="section news33">
+  <div class="wrap">
+    <span class="badge-new reveal">NOVITÀ · v47</span>
+    <h2 class="h2 reveal">Si parte prima,<br /><em>molto prima.</em></h2>
+    <p class="lead33 reveal">Basta attese ferme al 92%: il gioco scarica meno della metà dei dati, tutto in parallelo, e la grafica resta identica.</p>
+    <div class="cards cards33">
+      <article class="card tilt reveal" style="--d:0s"><div class="ico">⚡</div><h3>Niente più blocchi</h3><p>Le foto delle texture arrivano insieme al resto invece di fermare l'avvio fino all'ultima immagine.</p></article>
+      <article class="card tilt reveal" style="--d:.08s"><div class="ico">📦</div><h3>7 MB invece di 16</h3><p>Texture WebP alla risoluzione che serve davvero, personaggi senza animazioni inutili, three.js compresso.</p></article>
+      <article class="card tilt reveal" style="--d:.16s"><div class="ico">🚀</div><h3>Tutto in parallelo</h3><p>I file partono subito tutti insieme e la schermata con l'illustrazione appare in un attimo.</p></article>
+      <article class="card tilt reveal" style="--d:.24s"><div class="ico">🧮</div><h3>Texture più rapide</h3><p>Normal map e foto si elaborano senza passare avanti e indietro dalla scheda video.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── NOVITÀ v46 ───────── -->
+<section id="novita46" class="section news33">
   <div class="wrap">
     <span class="badge-new reveal">NOVITÀ · v46</span>
     <h2 class="h2 reveal">Roccia, neve e sabbia,<br /><em>tutto fotografato.</em></h2>
@@ -421,7 +436,7 @@
 
 <div id="toast"></div>
 
-<script type="module" src="js/site.js?v=46"></script>
-<script src="js/transition.js?v=46"></script>
+<script type="module" src="js/site.js?v=47"></script>
+<script src="js/transition.js?v=47"></script>
 </body>
 </html>

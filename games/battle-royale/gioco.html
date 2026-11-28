@@ -13,28 +13,102 @@
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
 <link rel="apple-touch-icon" href="icon-180.png" />
 <title>Arena Royale 3D</title>
-<link rel="preload" as="image" href="img/tex/stone.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/plaster.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/brick.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/roof.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/wood.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/cobble.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/asphalt.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/slabs.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/grass.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/dirt.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/rock.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/concrete.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/metal.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/parquet.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/snow.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/sand.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/slate.jpg?v=46" />
-<link rel="preload" as="image" href="img/tex/paintwood.jpg?v=46" />
-<link rel="stylesheet" href="style.css?v=46" />
-<script type="importmap">
-  { "imports": { "three": "./vendor/three.module.js?v=19", "three/addons/": "./vendor/addons/" } }
+<link rel="stylesheet" href="style.css?v=47" />
+<link rel="preload" as="script" href="js/loading.js?v=47" />
+<!-- v47: foto delle texture in WebP (512 px; 1024 px solo per terreno e rocce con la qualità alta), scelte come in texgen.js -->
+<script>
+(function () {
+  var g = {}, first = true;
+  try { var s = localStorage.getItem('arenaRoyale'); first = !s; g = (JSON.parse(s || '{}').gfx) || {}; } catch (e) { /* ok */ }
+  var q = g.texq; try { if (first && !q && matchMedia('(pointer: coarse)').matches) q = 'low'; } catch (e) { /* ok */ }
+  var big = q !== 'low' && q !== 'normal' ? ['rock', 'grass', 'snow', 'sand'] : [];
+  'stone plaster brick roof wood cobble asphalt slabs grass dirt rock concrete metal parquet snow sand slate paintwood'.split(' ').forEach(function (n) {
+    var l = document.createElement('link'); l.rel = 'preload'; l.as = 'image';
+    l.href = 'img/tex/' + (big.indexOf(n) >= 0 ? '' : 's/') + n + '.webp?v=47';
+    document.head.appendChild(l);
+  });
+})();
 </script>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js?v=20", "three/addons/": "./vendor/addons/" } }
+</script>
+<!-- v47: i due modelli base dei personaggi (servono prima di costruire l'isola) -->
+<link rel="preload" as="fetch" crossorigin="anonymous" href="models/chars/soldato.glb" />
+<link rel="preload" as="fetch" crossorigin="anonymous" href="models/chars/donna.glb" />
+<script>
+// v47: e il modello della skin scelta (stessa scelta di realchar.js: alcune skin condividono il file di un'altra)
+(function () {
+  var id = 'recluta'; try { id = JSON.parse(localStorage.getItem('arenaRoyale') || '{}').skin || id; } catch (e) { /* ok */ }
+  var same = { gladiatore: 'recluta', imperatore: 'agente', arlecchino: 'agente', cuoco: 'meccanico', sommozzatrice: 'esploratrice', mummia: 'zombie' };
+  var f = same[id] || id;
+  if (' agente astro banana cavaliere cowboy cyber drago esploratrice giardiniera leo meccanico ninja oren pirata rapper recluta robot samurai scienziata spettro tamsin tattico vichingo zombie '.indexOf(' ' + f + ' ') < 0) return;
+  var l = document.createElement('link'); l.rel = 'preload'; l.as = 'fetch'; l.crossOrigin = 'anonymous'; l.href = 'models/chars/' + f + '.glb';
+  document.head.appendChild(l);
+})();
+</script>
+<!-- v47: tutti i moduli del gioco in parallelo (prima si scoprivano a cascata, un livello di import alla volta) -->
+<link rel="modulepreload" href="js/main.js?v=47" />
+<link rel="modulepreload" href="js/sky.js?v=47" />
+<link rel="modulepreload" href="vendor/three.module.js?v=20" />
+<link rel="modulepreload" href="vendor/three.core.js" />
+<link rel="modulepreload" href="js/throwables.js?v=47" />
+<link rel="modulepreload" href="js/crosshair.js?v=47" />
+<link rel="modulepreload" href="js/boss.js?v=47" />
+<link rel="modulepreload" href="js/sculpt.js?v=47" />
+<link rel="modulepreload" href="vendor/addons/utils/BufferGeometryUtils.js" />
+<link rel="modulepreload" href="js/bossfight.js?v=47" />
+<link rel="modulepreload" href="js/held.js?v=47" />
+<link rel="modulepreload" href="js/character.js?v=47" />
+<link rel="modulepreload" href="js/models3d.js?v=47" />
+<link rel="modulepreload" href="js/texgen.js?v=47" />
+<link rel="modulepreload" href="js/items.js?v=47" />
+<link rel="modulepreload" href="js/weapons.js?v=47" />
+<link rel="modulepreload" href="js/config.js?v=47" />
+<link rel="modulepreload" href="js/props.js?v=47" />
+<link rel="modulepreload" href="js/chartex.js?v=47" />
+<link rel="modulepreload" href="js/realchar.js?v=47" />
+<link rel="modulepreload" href="js/costume.js?v=47" />
+<link rel="modulepreload" href="vendor/addons/utils/SkeletonUtils.js" />
+<link rel="modulepreload" href="vendor/addons/loaders/GLTFLoader.js" />
+<link rel="modulepreload" href="js/anim.js?v=47" />
+<link rel="modulepreload" href="js/stove.js?v=47" />
+<link rel="modulepreload" href="js/inventory.js?v=47" />
+<link rel="modulepreload" href="js/touch.js?v=47" />
+<link rel="modulepreload" href="js/events.js?v=47" />
+<link rel="modulepreload" href="js/weather.js?v=47" />
+<link rel="modulepreload" href="js/world.js?v=47" />
+<link rel="modulepreload" href="js/noise.js?v=47" />
+<link rel="modulepreload" href="js/monuments.js?v=47" />
+<link rel="modulepreload" href="js/cars.js?v=47" />
+<link rel="modulepreload" href="js/city.js?v=47" />
+<link rel="modulepreload" href="js/townkit.js?v=47" />
+<link rel="modulepreload" href="js/citytex.js?v=47" />
+<link rel="modulepreload" href="js/audio.js?v=47" />
+<link rel="modulepreload" href="js/settings-ui.js?v=47" />
+<link rel="modulepreload" href="js/gfx.js?v=47" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/GTAOPass.js" />
+<link rel="modulepreload" href="vendor/addons/math/SimplexNoise.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/CopyShader.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/PoissonDenoiseShader.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/GTAOShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/Pass.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/FXAAPass.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/ShaderPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/FXAAShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/SMAAPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/SMAAShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/OutputPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/OutputShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/UnrealBloomPass.js" />
+<link rel="modulepreload" href="vendor/addons/shaders/LuminosityHighPassShader.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/RenderPass.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/EffectComposer.js" />
+<link rel="modulepreload" href="vendor/addons/postprocessing/MaskPass.js" />
+<link rel="modulepreload" href="js/menu.js?v=47" />
+<link rel="modulepreload" href="js/net.js?v=47" />
+<link rel="modulepreload" href="js/progress.js?v=47" />
+<link rel="modulepreload" href="js/news.js?v=47" />
+<link rel="modulepreload" href="js/emotes.js?v=47" />
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -324,9 +398,9 @@
 <div id="rotateHint"><div class="phone"></div><b>Ruota il telefono</b><span>Arena Royale si gioca in orizzontale</span></div>
 
 <div id="loading" class="screen"><div class="spinner"></div><p>Caricamento del gioco…</p></div>
-<script src="js/loading.js?v=46"></script>
+<script src="js/loading.js?v=47"></script>
 
-<script type="module" src="js/main.js?v=46"></script>
-<script src="js/transition.js?v=46"></script>
+<script type="module" src="js/main.js?v=47"></script>
+<script src="js/transition.js?v=47"></script>
 </body>
 </html>

@@ -4,7 +4,9 @@
 //  Se nella cartella models/ ci sono i file .glb originali, vengono usati quelli.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS, photoTexture, photoMeanLinear } from './texgen.js?v=46';
+import { normalFromHeight, NORMALS, photoTexture, photoMeanLinear, photosReady } from './texgen.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 function mulberry32(a) {
   return function () {
@@ -117,7 +119,7 @@ function wobble(geo, amt, seed, keepBottom = false) {
 function makeLeafAtlas() {
   const SW = 1024, SH = 512, H = 256, c = document.createElement('canvas');
   c.width = SW; c.height = SH;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   const rnd = mulberry32(3535);
   const grey = (k) => { const L = Math.round(255 * Math.max(0, Math.min(1, k))); return `rgb(${L},${L},${L})`; };
   const leaf = (x, y, len, wid, ang, k) => {
@@ -709,7 +711,7 @@ function makeStoneTexture() {
   // v22: niente grana per pixel (dava il "rumore" a quadretti da vicino): solo macchie morbide e venature sfumate
   const S = 256, c = document.createElement('canvas');
   c.width = c.height = S;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, S, S);
   const wrap = (fn) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) fn(ox, oy); };
   const rnd = mulberry32(999);
@@ -868,7 +870,7 @@ function makeBarrel(kind) {
 function makeHouseAtlas() {
   const S = 1024, H = 512, c = document.createElement('canvas');
   c.width = c.height = S;
-  const g = c.getContext('2d'), rnd = mulberry32(3636);
+  const g = c.getContext('2d', WRF), rnd = mulberry32(3636);
   const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
   // ── 0 · tavole verticali grigio-azzurre consumate ──
   {
@@ -1018,7 +1020,7 @@ export const shedMaterial = makeAtlasMaterial('shed');
 function makeCivicAtlas() {
   const S = 1024, H = 512, c = document.createElement('canvas');
   c.width = c.height = S;
-  const g = c.getContext('2d'), rnd = mulberry32(3838);
+  const g = c.getContext('2d', WRF), rnd = mulberry32(3838);
   const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
   // 0 · legno arancio: una tavola per riquadro (la venatura corre lungo u e si ripete senza giunte)
   {
@@ -1414,9 +1416,8 @@ export const bushLeafMaterial = addWind(makeLeafMaterial(true), 0.3, 0.07, 'bush
 
 /** roccia con texture di pietra proiettata sui 3 assi (coordinate oggetto) */
 // v46: roccia fotografica (granito con licheni e muschio) campionata in triplanare; se manca, la marezzatura di prima
-const rockPhoto = photoTexture('rock');
-const rockMean = rockPhoto ? photoMeanLinear('rock') : [0.5, 0.5, 0.5];
-const stoneTex = rockPhoto || makeStoneTexture();
+// v47: la foto arriva in parallelo al resto del gioco: la texture si assegna appena è pronta (prima di costruire l'isola)
+let rockPhoto = null, rockMean = [0.5, 0.5, 0.5];
 // rumore 3D liscio per gli shader (hash senza seno: stabile anche con coordinate grandi)
 const GLSL_NOISE = `
   float rHash(vec3 p3) { p3 = fract(p3 * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
@@ -1434,7 +1435,13 @@ const GLSL_NOISE = `
 `;
 // v22: roccia ridisegnata. Niente rilievo preso dalla texture (i texel filtrati davano i "quadretti"): forme e rilievo
 // vengono da rumore 3D liscio che si attenua con la distanza; venature a strati morbide, muschio e neve sulle facce in alto
-export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0.0, flatShading: true, map: stoneTex });
+export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0.0, flatShading: true });
+photosReady.then(() => {
+  rockPhoto = photoTexture('rock');
+  if (rockPhoto) rockMean = photoMeanLinear('rock');
+  rockMaterial.map = rockPhoto || makeStoneTexture();
+  rockMaterial.needsUpdate = true;
+});
 rockMaterial.onBeforeCompile = (sh) => {
   sh.uniforms.rockMean = { value: new THREE.Vector3(...rockMean) };
   sh.vertexShader = sh.vertexShader

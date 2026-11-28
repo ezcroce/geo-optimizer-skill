@@ -9,8 +9,10 @@
 //  Qui ci sono le texture delle strade, gli oggetti instanziati (colori per vertice) e i costruttori.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts } from './props.js?v=46';
-import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto, photoData } from './texgen.js?v=46';
+import { mergeParts } from './props.js?v=47';
+import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto, photoData } from './texgen.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 const P = (geo, color, o = {}) => ({ geo, color, o });
 
@@ -26,7 +28,7 @@ function rng(a) {
 function cv(b = 128) {
   const c = document.createElement('canvas');
   c.width = c.height = Math.max(16, Math.round(b * TEXQ));
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.setTransform(c.width / b, 0, 0, c.height / b, 0, 0);
   return { c, g };
 }

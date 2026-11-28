@@ -1,9 +1,20 @@
 // ─────────────────────────────────────────────────────────────
 //  Cartello delle novità (lobby): ultime versioni del gioco
 // ─────────────────────────────────────────────────────────────
-export const NEWS_VERSION = 'v46';
+export const NEWS_VERSION = 'v47';
 
 export const NEWS = [
+  {
+    v: 'v47', title: 'Caricamento molto più veloce', color: '#7ee0a1', icon: '⚡',
+    items: [
+      'Il gioco non resta più fermo al 92%: le foto delle texture si scaricano insieme al resto invece di bloccare l’avvio fino all’ultima immagine',
+      'Meno della metà dei dati da scaricare (circa 7 MB invece di 16): texture in formato WebP alla risoluzione che il gioco usa davvero, modelli dei personaggi senza animazioni inutilizzate, three.js compresso',
+      'Tutti i file partono subito in parallelo (prima si scoprivano uno dopo l’altro) e la schermata con l’illustrazione appare in un attimo',
+      'Preparazione delle texture più rapida: le normal map e le foto si elaborano in memoria normale invece di passare avanti e indietro dalla scheda video',
+      'Nella barra di caricamento ora vedi quante texture sono arrivate (per esempio 12/18)',
+      'Grafica identica alla v46',
+    ],
+  },
   {
     v: 'v46', title: 'Ancora più foto: roccia, neve, sabbia e metallo', color: '#9fb4c7', icon: '🪨',
     items: [

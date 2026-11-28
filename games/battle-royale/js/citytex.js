@@ -4,7 +4,9 @@
 //  Tutte le facciate ripetono 4 campate × 4 piani: una cella = 3 m × 3 m.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto } from './texgen.js?v=46';
+import { normalFromHeight, NORMALS, TEXQ, ANISO, hasPhoto, paintPhoto } from './texgen.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 // v45: foto di base per ogni stile di muro (una ripetizione = 2 m, uguale su facciate e muri lisci)
 const WALL_PHOTO = {
@@ -39,7 +41,7 @@ function rng(a) {
 function cv(bw, bh, q = TEXQ) {
   const c = document.createElement('canvas');
   c.width = Math.max(8, Math.round(bw * q)); c.height = Math.max(8, Math.round(bh * q));
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.setTransform(c.width / bw, 0, 0, c.height / bh, 0, 0);
   return { c, g };
 }

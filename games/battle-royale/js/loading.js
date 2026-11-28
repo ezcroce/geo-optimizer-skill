@@ -42,7 +42,7 @@
   ];
   var el, img0, img1, bar, pct, title, sub, tip, stage, front = 0;
   var target = 0, shown = 0, auto = true, artIdx = -1, tipIdx = Math.floor(Math.random() * TIPS.length);
-  var tArt = 0, tTip = 0, visible = false, raf = 0, started = 0;
+  var tArt = 0, tTip = 0, visible = false, raf = 0, started = 0, guided = false;
 
   function pickArt() {
     var i;
@@ -68,8 +68,9 @@
   function loop(now) {
     raf = 0;
     if (!visible) return;
-    // senza indicazioni dal gioco la barra avanza piano da sola (mai oltre il 92%)
-    if (auto) target = Math.max(target, Math.min(0.92, 1 - Math.exp(-(now - started) / 9000)));
+    // senza indicazioni dal gioco la barra avanza piano da sola: v47 al primo avvio mai oltre il 45%
+    // (poi il gioco prende la guida dal 50%: prima restava ferma al 92% mentre arrivavano ancora le foto)
+    if (auto) target = Math.max(target, Math.min(guided ? 0.92 : 0.45, 1 - Math.exp(-(now - started) / 9000)));
     shown += (target - shown) * 0.12;
     if (Math.abs(target - shown) < 0.002) shown = target;
     bar.style.transform = 'scaleX(' + shown.toFixed(4) + ')';
@@ -118,7 +119,7 @@
       var seen = 0, EXPECT = 70;
       new PerformanceObserver(function (list) {
         list.getEntries().forEach(function (e) { if (/\.(js|glb|css)(\?|$)/.test(e.name)) seen++; });
-        if (auto && visible) target = Math.max(target, Math.min(0.6, seen / EXPECT * 0.6));
+        if (auto && visible && !guided) target = Math.max(target, Math.min(0.45, seen / EXPECT * 0.45));
       }).observe({ type: 'resource', buffered: true });
     } catch (e) { /* browser vecchio: avanza a tempo */ }
   }
@@ -127,10 +128,11 @@
     /** frazione 0..1 (null = lascia avanzare da sola) e testo della fase (facoltativo) */
     set: function (f, text) {
       if (!el) return;
-      if (f == null) auto = true; else { auto = false; target = Math.max(0, Math.min(1, f)); }
+      if (f == null) auto = true; else { auto = false; guided = true; target = Math.max(visible ? target : 0, Math.min(1, f)); }   // v47: la barra non torna indietro
       if (text) stage.textContent = text;
     },
     tips: TIPS, art: ART,
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build); else build();
+  // v47: lo script sta subito dopo #loading: si costruisce subito (DOMContentLoaded arriva solo dopo i moduli del gioco)
+  if (document.getElementById('loading') || document.readyState !== 'loading') build(); else document.addEventListener('DOMContentLoaded', build);
 })();

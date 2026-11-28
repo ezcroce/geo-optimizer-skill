@@ -6,7 +6,9 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=46';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 const once = (f) => { let v; return () => v || (v = f()); };
 function mulberry(a) {
@@ -75,7 +77,7 @@ const busPaint = once(() => {
 /** fascia laterale con la scritta BATTLE BUS */
 const busDecal = once(() => {
   const W = 1024, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.fillStyle = '#f4f4f0'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#ffcc33'; g.fillRect(0, 0, W, 14); g.fillRect(0, H - 14, W, 14);
   g.font = 'italic 900 78px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -87,7 +89,7 @@ const busDecal = once(() => {
 /** spicchi della mongolfiera: tessuto con cuciture e toppe */
 const balloonTex = once(() => {
   const W = 512, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d'), rnd = mulberry(77);
+  const g = c.getContext('2d', WRF), rnd = mulberry(77);
   const N = 16;
   for (let i = 0; i < N; i++) {
     g.fillStyle = i % 2 ? '#e83a3a' : '#c92a2e'; g.fillRect(i * W / N, 0, W / N + 1, H);
@@ -148,7 +150,7 @@ const busMats = once(() => {
 /** adesivi sul fianco: «100», stella con fulmine, logo della mongolfiera */
 const busStickers = once(() => {
   const W = 768, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   // 1) cerchio «100 giocatori»
   g.fillStyle = '#ffd24a'; g.beginPath(); g.arc(128, 128, 112, 0, 7); g.fill();
   g.lineWidth = 14; g.strokeStyle = '#c0242a'; g.stroke();
@@ -174,7 +176,7 @@ const busStickers = once(() => {
 /** sporco e fango sulla parte bassa della carrozzeria (trasparente in alto) */
 const busMud = once(() => {
   const W = 512, H = 64, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(80,60,40,0)'); gr.addColorStop(0.6, 'rgba(80,60,40,0.35)'); gr.addColorStop(1, 'rgba(60,45,30,0.7)');
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -185,7 +187,7 @@ const busMud = once(() => {
 /** insegna luminosa sul tetto */
 const busSign = once(() => {
   const W = 512, H = 96, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.fillStyle = '#10141c'; g.fillRect(0, 0, W, H);
   g.fillStyle = 'rgba(255,190,40,0.07)';
   for (let x = 4; x < W; x += 8) for (let y = 4; y < H; y += 8) { g.beginPath(); g.arc(x, y, 2.6, 0, 7); g.fill(); }   // matrice di LED
@@ -197,7 +199,7 @@ const busSign = once(() => {
 /** targa */
 const busPlate = once(() => {
   const W = 256, H = 64, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.fillStyle = '#f6f6f0'; g.fillRect(0, 0, W, H);
   g.fillStyle = '#1f4fb0'; g.fillRect(0, 0, 30, H); g.fillRect(W - 30, 0, 30, H);
   g.strokeStyle = '#222'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4);
@@ -209,7 +211,7 @@ const busPlate = once(() => {
 /** finestrini: interno buio con sedili, passeggeri in sagoma e riflesso del cielo (6 riquadri diversi) */
 const busWindows = once(() => {
   const N = 6, CW = 128, H = 128, c = document.createElement('canvas'); c.width = CW * N; c.height = H;
-  const g = c.getContext('2d'), rnd = mulberry(31);
+  const g = c.getContext('2d', WRF), rnd = mulberry(31);
   const skins = ['#e8b48a', '#c58c5f', '#8a5a3a', '#f0c8a0', '#a8e070'];
   const tops = ['#e83a3a', '#2f6fd6', '#ffcc33', '#44c070', '#a050e0', '#ff8a2a'];
   for (let i = 0; i < N; i++) {

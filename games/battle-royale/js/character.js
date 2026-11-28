@@ -1,12 +1,14 @@
 // Modelli 3D low‑poly: personaggi con skin, armi e deltaplani
 import * as THREE from 'three';
-import { REAL, attachReal, realKind } from './realchar.js?v=46';
-import { normalFromHeight, NORMALS } from './texgen.js?v=46';
-import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=46';
+import { REAL, attachReal, realKind } from './realchar.js?v=47';
+import { normalFromHeight, NORMALS } from './texgen.js?v=47';
+import { clothTexture, skinTexture, hairTexture, gliderTexture, COLORED, CLOTH_LOOK, SKIN_CLOTH } from './chartex.js?v=47';
 /** normal map ricavata dalla trama (cache per texture) */
 function nrm(t, k = 1.2) { if (!NORMALS) return null; if (!t.userData.n) { t.userData.n = normalFromHeight(t.image, k); t.userData.n.repeat.copy(t.repeat); } return t.userData.n; }
-import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=46';
-import { mergeParts } from './props.js?v=46';
+import { WEAPONS, RARITIES, HATS, BACKPACKS } from './config.js?v=47';
+import { mergeParts } from './props.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -244,9 +246,9 @@ function faceMaterial(skin) {
   // si disegna in coordinate 256×128 su una tela al doppio della risoluzione (occhi anime nitidi)
   const W = 256, H = 128, RS = 2;
   const c = document.createElement('canvas'); c.width = W * RS; c.height = H * RS;
-  const g = c.getContext('2d'); g.scale(RS, RS);
+  const g = c.getContext('2d', WRF); g.scale(RS, RS);
   const e = document.createElement('canvas'); e.width = W * RS; e.height = H * RS;
-  const ge = e.getContext('2d'); ge.scale(RS, RS);
+  const ge = e.getContext('2d', WRF); ge.scale(RS, RS);
   ge.fillStyle = '#000'; ge.fillRect(0, 0, W, H);
   const mask = skin.acc === 'ninja';
   const robot = skin.id === 'robot';
@@ -1561,7 +1563,7 @@ function featherGeo() {
 }
 /** v40: pittura dello scudo da legionario (fulmini e ali dorate sul rosso) */
 const scutumTex = (col, acc) => cachedTex('scutum40' + col + acc, () => {
-  const c = document.createElement('canvas'); c.width = 256; c.height = 256; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256; const g = c.getContext('2d', WRF);
   g.fillStyle = col; g.fillRect(0, 0, 256, 256);
   g.strokeStyle = acc; g.fillStyle = acc; g.lineWidth = 6;
   g.strokeRect(12, 12, 232, 232);
@@ -1576,7 +1578,7 @@ const scutumTex = (col, acc) => cachedTex('scutum40' + col + acc, () => {
 });
 /** v40: vessillo rosso con frange e SPQR */
 const vexillumTex = (col, acc) => cachedTex('vexil40' + col + acc, () => {
-  const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = 128; c.height = 160; const g = c.getContext('2d', WRF);
   g.fillStyle = col; g.fillRect(0, 0, 128, 160);
   g.strokeStyle = acc; g.lineWidth = 4; g.strokeRect(6, 6, 116, 148);
   g.fillStyle = acc; g.font = 'bold 34px serif'; g.textAlign = 'center'; g.fillText('SPQR', 64, 92);
@@ -1903,8 +1905,8 @@ function lodGeometry(skin, cos = {}) {
 
 // ─────────────── Armi ───────────────
 // I modelli, le texture e le icone delle armi sono in weapons.js
-export { buildWeaponMesh } from './weapons.js?v=46';
-import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=46';
+export { buildWeaponMesh } from './weapons.js?v=47';
+import { buildConsumableMesh, buildAmmoMesh } from './items.js?v=47';
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
 /** Modelli semplici per consumabili e munizioni a terra */
@@ -2024,4 +2026,4 @@ export function buildGlider(glider) {
 }
 
 /** Il "Battle Bus" volante: modello in models3d.js */
-export { buildBus } from './models3d.js?v=46';
+export { buildBus } from './models3d.js?v=47';

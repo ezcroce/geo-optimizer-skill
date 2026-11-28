@@ -9,7 +9,9 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Sculpt, sculptMaterial } from './sculpt.js?v=46';
+import { Sculpt, sculptMaterial } from './sculpt.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 const lerp = (a, b, k) => a + (b - a) * k;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -36,7 +38,7 @@ export const MOVE_IDS = Object.keys(MOVES);
 let MATS = null;
 function skinTexture() {
   const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
-  const g = c.getContext('2d'), r = mulberry(66);
+  const g = c.getContext('2d', WRF), r = mulberry(66);
   g.fillStyle = '#c4ae92'; g.fillRect(0, 0, S, S);
   for (let i = 0; i < 2600; i++) { const v = r(); g.fillStyle = v < 0.5 ? `rgba(80,60,45,${0.06 + r() * 0.12})` : `rgba(255,240,220,${0.05 + r() * 0.1})`; g.beginPath(); g.arc(r() * S, r() * S, 0.6 + r() * 2.4, 0, 6.283); g.fill(); }
   for (let i = 0; i < 90; i++) {   // pieghe e rughe
@@ -93,7 +95,7 @@ let DETAIL = null;
 function detailTexture() {
   if (DETAIL) return DETAIL;
   const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
-  const g = c.getContext('2d'), r = mulberry(91);
+  const g = c.getContext('2d', WRF), r = mulberry(91);
   g.fillStyle = '#c4c4c4'; g.fillRect(0, 0, S, S);
   for (let i = 0; i < 3200; i++) { const v = r(); g.fillStyle = v < 0.55 ? `rgba(40,30,25,${0.05 + r() * 0.1})` : `rgba(255,250,240,${0.05 + r() * 0.08})`; g.beginPath(); g.arc(r() * S, r() * S, 0.5 + r() * 2, 0, 6.283); g.fill(); }
   for (let i = 0; i < 140; i++) {   // rughe e pieghe della pelle

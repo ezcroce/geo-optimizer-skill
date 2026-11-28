@@ -47,3 +47,8 @@ Sono modelli con scheletro standard Mixamo (`mixamorig:Hips`, `Spine`, `LeftArm`
 con qualunque personaggio esportato da Mixamo/Blender in .glb con lo stesso scheletro e lo stesso nome file.
 Lo scheletro procedurale del gioco fa le animazioni e la posa viene trasferita alle ossa (`js/realchar.js`).
 Se i file mancano si torna ai personaggi procedurali.
+
+**v47 – alleggeriti per il caricamento:** dai due modelli base sono state tolte le animazioni incluse (Idle, Run,
+Walk, SambaDance… il gioco non le usa: anima tutto con lo scheletro procedurale) e le coordinate UV in più che nessun
+materiale usava; le texture sono state ricompresse in JPEG (la normal map della donna compresa). Da 5,4 MB a 2,2 MB,
+stesso aspetto. Se li sostituisci con un modello nuovo, conviene fare lo stesso.

@@ -6,7 +6,9 @@
 //  griglia, maniglie, specchietti e targhe italiane. Tre carrozzerie: berlina, utilitaria, SUV.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { normalFromHeight, NORMALS } from './texgen.js?v=46';
+import { normalFromHeight, NORMALS } from './texgen.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 // colori di serie (metallizzati e pastello)
 export const CAR_PAINTS = ['#8f1a1a', '#1e3f73', '#e9e9e6', '#121316', '#9da3a8', '#5d6266', '#2f4a3a', '#c7b48f', '#1d6f8a', '#b8b9b4', '#6a1f2e', '#d9a21b'];
@@ -281,7 +283,7 @@ function buildVariant(v) {
 // ── texture della vernice: linee delle portiere, sportello carburante, muso con prese d'aria, coda ──
 function paintTexture(B) {
   const v = B.v, S = 1024, cv = document.createElement('canvas'); cv.width = S; cv.height = S;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d', WRF);
   g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
   const UVW = B.UVW;
   // fianco: u = (z + UVW/2)/UVW, v = 0.5 + y/4  (in canvas y è capovolto)
@@ -329,7 +331,7 @@ function paintTexture(B) {
 
 function plateTexture() {
   const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112;
-  const g = cv.getContext('2d');
+  const g = cv.getContext('2d', WRF);
   g.fillStyle = '#f4f4f0'; g.fillRect(0, 0, 512, 112);
   g.fillStyle = '#1c3f9e'; g.fillRect(0, 0, 50, 112); g.fillRect(462, 0, 50, 112);
   g.fillStyle = '#f2cf2a'; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.beginPath(); g.arc(25 + Math.cos(a) * 13, 34 + Math.sin(a) * 13, 2.4, 0, 7); g.fill(); }

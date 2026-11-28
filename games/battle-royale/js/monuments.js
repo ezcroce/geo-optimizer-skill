@@ -8,8 +8,10 @@
 //  2 intonaco chiaro della chiesa, 3 marmo bianco venato.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { mergeParts, makeAtlasMaterial } from './props.js?v=46';
-import { paintPhoto } from './texgen.js?v=46';
+import { mergeParts, makeAtlasMaterial } from './props.js?v=47';
+import { paintPhoto, photosReady } from './texgen.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -18,7 +20,7 @@ function mulberry(a) {
 function makeMonumentAtlas() {
   const S = 1024, H = 512, c = document.createElement('canvas');
   c.width = c.height = S;
-  const g = c.getContext('2d'), rnd = mulberry(3801);
+  const g = c.getContext('2d', WRF), rnd = mulberry(3801);
   const hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
   // 0 · travertino a blocchi (filari orizzontali sfalsati, fori e macchie)
   {
@@ -74,13 +76,17 @@ function makeMonumentAtlas() {
       g.stroke();
     }
   }
-  // v45: grana fotografica sopra il disegno: travertino poroso, sabbia vera, intonaco e marmo appena segnati
-  paintPhoto(g, 'plaster', 0, 0, H, H, { tile: H / 2, mode: 'detail', strength: 0.5, contrast: 1.1 });
-  if (!paintPhoto(g, 'sand', H, 0, H, H, { tile: H / 2, mode: 'detail', strength: 0.75, contrast: 1.1 })) paintPhoto(g, 'dirt', H, 0, H, H, { tile: H / 2, mode: 'detail', strength: 0.55, contrast: 1.0 });   // v46: sabbia vera
-  paintPhoto(g, 'plaster', 0, H, H, H, { tile: H / 2, mode: 'detail', strength: 0.4, contrast: 1.0, ox: 0.5 });
-  paintPhoto(g, 'plaster', H, H, H, H, { tile: H / 2, mode: 'detail', strength: 0.22, contrast: 1.0, oy: 0.5 });
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  // v47: le foto arrivano in parallelo al resto del gioco: la grana si aggiunge appena sono pronte (prima dell'isola)
+  photosReady.then(() => {
+    // v45: grana fotografica sopra il disegno: travertino poroso, sabbia vera, intonaco e marmo appena segnati
+    paintPhoto(g, 'plaster', 0, 0, H, H, { tile: H / 2, mode: 'detail', strength: 0.5, contrast: 1.1 });
+    if (!paintPhoto(g, 'sand', H, 0, H, H, { tile: H / 2, mode: 'detail', strength: 0.75, contrast: 1.1 })) paintPhoto(g, 'dirt', H, 0, H, H, { tile: H / 2, mode: 'detail', strength: 0.55, contrast: 1.0 });   // v46: sabbia vera
+    paintPhoto(g, 'plaster', 0, H, H, H, { tile: H / 2, mode: 'detail', strength: 0.4, contrast: 1.0, ox: 0.5 });
+    paintPhoto(g, 'plaster', H, H, H, H, { tile: H / 2, mode: 'detail', strength: 0.22, contrast: 1.0, oy: 0.5 });
+    t.needsUpdate = true;
+  });
   return t;
 }
 export const monumentAtlas = makeMonumentAtlas();

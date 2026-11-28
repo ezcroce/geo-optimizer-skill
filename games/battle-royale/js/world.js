@@ -4,12 +4,14 @@
 // un pezzo per volta, e liberata quando ci si allontana.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=46';
-import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=46';
-import { carInstances } from './cars.js?v=25';
-import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=46';
-import { makeNoise, fbm, ridged } from './noise.js?v=19';
-import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=46';
+import { canvas2d, addGrain, normalFromHeight, colorTex, NORMALS, TEXQ, hasPhoto, paintPhoto, photoTexture, photoMeanLinear } from './texgen.js?v=47';
+import { planTown, streetAt, onStreet, buildCity, CITY_SPECIALS, STREET } from './city.js?v=47';
+import { carInstances } from './cars.js?v=47';
+import { monumentMaterial, churchGeo, churchColliders, buildArena, ARENA } from './monuments.js?v=47';
+import { makeNoise, fbm, ridged } from './noise.js?v=47';
+import { mergeParts, TREE_KINDS, PROPS, PROP_DIMS, SHED, MODEL_SOURCE, propMaterial, metalPropMaterial, logMaterial, treeMaterial, bushMaterial, rockMaterial, WIND, LEAVES, leafMaterial, bushLeafMaterial, TREE_MATS, shedMaterial, civicMaterial } from './props.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 /** posizione del giocatore: l'erba vicina si piega al suo passaggio */
 export const GRASS_PLAYER = { value: new THREE.Vector3(0, -9999, 0) };
@@ -997,7 +999,7 @@ function makeWoodTexture() {
   if (photo) {
     // cornice con le venature orizzontali (foto ruotata), un po' più scura delle assi
     const tc = document.createElement('canvas'); tc.width = tc.height = S;
-    const tg = tc.getContext('2d'); tg.setTransform(S / B, 0, 0, S / B, 0, 0);
+    const tg = tc.getContext('2d', WRF); tg.setTransform(S / B, 0, 0, S / B, 0, 0);
     paintPhoto(tg, 'wood', 0, 0, B, B, { rot: true, tint: '#7a4c22', keep: 0.7, contrast: 1.25, ox: 0.37 });
     frameStyle = g.createPattern(tc, 'repeat'); frameStyle.setTransform(new DOMMatrix().scale(B / S));
   }
@@ -1013,7 +1015,7 @@ function makeWoodTexture() {
   }
   // v22: niente grana per pixel sul rilievo (dava puntini e righe "rumorose" da vicino); rilievo leggermente sfocato
   addGrain(g, S, 4);
-  { const tmp = document.createElement('canvas'); tmp.width = tmp.height = H.S; const tg = tmp.getContext('2d'); tg.filter = 'blur(0.8px)'; tg.drawImage(H.c, 0, 0); h.save(); h.setTransform(1, 0, 0, 1, 0, 0); h.drawImage(tmp, 0, 0); h.restore(); }
+  { const tmp = document.createElement('canvas'); tmp.width = tmp.height = H.S; const tg = tmp.getContext('2d', WRF); tg.filter = 'blur(0.8px)'; tg.drawImage(H.c, 0, 0); h.save(); h.setTransform(1, 0, 0, 1, 0, 0); h.drawImage(tmp, 0, 0); h.restore(); }
   const t = withNormal(c, H.c, 2.2);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   if (t.userData.normal) t.userData.normal.wrapS = t.userData.normal.wrapT = THREE.ClampToEdgeWrapping;
@@ -1251,7 +1253,7 @@ function groundColor(x, z, h, out, slope = null) {
 function makeGroundDetail() {
   const S = 256, c = document.createElement('canvas');   // (v45: canale R dalla foto della terra)
   c.width = c.height = S;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.fillStyle = 'rgb(150,150,0)'; g.fillRect(0, 0, S, S);
   const wrap = (fn) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) fn(ox, oy); };
   // canale G: chiazze morbide
@@ -1408,7 +1410,7 @@ function addGroundDetail(mat, tex, near = 70, far = 260, amount = 1, bump = fals
 function makeWaterNormal() {
   const S = 128, c = document.createElement('canvas');
   c.width = c.height = S;
-  const g = c.getContext('2d'), img = g.createImageData(S, S), d = img.data;
+  const g = c.getContext('2d', WRF), img = g.createImageData(S, S), d = img.data;
   const waves = [];
   for (let i = 0; i < 9; i++) waves.push({ kx: Math.round((Math.random() - 0.5) * 10), ky: Math.round((Math.random() - 0.5) * 10) || 1, a: 0.4 / (1 + i * 0.4), p: Math.random() * 6.283 });
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
@@ -2655,7 +2657,7 @@ export function buildWorld(scene, opts = {}) {
   const depthTex = (() => {
     const S = 256, c = document.createElement('canvas');
     c.width = c.height = S;
-    const g = c.getContext('2d'), img = g.createImageData(S, S), d = img.data;
+    const g = c.getContext('2d', WRF), img = g.createImageData(S, S), d = img.data;
     for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
       const x = -800 + (i + 0.5) / S * 1600, z = -800 + (j + 0.5) / S * 1600;
       const dep = Math.max(0, Math.min(1, (WATER_LEVEL - terrainHeight(x, z)) / 8));

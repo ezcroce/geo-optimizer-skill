@@ -1,43 +1,43 @@
 // ═════════════════════════════════════════════════════════════
 //  ARENA ROYALE 3D — battle royale in terza persona (Three.js)
 // ═════════════════════════════════════════════════════════════
-import { EMOTES, poseEmote } from './emotes.js?v=46';
+import { EMOTES, poseEmote } from './emotes.js?v=47';
 const EMOTE_KEYS = ['Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus'];   // v39: 6 7 8 9 0 ' (sei balletti)
 import * as THREE from 'three';
 import {
   RARITIES, WEAPONS, WEAPON_POOL, CONSUMABLES, AMMO_TYPES, SKINS, GLIDERS,
   DIFFICULTY, scaledDifficulty, STORM_PHASES, DUEL_PHASES, BOT_NAMES, HATS, BACKPACKS, MODES, TEAM_MODES, teamSize, MATE_COLORS,
-} from './config.js?v=46';
-import * as PR from './progress.js?v=46';
-import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=46';
-import { initMenu } from './menu.js?v=46';
-import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=46';
-import { initSettingsUI } from './settings-ui.js?v=46';
-import { applyAnisotropy } from './texgen.js?v=46';
-import * as A from './audio.js?v=46';
+} from './config.js?v=47';
+import * as PR from './progress.js?v=47';
+import { NET, broadcast as netSend, sendTo as netSendTo } from './net.js?v=47';
+import { initMenu } from './menu.js?v=47';
+import { createGfx, PRESETS, GFX_DEFAULT } from './gfx.js?v=47';
+import { initSettingsUI } from './settings-ui.js?v=47';
+import { applyAnisotropy, photosReady, photoProgress } from './texgen.js?v=47';
+import * as A from './audio.js?v=47';
 import {
   buildWorld, terrainHeight, groundAt, resolveCollisions, ceilingAt, rayWorld, rayColliders,
   addCollider, removeCollider, HALF, WATER_LEVEL, TOWNS, SCALE, GRASS_PLAYER, tallGrassAt, QUALITY, GRASS_FADE,
   biomeAt, biomeName, BIOME_NAMES, THEME_LABEL, CLIP, mulberry32, queryColliders, rampTop,
-} from './world.js?v=46';
-import { createWeather } from './weather.js?v=24';
-import { createEvents } from './events.js?v=19';
-import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=46';
-import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=46';
-import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=46';
-import { buildChestMesh } from './models3d.js?v=46';
-import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=46';
-import { createInventory } from './inventory.js?v=46';
-import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=46';
-import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=46';
-import { createStoves } from './stove.js?v=26';
-import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=46';
-import { buildPickaxe, heldConsumable } from './held.js?v=46';
-import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=46';
-import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=46';
-import { createCrosshair } from './crosshair.js?v=46';
-import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=46';
-import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=46';
+} from './world.js?v=47';
+import { createWeather } from './weather.js?v=47';
+import { createEvents } from './events.js?v=47';
+import { buildCharacter, buildWeaponMesh, buildItemMesh, buildGlider, buildBus, RIG } from './character.js?v=47';
+import { weaponIcon, cachedWeaponIcon } from './weapons.js?v=47';
+import { consIcon, ammoIcon, rocketProjectileGeo } from './items.js?v=47';
+import { buildChestMesh } from './models3d.js?v=47';
+import { createTouch, IS_TOUCH_DEVICE } from './touch.js?v=47';
+import { createInventory } from './inventory.js?v=47';
+import { loadModelOverrides, MODEL_SOURCE, PROPS, LEAVES, treeMaterial, bushMaterial, leafMaterial, bushLeafMaterial, rockMaterial, propMaterial, logMaterial, shedMaterial, WIND } from './props.js?v=47';
+import { loadRealChars, syncAllReal, loadSkinModel, prioritizeSkins, ALL_SKIN_MODELS, realWarmObject, skinLoadStatus } from './realchar.js?v=47';
+import { createStoves } from './stove.js?v=47';
+import { resetPose, setLeg, setArm, legsLocomotion, legsAir, legsAirBlend, armsSwing, poseHold, handsToGun, poseClimb, poseMantle, poseSkydive, poseGlide, poseSwim, poseDeath, gaitRate, posePickaxe, poseUse, poseClaws } from './anim.js?v=47';
+import { buildPickaxe, heldConsumable } from './held.js?v=47';
+import { createBossFight, createClawFX, BOSS_CHANCE } from './bossfight.js?v=47';
+import { MOVES as CLAW_MOVES, buildClawGauntlet } from './boss.js?v=47';
+import { createCrosshair } from './crosshair.js?v=47';
+import { createThrowables, buildThrowMesh, buildPlacedMesh, throwVelocity, THROWABLES, THROW_IDS, THROW_G, THROW_SPEED, FRAG, IMPULSE, PAD, TRAP } from './throwables.js?v=47';
+import { skyMaterial, buildCloudGeometry, cloudMaterial, faceClouds } from './sky.js?v=47';
 
 const $ = s => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -190,8 +190,12 @@ const clouds = [];
 // se in models/ ci sono i file .glb originali vengono caricati prima di costruire il mondo
 const LD = (f, t) => { try { window.LOADING && window.LOADING.set(f, t); } catch { /* schermata assente */ } };   // v40
 const nextPaint = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
-LD(0.62, 'Caricamento dei personaggi…');
-const [loadedModels] = await Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/', [settings.skin])]);   // v25/v26: personaggi realistici (quello del giocatore subito)
+LD(0.5, 'Caricamento dei personaggi e delle texture…');
+// v47: le foto delle texture si scaricano insieme ai personaggi (prima bloccavano l'avvio di tutto il gioco)
+let _ldDone = false;
+const _ldTick = setInterval(() => { if (!_ldDone) LD(0.5 + 0.22 * photoProgress.done / photoProgress.total, `Caricamento dei personaggi e delle texture… ${photoProgress.done}/${photoProgress.total}`); }, 200);
+const [loadedModels] = await Promise.all([loadModelOverrides('models/'), loadRealChars('models/chars/', [settings.skin]), photosReady]);   // v25/v26: personaggi realistici (quello del giocatore subito)
+_ldDone = true; clearInterval(_ldTick);
 if (loadedModels.length) console.info('Modelli GLB caricati:', loadedModels.join(', '));
 LD(0.74, "Costruzione dell'isola…");
 await nextPaint();

@@ -8,7 +8,7 @@
 //   · effetti condivisi con gli Artigli del giocatore: scie delle artigliate e onde d'urto.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { buildGargoyle, warmGargoyle, animateGargoyle, hitSpheres, MOVES } from './boss.js?v=46';
+import { buildGargoyle, warmGargoyle, animateGargoyle, hitSpheres, MOVES } from './boss.js?v=47';
 
 export const BOSS_HP = 2200;
 export const BOSS_CHANCE = 0.45;           // probabilità che una partita abbia il boss

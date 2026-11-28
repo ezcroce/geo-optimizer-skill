@@ -5,7 +5,9 @@
 //  macchie). Tutte ripetibili, con normal map ricavata dal rilievo.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=46';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -468,7 +470,7 @@ export function gliderTexture(id, color, accent) {
   if (GL_CACHE.has(key)) return GL_CACHE.get(key);
   const W = 512, H = 256;
   const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d'), rnd = mulberry(hash(key));
+  const g = c.getContext('2d', WRF), rnd = mulberry(hash(key));
   const X = (u) => u * W, Y = (v) => v * H;
   const sym = (fn) => { fn(1); g.save(); g.translate(W, 0); g.scale(-1, 1); fn(-1); g.restore(); };   // disegno simmetrico
   g.fillStyle = color; g.fillRect(0, 0, W, H);
@@ -636,7 +638,7 @@ export function gliderTexture(id, color, accent) {
   let normalMap = null;
   if (NORMALS) {
     const hc = document.createElement('canvas'); hc.width = W / 2; hc.height = H / 2;
-    const hg = hc.getContext('2d'); hg.fillStyle = '#808080'; hg.fillRect(0, 0, W / 2, H / 2);
+    const hg = hc.getContext('2d', WRF); hg.fillStyle = '#808080'; hg.fillRect(0, 0, W / 2, H / 2);
     hg.fillStyle = '#9a9a9a'; for (let x = 0; x < W / 2; x += 3) hg.fillRect(x, 0, 1, H / 2);
     hg.fillStyle = '#585858'; for (let k = 1; k < 12; k++) hg.fillRect(k / 12 * W / 2 - 1, H / 40, 2, H / 2);
     hg.fillRect(0, H / 40 - 1, W / 2, 2);

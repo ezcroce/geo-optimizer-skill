@@ -5,6 +5,8 @@
 //  (+2 PS al secondo fino a 100). La legna brucia per un minuto, poi la stufa si spegne da sola.
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 export const STOVE_BURN = 60;     // secondi di fuoco per ogni accensione
 export const STOVE_HEAL = 2;      // PS al secondo
@@ -12,7 +14,7 @@ const SMOKE_N = 14;
 
 function canvasTex(draw, w = 64, h = 64) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
+  draw(c.getContext('2d', WRF), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }

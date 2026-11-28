@@ -2,6 +2,8 @@
 //  Utilità per le texture procedurali: qualità, normal map dal rilievo
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 const saved = (() => { try { return JSON.parse(localStorage.getItem('arenaRoyale') || '{}').gfx || {}; } catch { return {}; } })();
 // primo avvio su telefono/tablet: texture leggere (come il preset "Bassa" scelto in main.js)
@@ -17,7 +19,7 @@ export function canvas2d(base) {
   const S = Math.max(16, Math.round(base * TEXQ));
   const c = document.createElement('canvas');
   c.width = c.height = S;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   g.setTransform(S / base, 0, 0, S / base, 0, 0);
   return { c, g, S, k: S / base };
 }
@@ -40,21 +42,27 @@ export function normalFromHeight(hc, strength = 2) {
   const src = hc.getContext('2d').getImageData(0, 0, S, H).data;
   const out = document.createElement('canvas');
   out.width = S; out.height = H;
-  const og = out.getContext('2d');
+  const og = out.getContext('2d', WRF);
   const img = og.createImageData(S, H), d = img.data;
-  const h = (x, y) => src[((((y % H) + H) % H) * S + (((x % S) + S) % S)) * 4] / 255;
-  const k = strength * S / 128;
-  for (let y = 0; y < H; y++) for (let x = 0; x < S; x++) {
-    const tl = h(x - 1, y - 1), t = h(x, y - 1), tr = h(x + 1, y - 1);
-    const l = h(x - 1, y), r = h(x + 1, y);
-    const bl = h(x - 1, y + 1), b = h(x, y + 1), br = h(x + 1, y + 1);
-    const dx = (tr + 2 * r + br) - (tl + 2 * l + bl);
-    const dy = (bl + 2 * b + br) - (tl + 2 * t + tr);
-    let nx = -dx * k, ny = dy * k, nz = 1;
-    const len = Math.hypot(nx, ny, nz);
-    nx /= len; ny /= len; nz /= len;
-    const i = (y * S + x) * 4;
-    d[i] = (nx * 0.5 + 0.5) * 255; d[i + 1] = (ny * 0.5 + 0.5) * 255; d[i + 2] = (nz * 0.5 + 0.5) * 255; d[i + 3] = 255;
+  // v47: stesso filtro di Sobel di prima, ma su un array di float con gli indici dei vicini già calcolati
+  // (prima: una funzione con due modulo per campione e Math.hypot → era la parte più lenta del caricamento)
+  const N = S * H, hf = new Float32Array(N);
+  for (let i = 0, j = 0; i < N; i++, j += 4) hf[i] = src[j];
+  const xl = new Int32Array(S), xr = new Int32Array(S);
+  for (let x = 0; x < S; x++) { xl[x] = (x + S - 1) % S; xr[x] = (x + 1) % S; }
+  const k = strength * S / 128 / 255;
+  for (let y = 0; y < H; y++) {
+    const rt = ((y + H - 1) % H) * S, rc = y * S, rb = ((y + 1) % H) * S;
+    for (let x = 0; x < S; x++) {
+      const a = xl[x], c = xr[x];
+      const tl = hf[rt + a], t = hf[rt + x], tr = hf[rt + c];
+      const l = hf[rc + a], r = hf[rc + c];
+      const bl = hf[rb + a], b = hf[rb + x], br = hf[rb + c];
+      const nx = -((tr + 2 * r + br) - (tl + 2 * l + bl)) * k, ny = ((bl + 2 * b + br) - (tl + 2 * t + tr)) * k;
+      const il = 127.5 / Math.sqrt(nx * nx + ny * ny + 1);
+      const i = (rc + x) * 4;
+      d[i] = nx * il + 127.5; d[i + 1] = ny * il + 127.5; d[i + 2] = il + 127.5; d[i + 3] = 255;
+    }
   }
   og.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(out);
@@ -87,26 +95,34 @@ export function applyAnisotropy(root, n) {
 }
 
 // ═════════════════════════════════════════════════════════════
-//  v45: texture fotografiche (img/tex/*.jpg, 1024 px, affiancabili senza cuciture)
+//  v45: texture fotografiche (img/tex/*.jpg = originali 1024 px affiancabili; il gioco scarica le WebP in img/tex/s/ e img/tex/)
 //  Fanno da base alle texture procedurali: le tinte, le finestre e i dettagli si disegnano sopra.
 //  Se un'immagine non arriva, ogni generatore torna al disegno procedurale di prima.
 // ═════════════════════════════════════════════════════════════
 const PHOTO_LIST = ['stone', 'plaster', 'brick', 'roof', 'wood', 'cobble', 'asphalt', 'slabs', 'grass', 'dirt',
   'rock', 'concrete', 'metal', 'parquet', 'snow', 'sand', 'slate', 'paintwood'];   // v46: seconda serie
 export const PHOTOS = {};
+// v47: WebP a 512 px (il gioco non ricampiona mai oltre i 512 px); a 1024 px solo le 4 foto usate intere come
+// texture del terreno e delle rocce, e solo con la qualità texture alta. Prima: 18 JPEG da 1024 px = 5,4 MB
+const PHOTO_BIG = TEXQ >= 2 ? new Set(['rock', 'grass', 'snow', 'sand']) : new Set();
+export const photoUrl = (n) => new URL(`../img/tex/${PHOTO_BIG.has(n) ? '' : 's/'}${n}.webp?v=47`, import.meta.url).href;
+export const photoProgress = { done: 0, total: PHOTO_LIST.length };
 function loadPhoto(n) {
   return new Promise(res => {
     const im = new Image();
-    const to = setTimeout(() => res(null), 25000);
-    im.onload = () => { clearTimeout(to); res(im); };
-    im.onerror = () => { clearTimeout(to); res(null); };
-    im.src = new URL(`../img/tex/${n}.jpg?v=46`, import.meta.url).href;
+    let fin = false;
+    const end = (ok) => { if (fin) return; fin = true; clearTimeout(to); photoProgress.done++; res(ok ? im : null); };
+    const to = setTimeout(() => end(false), 20000);
+    im.onload = () => end(true);
+    im.onerror = () => end(false);
+    im.src = photoUrl(n);
   });
 }
-try {
-  const ims = await Promise.all(PHOTO_LIST.map(loadPhoto));
+/** v47: le foto si scaricano in parallelo al resto (prima un await qui bloccava tutto il gioco fino all'ultima foto);
+ *  main.js le aspetta solo prima di costruire l'isola, insieme ai personaggi */
+export const photosReady = Promise.all(PHOTO_LIST.map(loadPhoto)).then((ims) => {
   PHOTO_LIST.forEach((n, i) => { if (ims[i]) PHOTOS[n] = { img: ims[i], sizes: new Map(), tex: null }; });
-} catch { /* niente foto: texture procedurali */ }
+}).catch(() => { /* niente foto: texture procedurali */ });
 export const hasPhoto = (n) => !!PHOTOS[n];
 
 /** pixel della foto ridimensionata a size×size (in cache) e colore medio */
@@ -124,7 +140,7 @@ export function photoData(name, size) {
     let src = P.img, s = P.img.width;
     while (s / 2 > size * 1.4) {
       const t = document.createElement('canvas'); t.width = t.height = Math.round(s / 2);
-      const tg = t.getContext('2d'); tg.imageSmoothingQuality = 'high'; tg.drawImage(src, 0, 0, t.width, t.height);
+      const tg = t.getContext('2d', WRF); tg.imageSmoothingQuality = 'high'; tg.drawImage(src, 0, 0, t.width, t.height);
       src = t; s = t.width;
     }
     g.drawImage(src, 0, 0, size, size);
@@ -133,7 +149,9 @@ export function photoData(name, size) {
     const n = size * size;
     for (let i = 0; i < px.length; i += 4) { r += px[i]; gg += px[i + 1]; b += px[i + 2]; }
     r /= n; gg /= n; b /= n;
-    D = { size, px, canvas: c, mean: [r, gg, b], lum: 0.299 * r + 0.587 * gg + 0.114 * b };
+    const L = new Float32Array(n);   // v47: luminanza già calcolata (paintPhoto la usa per ogni pixel)
+    for (let i = 0, j = 0; i < n; i++, j += 4) L[i] = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
+    D = { size, px, L, canvas: c, mean: [r, gg, b], lum: 0.299 * r + 0.587 * gg + 0.114 * b };
     P.sizes.set(size, D);
   }
   return D;
@@ -191,29 +209,43 @@ export function paintPhoto(g, name, x, y, w, h, o = {}) {
   const [mr, mg, mb] = D.mean, ml = D.lum;
   const tint = o.tint ? hexRgb(o.tint) : null;
   const base = o.base ?? 128;
+  // v47: un ciclo per modalità e luminanza già pronta (stessi conti di prima, circa il doppio più veloce)
+  const LL = D.L, inv = 1 / ml, a1 = 1 - alpha;
   for (let j = 0; j < H; j++) {
     const v = Math.min(S - 1, Math.floor((((j + 0.5 + oy) / tdy) % 1) * S));
-    for (let i = 0; i < W; i++) {
-      const u = us[i];
-      const k = rot ? (((S - 1 - u) * S + v) * 4) : ((v * S + u) * 4);
-      const r = s[k], gg = s[k + 1], b = s[k + 2];
-      const L = 0.299 * r + 0.587 * gg + 0.114 * b;
-      const q = (j * W + i) * 4;
-      let R, G, B;
-      if (mode === 'detail') {
-        const f = 1 + (1 + (L / ml - 1) * contrast - 1) * strength;
-        R = d[q] * f; G = d[q + 1] * f; B = d[q + 2] * f;
-      } else if (mode === 'height') {
-        R = G = B = base + (L - ml) * contrast;
-      } else if (tint) {
-        const lr = L / ml;
-        const rr = 1 + (lr + (r / mr - lr) * keep - 1) * contrast, rg = 1 + (lr + (gg / mg - lr) * keep - 1) * contrast, rb = 1 + (lr + (b / mb - lr) * keep - 1) * contrast;
-        R = tint[0] * rr * bright; G = tint[1] * rg * bright; B = tint[2] * rb * bright;
-      } else {
-        R = (mr + (r - mr) * contrast) * bright; G = (mg + (gg - mg) * contrast) * bright; B = (mb + (b - mb) * contrast) * bright;
+    let q = j * W * 4;
+    if (mode === 'detail') {
+      const ks = contrast * strength * inv;
+      for (let i = 0; i < W; i++, q += 4) {
+        const u = us[i], p = rot ? (S - 1 - u) * S + v : v * S + u;
+        const f = 1 + (LL[p] - ml) * ks;
+        let R = d[q] * f, G = d[q + 1] * f, B = d[q + 2] * f;
+        if (alpha < 1) { R = d[q] * a1 + R * alpha; G = d[q + 1] * a1 + G * alpha; B = d[q + 2] * a1 + B * alpha; }
+        d[q] = R; d[q + 1] = G; d[q + 2] = B; d[q + 3] = 255;
       }
-      if (alpha < 1) { R = d[q] + (R - d[q]) * alpha; G = d[q + 1] + (G - d[q + 1]) * alpha; B = d[q + 2] + (B - d[q + 2]) * alpha; }
-      d[q] = R; d[q + 1] = G; d[q + 2] = B; d[q + 3] = 255;
+    } else if (mode === 'height') {
+      for (let i = 0; i < W; i++, q += 4) {
+        const u = us[i], p = rot ? (S - 1 - u) * S + v : v * S + u;
+        let V = base + (LL[p] - ml) * contrast, R = V, G = V, B = V;
+        if (alpha < 1) { R = d[q] * a1 + V * alpha; G = d[q + 1] * a1 + V * alpha; B = d[q + 2] * a1 + V * alpha; }
+        d[q] = R; d[q + 1] = G; d[q + 2] = B; d[q + 3] = 255;
+      }
+    } else if (tint) {
+      const kr = keep / mr, kg = keep / mg, kb = keep / mb, t0 = tint[0] * bright, t1 = tint[1] * bright, t2 = tint[2] * bright;
+      for (let i = 0; i < W; i++, q += 4) {
+        const u = us[i], p = rot ? (S - 1 - u) * S + v : v * S + u, k = p * 4;
+        const lr = LL[p] * inv, lk = lr * (1 - keep) - 1;
+        let R = t0 * (1 + (lk + s[k] * kr) * contrast), G = t1 * (1 + (lk + s[k + 1] * kg) * contrast), B = t2 * (1 + (lk + s[k + 2] * kb) * contrast);
+        if (alpha < 1) { R = d[q] * a1 + R * alpha; G = d[q + 1] * a1 + G * alpha; B = d[q + 2] * a1 + B * alpha; }
+        d[q] = R; d[q + 1] = G; d[q + 2] = B; d[q + 3] = 255;
+      }
+    } else {
+      for (let i = 0; i < W; i++, q += 4) {
+        const u = us[i], k = (rot ? (S - 1 - u) * S + v : v * S + u) * 4;
+        let R = (mr + (s[k] - mr) * contrast) * bright, G = (mg + (s[k + 1] - mg) * contrast) * bright, B = (mb + (s[k + 2] - mb) * contrast) * bright;
+        if (alpha < 1) { R = d[q] * a1 + R * alpha; G = d[q + 1] * a1 + G * alpha; B = d[q + 2] * a1 + B * alpha; }
+        d[q] = R; d[q + 1] = G; d[q + 2] = B; d[q + 3] = 255;
+      }
     }
   }
   g.putImageData(img, X0, Y0);

@@ -7,8 +7,10 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=46';
-import { renderIcon } from './weapons.js?v=46';
+import { canvas2d, normalFromHeight, colorTex, NORMALS } from './texgen.js?v=47';
+import { renderIcon } from './weapons.js?v=47';
+/** v47: canvas delle texture in memoria normale: si rileggono i pixel (rilievo, foto) senza farli tornare dalla GPU */
+const WRF = { willReadFrequently: true };
 
 function mulberry(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
@@ -69,7 +71,7 @@ const plasticTex = once(() => {
 /** etichetta delle pozioni: blu notte, scudo bianco con fulmine e valore */
 function potionLabelTex(big) {
   const W = 256, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d', WRF);
   const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, big ? '#163a8c' : '#1d5fae'); gr.addColorStop(1, big ? '#0b1f52' : '#123d78');
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   g.strokeStyle = '#cfe6ff'; g.lineWidth = 4; g.strokeRect(6, 6, W - 12, H - 12);
@@ -293,7 +295,7 @@ const AMMO = {
   shells: { kind: 'box', size: [0.26, 0.26, 0.11], label: 'cartucce' },
   rockets: { kind: 'spindle', size: [0.78, 0.12, 0.2], label: 'razzi' },
 };
-function cnv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return { c, g: c.getContext('2d') }; }
+function cnv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return { c, g: c.getContext('2d', WRF) }; }
 function speckle(g, w, h, n, a, rnd) { for (let i = 0; i < n; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,255'},${rnd() * a})`; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); } }
 function spaced(g, txt, x, y, sp) { // testo spaziato centrato
   const ws = [...txt].map((ch) => g.measureText(ch).width), tot = ws.reduce((a, b) => a + b, 0) + sp * (txt.length - 1);

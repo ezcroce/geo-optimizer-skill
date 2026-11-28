@@ -481,42 +481,10 @@ body {
   color: #d8b4fe;
 }
 
-.role-pref-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
+.role-random-notice {
+  color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 600;
-  color: #cbd5e1;
-}
-
-.seg-group {
-  display: flex;
-  background: rgba(5, 9, 18, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 3px;
-  gap: 3px;
-}
-
-.seg-group button {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 0.74rem;
-  padding: 5px 10px;
-  border-radius: 7px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.16s ease;
-}
-
-.seg-group button.active {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(99, 102, 241, 0.28));
-  color: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.38);
 }
 
 .code-join-row {

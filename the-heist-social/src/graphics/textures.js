@@ -8,6 +8,46 @@ function hash2(x, y) {
   return n - Math.floor(n);
 }
 
+// Fine surface detail is drawn at matching positions on color and bump maps.
+// This keeps the villa materials tactile without loading large external images.
+function addSurfaceDetail(ctx, size, key, isData) {
+  const base = key.replace(/_b$/, '');
+  const wood = /^(fl_parquet|wood_|door_coffered|tree_bark)/.test(base);
+  const stone = /^(fl_mcheck|fl_mwhite|fl_trav|carved_stone|wall_ext|prop_calacatta)/.test(base);
+  const fabric = /^(wall_int|rug_|tuft_)/.test(base);
+  const nature = /^(fl_grass|foliage_|hedge_)/.test(base);
+  if (!wood && !stone && !fabric && !nature) return;
+
+  ctx.save();
+  // Translucent highlights and dark flecks preserve the underlying pattern and grout.
+  const count = nature ? 2600 : stone ? 2100 : 1600;
+  for (let i = 0; i < count; i++) {
+    const x = hash2(i + 17, 51) * size;
+    const y = hash2(73, i + 17) * size;
+    const light = i % 3 === 0;
+    ctx.fillStyle = isData
+      ? (light ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.10)')
+      : (light ? 'rgba(255,245,222,0.10)' : 'rgba(30,20,12,0.10)');
+    const w = (wood ? 4 + hash2(i, 3) * 8 : 1 + hash2(i, 3) * 3) * size / 512;
+    const h = (nature ? 3 + hash2(i, 9) * 5 : 1 + hash2(i, 9) * 2) * size / 512;
+    ctx.fillRect(x, y, w, h);
+  }
+
+  if (wood || fabric) {
+    ctx.strokeStyle = isData ? 'rgba(20,20,20,0.10)' : 'rgba(25,14,8,0.10)';
+    ctx.lineWidth = Math.max(0.5, size / 512);
+    const step = fabric ? 6 : 11;
+    for (let i = 0; i < 512 / step; i++) {
+      const y = i * step * size / 512;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.bezierCurveTo(size * 0.3, y + size * 0.008, size * 0.7, y - size * 0.008, size, y);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function makeTexture(key, size, drawFn, { repeatX = 1, repeatY = 1, isData = false, transparent = false } = {}) {
   const fullKey = `${key}_${repeatX.toFixed(2)}_${repeatY.toFixed(2)}_${isData ? 'd' : 'c'}`;
   if (texCache.has(fullKey)) return texCache.get(fullKey);
@@ -21,6 +61,7 @@ function makeTexture(key, size, drawFn, { repeatX = 1, repeatY = 1, isData = fal
     ctx.fillRect(0, 0, size, size);
   }
   drawFn(ctx, size);
+  if (!transparent) addSurfaceDetail(ctx, size, key, isData);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;

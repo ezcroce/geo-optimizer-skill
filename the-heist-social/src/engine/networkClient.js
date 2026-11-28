@@ -590,7 +590,7 @@ export class NetworkClient {
     });
 
     if (!r.fillWithBots && roster.length >= 2) {
-      r.sim.initMatch(roster, 'random');
+      r.sim.initMatch(roster);
       r.sim.state.players = r.sim.state.players.filter((p) => !p.isBot);
       const thiefIdx = Math.floor(Math.random() * r.sim.state.players.length);
       r.sim.state.players.forEach((p, idx) => {
@@ -598,7 +598,7 @@ export class NetworkClient {
       });
       r.sim.state.mainDiamond.carrierId = r.sim.state.players[thiefIdx].id;
     } else {
-      r.sim.initMatch(roster, 'random');
+      r.sim.initMatch(roster);
     }
 
     this._rtcBroadcastSimState();

@@ -155,7 +155,7 @@ function startRoomMatch(room) {
   // If fillWithBots is false and >= 3 humans, only use humans; otherwise pad to 10 with smart AI suspects
   if (!room.fillWithBots && roster.length >= 2) {
     // Temporarily init and trim bots if disabled
-    room.sim.initMatch(roster, 'random');
+    room.sim.initMatch(roster);
     room.sim.state.players = room.sim.state.players.filter((p) => !p.isBot);
     // Ensure exactly 1 thief among humans
     const thiefIdx = Math.floor(Math.random() * room.sim.state.players.length);
@@ -164,7 +164,7 @@ function startRoomMatch(room) {
     });
     room.sim.state.mainDiamond.carrierId = room.sim.state.players[thiefIdx].id;
   } else {
-    room.sim.initMatch(roster, 'random');
+    room.sim.initMatch(roster);
   }
 
   broadcastSimState(room);

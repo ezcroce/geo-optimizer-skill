@@ -9,7 +9,7 @@ Videogioco multiplayer **online e offline** di azione e deduzione sociale in tem
 ### 1. Architettura Web, Matchmaking & Stanze Private
 - **Server Unificato Express + WebSocket (`/ws`) + Three.js WebGL**: un unico URL gestisce sia il rendering 3D sia il multiplayer autoritativo lato server (zero port-forwarding o host P2P richiesto ai giocatori).
 - **Tre Modalità Immediate dal Menu**:
-  1. **Gioca Subito (Offline / 10 Giocatori con IA)**: partita istantanea con 9 ospiti IA contestuali che pattugliano la villa, usano la Sala CCTV, ricordano chi hanno incrociato, mentono (se Ladro) e votano in italiano. Include selettore facoltativo *Casuale / Prova Ladro / Prova Civile*.
+  1. **Gioca Subito (Offline / 10 Giocatori con IA)**: partita istantanea con 9 ospiti IA contestuali che pattugliano la villa, usano la Sala CCTV, ricordano chi hanno incrociato, mentono (se Ladro) e votano in italiano. Il ruolo è sempre assegnato casualmente.
   2. **Matchmaking Rapido Online**: coda pubblica automatica fino a 10 giocatori.
   3. **Stanza Privata tramite Codice (`VL-XXXX`)**: generazione codice stanza + link invito diretto (`?room=VL-XXXX`), con possibilità di completare i posti liberi fino a 10 con Bot IA.
 - **Personaggi Umanoidi 3D Realistici (`src/graphics/humanoid.js`)**: proporzioni anatomiche classiche 1:7.5, busto continuo ed arti raccordati senza stacchi né geometrie astratte, abiti civili sartoriali da gala personalizzabili e animazioni procedurali fluide a 60 FPS.

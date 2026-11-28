@@ -33,7 +33,6 @@ const villaScene = new VillaSceneManager(canvas);
 
 let selectedPreset = CHARACTER_PRESETS[0];
 let customAppearance = { ...selectedPreset };
-let offlineRolePref = 'random';
 
 let playMode = null; // 'offline' | 'online'
 let localSim = null;
@@ -188,15 +187,6 @@ function buildLobbyCustomizer() {
 
   nameInput.addEventListener('input', refreshProfilePreview);
   refreshProfilePreview();
-
-  // Offline Role Segmented Picker
-  document.querySelectorAll('#offline-role-group button').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#offline-role-group button').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      offlineRolePref = btn.dataset.role;
-    });
-  });
 }
 
 function renderWaitingRoomUI() {
@@ -309,8 +299,7 @@ function startOfflineMatch() {
         isBot: false,
         appearance: { ...customAppearance, name: playerName },
       },
-    ],
-    offlineRolePref
+    ]
   );
 
   lastKnownPhase = null;

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "([ -d node_modules ] || npm install) && node server/index.js",
     "start": "([ -d node_modules ] || npm install) && node server/index.js",
-    "build": "vite build"
+    "build": "vite build",
+    "build:standalone": "vite build && node scripts/build-standalone.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "express": "^4.21.2",

@@ -110,7 +110,7 @@ export class GameSimulation {
     this.scheduledChatTimers = [];
   }
 
-  initMatch(rosterConfigs, rolePreference = 'random') {
+  initMatch(rosterConfigs) {
     this.clearTimers();
 
     // Ensure exactly up to 10 players (fill remaining with distinct AI presets if needed)
@@ -130,17 +130,8 @@ export class GameSimulation {
       }
     }
 
-    // Randomly select 1 Thief among the 10 suspects (respecting optional offline debug preference)
-    let thiefIndex = Math.floor(Math.random() * fullRoster.length);
-    if (rolePreference === 'thief') {
-      const humanIdx = fullRoster.findIndex((p) => !p.isBot);
-      if (humanIdx >= 0) thiefIndex = humanIdx;
-    } else if (rolePreference === 'civilian') {
-      const botIndices = fullRoster.map((p, idx) => (p.isBot ? idx : -1)).filter((i) => i >= 0);
-      if (botIndices.length > 0) {
-        thiefIndex = botIndices[Math.floor(Math.random() * botIndices.length)];
-      }
-    }
+    // Every participant has the same chance of being the thief in every mode.
+    const thiefIndex = Math.floor(Math.random() * Math.min(fullRoster.length, 10));
 
     // Spawn circle around the Grand Foyer & Gallery
     const spawnCoords = [
